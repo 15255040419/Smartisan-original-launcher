@@ -1,0 +1,56 @@
+.class Landroid/support/v4/widget/ContentLoadingProgressBar$2;
+.super Ljava/lang/Object;
+.source "ContentLoadingProgressBar.java"
+
+# interfaces
+.implements Ljava/lang/Runnable;
+
+
+# instance fields
+.field final synthetic this$0:Landroid/support/v4/widget/ContentLoadingProgressBar;
+
+
+# direct methods
+.method constructor <init>(Landroid/support/v4/widget/ContentLoadingProgressBar;)V
+    .locals 0
+
+    .line 1
+    iput-object p1, p0, Landroid/support/v4/widget/ContentLoadingProgressBar$2;->this$0:Landroid/support/v4/widget/ContentLoadingProgressBar;
+
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public run()V
+    .locals 4
+
+    .line 1
+    iget-object v0, p0, Landroid/support/v4/widget/ContentLoadingProgressBar$2;->this$0:Landroid/support/v4/widget/ContentLoadingProgressBar;
+
+    const/4 v1, 0x0
+
+    iput-boolean v1, v0, Landroid/support/v4/widget/ContentLoadingProgressBar;->mPostedShow:Z
+
+    .line 2
+    iget-boolean v2, v0, Landroid/support/v4/widget/ContentLoadingProgressBar;->mDismissed:Z
+
+    if-nez v2, :cond_0
+
+    .line 3
+    invoke-static {}, Ljava/lang/System;->currentTimeMillis()J
+
+    move-result-wide v2
+
+    iput-wide v2, v0, Landroid/support/v4/widget/ContentLoadingProgressBar;->mStartTime:J
+
+    .line 4
+    iget-object p0, p0, Landroid/support/v4/widget/ContentLoadingProgressBar$2;->this$0:Landroid/support/v4/widget/ContentLoadingProgressBar;
+
+    invoke-virtual {p0, v1}, Landroid/widget/ProgressBar;->setVisibility(I)V
+
+    :cond_0
+    return-void
+.end method

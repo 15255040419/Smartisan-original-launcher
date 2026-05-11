@@ -1,0 +1,16 @@
+build/
+*.apk
+*.png
+*.jpg
+*.jpeg
+launcher/scratch/
+decoded_desktop/
+desktop_orig/
+desktop_orig_norsc/
+theme_raven_orig/
+original_apks/
+clean_launcher_raw/
+manifest_decode_keep/
+manifest_decode_test/
+recovered_diff.txt
+recovered_log.json

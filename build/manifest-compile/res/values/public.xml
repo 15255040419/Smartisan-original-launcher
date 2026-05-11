@@ -1,0 +1,9 @@
+﻿<resources>
+    <public type="drawable" name="ic_launcher" id="0x7f020184" />
+    <public type="xml" name="searchable" id="0x7f060000" />
+    <public type="string" name="app_name" id="0x7f0b0043" />
+    <public type="style" name="Theme" id="0x7f0c015d" />
+    <public type="style" name="LauncherThemeStyle" id="0x7f0c015f" />
+    <public type="style" name="ConfirmPasswordStyle" id="0x7f0c0160" />
+    <public type="style" name="LauncherActivityTheme" id="0x7f0c0163" />
+</resources>

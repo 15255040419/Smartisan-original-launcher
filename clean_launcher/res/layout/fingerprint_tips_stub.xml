@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.smartisanos.securitycenter.widget.FingerprintTipsView android:gravity="center" android:id="@id/fingerprint_tips_view" android:background="@android:color/transparent" android:visibility="invisible" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/unlocker_fp_tips_margin_bottom" android:layout_alignParentBottom="true"
+  xmlns:android="http://schemas.android.com/apk/res/android" />

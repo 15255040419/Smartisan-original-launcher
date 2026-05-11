@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge android:background="@null" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <include android:id="@id/unlocker" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerInParent="true" layout="@layout/security_control_unlocker" />
+    <ViewStub android:id="@id/faceid_view_stub" android:layout="@layout/faceid_tips_stub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/unlocker_faceid_margin_top" android:layout_centerHorizontal="true" />
+    <ViewStub android:gravity="center" android:id="@id/fp_tips_stub" android:layout="@layout/fingerprint_tips_stub" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/unlocker_fp_tips_margin_bottom" android:layout_alignParentBottom="true" />
+</merge>

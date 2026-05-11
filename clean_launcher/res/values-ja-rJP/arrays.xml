@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="pre_title_list">
+        <item>ゲーム</item>
+        <item>システムツール</item>
+        <item>ニュース</item>
+        <item>ライフスタイル</item>
+        <item>交通</item>
+        <item>メディア</item>
+        <item>ビジネス</item>
+        <item>勉強＆教育</item>
+        <item>ソーシャルネットワーキング</item>
+        <item>キッズ</item>
+        <item>ファイナンス</item>
+        <item>ブック</item>
+    </string-array>
+</resources>

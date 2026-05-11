@@ -1,0 +1,119 @@
+#this config is for 9 cells page
+#start point is from left top
+#so we must change the left top coordinate to mid point coordinate
+[BACKGROUND]
+bgWidth = 720
+bgHeight = 1280
+bgZ = 100
+mainCameraZ = 20
+mainCameraFar = 200
+mainCameraNear = 1
+
+
+[PAGE_1_3X3]
+pageStartX = 0
+pageStartY = 2
+pageCellWidth = 238
+pageCellHeight = 304
+pageCellForegroundWidth = 164
+pageCellForegroundHeight = 164
+pageCellTexWidth = 238
+pageCellTexHeight = 304
+pageCellRowNum = 3
+pageCellColNum = 3
+pageCellHSpacing = 8
+pageCellVSpacing = 8
+pageHSpacing = 20
+pageVSpacing = 0
+pageDockSpacing = 6
+pageDockWidth = 720
+pageDockHeight = 305
+pageTitleShow = false
+pageTitleWidth = 720
+pageTitleHeight = 150
+dockSettingViewWidth = 128
+dockSettingViewHeight = 128
+
+[PAGE_4_3X3]
+pageStartX = 0
+pageStartY = 0
+pageCellWidth = 238
+pageCellHeight = 304
+pageCellTexWidth = 238
+pageCellTexHeight = 304
+pageCellRowNum = 3
+pageCellColNum = 3
+pageCellHSpacing = 5
+pageCellVSpacing = 8
+pageDockSpacing = 6
+pageDockWidth = 720
+pageDockHeight = 200
+pageTitleShow = true
+pageTitleWidth = 346
+pageTitleHeight = 68
+pageHSpacing = 10
+pageVSpacing = 10
+
+[PAGE_1_4X4]
+pageStartX = 0
+pageStartY = 2
+pageCellWidth = 178
+pageCellHeight = 242
+pageCellForegroundWidth = 118
+pageCellForegroundHeight = 118
+pageCellTexWidth = 178
+pageCellTexHeight = 242
+pageCellRowNum = 4
+pageCellColNum = 4
+pageCellHSpacing = 8
+pageCellVSpacing = 8
+pageHSpacing = 20
+pageVSpacing = 0
+pageDockSpacing = 6
+pageDockWidth = 720
+pageDockHeight = 248
+pageTitleShow = false
+pageTitleWidth = 720
+pageTitleHeight = 130
+dockSettingViewWidth = 128
+dockSettingViewHeight = 128
+
+[PAGE_4_4X4]
+pageStartX = 0
+pageStartY = 0
+pageCellWidth = 178
+pageCellHeight = 242
+pageCellTexWidth = 178
+pageCellTexHeight = 242
+pageCellRowNum = 4
+pageCellColNum = 4
+pageCellHSpacing = 5
+pageCellVSpacing = 8
+pageDockSpacing = 6
+pageDockWidth = 720
+pageDockHeight = 122
+pageTitleShow = true
+pageTitleWidth = 346
+pageTitleHeight = 60
+pageHSpacing = 10
+pageVSpacing = 10
+
+[ANIMATION_SETTING]
+page1ToPage4Time = 0.2
+page4ToPage1Time = 0.2
+
+[PAGE_TITLE_CONTENT_SETTING_36]
+leftIconWidth = 64
+leftIconHeight = 64
+rightIconWidth = 64
+rightIconHeight = 64
+leftPadding = 20
+rightPadding = 20
+leftTopTranslucentWidth = 15
+leftTopTranslucentHeight = 15
+rightTopTranslucentWidth = 15
+rightTopTranslucentHeight = 15
+leftIconStartX = 30
+leftIconStartY = 2
+rightIconStartX = 280
+rightIconStartY = 2

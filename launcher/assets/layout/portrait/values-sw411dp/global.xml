@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout>
+    <integer name="window_width">1440</integer>
+    <integer name="window_height">2560</integer>
+    <integer name="status_bar_height">90</integer>
+    <integer name="density_mode">2</integer>
+</layout>

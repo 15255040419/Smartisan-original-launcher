@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!--totalFrame(帧数) 目前是作为计算时间的参考,可以不用修改,如果需要修改时间,只修改totalDuration(秒)就行了-->
+
+<!--cell 中alpha的表示是参考的之前版本的名称,此处alpha的含义是,用来调整砖块的颜色(不是阴影颜色),如果init_alpha或者target_alpha设定为1,砖块就会变成全黑,如果设置为0,砖块就是原本颜色-->
+
+<!--cell 中,index 不要修改,这个是用来表示第几块砖块的-->
+<UnlockAnimation
+    name="unlock9"
+    totalDuration="1.23"
+    totalFame="130"
+    >
+    <!-- delay = frameCount-->
+    <cell
+        index="0"
+        animcount="3"
+        init_alpha="0.72f"
+        init_scale="0.88f"
+        delay_frame="0"
+        >
+        <pass
+            duration="14"
+            interpolator="CUBIC_OUT"
+            target_alpha="0"
+            target_scale="1.02f"
+            />
+        <pass
+            duration="38"
+            interpolator="CUBIC_IN_OUT"
+            target_alpha="0.2f"
+            target_scale="0.97f"
+            />
+        <pass
+            duration="48"
+            interpolator="CUBIC_OUT"
+            target_alpha="0"
+            target_scale="1.0f"
+            />
+
+    </cell>
+
+    <cell
+        index="1"
+        animcount="3"
+        init_alpha="0.57f"
+        init_scale="0.9f"
+        delay_frame="0"
+        >
+        <pass
+            duration="10"
+            interpolator="QUART_OUT"
+            target_alpha="0"
+            target_scale="1.02f"
+            />
+        <pass
+            duration="24"
+            interpolator="QUART_OUT"
+            target_alpha="0.3f"
+            target_scale="0.97f"
+            />
+        <pass
+            duration="48"
+            interpolator="CUBIC_OUT"
+            target_alpha="0"
+            target_scale="1.0f"
+            />
+
+    </cell>
+
+    <cell
+        index="2"
+        animcount="3"
+        init_alpha="0.63f"
+        init_scale="0.89f"
+        delay_frame="2"
+        >
+        <pass
+            duration="28"
+            interpolator="CUBIC_OUT"
+            target_alpha="0"
+            target_scale="1.01f"
+            />
+        <pass
+            duration="39"
+            interpolator="CUBIC_OUT"
+            target_alpha="0.3f"
+            target_scale="0.98f"
+            />
+        <pass
+            duration="60"
+            interpolator="QUAD_OUT"
+            target_alpha="0"
+            target_scale="1.0f"
+            />
+
+    </cell>
+
+    <cell
+        index="3"
+        animcount="3"
+        init_alpha="0.55f"
+        init_scale="0.9f"
+        delay_frame="2"
+        >
+        <pass
+            duration="26"
+            interpolator="SINE_OUT"
+            target_alpha="0"
+            target_scale="1.01f"
+            />
+        <pass
+            duration="28"
+            interpolator="SINE_OUT"
+            target_alpha="0.3f"
+            target_scale="0.97f"
+            />
+        <pass
+            duration="54"
+            interpolator="SINE_OUT"
+            target_alpha="0"
+            target_scale="1.0f"
+            />
+
+    </cell>
+
+    <cell
+        index="4"
+        animcount="2"
+        init_alpha="0.7f"
+        init_scale="0.89f"
+        delay_frame="0"
+        >
+        <pass
+            duration="22"
+            interpolator="SINE_OUT"
+            target_alpha="0"
+            target_scale="1.03f"
+            />
+        <pass
+            duration="107"
+            interpolator="SINE_OUT"
+            target_alpha="0f"
+            target_scale="1.0f"
+            />
+
+    </cell>
+
+    <cell
+        index="5"
+        animcount="3"
+        init_alpha="0.58f"
+        init_scale="0.92f"
+        delay_frame="2"
+        >
+        <pass
+            duration="10"
+            interpolator="CUBIC_OUT"
+            target_alpha="0"
+            target_scale="1.02f"
+            />
+        <pass
+            duration="22"
+            interpolator="CUBIC_OUT"
+            target_alpha="0.2f"
+            target_scale="0.98f"
+            />
+        <pass
+            duration="66"
+            interpolator="CUBIC_OUT"
+            target_alpha="0f"
+            target_scale="1.0f"
+            />
+
+    </cell>
+
+    <cell
+        index="6"
+        animcount="3"
+        init_alpha="0.7f"
+        init_scale="0.89f"
+        delay_frame="0"
+        >
+        <pass
+            duration="26"
+            interpolator="CUBIC_OUT"
+            target_alpha="0"
+            target_scale="1.01f"
+            />
+        <pass
+            duration="22"
+            interpolator="SINE_OUT"
+            target_alpha="0.2f"
+            target_scale="0.97f"
+            />
+        <pass
+            duration="42"
+            interpolator="SINE_OUT"
+            target_alpha="0f"
+            target_scale="1.0f"
+            />
+
+    </cell>
+
+    <cell
+        index="7"
+        animcount="4"
+        init_alpha="0.6f"
+        init_scale="0.91f"
+        delay_frame="0"
+        >
+        <pass
+            duration="16"
+            interpolator="CUBIC_OUT"
+            target_alpha="0"
+            target_scale="1.015f"
+            />
+        <pass
+            duration="4"
+            interpolator="SINE_OUT"
+            target_alpha="0.0f"
+            target_scale="1.025f"
+            />
+        <pass
+            duration="32"
+            interpolator="LINEAR"
+            target_alpha="0.3f"
+            target_scale="0.995f"
+            />
+        <pass
+            duration="60"
+            interpolator="SINE_OUT"
+            target_alpha="0.0f"
+            target_scale="1.0"
+            />
+
+    </cell>
+
+    <cell
+        index="8"
+        animcount="2"
+        init_alpha="0.66f"
+        init_scale="0.89f"
+        delay_frame="4"
+        >
+        <pass
+            duration="20"
+            interpolator="SINE_OUT"
+            target_alpha="0"
+            target_scale="1.03f"
+            />
+        <pass
+            duration="46"
+            interpolator="SINE_OUT"
+            target_alpha="0f"
+            target_scale="1.0f"
+            />
+
+    </cell>
+
+    <batchshadow
+        index="555"
+        animcount="1"
+        init_alpha="0.0f"
+        init_scale="1.0f"
+        delay_frame="90"
+        >
+        <pass
+            duration="30"
+            interpolator="CUBIC_OUT"
+            target_alpha="0.0"
+            target_scale="1.0f"
+            />
+    </batchshadow>
+
+    <statusbar
+        index="666"
+        animcount="1"
+        init_alpha="0.7f"
+        init_scale="0.86f"
+        delay_frame="2"
+        >
+        <pass
+            duration="58"
+            interpolator="CUBIC_OUT"
+            target_alpha="0.0f"
+            target_scale="1.0f"
+            />
+    </statusbar>
+
+    <navigationbar
+        index="777"
+        animcount="1"
+        init_alpha="0.7f"
+        init_scale="0.86f"
+        delay_frame="2"
+    >
+        <pass
+            duration="58"
+            interpolator="CUBIC_OUT"
+            target_alpha="0.0f"
+            target_scale="1.0f"
+        />
+    </navigationbar>
+
+    <dock
+        index="888"
+        animcount="1"
+        init_alpha="0.7f"
+        init_scale="0.86f"
+        delay_frame="4"
+        >
+        <pass
+            duration="58"
+            interpolator="CUBIC_OUT"
+            target_alpha="0.0"
+            target_scale="1.0f"
+            />
+    </dock>
+
+    <background
+        index="999"
+        animcount="1"
+        init_alpha="0.0f"
+        init_scale="1.0f"
+        delay_frame="0"
+        >
+        <pass
+            duration="130"
+            interpolator="CUBIC_OUT"
+            target_alpha="0.0"
+            target_scale="1.0f"
+            />
+    </background>
+
+
+</UnlockAnimation>

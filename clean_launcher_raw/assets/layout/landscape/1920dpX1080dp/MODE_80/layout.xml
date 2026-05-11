@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout>
+    <integer name="blur_radius">20</integer>
+    <integer name="blur_width">32</integer>
+
+    <dp name="cell_height_dock">138dp</dp>
+
+    <integer name="cell_spacing_h">0</integer>
+    <integer name="cell_spacing_v">0</integer>
+
+    <integer name="cell_up_shadow_image_content_height">346</integer>
+    <integer name="cell_up_shadow_image_content_height_trans">458</integer>
+    <integer name="cell_up_shadow_image_content_width">270</integer>
+    <integer name="cell_up_shadow_image_height">478</integer>
+    <integer name="cell_up_shadow_image_height_trans">624</integer>
+    <integer name="cell_up_shadow_image_width">374</integer>
+
+    <dp name="cell_width">105dp</dp>
+    <dp name="cell_height">128dp</dp>
+
+    <integer name="dock_app_count">4</integer>
+    <integer name="dock_cells_offset_y">0</integer>
+    <integer name="dock_cells_offset_y_without_app_name">0</integer>
+
+    <!--<integer name="dock_width">102</integer>-->
+    <!--<dp name="dock_width">128dp</dp>-->
+    <dp name="dock_height">128dp</dp>
+    <!--<integer name="dock_margin_top">378</integer>-->
+    <!--<ratio name="dock_margin_top">0.32037037H</ratio>-->
+    <!--<integer name="dock_margin_bottom">136</integer>-->
+    <!--<dp name="dock_margin_bottom">90dp</dp>-->
+    <!--<integer name="dock_margin_left">0</integer>-->
+    <!--<dp name="dock_margin_left">0dp</dp>-->
+    <!--<integer name="dock_margin_right">2140</integer>-->
+    <!--<ratio name="dock_margin_right">0.94290812W</ratio>-->
+    <dp name="dock_height_trans">128dp</dp>
+
+    <dp name="dot_height">12dp</dp>
+    <dp name="dot_spacing">10dp</dp>
+    <dp name="dot_width">12dp</dp>
+    <dp name="dot_margin_bottom">30dp</dp>
+    <dp name="dot_margin_bottom_meeting">24dp</dp>
+
+    <dp name="edit_icon_height">30dp</dp>
+    <dp name="edit_icon_width">30dp</dp>
+    <dp name="eye_icon_height">30dp</dp>
+    <dp name="eye_icon_width">30dp</dp>
+
+    <integer name="flag_message_number_height">29</integer>
+    <integer name="flag_message_number_width">20</integer>
+    <integer name="flag_message_textsize">32</integer>
+    <integer name="float_page_translate_y">0</integer>
+    <integer name="float_page_x_scale_need_div_2">3</integer>
+    <integer name="float_page_y_scale_need_div_2">3</integer>
+    <dp name="float_text_font_size">34dp</dp>
+    <dp name="icon_offset_y">16dp</dp>
+    <integer name="icon_offset_y_without_app_name">-7</integer>
+
+    <dp name="icon_size_origin">64dp</dp>
+    <dp name="icon_size_with_shadow">78.5dp</dp>
+
+    <dp name="lock_icon_height">30dp</dp>
+    <dp name="lock_icon_width">30dp</dp>
+
+    <integer name="magnify_stencil_radius">50</integer>
+    <integer name="magnify_uv_radius">49</integer>
+    <integer name="magnify_x_offset">-12</integer>
+    <integer name="magnify_y_offset">16</integer>
+    <integer name="max_dot_num">9</integer>
+    <!--<integer name="max_title_name_length">385</integer>-->
+    <integer name="multi_select_distance">6</integer>
+    <dp name="name_off_set_y">-35dp</dp>
+    <integer name="page_cell_col_num">4</integer>
+    <integer name="page_cell_row_num">5</integer>
+    <dp name="page_green_cover_image_content_height">596dp</dp>
+    <dp name="page_green_cover_image_content_width">312dp</dp>
+    <dp name="page_green_cover_image_height">596dp</dp>
+    <dp name="page_green_cover_image_width">312dp</dp>
+    <!--<integer name="page_spacing_h">50</integer>-->
+    <dp name="page_spacing_h">42dp</dp>
+    <!--<integer name="page_spacing_v">10</integer>-->
+    <dp name="page_spacing_v">42dp</dp>
+    <dp name="page_title_height">54dp</dp>
+    <!--<dp name="page_title_name_spacing_left">10dp</dp>-->
+    <dp name="page_title_name_spacing_bottom">9dp</dp>
+    <dp name="page_title_shadow_height">56dp</dp>
+    <!--<dp name="page_title_shadow_width">324dp</dp>-->
+    <!--<dp name="page_title_width">312dp</dp>-->
+
+    <integer name="page_up_shadow_image_gaussian_deltay">5</integer>
+    <integer name="page_up_shadow_image_height">1059</integer>
+    <integer name="page_up_shadow_image_paddingbottom">70</integer>
+    <integer name="page_up_shadow_image_paddingbottom_trans">78</integer>
+    <integer name="page_up_shadow_image_paddingleft">46</integer>
+    <integer name="page_up_shadow_image_paddingright">46</integer>
+    <integer name="page_up_shadow_image_padingtop">68</integer>
+    <integer name="page_up_shadow_image_padingtop_trans">74</integer>
+    <integer name="page_up_shadow_image_width">616</integer>
+
+    <!--<integer name="page_view_margin_bottom">136</integer>-->
+    <dp name="page_view_margin_bottom">92dp</dp>
+    <dp name="page_view_margin_bottom_meeting">54dp</dp>
+    <!--<integer name="page_view_margin_left">432</integer>-->
+    <!--ratio name="page_view_margin_left">0.1926851W</ratio-->
+    <!--<integer name="page_view_margin_right">42</integer>-->
+    <!--ratio name="page_view_margin_right">0.1926851W</ratio-->
+    <!--<integer name="page_view_margin_top">378</integer>-->
+    <!--ratio name="page_view_margin_top">0.35H</ratio-->
+
+    <dp name="setting_button">44dp</dp>
+    <dp name="text_font_size">12dp</dp>
+    <dp name="page_title_text_font_size">16dp</dp>
+    <dp name="title_page_spacing">10dp</dp>
+    <integer name="trash_display_height">63</integer>
+    <integer name="trash_float_up_height">36</integer>
+    <dp name="trash_height">71dp</dp>
+    <integer name="trash_react_height">420</integer>
+    <integer name="trash_react_width">200</integer>
+    <dp name="trash_width">54dp</dp>
+
+    <dp name="page_padding_top">10dp</dp>
+    <dp name="page_padding_bottom">28dp</dp>
+    <dp name="page_padding_left">22dp</dp>
+    <dp name="page_padding_right">22dp</dp>
+
+    <dp name="eye_spacing_left">16dp</dp>
+    <dp name="eye_spacing_bottom">7dp</dp>
+    <dp name="edit_spacing_right">16dp</dp>
+    <dp name="edit_spacing_bottom">7dp</dp>
+    <dp name="lock_spacing_right">16dp</dp>
+    <dp name="lock_spacing_bottom">7dp</dp>
+
+    <dp name="bg_edge_shadow_spacing_bottom">-2dp</dp>
+    <dp name="bg_edge_shadow_height">12dp</dp>
+
+    <dp name="dock_create_folder_height">44dp</dp>
+    <dp name="dock_create_folder_width">126dp</dp>
+    <dp name="dock_create_folder_margin_left">24dp</dp>
+    <dp name="dock_delete_btn_width">86dp</dp>
+    <dp name="dock_delete_btn_margin_left">36dp</dp>
+    <dp name="dock_select_text_margin_left">184dp</dp>
+    <dp name="dock_select_text_width">227dp</dp>
+    <dp name="sort_icon_spacing">68dp</dp>
+
+    <dp name="dock_cell_icon_size">54dp</dp>
+
+</layout>

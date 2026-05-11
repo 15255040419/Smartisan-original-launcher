@@ -1,0 +1,11 @@
+version: 3.0.1
+apkFileName: com.smartisanos.launcher-3.apk
+sdkInfo:
+  minSdkVersion: 29
+doNotCompress:
+- arsc
+- dex
+- jpg
+- ogg
+- png
+- so

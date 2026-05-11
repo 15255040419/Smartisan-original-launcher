@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="dialog_padding">16.0dp</dimen>
+    <dimen name="theme_preview_block_width">176.0px</dimen>
+    <dimen name="theme_preview_block_height">348.0px</dimen>
+    <dimen name="theme_preview_block_margin_top">14.0dp</dimen>
+    <dimen name="theme_preview_block_layout_min_height">242.5dp</dimen>
+    <dimen name="status_bar_h">60.0px</dimen>
+    <dimen name="password_button_w">137.0dp</dimen>
+    <dimen name="password_button_h">86.0dp</dimen>
+    <dimen name="theme_preview_img_large_w">556.0px</dimen>
+    <dimen name="theme_preview_img_large_h">1122.0px</dimen>
+    <dimen name="theme_preview_detail_phone_black_w">740.0px</dimen>
+    <dimen name="theme_preview_detail_phone_black_h">1542.0px</dimen>
+</resources>
