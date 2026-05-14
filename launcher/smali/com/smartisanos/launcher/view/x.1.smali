@@ -665,13 +665,15 @@
 
     int-to-float p1, p1
 
-    const/high16 v0, 0x41000000    # 8.0f
+    iget v0, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->setting_button:F
 
-    div-float/2addr p1, v0
+    div-float/2addr v0, v4
 
-    const/high16 v0, 0x40e00000    # 7.0f
+    sub-float/2addr p1, v0
 
-    mul-float/2addr p1, v0
+    iget v0, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->dock_delete_btn_margin_left:F
+
+    sub-float/2addr p1, v0
 
     .line 35
     iget v0, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->dock_height:F
@@ -1616,8 +1618,6 @@
 
     if-ne p5, p1, :cond_8
 
-    goto :cond_8
-
     :cond_7
     sub-float v6, v2, v4
 
@@ -1925,13 +1925,11 @@
     div-float/2addr v1, v3
 
     .line 12
-    sget v4, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v4, v4
-
-    const/high16 v0, 0x41000000    # 8.0f
+    iget v4, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->setting_button:F
 
     div-float/2addr v4, v0
+
+    div-float/2addr v4, v3
 
     .line 13
     new-instance v0, Lcom/smartisanos/smengine/a/j;
@@ -3104,14 +3102,6 @@
     aput-object v3, p0, v0
 
     .line 12
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v2, p0
-
-    const/high16 v3, 0x40000000    # 2.0f
-
-    div-float/2addr v2, v3
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->ev:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v0
@@ -3150,14 +3140,6 @@
 
     .line 15
     :cond_1
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v5, p0
-
-    const/high16 v3, 0x40400000    # 3.0f
-
-    div-float/2addr v5, v3
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->fv:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v0
@@ -3165,18 +3147,6 @@
     invoke-static {v5, v4, p0, v1}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
 
     .line 16
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v2, p0
-
-    const/high16 v3, 0x40400000    # 3.0f
-
-    div-float/2addr v2, v3
-
-    const/high16 v3, 0x40000000    # 2.0f
-
-    mul-float/2addr v2, v3
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->fv:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v7
@@ -3215,14 +3185,6 @@
 
     .line 19
     :cond_3
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v6, p0
-
-    const/high16 v3, 0x40800000    # 4.0f
-
-    div-float/2addr v6, v3
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->gv:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v0
@@ -3230,14 +3192,6 @@
     invoke-static {v6, v4, p0, v1}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
 
     .line 20
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v5, p0
-
-    const/high16 v3, 0x40000000    # 2.0f
-
-    div-float/2addr v5, v3
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->gv:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v7
@@ -3245,18 +3199,6 @@
     invoke-static {v5, v4, p0, v1}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
 
     .line 21
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v2, p0
-
-    const/high16 v3, 0x40800000    # 4.0f
-
-    div-float/2addr v2, v3
-
-    const/high16 v3, 0x40400000    # 3.0f
-
-    mul-float/2addr v2, v3
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->gv:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v8
@@ -3390,14 +3332,6 @@
 
     .line 27
     :cond_7
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v3, p0
-
-    const/high16 v11, 0x40a00000    # 5.0f
-
-    div-float/2addr v3, v11
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->hv:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v0
@@ -3405,18 +3339,6 @@
     invoke-static {v3, v4, p0, v1}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
 
     .line 28
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v6, p0
-
-    const/high16 v11, 0x40a00000    # 5.0f
-
-    div-float/2addr v6, v11
-
-    const/high16 v11, 0x40000000    # 2.0f
-
-    mul-float/2addr v6, v11
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->hv:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v7
@@ -3424,18 +3346,6 @@
     invoke-static {v6, v4, p0, v1}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
 
     .line 29
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v5, p0
-
-    const/high16 v11, 0x40a00000    # 5.0f
-
-    div-float/2addr v5, v11
-
-    const/high16 v11, 0x40400000    # 3.0f
-
-    mul-float/2addr v5, v11
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->hv:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v8
@@ -3443,18 +3353,6 @@
     invoke-static {v5, v4, p0, v1}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
 
     .line 30
-    sget p0, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v2, p0
-
-    const/high16 v11, 0x40a00000    # 5.0f
-
-    div-float/2addr v2, v11
-
-    const/high16 v11, 0x40800000    # 4.0f
-
-    mul-float/2addr v2, v11
-
     sget-object p0, Lcom/smartisanos/launcher/view/x;->hv:[Lcom/smartisanos/smengine/a/j;
 
     aget-object p0, p0, v9
@@ -3693,31 +3591,25 @@
     sub-float v4, v7, v4
 
     .line 11
-    sget v3, Lcom/smartisanos/launcher/data/Constants;->window_width:I
+    iget v3, v3, Lcom/smartisanos/smengine/a/j;->x:F
 
-    int-to-float v3, v3
+    div-float/2addr v5, v6
 
-    const/high16 v5, 0x41000000    # 8.0f
+    add-float/2addr v3, v5
 
-    div-float/2addr v3, v5
+    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->sort_icon_spacing:F
 
-    move v5, v3
+    const/high16 v5, 0x3fc00000    # 1.5f
 
-    const/high16 v6, 0x40400000    # 3.0f
+    mul-float/2addr v5, v0
 
-    mul-float/2addr v5, v6
+    sub-float/2addr v3, v5
 
-    move v6, v3
+    add-float v5, v3, v0
 
-    const/high16 v0, 0x40a00000    # 5.0f
+    add-float v6, v5, v0
 
-    mul-float/2addr v6, v0
-
-    move v0, v3
-
-    const/high16 v8, 0x40e00000    # 7.0f
-
-    mul-float/2addr v0, v8
+    add-float/2addr v0, v6
 
     .line 12
     sget-object v8, Lcom/smartisanos/launcher/view/x;->cv:[Lcom/smartisanos/smengine/a/j;
@@ -3946,40 +3838,63 @@
     add-float/2addr v8, v10
 
     .line 14
-    move/from16 v16, v8
+    iget v11, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->cell_width:F
 
-    sget v11, Lcom/smartisanos/launcher/data/Constants;->window_width:I
-
-    int-to-float v11, v11
-
-    const/high16 v12, 0x41000000    # 8.0f
+    iget v12, v2, Lcom/smartisanos/launcher/data/LayoutProperty;->cell_width:F
 
     div-float/2addr v11, v12
 
     .line 15
-    sget-object v8, Lcom/smartisanos/launcher/view/x;->Zu:Lcom/smartisanos/smengine/a/j;
+    iget v12, v2, Lcom/smartisanos/launcher/data/LayoutProperty;->setting_button:F
 
-    invoke-static {v11, v4, v8, v2}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
+    div-float/2addr v12, v11
+
+    div-float/2addr v12, v7
 
     .line 16
-    move v13, v11
-
-    const/high16 v14, 0x40a00000    # 5.0f
-
-    mul-float/2addr v13, v14
-
-    sget-object v8, Lcom/smartisanos/launcher/view/x;->av:Lcom/smartisanos/smengine/a/j;
-
-    invoke-static {v13, v4, v8, v2}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
+    iget v11, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->dock_create_folder_width:F
 
     .line 17
-    const/high16 v14, 0x40e00000    # 7.0f
+    iget v13, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->dock_delete_btn_width:F
 
-    mul-float/2addr v11, v14
+    .line 18
+    iget v14, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->dock_create_folder_margin_left:F
 
+    .line 19
+    iget v15, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->dock_delete_btn_margin_left:F
+
+    add-float/2addr v12, v15
+
+    move/from16 v16, v8
+
+    .line 20
+    sget-object v8, Lcom/smartisanos/launcher/view/x;->Zu:Lcom/smartisanos/smengine/a/j;
+
+    invoke-static {v12, v4, v8, v2}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
+
+    div-float/2addr v13, v7
+
+    sub-float/2addr v5, v13
+
+    sub-float/2addr v5, v15
+
+    .line 21
     sget-object v8, Lcom/smartisanos/launcher/view/x;->bv:Lcom/smartisanos/smengine/a/j;
 
-    invoke-static {v11, v4, v8, v2}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
+    invoke-static {v5, v4, v8, v2}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
+
+    sub-float/2addr v5, v13
+
+    sub-float/2addr v5, v14
+
+    div-float/2addr v11, v7
+
+    sub-float/2addr v5, v11
+
+    .line 22
+    sget-object v8, Lcom/smartisanos/launcher/view/x;->av:Lcom/smartisanos/smengine/a/j;
+
+    invoke-static {v5, v4, v8, v2}, Lcom/smartisanos/launcher/view/x;->a(FFLcom/smartisanos/smengine/a/j;Lcom/smartisanos/launcher/data/LayoutProperty;)V
 
     .line 23
     new-instance v4, Lcom/smartisanos/smengine/a/j;

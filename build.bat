@@ -38,7 +38,11 @@ if errorlevel 1 (
 )
 
 if exist "%ZIPALIGN%" (
-  "%ZIPALIGN%" -p -f 4 "%OUT_DIR%\launcher-presigned.apk" "%OUT_DIR%\launcher-signed.apk"
+  "%ZIPALIGN%" -P 16 -f 4 "%OUT_DIR%\launcher-presigned.apk" "%OUT_DIR%\launcher-signed.apk"
+  if errorlevel 1 (
+    echo FAIL: zipalign failed.
+    exit /b 1
+  )
 ) else (
   echo WARN: zipalign not found, using unaligned APK.
   copy /y "%OUT_DIR%\launcher-presigned.apk" "%OUT_DIR%\launcher-signed.apk" >nul

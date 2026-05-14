@@ -46,6 +46,7 @@ E:\FANG\smartisan\smartisan-launcher-original-port\build\launcher-signed.apk
 - `Constants.initDockSize(I)` 已改为使用运行时 `Constants.window_width` 覆盖 `dock_width`，避免底部区域继续按旧固定宽度计算。
 - `Constants.setPhysicalScreenSize(Context)` 的大屏分支已改为标准 `Display.getRealMetrics()`，不再依赖 Smartisan 私有 `DisplaySmtEx.getSmRealMetrics()`。
 - `Constants.initDockSize(I)` 覆盖 `dock_width` 后同步把 `dock_margin_left/right` 归零，避免出现 `window_width - oldMargin - newDockWidth` 得到负 margin。
+- 文件夹打开态已缩小：调整 `MODE_9/layout.xml` 中的 `folder_bookcase_*`、`icon_size_with_shadow_folder`、folder 文本字号和标题范围。当前虚拟机实际命中 `layout/portrait/values-sw411dp/MODE_9/layout.xml`，同类 1080 资源目录也已同步收小。
 
 ## 当前设置页状态
 
@@ -70,7 +71,7 @@ E:\FANG\smartisan\smartisan-launcher-original-port\build\launcher-signed.apk
 
 - `ThemeChooserActivity` 原本是主题选择页，现在临时作为设置页宿主。后续如果恢复原主题选择功能，要把主题入口移到设置页子页面中，不要直接覆盖这个宿主。
 - 当前构建仍依赖 `launcher/original/AndroidManifest.xml` 的二进制 Manifest 注入，文本 Manifest 修改不会自动生效。
-- 底部错位仍未完成。此前把齿轮 X 坐标强制居中的尝试会破坏原版底部按钮体系，必须回退，改为整体底部按钮组按运行时分辨率缩放/定位。
+- 底部桌面 / 编辑模式交互已按原始 `com.smartisanos.launcher-3.apk` 恢复。关键修复是把 `launcher/smali/com/smartisanos/launcher/view/x.1.smali` 的 dock / 编辑坐标算法恢复为原版逻辑，避免此前用 `window_width / n` 等分屏宽导致齿轮遮挡 dock 图标、拖拽落点错位。
 - 底部按钮组的重点计算点已经确认在 `launcher/smali/com/smartisanos/launcher/view/x.1.smali` 的 `sx()`、`b(V)`、`l(II)` 等方法里，尤其是 `dock_delete_btn_width`、`dock_create_folder_width`、`dock_*_margin_left` 这一组。
 - 当前设置页用程序化 View，尚未合并 maintained 的 `res/layout` 和样式资源。
 - 当前截图中的问题已经确认不是单个底部图标坐标，而是 12/20 主题资源、`window_width/window_height`、`LayoutProperty` 与启动动画共用的运行时坐标基准问题。
@@ -323,7 +324,7 @@ APK 可构建、可安装、可启动。
 - [x] `Constants.initDockSize(I)` 已把 `dock_margin_left/right` 同步归零，避免负 margin。
 - [x] `Constants.setPhysicalScreenSize(Context)` 大屏分支已改为标准 `Display.getRealMetrics()`。
 - [x] 回退单独居中底部齿轮的错误尝试。
-- [ ] 继续追踪底部按钮组和右侧底部图标的最终坐标计算点。
+- [x] `view/x.1.smali` 已按原始 APK 恢复 `ra()` / `rx()` / `sx()` 的 dock 与编辑模式坐标算法，桌面和编辑模式底部交互已验证正常。
 - [ ] 统一 12/20 的 `LayoutProperty` 适配：宽度缩放、高度基准、dock/page/loading 动画共用坐标。
 - [ ] 验证 720P、1080P、1440P，以及 18:9 / 20:9 高屏比例。
 - [ ] 同步检查启动动画偏移是否共用同一套宽度/Camera/SceneNode 逻辑。
@@ -331,7 +332,7 @@ APK 可构建、可安装、可启动。
 验收：
 
 ```text
-1080 宽设备：底部齿轮居中，右侧图标不裁切。
+1080 宽设备：桌面和编辑模式底部图标不遮挡，dock 图标拖入拖出后位置正确。
 720 / 1440 或其他宽度：位置按比例正确。
 启动动画居中。
 ```
@@ -433,7 +434,7 @@ SecurityException
 
 ## 当前结论
 
-当前可运行成果要保留。临时设置弹窗已移除，设置页宿主已能启动，但入口方式必须改为桌面“设置”图标，不能复用编辑/总览底部齿轮。底部错位仍未完成，需要按底部按钮组整体做运行时分辨率自适应。
+当前可运行成果要保留。临时设置弹窗已移除，设置页宿主已能启动，但入口方式必须改为桌面“设置”图标，不能复用编辑/总览底部齿轮。桌面和编辑模式底部交互已通过恢复原版 `x.1.smali` 坐标算法修正，后续适配必须在这套原版逻辑上扩展，不能再单独移动齿轮或把 dock 图标改成简单等分屏宽。
 
 后续正确方向：
 
