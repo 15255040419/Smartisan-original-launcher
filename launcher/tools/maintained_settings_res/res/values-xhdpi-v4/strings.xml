@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="icon_scale_9_16">0.71</string>
+    <string name="texture_path">t/pack720/pack</string>
+    <string name="texture_path_base16">t/pack720/pack16</string>
+</resources>

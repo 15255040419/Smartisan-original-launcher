@@ -894,6 +894,21 @@
 
     .line 31
     :cond_8
+    iget-object v2, p0, Lcom/smartisanos/launcher/a/P;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-object v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->componentName:Ljava/lang/String;
+
+    const-string v8, "com.smartisanos.launcher.theme.ThemeChooserActivity"
+
+    invoke-virtual {v8, v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v2
+
+    if-eqz v2, :cond_launcher_settings_flags_done
+
+    const/high16 v1, 0x10000000
+
+    :cond_launcher_settings_flags_done
     invoke-virtual {v0, v1}, Landroid/content/Intent;->setFlags(I)Landroid/content/Intent;
 
     const-string v1, "android.intent.category.LAUNCHER"

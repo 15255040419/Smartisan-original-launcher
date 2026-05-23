@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <RelativeLayout android:background="@drawable/menu_dialog_head_background" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textSize="13.5sp" android:textColor="#cc000000" android:gravity="center" android:id="@id/btn_cancel_left" android:background="@drawable/menu_dialog_cancel_button" android:visibility="invisible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="66.0dp" android:text="@string/cancel_text" android:layout_alignParentLeft="true" android:layout_centerVertical="true" />
+        <TextView android:textSize="13.5sp" android:textColor="#cc000000" android:gravity="center" android:id="@id/btn_cancel_right" android:background="@drawable/menu_dialog_cancel_button" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="66.0dp" android:text="@string/cancel_text" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+        <TextView android:textSize="15.0sp" android:textColor="#cc000000" android:ellipsize="end" android:gravity="center" android:id="@id/title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="6.0dp" android:layout_marginRight="6.0dp" android:maxLines="2" android:layout_toLeftOf="@id/btn_cancel_right" android:layout_toRightOf="@id/btn_cancel_left" android:layout_centerVertical="true" />
+    </RelativeLayout>
+    <LinearLayout android:orientation="vertical" android:background="@drawable/menu_dialog_background" android:paddingTop="12.0dp" android:paddingBottom="12.0dp" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <ListView android:scrollbarStyle="insideOverlay" android:id="@id/content_list" android:visibility="gone" android:scrollbars="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:listSelector="@android:color/transparent" android:divider="@null" android:overScrollMode="never" />
+        <smartisanos.app.MenuDialogTextView android:textSize="18.0sp" android:textColor="#ffffffff" android:gravity="center" android:id="@id/btn_ok" android:background="@drawable/menu_dialog_button_red" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:shadowColor="#26000000" android:shadowDx="0.0" android:shadowDy="-2.0" android:shadowRadius="0.1" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true" android:drawable="@drawable/feedback_title_btn_ok_light_down" />
+    <item android:state_focused="true" android:drawable="@drawable/feedback_title_btn_ok_light_down" />
+    <item android:state_enabled="false" android:drawable="@drawable/feedback_title_btn_ok_both_disabled" />
+    <item android:drawable="@drawable/feedback_title_btn_ok_light" />
+</selector>

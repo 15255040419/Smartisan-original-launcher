@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="letters_bar_dot_x_offset">4.0px</dimen>
+    <dimen name="letters_bar_highlight_icon_x">34.0px</dimen>
+    <dimen name="letters_bar_highlight_icon_y">23.0px</dimen>
+    <dimen name="letters_bar_letter_font_x_offset">68.0px</dimen>
+</resources>

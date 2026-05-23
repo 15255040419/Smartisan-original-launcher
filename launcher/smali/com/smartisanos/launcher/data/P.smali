@@ -411,6 +411,8 @@
     .line 17
     :cond_5
     :goto_4
+    invoke-static {p2, p3}, Lcom/smartisanos/launcher/data/LayoutPropertyAdapter;->adapt(Ljava/lang/Object;Ljava/lang/String;)V
+
     invoke-virtual {p2, p3}, Lcom/smartisanos/launcher/data/LayoutProperty;->initAfterLoadRes(Ljava/lang/String;)V
 
     goto :goto_5
@@ -462,6 +464,8 @@
 
     .line 20
     :goto_6
+    invoke-static {p2, p3}, Lcom/smartisanos/launcher/data/LayoutPropertyAdapter;->adapt(Ljava/lang/Object;Ljava/lang/String;)V
+
     invoke-virtual {p2, p3}, Lcom/smartisanos/launcher/data/LayoutProperty;->initAfterLoadRes(Ljava/lang/String;)V
 
     throw p0

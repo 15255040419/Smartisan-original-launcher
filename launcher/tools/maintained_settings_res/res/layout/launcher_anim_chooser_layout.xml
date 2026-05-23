@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@drawable/background" android:fitsSystemWindows="true" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:setting="http://schemas.android.com/apk/res-auto">
+    <com.smartisanos.home.widget.sys.Title android:id="@id/view_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" setting:title_titlex="@string/flip_anim_title" />
+    <com.smartisanos.home.widget.sys.GridViewWithHeaderAndFooter android:id="@id/grid_view" android:background="@android:color/transparent" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/view_title" android:overScrollMode="always" />
+    <include layout="@layout/title_bar_shadow" />
+</RelativeLayout>

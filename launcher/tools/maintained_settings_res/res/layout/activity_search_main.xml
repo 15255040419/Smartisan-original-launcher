@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.smartisanos.quicksearchbox.container.MainContainerView android:id="@id/main_container" android:background="@drawable/source_maincontainer_bg" android:fitsSystemWindows="true" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <FrameLayout android:id="@id/search_editbox_container" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" />
+    <include layout="@layout/main_background_hint" />
+    <include android:id="@id/search_switchinput_tabbar" layout="@layout/switch_input_tab_bar" />
+    <FrameLayout android:id="@id/search_resultbox_container" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_above="@id/search_switchinput_tabbar" android:layout_below="@id/search_editbox_container" />
+    <View android:id="@id/search_editbox_shadow" android:background="@drawable/editbox_shadow" android:layout_width="match_parent" android:layout_height="@dimen/search_shadow" android:layout_below="@id/search_editbox_container" />
+    <View android:background="@drawable/t9_panel_shadow" android:layout_width="match_parent" android:layout_height="@dimen/search_shadow" android:layout_above="@id/search_switchinput_tabbar" />
+    <com.smartisanos.quicksearchbox.container.t9keyboard.T9PanelView android:id="@id/search_t9_panel" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentBottom="true" />
+</com.smartisanos.quicksearchbox.container.MainContainerView>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="222.0dp"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <FrameLayout android:layout_gravity="center_horizontal" android:id="@id/phone_layout" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="27.0dp">
+        <ImageView android:layout_gravity="center|top" android:id="@id/theme_preview_block" android:layout_width="58.0dp" android:layout_height="103.0dp" android:layout_marginTop="18.0dp" android:scaleType="fitXY" />
+        <ImageView android:id="@id/phone_bg" android:background="@drawable/phone_frame" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <FrameLayout android:layout_gravity="center" android:id="@id/theme_block_downloading_progress" android:background="@drawable/theme_block_downloading_progress_bg" android:layout_width="58.0dp" android:layout_height="103.0dp">
+            <ProgressBar android:layout_gravity="center" android:layout_width="48.0dp" android:layout_height="48.0dp" />
+        </FrameLayout>
+    </FrameLayout>
+    <TextView android:textSize="15.0sp" android:textColor="#cc000000" android:ellipsize="end" android:layout_gravity="center_horizontal" android:id="@id/theme_name_preview" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8.0dp" android:maxLines="1" />
+    <TextView android:textSize="10.0sp" android:textColor="#80000000" android:layout_gravity="center_horizontal" android:id="@id/theme_downloading_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="1.0dp" android:layout_marginBottom="4.0dp" android:text="@string/theme_block_downloading_text" />
+</LinearLayout>

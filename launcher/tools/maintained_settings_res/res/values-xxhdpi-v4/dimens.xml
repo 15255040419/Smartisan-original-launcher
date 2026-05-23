@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="dialog_padding">16.0dp</dimen>
+    <dimen name="icon_settings_author_margin_left">66.0px</dimen>
+    <dimen name="icon_settings_author_margin_right">81.0dp</dimen>
+    <dimen name="icon_settings_icon_margin_left">54.0px</dimen>
+    <dimen name="edit_title_item_textsize">4.0sp</dimen>
+    <dimen name="password_button_h">74.0dp</dimen>
+    <dimen name="password_button_w">120.0dp</dimen>
+    <dimen name="phone_detail_preview_marginTop">39.0dp</dimen>
+    <dimen name="theme_preview_detail_phone_black_h">493.29688dp</dimen>
+    <dimen name="theme_preview_detail_phone_black_w">238.0dp</dimen>
+    <dimen name="theme_preview_img_large_h">330.0dp</dimen>
+    <dimen name="theme_preview_img_large_marginTop">82.0dp</dimen>
+    <dimen name="theme_preview_img_large_w">186.0dp</dimen>
+    <dimen name="theme_thumbnail_setting_h">68.0dp</dimen>
+    <dimen name="theme_thumbnail_setting_w">53.0dp</dimen>
+</resources>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:orientation="horizontal" android:id="@id/row_1" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/one" android:background="@drawable/btn_0_classic_normal" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/two" android:background="@drawable/btn_0_classic_normal" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/three" android:background="@drawable/btn_0_classic_normal" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@id/row_2" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/four" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/five" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/six" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@id/row_3" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/seven" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/eight" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/nine" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@id/row_4" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/down" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/zero" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+        <com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView android:id="@id/delete" android:layout_width="0.0dp" android:layout_height="match_parent" android:layout_weight="1.0" />
+    </LinearLayout>
+</merge>

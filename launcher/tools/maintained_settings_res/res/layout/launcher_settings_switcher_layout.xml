@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:setting="http://schemas.android.com/apk/res/com.smartisanos.home">
+    <include layout="@layout/item_bottom_shadow_layout" />
+    <com.smartisanos.home.settings.SettingItemSwitch android:id="@id/multi_block_fast_launch_app" setting:setting_item_switch_title="@string/multi_block_fast_launch_app" style="@style/SettingSubItemSingleStyle" />
+    <com.smartisanos.home.widget.sys.TipsView android:id="@id/fast_launch_tips" android:layout_marginTop="@dimen/settings_item_title_margin_top" android:text="@string/launcher_fast_launch_tips_36" style="@style/SettingItemTipsStyle" />
+    <com.smartisanos.home.settings.SettingItemSwitch android:id="@id/launcher_flip_animation" android:visibility="gone" setting:setting_item_switch_title="@string/launcher_flip_animation" style="@style/SettingSubItemSingleStyle" />
+</LinearLayout>

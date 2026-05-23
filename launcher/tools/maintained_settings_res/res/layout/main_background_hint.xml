@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:id="@id/background_hint_container" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/background_hint_container_margintop" android:layout_below="@id/search_editbox_container"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:layout_gravity="center_horizontal" android:orientation="horizontal" android:layout_width="wrap_content" android:layout_height="wrap_content">
+        <ImageView android:layout_width="wrap_content" android:layout_height="match_parent" android:src="@drawable/search_icon" android:scaleType="centerInside" />
+        <TextView android:textSize="@dimen/background_hint_title_textsize" android:textColor="@color/background_hint_text_color" android:id="@id/background_hint_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/background_hint_title_marginleft" android:text="@string/search_hint_title" />
+    </LinearLayout>
+    <TextView android:textSize="@dimen/background_hint_content_textsize" android:textColor="@color/background_hint_text_color" android:gravity="center" android:id="@id/background_hint_content" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/background_hint_content_marginLeftandRight" android:layout_marginTop="@dimen/background_hint_content_marginTop" android:layout_marginRight="@dimen/background_hint_content_marginLeftandRight" android:text="@string/search_hint_content_detail" android:lineSpacingMultiplier="1.1" />
+</LinearLayout>

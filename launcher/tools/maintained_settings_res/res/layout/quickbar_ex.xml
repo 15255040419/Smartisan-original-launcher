@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:layout_width="@dimen/quickbar_ex_width" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <GridView android:scrollbarStyle="outsideOverlay" android:gravity="center" android:id="@id/quickbar_right_grid_view" android:background="#eaeaea" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginLeft="@dimen/quickbar_grid_view_margin_left" android:listSelector="@android:color/transparent" android:horizontalSpacing="3.0px" android:verticalSpacing="3.0px" android:stretchMode="none" android:columnWidth="@dimen/quickbar_ex_grid_column_width" android:numColumns="3" android:layout_alignParentLeft="true" android:overScrollMode="never" />
+    <smartisanos.widget.letters.LettersBar android:id="@id/quickbar_left_letters_bar" android:layout_width="@dimen/letters_bar_width" android:layout_height="match_parent" android:layout_alignParentLeft="true" android:layout_alignParentTop="true" />
+</RelativeLayout>

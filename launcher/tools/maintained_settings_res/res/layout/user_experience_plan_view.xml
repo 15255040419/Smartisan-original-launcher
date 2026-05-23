@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="15.0sp" android:textColor="#5c5c5c" android:gravity="left|center" android:id="@id/user_experience_dialog_message" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/experience_dialog_content_margin_top" android:text="@string/setting_user_experience_des_txt" android:lineSpacingMultiplier="1.1" style="?android:attr/textAppearanceMedium" />
+    <LinearLayout android:gravity="center_vertical" android:layout_gravity="left|center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/experience_dialog_content_margin_sub" android:layout_marginBottom="@dimen/experience_dialog_content_margin_bot">
+        <CheckBox android:id="@id/user_experience_dialog_checkbox" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="1.0dp" android:button="@drawable/btn_check_smartisanos_light" />
+        <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="#5c5c5c" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="4.0dp" android:text="@string/user_plan_dialog_agree_check" style="?android:attr/textAppearanceMedium" />
+        <TextView android:textSize="15.0sp" android:textStyle="bold" android:textColor="@color/setting_item_text_rigth_color" android:id="@id/user_experience_dialog_click_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/experience_dialog_check_space" android:text="@string/setting_user_experience_txt" style="?android:attr/textAppearanceMedium" />
+    </LinearLayout>
+</merge>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:orientation="vertical" android:background="@drawable/theme_preview_bg" android:fitsSystemWindows="true" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:orientation="horizontal" android:id="@id/view_title" android:background="@drawable/launcher_title_bar_bg" android:layout_width="match_parent" android:layout_height="51.0dp" android:layout_alignParentTop="true">
+        <TextView android:textColor="@color/launcher_title_bar_button_text_colorlist" android:gravity="left|center" android:id="@id/btn_back" android:background="@drawable/selector_title_button_back" android:layout_width="wrap_content" android:layout_height="match_parent" android:maxWidth="@dimen/title_back_btn_max_width" android:text="@string/title_button_text_back" android:singleLine="true" android:layout_alignParentLeft="true" android:layout_centerVertical="true" />
+        <TextView android:textSize="@dimen/title_bar_title_text_size" android:textColor="#9a000000" android:gravity="center" android:layout_width="wrap_content" android:layout_height="match_parent" android:text="@string/theme_title_bar_text" android:singleLine="true" android:layout_weight="1.0" android:layout_centerInParent="true" />
+        <TextView android:textSize="@dimen/title_bar_btn_text_size" android:textColor="@color/title_bar_btn_set_text_colorlist" android:gravity="center" android:id="@id/btn_ok" android:background="@drawable/theme_item_bottom_title_apply" android:layout_width="wrap_content" android:layout_height="match_parent" android:text="@string/theme_title_bar_btn_setup" android:singleLine="true" android:layout_centerVertical="true" />
+        <LinearLayout android:gravity="center" android:id="@id/btn_download" android:background="@drawable/theme_download_button" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="match_parent" android:layout_alignParentRight="true">
+            <ImageView android:layout_gravity="center" android:background="@drawable/theme_download_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="match_parent" android:layout_alignParentRight="true">
+            <com.smartisanos.launcher.widget.StatusIconView android:layout_gravity="center" android:id="@id/status_icon_view" android:focusable="true" android:visibility="gone" android:clickable="true" android:layout_width="70.0dp" android:layout_height="48.0dp" />
+        </LinearLayout>
+    </LinearLayout>
+    <HorizontalScrollView android:id="@id/theme_color_dot_list" android:background="@drawable/theme_item_dot_list_bg" android:scrollbars="none" android:layout_width="match_parent" android:layout_height="80.0dp" android:layout_alignParentBottom="true">
+        <LinearLayout android:orientation="horizontal" android:id="@id/horizontal_linear_layout" android:layout_width="match_parent" android:layout_height="match_parent" />
+    </HorizontalScrollView>
+    <FrameLayout android:layout_gravity="center_horizontal" android:id="@id/phone_detail_preview" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12.0dp" android:layout_above="@id/theme_color_dot_list" android:layout_below="@id/view_title" android:layout_centerHorizontal="true">
+        <ImageView android:layout_gravity="center_horizontal" android:id="@id/theme_preview_img_large" android:layout_width="@dimen/theme_preview_img_large_w" android:layout_height="@dimen/theme_preview_img_large_h" android:layout_marginTop="@dimen/theme_preview_img_large_marginTop" android:scaleType="fitXY" />
+        <ImageView android:id="@id/theme_preview_bg" android:background="@drawable/theme_preview_detail_phone_white" android:layout_width="@dimen/theme_preview_detail_phone_black_w" android:layout_height="@dimen/theme_preview_detail_phone_black_h" android:scaleType="fitXY" android:minWidth="@dimen/theme_preview_detail_phone_black_w" android:minHeight="@dimen/theme_preview_detail_phone_black_h" />
+    </FrameLayout>
+</RelativeLayout>

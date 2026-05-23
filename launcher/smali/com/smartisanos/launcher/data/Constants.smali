@@ -1005,8 +1005,12 @@
 
     const-string v1, "com.google.android.googlequicksearchbox;com.google.android.handsfree.HandsFreeLauncherActivity"
 
+    const-string v2, "com.smartisanos.launcher;com.smartisanos.launcher.LauncherAlias"
+
+    const-string v3, "com.smartisanos.launcher;com.smartisanos.launcher.Launcher"
+
     .line 103
-    filled-new-array {v1}, [Ljava/lang/String;
+    filled-new-array {v1, v2, v3}, [Ljava/lang/String;
 
     move-result-object v1
 
@@ -1065,6 +1069,13 @@
 .method public static cellCount(I)I
     .locals 3
 
+    const/16 v0, 0x14
+
+    if-ne p0, v0, :cond_cell_count_switch
+
+    return v0
+
+    :cond_cell_count_switch
     packed-switch p0, :pswitch_data_0
 
     .line 1
@@ -1653,6 +1664,10 @@
     if-eq p0, v1, :cond_0
 
     const/16 v1, 0x9
+
+    if-eq p0, v1, :cond_0
+
+    const/16 v1, 0x14
 
     if-eq p0, v1, :cond_0
 
@@ -10590,6 +10605,15 @@
 
     const/16 v0, 0x9
 
+    if-ne p0, v0, :cond_check_page_20
+
+    const/4 p0, 0x1
+
+    return p0
+
+    :cond_check_page_20
+    const/16 v0, 0x14
+
     if-ne p0, v0, :cond_0
 
     const/4 p0, 0x1
@@ -12657,21 +12681,13 @@
     const/4 v2, 0x1
 
     aput v1, v0, v2
-    # --- Runtime scale for original 1080x2340 layout baseline ---
-    sget-object v4, Lcom/smartisanos/launcher/data/Constants;->PHYSICAL_SCREEN_SIZE:[I
+    # --- Legacy global scale disabled; LayoutPropertyAdapter owns scaling ---
+    const/high16 v6, 0x3f800000    # 1.0f
 
-    aget v5, v4, v3
-
-    int-to-float v6, v5
-    const/high16 v8, 0x44870000    # 1080.0f
-    div-float/2addr v6, v8
     sput v6, Lcom/smartisanos/launcher/data/Constants;->SCALE_X:F
 
-    aget v5, v4, v2
+    const/high16 v6, 0x3f800000    # 1.0f
 
-    int-to-float v6, v5
-    const/high16 v8, 0x45120000    # 2340.0f
-    div-float/2addr v6, v8
     sput v6, Lcom/smartisanos/launcher/data/Constants;->SCALE_Y:F
 
     .line 12

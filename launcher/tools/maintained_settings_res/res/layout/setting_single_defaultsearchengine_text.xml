@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/item_block_gap" style="@style/SettingSubItemSingleStyle"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="@dimen/setting_item_text_size" android:textColor="@drawable/more_item_color_bg" android:id="@id/searchengine_text" android:paddingLeft="@dimen/setting_item_text_left" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/setting_engine_set" android:layout_centerVertical="true" />
+    <ImageView android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/setting_next" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+    <TextView android:textSize="@dimen/setting_item_current_language_size" android:textColor="@drawable/current_language_text_color" android:ellipsize="end" android:gravity="right" android:id="@id/current_engine" android:paddingRight="@dimen/setting_item_text_account_right" android:layout_width="wrap_content" android:layout_height="wrap_content" android:singleLine="true" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+</RelativeLayout>

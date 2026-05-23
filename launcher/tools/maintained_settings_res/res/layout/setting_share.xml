@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@drawable/share_bg" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <RelativeLayout android:orientation="horizontal" android:background="@drawable/share_title_bar" android:layout_width="wrap_content" android:layout_height="wrap_content">
+        <TextView android:textSize="15.0sp" android:textColor="#454549" android:gravity="center" android:id="@id/share_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/share_text" android:layout_centerInParent="true" />
+        <Button android:textSize="13.5sp" android:textColor="#313131" android:gravity="center" android:id="@id/share_cancel" android:background="@drawable/setting_share_cancel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="66.0dp" android:text="@string/cancel_text" android:layout_alignParentRight="true" android:textAllCaps="false" />
+    </RelativeLayout>
+    <TableLayout android:id="@id/layout_share" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="17.0dp" android:layout_marginBottom="31.0dp">
+        <TableRow android:layout_weight="1.0">
+            <TextView android:id="@id/share_weibo" android:text="@string/weibo" android:drawableTop="@drawable/weibo" style="@style/ShareItemStyle" />
+            <TextView android:id="@id/share_weixin" android:text="@string/we_chat" android:drawableTop="@drawable/wx" style="@style/ShareItemStyle" />
+            <TextView android:id="@id/share_twitter" android:text="@string/twitter" android:drawableTop="@drawable/twitter" style="@style/ShareItemStyle" />
+        </TableRow>
+        <TableRow android:layout_marginTop="84.0px" android:layout_weight="1.0">
+            <TextView android:id="@id/share_qzone" android:text="@string/qzone" android:drawableTop="@drawable/qzone" style="@style/ShareItemStyle" />
+            <TextView android:id="@id/share_weixin_timeline" android:text="@string/we_chat_timeline" android:drawableTop="@drawable/pyq" style="@style/ShareItemStyle" />
+            <TextView android:id="@id/share_facebook" android:text="@string/facebook" android:drawableTop="@drawable/fb" style="@style/ShareItemStyle" />
+        </TableRow>
+    </TableLayout>
+</LinearLayout>

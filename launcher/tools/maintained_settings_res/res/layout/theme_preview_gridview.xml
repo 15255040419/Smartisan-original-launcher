@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@drawable/background" android:fitsSystemWindows="true" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:smartisanos="http://schemas.android.com/apk/res/smartisanos" xmlns:setting="http://schemas.android.com/apk/res/com.smartisanos.home">
+    <com.smartisanos.home.widget.sys.Title android:id="@id/view_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" setting:title_titlex="@string/wall_paper_header_title" />
+    <ImageView android:id="@id/title_shadow" android:background="@drawable/title_bar_shadow" android:focusable="false" android:focusableInTouchMode="false" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_below="@id/view_title" />
+    <ScrollView android:id="@id/theme_list_scrollview" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/view_title" android:layout_alignParentBottom="true" android:overScrollMode="always">
+        <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="15.0sp" android:textColor="#80000000" android:paddingLeft="@dimen/theme_chooser_text_padding_left" android:paddingTop="11.0dp" android:paddingBottom="1.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/title_installed_themes" />
+            <com.smartisanos.launcher.theme.ThemePreviewGridView android:id="@id/installed_list" android:layout_width="match_parent" android:layout_height="wrap_content" android:numColumns="2" />
+            <TextView android:textSize="15.0sp" android:textColor="#80000000" android:id="@id/theme_not_installed_text" android:paddingLeft="@dimen/theme_chooser_text_padding_left" android:paddingTop="11.0dp" android:paddingBottom="1.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/title_uninstalled_themes" />
+            <com.smartisanos.launcher.theme.ThemePreviewGridView android:id="@id/not_installed_list" android:layout_width="match_parent" android:layout_height="wrap_content" android:numColumns="2" />
+            <ImageView android:background="@android:color/transparent" android:layout_width="match_parent" android:layout_height="2.0dp" />
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>

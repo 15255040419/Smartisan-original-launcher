@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:orientation="horizontal" android:id="@id/list_item" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/product_app_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/list_item_image_left" android:layout_alignParentLeft="true" android:layout_centerInParent="true" />
+    <RelativeLayout android:orientation="horizontal" android:layout_width="wrap_content" android:layout_height="@dimen/list_item_height" android:layout_marginRight="@dimen/item_button_right" android:layout_toRightOf="@id/product_app_icon" android:layout_centerInParent="true">
+        <Button android:textSize="@dimen/item_button_text_size" android:textColor="@color/item_button_text_color" android:gravity="center" android:id="@id/product_app_operation" android:background="@drawable/app_operation_button" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentRight="true" android:layout_centerInParent="true" />
+        <LinearLayout android:gravity="center_vertical" android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="match_parent" android:layout_marginLeft="@dimen/list_item_text_left" android:layout_marginRight="@dimen/list_item_text_right" android:layout_toLeftOf="@id/product_app_operation" android:layout_alignParentLeft="true" android:layout_centerInParent="true">
+            <TextView android:textSize="@dimen/item_app_name_size" android:textColor="@color/item_app_name_color" android:gravity="center_vertical" android:id="@id/product_app_name" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            <TextView android:textSize="@dimen/item_app_des_size" android:textColor="@color/item_app_des_color" android:ellipsize="end" android:gravity="center_vertical" android:id="@id/product_app_describe" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/item_app_des_top" android:singleLine="true" android:layout_alignParentLeft="true" />
+        </LinearLayout>
+    </RelativeLayout>
+</RelativeLayout>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer-array name="icon_shadow_color">
+        <item>0x2f000000</item>
+        <item>0x3f000000</item>
+    </integer-array>
+    <integer-array name="icon_shadow_radius">
+        <item>12</item>
+        <item>4</item>
+    </integer-array>
+    <integer-array name="background_init_color_for_unlock_animation">
+        <item>10</item>
+        <item>10</item>
+        <item>12</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+    </integer-array>
+    <integer-array name="cell_init_color_for_unlock_animation16">
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+    </integer-array>
+    <integer-array name="cell_init_color_for_unlock_animation9">
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+    </integer-array>
+    <integer-array name="dock_init_color_for_unlock_animation16">
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+    </integer-array>
+    <integer-array name="dock_init_color_for_unlock_animation9">
+        <item>100</item>
+        <item>100</item>
+        <item>100</item>
+    </integer-array>
+    <integer-array name="icon_shadow_color_light">
+        <item>0x12000000</item>
+        <item>0x12000000</item>
+    </integer-array>
+    <integer-array name="shadow_init_color_for_unlock_animation">
+        <item>0</item>
+        <item>0</item>
+        <item>2</item>
+        <item>27</item>
+    </integer-array>
+</resources>

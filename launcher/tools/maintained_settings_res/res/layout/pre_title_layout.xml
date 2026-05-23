@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:gravity="center_vertical" android:orientation="vertical" android:padding="@dimen/dialog_padding" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <EditText android:id="@id/title_edittext" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="2.0dp" android:layout_marginRight="2.0dp" android:layout_marginBottom="7.0dp" android:singleLine="true" android:maxLength="25" />
+    <GridView android:gravity="center" android:id="@id/title_gridview" android:layout_width="match_parent" android:layout_height="match_parent" android:listSelector="#00000000" android:numColumns="4" />
+</LinearLayout>

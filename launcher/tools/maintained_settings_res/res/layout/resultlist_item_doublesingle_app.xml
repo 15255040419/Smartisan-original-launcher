@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.smartisanos.quicksearchbox.container.resultbox.resultlist.item.doublesingle.ItemDoubleSingle android:orientation="vertical" android:id="@id/resultlist_doublesingle_item" android:layout_width="match_parent" android:layout_height="wrap_content" style="@style/DoubleSingleItem"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/resultlist_singleicon" android:visibility="gone" style="@style/SingleIcon_App" />
+    <TextView android:id="@id/resultlist_singletext" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_toRightOf="@id/resultlist_singleicon" android:layout_centerVertical="true" style="@style/SingleText" />
+</com.smartisanos.quicksearchbox.container.resultbox.resultlist.item.doublesingle.ItemDoubleSingle>

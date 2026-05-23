@@ -136,54 +136,43 @@
     .locals 1
 
     .line 1
-    iget-object p2, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
+    iget-object v0, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
 
-    if-nez p2, :cond_0
+    if-nez v0, :cond_0
 
     .line 2
-    new-instance p2, Lsmartisanos/app/SmartisanProgressDialog;
+    new-instance v0, Lsmartisanos/app/SmartisanProgressDialog;
 
-    invoke-direct {p2, p1}, Lsmartisanos/app/SmartisanProgressDialog;-><init>(Landroid/content/Context;)V
+    invoke-direct {v0, p1}, Lsmartisanos/app/SmartisanProgressDialog;-><init>(Landroid/content/Context;)V
 
-    iput-object p2, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
+    iput-object v0, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
 
     .line 3
-    iget-object p1, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
+    sget p1, Lcom/smartisanos/launcher/jb;->loading_progress:I
 
-    invoke-virtual {p1}, Lsmartisanos/app/SmartisanProgressDialog;->getWindow()Landroid/view/Window;
-
-    move-result-object p1
+    invoke-virtual {v0, p1}, Lsmartisanos/app/SmartisanProgressDialog;->setIndeterminateDrawableResource(I)V
 
     .line 4
-    iget-object p1, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
+    const/4 p1, 0x0
 
-    sget p2, Lcom/smartisanos/launcher/jb;->loading_progress:I
-
-    invoke-virtual {p1, p2}, Lsmartisanos/app/SmartisanProgressDialog;->setIndeterminateDrawableResource(I)V
+    invoke-virtual {v0, p1}, Lsmartisanos/app/SmartisanProgressDialog;->setCancelable(Z)V
 
     .line 5
-    iget-object p1, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
+    const/4 p1, 0x1
 
-    const/4 p2, 0x0
-
-    invoke-virtual {p1, p2}, Lsmartisanos/app/SmartisanProgressDialog;->setCancelable(Z)V
+    invoke-virtual {v0, p1}, Lsmartisanos/app/SmartisanProgressDialog;->setDarkTheme(Z)V
 
     .line 6
-    iget-object p1, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
+    const/4 p1, 0x0
 
-    const/4 v0, 0x1
-
-    invoke-virtual {p1, v0}, Lsmartisanos/app/SmartisanProgressDialog;->setDarkTheme(Z)V
+    invoke-virtual {v0, p1}, Lsmartisanos/app/SmartisanProgressDialog;->setCanceledOnTouchOutside(Z)V
 
     .line 7
-    iget-object p1, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
-
-    invoke-virtual {p1, p2}, Lsmartisanos/app/SmartisanProgressDialog;->setCanceledOnTouchOutside(Z)V
-
-    .line 8
-    iput-boolean p2, p0, Lcom/smartisanos/launcher/widget/c;->Xz:Z
+    iput-boolean p1, p0, Lcom/smartisanos/launcher/widget/c;->Xz:Z
 
     :cond_0
+    invoke-virtual {v0, p2}, Lsmartisanos/app/SmartisanProgressDialog;->setMessage(Ljava/lang/String;)V
+
     return-void
 .end method
 

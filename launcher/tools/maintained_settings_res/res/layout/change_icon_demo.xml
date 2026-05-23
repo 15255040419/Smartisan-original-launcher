@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@drawable/sub_item_back_ground_bottom" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="31.0dp">
+        <FrameLayout android:id="@id/change_icon_demo_text_center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerHorizontal="true" android:layout_centerVertical="true" />
+        <FrameLayout android:id="@id/change_icon_demo_text_left" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="41.0dp" android:layout_toLeftOf="@id/change_icon_demo_text_center" android:layout_alignParentLeft="true">
+            <TextView android:textSize="13.5sp" android:textColor="#949597" android:gravity="center_vertical" android:layout_gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="1.0dp" android:text="@string/default_icon_text" android:singleLine="true" android:layout_weight="1.0" />
+        </FrameLayout>
+        <FrameLayout android:id="@id/change_icon_demo_text_right" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="41.0dp" android:layout_toRightOf="@id/change_icon_demo_text_center" android:layout_alignParentRight="true">
+            <TextView android:textSize="13.5sp" android:textColor="#949597" android:gravity="center_vertical" android:layout_gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="1.0dp" android:text="@string/improved_icon_text" android:singleLine="true" android:layout_weight="1.0" />
+        </FrameLayout>
+    </RelativeLayout>
+    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14.0dp">
+        <FrameLayout android:id="@id/icon_row_1_center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerHorizontal="true" android:layout_centerVertical="true" />
+        <FrameLayout android:id="@id/default_icon_1_frame" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="41.0dp" android:layout_toLeftOf="@id/icon_row_1_center" android:layout_alignParentLeft="true">
+            <ImageView android:layout_gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/default_icon_1" />
+        </FrameLayout>
+        <FrameLayout android:id="@id/redesign_icon_1_frame" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="41.0dp" android:layout_toRightOf="@id/icon_row_1_center" android:layout_alignParentRight="true">
+            <ImageView android:layout_gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/default_redesign_1" />
+        </FrameLayout>
+    </RelativeLayout>
+    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="33.0dp">
+        <FrameLayout android:id="@id/icon_row_2_center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerHorizontal="true" android:layout_centerVertical="true" />
+        <FrameLayout android:id="@id/default_icon_2_frame" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="41.0dp" android:layout_toLeftOf="@id/icon_row_2_center" android:layout_alignParentLeft="true">
+            <ImageView android:layout_gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/default_icon_2" />
+        </FrameLayout>
+        <FrameLayout android:id="@id/redesign_icon_2_frame" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="41.0dp" android:layout_toRightOf="@id/icon_row_2_center" android:layout_alignParentRight="true">
+            <ImageView android:layout_gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/default_redesign_2" />
+        </FrameLayout>
+    </RelativeLayout>
+    <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="33.0dp" android:layout_marginBottom="41.0dp">
+        <FrameLayout android:id="@id/icon_row_3_center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerHorizontal="true" android:layout_centerVertical="true" />
+        <FrameLayout android:id="@id/default_icon_3_frame" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="41.0dp" android:layout_toLeftOf="@id/icon_row_3_center" android:layout_alignParentLeft="true">
+            <ImageView android:layout_gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/default_icon_3" />
+        </FrameLayout>
+        <FrameLayout android:id="@id/redesign_icon_3_frame" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="41.0dp" android:layout_toRightOf="@id/icon_row_3_center" android:layout_alignParentRight="true">
+            <ImageView android:layout_gravity="center" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/default_redesign_3" />
+        </FrameLayout>
+    </RelativeLayout>
+</LinearLayout>

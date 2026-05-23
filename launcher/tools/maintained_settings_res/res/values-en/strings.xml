@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="icon_redrawn">Redrawn</string>
+    <string name="icon_original">Original</string>
+    <string name="follow_studio_title">Noodle Studio</string>
+    <string name="check_update_title">Check for Updates</string>
+    <string name="update_available_title">Update Available</string>
+    <string name="set_to_default_home_title">Switch Default Launcher</string>
+    <string name="os_update_dlg_ok_btn">Download Now</string>
+    <string name="os_update_dlg_cancel_btn">Cancel</string>
+    <string name="icon_setting_text">Icon Settings</string>
+    <string name="follow_weixin_title">Build Author</string>
+    <string name="follow_weixin_content">ConvenienceNoodles\' Studio</string>
+    <string name="follow_weibo_title">Follow Weibo</string>
+    <string name="follow_weibo_content">ConvenienceNoodles</string>
+    <string name="follow_website_title">Official Website</string>
+    <string name="follow_website_content">www.smartisan.com</string>
+    <string name="setting_follow_title">FOLLOW US</string>
+    <string name="unlock_animation_title">Unlock Animation</string>
+    <string name="unlock_animation_tips">Play scale animation after unlock</string>
+</resources>

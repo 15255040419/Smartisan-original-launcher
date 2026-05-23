@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="dialog_padding">16.0dp</dimen>
+    <dimen name="edit_title_item_textsize">2.0sp</dimen>
+    <dimen name="password_button_h">86.0dp</dimen>
+    <dimen name="password_button_w">137.0dp</dimen>
+</resources>

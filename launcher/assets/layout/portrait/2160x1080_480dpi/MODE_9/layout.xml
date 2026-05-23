@@ -108,7 +108,7 @@
     <integer name="max_dot_num">36</integer>
     <integer name="multi_select_distance">6</integer>
     <integer name="name_off_set_y">-131</integer>
-    <integer name="name_off_set_y_folder">-92</integer>
+    <integer name="name_off_set_y_folder">-72</integer>
     <integer name="page_cell_col_num">3</integer>
     <integer name="page_cell_row_num">3</integer>
     <integer name="page_height_trans">1395</integer>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@drawable/background" android:fitsSystemWindows="true" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:setting="http://schemas.android.com/apk/res/com.smartisanos.home">
+    <com.smartisanos.home.widget.sys.Title android:id="@id/view_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" setting:title_titlex="@string/icon_setting_text" />
+    <ListView android:id="@id/icons_list_view" android:layout_width="match_parent" android:layout_height="match_parent" android:listSelector="@android:color/transparent" android:cacheColorHint="@android:color/transparent" android:divider="@null" android:layout_below="@id/view_title" android:layout_marginTop="0.0dp" android:paddingLeft="0.0dp" android:paddingRight="0.0dp" android:clipToPadding="false" android:overScrollMode="always" />
+    <include android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_below="@id/view_title" layout="@layout/title_bar_shadow" />
+</RelativeLayout>

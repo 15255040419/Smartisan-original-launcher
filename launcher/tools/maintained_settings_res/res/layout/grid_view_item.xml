@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout android:orientation="vertical" android:id="@id/grid_frame" android:layout_width="60.0dp" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <View android:layout_gravity="center_vertical" android:layout_width="match_parent" android:layout_height="72.0dp" />
+    <ImageView android:layout_gravity="center_vertical" android:id="@id/grid_item" android:clickable="true" android:layout_width="53.0dp" android:layout_height="53.0dp" android:src="@drawable/report_fragment_add" android:scaleType="fitXY" android:contentDescription="@string/user_feedback" android:overScrollMode="never" />
+    <ImageView android:layout_gravity="right|top" android:id="@id/grid_del" android:layout_width="33.0dp" android:layout_height="33.0dp" android:layout_marginTop="1.0dp" android:layout_marginRight="2.0dp" android:src="@drawable/report_fragment_delete" android:contentDescription="@string/user_feedback" />
+</FrameLayout>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@android:color/white" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:setting="http://schemas.android.com/apk/res-auto">
+    <com.smartisanos.home.widget.sys.Title android:id="@id/view_title" setting:title_titlex="@string/flip_anim_title" style="@style/TitleStyle" />
+    <com.smartisanos.home.widget.sys.SelectOptionsView android:gravity="center_horizontal" android:id="@id/select_options_view" android:background="@drawable/preview_slider_bg" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentBottom="true" android:layout_centerHorizontal="true" />
+    <LinearLayout android:gravity="center" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_above="@id/select_options_view" android:layout_below="@id/view_title" android:layout_centerHorizontal="true">
+        <com.smartisanos.home.widget.sys.VideoPlayerView android:id="@id/video_player_view" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <include layout="@layout/title_bar_shadow" />
+</RelativeLayout>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/preview_image" android:paddingLeft="@dimen/settings_item_preview_image_margin_left" android:paddingRight="@dimen/settings_item_preview_image_margin_right" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/settings_item_preview_image_margin_top" android:layout_centerHorizontal="true" />
+    <TextView android:textSize="@dimen/settings_item_preview_title_size" android:textColor="@color/setting_item_text_color" android:gravity="center_horizontal" android:id="@id/preview_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/preview_text_margin_top" android:singleLine="true" android:layout_below="@id/preview_image" android:layout_centerHorizontal="true" />
+    <ImageView android:id="@id/checked_image" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/preview_picture_selected" android:layout_alignRight="@id/preview_image" android:layout_alignParentTop="true" />
+</RelativeLayout>

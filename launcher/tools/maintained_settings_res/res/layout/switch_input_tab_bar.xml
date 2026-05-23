@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@drawable/tab_bg" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentBottom="true"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/tab_input_t9" android:paddingTop="4.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="10.0dp" android:src="@drawable/tab_t9_voice_selector" android:layout_alignParentLeft="true" android:layout_centerVertical="true" />
+    <ImageView android:id="@id/tab_input_soft" android:paddingTop="4.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="10.0dp" android:src="@drawable/tab_softkey_selector" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+</RelativeLayout>

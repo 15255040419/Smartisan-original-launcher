@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="@dimen/experience_dialog_title_text_size" android:textStyle="bold" android:textColor="#5c5c5c" android:gravity="center" android:layout_gravity="center" android:id="@id/custom_dialog_title" android:background="@drawable/dialog_top_panel" android:layout_width="match_parent" android:layout_height="56.0dp" style="?android:attr/buttonBarButtonStyle" />
+    <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/custom_dialog_content" android:paddingLeft="@dimen/experience_dialog_content_left" android:paddingRight="@dimen/experience_dialog_content_left" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="72.0dp">
+        <TextView android:textSize="15.0sp" android:textColor="#5c5c5c" android:gravity="left|center" android:id="@id/custom_dialog_message" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/dialog_content_margin_top" android:layout_marginBottom="@dimen/dialog_content_margin_bot" android:lineSpacingMultiplier="1.1" style="?android:attr/textAppearanceMedium" />
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@id/custom_dialog_buttons" android:background="@drawable/dialog_bottom_panel" android:layout_width="match_parent" android:layout_height="wrap_content" android:showDividers="middle" android:dividerPadding="0.0dp" style="?android:attr/buttonBarStyle" />
+</LinearLayout>

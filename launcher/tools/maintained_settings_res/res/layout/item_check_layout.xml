@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:layout_gravity="center_vertical" android:paddingLeft="30.0dp" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/item_check_left_icon" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="11.0dp" android:layout_alignParentLeft="true" />
+    <ImageView android:id="@id/item_check_icon" android:visibility="invisible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="18.0dp" android:src="@drawable/selector_item_check_icon" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+    <RelativeLayout android:id="@id/item_check_text_layout" android:duplicateParentState="true" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_toLeftOf="@id/item_check_icon" android:layout_toRightOf="@id/item_check_left_icon" android:layout_centerVertical="true">
+        <TextView android:textSize="18.0sp" android:textColor="@color/item_check_text_colorlist" android:id="@id/item_check_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:singleLine="true" />
+        <TextView android:textSize="13.5sp" android:textColor="@color/item_check_summary_text_colorlist" android:id="@id/item_check_summary" android:visibility="gone" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_below="@id/item_switch_title" android:layout_alignLeft="@id/item_switch_title" />
+    </RelativeLayout>
+</RelativeLayout>

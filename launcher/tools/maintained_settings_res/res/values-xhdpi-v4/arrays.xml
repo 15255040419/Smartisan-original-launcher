@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="default_docks">
+        <item>com.android.contacts.activities.DialtactsActivity</item>
+        <item>com.google.android.apps.chrome.Main</item>
+        <item>com.android.mms.ui.ConversationList</item>
+    </string-array>
+    <integer-array name="icon_shadow_color">
+        <item>0x2f000000</item>
+        <item>0x3f000000</item>
+    </integer-array>
+    <integer-array name="icon_shadow_radius">
+        <item>9</item>
+        <item>3</item>
+    </integer-array>
+</resources>

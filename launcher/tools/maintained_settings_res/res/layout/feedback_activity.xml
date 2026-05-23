@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@drawable/feedback_sdk_background" android:fitsSystemWindows="true" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:feedbackhelper="http://schemas.android.com/apk/res-auto">
+    <com.smartisan.feedbackhelper.utils.Title android:id="@id/view_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" feedbackhelper:feedback_itemtitle="@string/user_feedback" feedbackhelper:feedback_backText="@string/title_button_text_back" />
+    <include layout="@layout/feedback_title_bar_shadow" />
+    <ScrollView android:id="@id/view_main" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/view_title" android:overScrollMode="never">
+        <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <FrameLayout android:id="@id/launcher_container" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/view_title" />
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>

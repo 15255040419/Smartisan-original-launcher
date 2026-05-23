@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="dialog_padding">16.0dp</dimen>
+    <dimen name="icon_settings_author_margin_left">44.0px</dimen>
+    <dimen name="icon_settings_author_margin_right">54.0dp</dimen>
+    <dimen name="icon_settings_icon_margin_left">36.0px</dimen>
+</resources>

@@ -4597,9 +4597,13 @@
 
     iput-object v2, v1, Landroid/content/pm/ActivityInfo;->name:Ljava/lang/String;
 
+    const v2, 0x7f02018d
+
+    iput v2, v1, Landroid/content/pm/ActivityInfo;->icon:I
+
     iput-object v1, v0, Landroid/content/pm/ResolveInfo;->activityInfo:Landroid/content/pm/ActivityInfo;
 
-    const-string v1, "\u8bbe\u7f6e"
+    const-string v1, "\u684c\u9762\u8bbe\u7f6e"
 
     iput-object v1, v0, Landroid/content/pm/ResolveInfo;->nonLocalizedLabel:Ljava/lang/CharSequence;
 

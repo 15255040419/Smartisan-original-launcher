@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/smt_dialog_bg_full"
+    android:minWidth="300dp"
+    android:padding="0dp">
+
+    <!-- Title Bar -->
+    <TextView
+        android:id="@id/custom_dialog_title"
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:layout_alignParentTop="true"
+        android:background="@drawable/smt_dialog_header"
+        android:gravity="center"
+        android:text="@string/update_available_title"
+        android:textColor="#5C5C5C"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- Buttons Area (Fixed at Bottom) -->
+    <LinearLayout
+        android:id="@+id/update_dialog_btn_area"
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/smt_dialog_footer"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@id/btn_cancel"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/smt_dialog_btn_left"
+            android:text="@string/os_update_dlg_cancel_btn"
+            android:textColor="#5C5C5C"
+            android:textSize="16sp" />
+
+        <View
+            android:layout_width="1px"
+            android:layout_height="match_parent"
+            android:background="#D1D1D1" />
+
+        <Button
+            android:id="@id/btn_update"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/smt_dialog_btn_right"
+            android:text="@string/os_update_dlg_ok_btn"
+            android:textColor="#3D85C6"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:id="@+id/update_dialog_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:layout_above="@id/update_dialog_btn_area"
+        android:background="#D1D1D1" />
+
+    <!-- Content Area (Scrollable in the middle) -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/custom_dialog_title"
+        android:layout_above="@id/update_dialog_divider"
+        android:padding="24dp"
+        android:scrollbars="vertical"
+        android:fadingEdge="vertical"
+        android:requiresFadingEdge="vertical">
+
+        <TextView
+            android:id="@id/custom_dialog_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/check_update_title"
+            android:textColor="#5C5C5C"
+            android:textSize="15sp"
+            android:lineSpacingMultiplier="1.3" />
+    </ScrollView>
+
+</RelativeLayout>

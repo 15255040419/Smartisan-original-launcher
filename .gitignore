@@ -3,7 +3,10 @@ build/
 *.png
 *.jpg
 *.jpeg
+!launcher/assets/settings_native/
+!launcher/assets/settings_native/*.png
 launcher/scratch/
+scratch/
 decoded_desktop/
 desktop_orig/
 desktop_orig_norsc/

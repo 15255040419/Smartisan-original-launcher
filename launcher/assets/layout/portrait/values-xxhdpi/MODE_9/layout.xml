@@ -108,7 +108,7 @@
     <integer name="max_dot_num">36</integer>
     <integer name="multi_select_distance">6</integer>
     <integer name="name_off_set_y">-131</integer>
-    <integer name="name_off_set_y_folder">-92</integer>
+    <integer name="name_off_set_y_folder">-72</integer>
     <integer name="page_cell_col_num">3</integer>
     <integer name="page_cell_row_num">3</integer>
     <integer name="page_height_trans">1395</integer>
@@ -120,7 +120,7 @@
     <integer name="page_title_shadow_width">1080</integer>
     <integer name="page_title_width">1080</integer>
     <integer name="page_view_margin_bottom">0</integer>
-    <integer name="page_view_margin_bottom_folder">434</integer>
+    <integer name="page_view_margin_bottom_folder">399</integer>
     <integer name="page_view_margin_bottom_trans">46</integer>
     <integer name="page_view_margin_left">0</integer>
     <integer name="page_view_margin_left_folder">110</integer>
@@ -129,7 +129,7 @@
     <integer name="page_view_margin_right_folder">110</integer>
     <integer name="page_view_margin_right_trans">12</integer>
     <integer name="page_view_margin_top">0</integer>
-    <integer name="page_view_margin_top_folder">434</integer>
+    <integer name="page_view_margin_top_folder">469</integer>
     <integer name="page_view_margin_top_trans">14</integer>
     <integer name="page_width_trans">1056</integer>
     <integer name="setting_button">134</integer>

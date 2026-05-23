@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <FrameLayout android:id="@id/frame_layout" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="21.0dp" android:layout_alignParentLeft="true" android:layout_centerVertical="true">
+        <ImageView android:id="@id/item_icon_frame" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/wallpaper_setting_icon_frame" />
+        <ImageView android:layout_gravity="center" android:id="@id/item_icon" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:scaleType="centerCrop" android:adjustViewBounds="true" android:maxWidth="60.0dp" android:maxHeight="70.0dp" />
+    </FrameLayout>
+    <ImageView android:id="@id/item_arrow" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/selector_check_icon" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+    <LinearLayout android:orientation="vertical" android:id="@id/text_area" android:duplicateParentState="true" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginRight="@dimen/settings_item_title_right_margin" android:layout_toLeftOf="@id/item_arrow" android:layout_toRightOf="@id/frame_layout" android:layout_centerVertical="true">
+        <TextView android:textSize="@dimen/settings_item_title_size" android:textColor="@color/setting_item_text_colorlist" android:id="@id/item_title" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:singleLine="true" />
+        <TextView android:textSize="@dimen/settings_item_sub_title_size" android:textColor="@color/setting_item_summary_text_colorlist" android:ellipsize="end" android:id="@id/item_subtitle" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:singleLine="false" android:shadowColor="#33000000" android:shadowDy="-1.0" android:shadowRadius="0.0" android:layout_below="@id/item_title" />
+    </LinearLayout>
+</merge>

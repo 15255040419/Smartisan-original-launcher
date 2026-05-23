@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:background="@null" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <FrameLayout android:id="@id/transparent_view" android:layout_width="match_parent" android:layout_height="51.0dp" />
+    <TextView android:textSize="12.0sp" android:textColor="#757883" android:id="@id/popup_info_text" android:background="@drawable/feedback_popup_bg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:lineSpacingExtra="13.0dp" />
+</LinearLayout>

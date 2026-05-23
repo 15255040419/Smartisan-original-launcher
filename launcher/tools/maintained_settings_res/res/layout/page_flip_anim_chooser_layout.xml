@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@drawable/background" android:fitsSystemWindows="true" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:setting="http://schemas.android.com/apk/res-auto">
+    <com.smartisanos.home.widget.sys.Title android:id="@id/page_flip_anim_chooser_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" setting:title_titlex="@string/page_flip_anim_chooser_title_text" />
+    <ListView android:id="@android:id/list" android:layout_width="match_parent" android:layout_height="wrap_content" android:divider="@android:color/transparent" android:layout_below="@id/page_flip_anim_chooser_title" />
+    <include android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_below="@id/page_flip_anim_chooser_title" layout="@layout/title_bar_shadow" />
+</RelativeLayout>

@@ -30,7 +30,9 @@
   <uses-permission android:name="android.permission.STOP_APP_SWITCHES" />
   <uses-permission android:name="android.permission.CHANGE_COMPONENT_ENABLED_STATE" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS" />
   <uses-permission android:name="android.permission.STATUS_BAR" />
   <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
@@ -115,7 +117,7 @@
       </intent-filter>
       <meta-data android:name="revone_entry" android:value="com.smartisanos.desktop/com.smartisanos.launcher.ConfirmPasswordActivity" />
     </activity>
-    <activity android:theme="@0x7f0c015f" android:name="com.smartisanos.launcher.theme.ThemeChooserActivity" android:exported="true" android:taskAffinity="com.android.settings" android:launchMode="1" android:screenOrientation="1">
+    <activity android:theme="@0x7f0c015f" android:name="com.smartisanos.launcher.theme.ThemeChooserActivity" android:exported="true" android:taskAffinity="smartisanos.task.launcher" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1">
       <meta-data android:name="smartisanos.PACKAGELOCK_PACKAGENAME" android:value="com.android.settings" />
     </activity>
     <activity android:theme="@0x7f0c015f" android:name="com.smartisanos.launcher.theme.ThemeItemActivity" android:taskAffinity="com.android.settings" android:launchMode="1" android:screenOrientation="1">

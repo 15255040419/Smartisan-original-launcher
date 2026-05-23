@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:id="@id/useragree_container" android:background="@drawable/useragree_bg" android:fitsSystemWindows="true" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <smartisanos.widget.Title android:id="@id/useragree_titlebar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" />
+    <RelativeLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/useragree_titlebar">
+        <View android:orientation="horizontal" android:id="@id/user_experience_plan_selector" android:background="@drawable/sub_item_back_ground_bottom" android:layout_width="match_parent" android:layout_height="40.0dp" android:layout_marginBottom="6.0dp" android:layout_alignParentBottom="true" />
+        <RelativeLayout android:background="@drawable/sub_item_back_ground_top" android:paddingTop="4.0dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6.0dp" android:layout_above="@id/user_experience_plan_selector">
+            <ScrollView android:id="@id/useragree_scroll_view" android:paddingLeft="12.0dp" android:paddingRight="12.0dp" android:fadingEdge="none" android:layout_width="match_parent" android:layout_height="match_parent">
+                <WebView android:id="@id/experience_plan_info" android:layout_width="match_parent" android:layout_height="wrap_content" />
+            </ScrollView>
+            <TextView android:background="@drawable/expirement_header_cover" android:layout_width="match_parent" android:layout_height="24.0dp" android:layout_marginLeft="19.0dp" android:layout_marginRight="19.0dp" />
+            <TextView android:background="@drawable/expirement_footer_cover" android:layout_width="match_parent" android:layout_height="24.0dp" android:layout_marginLeft="19.0dp" android:layout_marginRight="19.0dp" android:layout_alignParentBottom="true" />
+        </RelativeLayout>
+    </RelativeLayout>
+</RelativeLayout>

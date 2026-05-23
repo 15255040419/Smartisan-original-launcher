@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="@dimen/follow_title_text_size" android:textColor="@color/follow_title_text_color" android:gravity="left|center" android:paddingLeft="@dimen/setting_item_text_left" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/follow_title_top" android:layout_marginBottom="@dimen/follow_title_bottom" android:text="@string/setting_follow_title" />
+    <RelativeLayout android:orientation="horizontal" android:id="@id/setting_follow_weixin" android:background="@drawable/setting_item_up" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textSize="@dimen/setting_item_text_size" android:textColor="@drawable/more_item_color_bg" android:paddingLeft="@dimen/setting_item_text_left" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/follow_weixin_title" android:layout_centerVertical="true" />
+        <TextView android:textSize="@dimen/setting_item_text_copyright_size" android:textColor="@drawable/more_item_right_color_bg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="@dimen/setting_item_text_right" android:text="@string/follow_weixin_content" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+    </RelativeLayout>
+    <RelativeLayout android:orientation="horizontal" android:id="@id/setting_follow_weibo" android:background="@drawable/more_item_middle" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textSize="@dimen/setting_item_text_size" android:textColor="@drawable/more_item_color_bg" android:paddingLeft="@dimen/setting_item_text_left" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/follow_weibo_title" android:layout_centerVertical="true" />
+        <TextView android:textSize="@dimen/setting_item_text_copyright_size" android:textColor="@drawable/more_item_right_color_bg" android:id="@id/follow_weibo_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="@dimen/setting_item_text_right" android:text="@string/follow_weibo_content" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+    </RelativeLayout>
+    <RelativeLayout android:orientation="horizontal" android:id="@id/setting_follow_website" android:background="@drawable/setting_item_down" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textSize="@dimen/setting_item_text_size" android:textColor="@drawable/more_item_color_bg" android:paddingLeft="@dimen/setting_item_text_left" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/follow_website_title" android:layout_centerVertical="true" />
+        <TextView android:textSize="@dimen/setting_item_text_copyright_size" android:textColor="@drawable/more_item_right_color_bg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="@dimen/setting_item_text_right" android:text="@string/follow_website_content" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+    </RelativeLayout>
+</LinearLayout>

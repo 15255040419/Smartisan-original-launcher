@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:paddingLeft="30.0dp" android:paddingTop="0.0dp" android:paddingRight="30.0dp" android:paddingBottom="40.0dp" android:layout_marginTop="-15.0dp" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="12.0sp" android:textColor="#999999" android:lineSpacingExtra="4.0dp" android:gravity="left" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/icon_setting_footer_text" android:lineHeight="18.0dp" />
+</LinearLayout>

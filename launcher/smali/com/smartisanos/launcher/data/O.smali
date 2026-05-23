@@ -226,9 +226,11 @@
 .end method
 
 .method private ua(Landroid/content/Context;)V
-    .locals 8
+    .locals 9
 
     const-string v0, "true"
+
+    move-object v8, p1
 
     .line 1
     sget-boolean v1, Lcom/smartisanos/launcher/va;->DBG:Z
@@ -354,6 +356,28 @@
     invoke-static {p1, v0, v1}, Landroid/provider/Settings$Global;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I
 
     move-result v0
+
+    const-string v4, "com.smartisanos.launcher_prefs"
+
+    const/4 v5, 0x0
+
+    invoke-virtual {v8, v4, v5}, Landroid/content/Context;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
+
+    move-result-object v4
+
+    const-string v5, "prefs_key_launcher_mode"
+
+    const/4 v6, -0x1
+
+    invoke-interface {v4, v5, v6}, Landroid/content/SharedPreferences;->getInt(Ljava/lang/String;I)I
+
+    move-result v4
+
+    if-eq v4, v6, :cond_launcher_mode_pref_done
+
+    move v0, v4
+
+    :cond_launcher_mode_pref_done
 
     .line 18
     invoke-static {v0}, Lcom/smartisanos/launcher/data/Constants;->checkSingleMode(I)Z
@@ -658,6 +682,20 @@
 
     .line 51
     invoke-static {p1, p0, v3}, Landroid/provider/Settings$Global;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I
+
+    move-result p0
+
+    const-string v4, "com.smartisanos.launcher_prefs"
+
+    const/4 v5, 0x0
+
+    invoke-virtual {v8, v4, v5}, Landroid/content/Context;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
+
+    move-result-object v4
+
+    const-string v5, "launcher_page_animation"
+
+    invoke-interface {v4, v5, p0}, Landroid/content/SharedPreferences;->getInt(Ljava/lang/String;I)I
 
     move-result p0
 

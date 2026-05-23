@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:setting="http://schemas.android.com/apk/res/com.smartisanos.home">
+    <TextView android:text="@string/launcher_mode_summary" style="@style/SettingItemTitleStyle" />
+    <LinearLayout android:background="@drawable/bg_preview_2" android:layout_marginLeft="8.0dp" android:layout_marginRight="8.0dp" style="@style/SettingPreviewStyle">
+        <com.smartisanos.home.settings.PreviewSettingItemView android:id="@id/smartisan_launcher_9_grids" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_weight="1.0" setting:previewNormalDrawable="@drawable/grids_9_preview_normal" setting:previewTitle="@string/mode_smartisan_launcher_9_grids" />
+        <com.smartisanos.home.settings.PreviewSettingItemView android:id="@id/smartisan_launcher_16_grids" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_weight="1.0" setting:previewNormalDrawable="@drawable/grids_16_preview_normal" setting:previewTitle="@string/mode_smartisan_launcher_16_grids" />
+    </LinearLayout>
+</LinearLayout>

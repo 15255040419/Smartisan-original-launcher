@@ -5323,6 +5323,10 @@
 
     iget v2, v2, Lcom/smartisanos/smengine/a/j;->y:F
 
+    invoke-static {p0, p1, p2, v3}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustX(Ljava/lang/Object;IIF)F
+
+    move-result v3
+
     iget v4, p0, Lcom/smartisanos/launcher/view/b/M;->WG:F
 
     invoke-virtual {v0, v3, v2, v4}, Lcom/smartisanos/smengine/SceneNode;->setTranslate(FFF)V
@@ -8686,6 +8690,10 @@
     iget v5, v4, Lcom/smartisanos/smengine/a/j;->x:F
 
     iget v4, v4, Lcom/smartisanos/smengine/a/j;->y:F
+
+    invoke-static {p0, v9, v10, v5}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustX(Ljava/lang/Object;IIF)F
+
+    move-result v5
 
     iget v6, p0, Lcom/smartisanos/launcher/view/b/M;->WG:F
 

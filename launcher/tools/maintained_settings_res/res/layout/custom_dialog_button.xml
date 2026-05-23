@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Button android:textSize="15.0sp" android:textStyle="bold" android:textColor="@drawable/ux_dialog_button_color" android:gravity="center" android:id="@id/custom_dialog_button" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_weight="1.0" style="?android:attr/buttonBarButtonStyle"
+  xmlns:android="http://schemas.android.com/apk/res/android" />

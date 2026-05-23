@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="pre_title_list">
+        <item>游戏</item>
+        <item>系统工具</item>
+        <item>新闻资讯</item>
+        <item>生活实用</item>
+        <item>交通出行</item>
+        <item>影音图像</item>
+        <item>商务办公</item>
+        <item>学习教育</item>
+        <item>社交通讯</item>
+        <item>儿童母婴</item>
+        <item>金融理财</item>
+        <item>书刊阅读</item>
+    </string-array>
+    <string-array name="page_scroll_anim_item">
+        <item>默认动画</item>
+        <item>图标翻转动画</item>
+        <item>图标拆开动画</item>
+        <item>页面翻转动画</item>
+        <item>百页窗动画</item>
+        <item>图标聚合动画</item>
+        <item>切牌动画</item>
+    </string-array>
+</resources>
