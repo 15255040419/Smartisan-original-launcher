@@ -139,8 +139,6 @@
 .method public static a(Landroid/content/ContentResolver;Ljava/lang/String;)V
     .locals 3
 
-    return-void
-
     .line 1
     sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
 
@@ -166,10 +164,56 @@
 
     .line 2
     :cond_0
+    :try_start_0
     sget-object v0, Lcom/smartisanos/launcher/data/M;->LAUNCHER_THEME:Ljava/lang/String;
 
     invoke-static {p0, v0, p1}, Landroid/provider/Settings$Global;->putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z
+    :try_end_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
 
+    goto :goto_0
+
+    :catch_0
+    move-exception p0
+
+    :goto_0
+    :try_start_1
+    invoke-static {}, Lcom/smartisanos/launcher/ja;->getInstance()Lcom/smartisanos/launcher/ja;
+
+    move-result-object p0
+
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/ja;->getApplication()Landroid/app/Application;
+
+    move-result-object p0
+
+    const-string v0, "com.smartisanos.launcher_prefs"
+
+    const/4 v1, 0x0
+
+    invoke-virtual {p0, v0, v1}, Landroid/app/Application;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
+
+    move-result-object p0
+
+    invoke-interface {p0}, Landroid/content/SharedPreferences;->edit()Landroid/content/SharedPreferences$Editor;
+
+    move-result-object p0
+
+    const-string v0, "launcher_theme"
+
+    invoke-interface {p0, v0, p1}, Landroid/content/SharedPreferences$Editor;->putString(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;
+
+    move-result-object p0
+
+    invoke-interface {p0}, Landroid/content/SharedPreferences$Editor;->apply()V
+    :try_end_1
+    .catch Ljava/lang/Throwable; {:try_start_1 .. :try_end_1} :catch_1
+
+    goto :goto_1
+
+    :catch_1
+    move-exception p0
+
+    :goto_1
     return-void
 .end method
 
@@ -185,19 +229,24 @@
 .method public static j(Landroid/content/ContentResolver;)Ljava/lang/String;
     .locals 3
 
+    :try_start_0
     .line 1
     sget-object v0, Lcom/smartisanos/launcher/data/M;->LAUNCHER_THEME:Ljava/lang/String;
 
     invoke-static {p0, v0}, Landroid/provider/Settings$Global;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object p0
+    :try_end_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
 
-    if-nez p0, :cond_smt_theme_default_done
+    goto :goto_0
 
-    const-string p0, "smartisan_theme_raven"
+    :catch_0
+    move-exception p0
 
-    :cond_smt_theme_default_done
+    const/4 p0, 0x0
 
+    :goto_0
     .line 2
     sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
 
@@ -222,6 +271,42 @@
     invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     :cond_0
+    if-nez p0, :cond_1
+
+    :try_start_1
+    invoke-static {}, Lcom/smartisanos/launcher/ja;->getInstance()Lcom/smartisanos/launcher/ja;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/ja;->getApplication()Landroid/app/Application;
+
+    move-result-object v0
+
+    const-string v1, "com.smartisanos.launcher_prefs"
+
+    const/4 v2, 0x0
+
+    invoke-virtual {v0, v1, v2}, Landroid/app/Application;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
+
+    move-result-object v0
+
+    const-string v1, "launcher_theme"
+
+    const/4 v2, 0x0
+
+    invoke-interface {v0, v1, v2}, Landroid/content/SharedPreferences;->getString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object p0
+    :try_end_1
+    .catch Ljava/lang/Throwable; {:try_start_1 .. :try_end_1} :catch_1
+
+    goto :goto_1
+
+    :catch_1
+    move-exception v0
+
+    :goto_1
+    :cond_1
     return-object p0
 .end method
 
@@ -253,15 +338,13 @@
     :try_start_0
     sget-object v1, Lcom/smartisanos/launcher/data/M;->LAUNCHER_HIDE_LABLE:Ljava/lang/String;
 
-    invoke-static {p1, v1}, Landroid/provider/Settings$System;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
+    const/4 v2, 0x0
 
-    move-result-object v1
-
-    .line 4
-    invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-static {v8, v1, v2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
 
     move-result v1
 
+    .line 4
     const/4 v2, 0x1
 
     const/4 v3, 0x0
@@ -331,7 +414,7 @@
     :goto_2
     sget-object v0, Lcom/smartisanos/launcher/data/M;->cr:Ljava/lang/String;
 
-    invoke-static {p1, v0, v2}, Landroid/provider/Settings$Global;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I
+    invoke-static {v8, v0, v2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
 
     move-result v0
 
@@ -639,7 +722,13 @@
 
     .line 45
     :cond_e
-    sput-boolean v2, Lcom/smartisanos/launcher/data/Constants;->OPEN_APP_IN_MULTI_PAGE_MODE:Z
+    const-string p0, "fast_launch_app_on"
+
+    invoke-static {v8, p0, v2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
+
+    move-result p0
+
+    sput-boolean p0, Lcom/smartisanos/launcher/data/Constants;->OPEN_APP_IN_MULTI_PAGE_MODE:Z
     :try_end_1
     .catch Ljava/lang/Exception; {:try_start_1 .. :try_end_1} :catch_1
 
@@ -702,14 +791,6 @@
     sput p0, Lcom/smartisanos/launcher/data/Constants;->SCROLL_ANIMATION_TYPE:I
 
     .line 52
-    sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
-
-    if-eqz p0, :cond_11
-
-    .line 53
-    sput v3, Lcom/smartisanos/launcher/data/Constants;->SCROLL_ANIMATION_TYPE:I
-
-    .line 54
     :cond_11
     sget-boolean p0, Lcom/smartisanos/launcher/va;->DBG:Z
 
@@ -945,23 +1026,14 @@
 .end method
 
 .method public J(Landroid/content/Context;)Z
-    .locals 1
+    .locals 2
 
     .line 1
-    invoke-virtual {p1}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
-
-    move-result-object p1
-
     sget-object v0, Lcom/smartisanos/launcher/data/M;->LAUNCHER_HIDE_LABLE:Ljava/lang/String;
 
-    invoke-static {p1, v0}, Landroid/provider/Settings$System;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
+    const/4 v1, 0x0
 
-    move-result-object p1
-
-    const-string v0, "true"
-
-    .line 2
-    invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-static {p1, v0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
 
     move-result p1
 

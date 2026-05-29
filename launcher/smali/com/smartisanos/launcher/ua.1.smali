@@ -1032,9 +1032,12 @@
 .end method
 
 .method public static d(Landroid/content/Context;)Landroid/graphics/drawable/Drawable;
-    .locals 1
+    .locals 2
 
     .line 1
+    move-object v1, p0
+
+    :try_start_0
     invoke-static {}, Lsmartisanos/api/WallpaperManagerSmt;->getInstance()Lsmartisanos/api/WallpaperManagerSmt;
 
     move-result-object v0
@@ -1046,6 +1049,34 @@
     invoke-virtual {v0, p0}, Lsmartisanos/api/WallpaperManagerSmt;->getDrawableUncheck(Landroid/app/WallpaperManager;)Landroid/graphics/drawable/Drawable;
 
     move-result-object p0
+    :try_end_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
+
+    if-eqz p0, :cond_0
+
+    return-object p0
+
+    :catch_0
+    move-exception v0
+
+    :cond_0
+    :try_start_1
+    invoke-static {v1}, Landroid/app/WallpaperManager;->getInstance(Landroid/content/Context;)Landroid/app/WallpaperManager;
+
+    move-result-object p0
+
+    invoke-virtual {p0}, Landroid/app/WallpaperManager;->getDrawable()Landroid/graphics/drawable/Drawable;
+
+    move-result-object p0
+    :try_end_1
+    .catch Ljava/lang/Throwable; {:try_start_1 .. :try_end_1} :catch_1
+
+    return-object p0
+
+    :catch_1
+    move-exception p0
+
+    const/4 p0, 0x0
 
     return-object p0
 .end method
@@ -2251,6 +2282,8 @@
 
 .method public static setAnimationScale(IF)V
     .locals 1
+
+    return-void
 
     .line 1
     sget-object v0, Lcom/smartisanos/launcher/ua;->Sf:Landroid/view/IWindowManager;

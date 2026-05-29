@@ -38,6 +38,18 @@
     return-void
 .end method
 
+.method protected onActivityResult(IILandroid/content/Intent;)V
+    .locals 1
+
+    invoke-super {p0, p1, p2, p3}, Landroid/app/Activity;->onActivityResult(IILandroid/content/Intent;)V
+
+    invoke-static {p0, p1, p2, p3}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onActivityResult(Landroid/app/Activity;IILandroid/content/Intent;)Z
+
+    move-result v0
+
+    return-void
+.end method
+
 .method protected onDestroy()V
     .locals 1
 

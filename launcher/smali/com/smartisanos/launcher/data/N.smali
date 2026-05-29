@@ -1060,6 +1060,10 @@
 
     move-result p0
 
+    invoke-static {p1, p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isTransparentThemeWithWallpaper(Landroid/content/Context;Z)Z
+
+    move-result p0
+
     sput-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
 
     .line 2
@@ -1069,6 +1073,15 @@
 
     sput-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransWallpaperBlur:Z
 
+    sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
+
+    if-eqz p0, :cond_trans_wallpaper_blur_done
+
+    const/4 p0, 0x1
+
+    sput-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransWallpaperBlur:Z
+
+    :cond_trans_wallpaper_blur_done
     .line 3
     sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
 
@@ -1082,6 +1095,7 @@
     .line 5
     sput-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransWallpaperBlur:Z
 
+    .line 6
     :cond_0
     return-void
 .end method

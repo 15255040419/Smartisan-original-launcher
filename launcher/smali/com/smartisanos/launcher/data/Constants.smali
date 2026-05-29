@@ -996,8 +996,10 @@
 
     const-string v2, "com.iflytek.speechcloud"
 
+    const-string v3, "app.lawnchair"
+
     .line 102
-    filled-new-array {v1, v2}, [Ljava/lang/String;
+    filled-new-array {v1, v2, v3}, [Ljava/lang/String;
 
     move-result-object v1
 
@@ -4207,7 +4209,7 @@
     goto :goto_0
 
     :cond_5
-    move v0, v1
+    const/16 v0, 0x14
 
     goto :goto_0
 
@@ -6394,6 +6396,25 @@
 
     sput v2, Lcom/smartisanos/launcher/data/Constants;->page_title_text_shadow_color:I
 
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/X;->i(Lcom/smartisanos/launcher/theme/v;)Z
+
+    move-result v2
+
+    if-eqz v2, :cond_aero_constants_done
+
+    const/4 v2, -0x1
+
+    sput v2, Lcom/smartisanos/launcher/data/Constants;->app_text_color:I
+
+    sput v2, Lcom/smartisanos/launcher/data/Constants;->page_title_text_color:I
+
+    const v2, -0x67000000
+
+    sput v2, Lcom/smartisanos/launcher/data/Constants;->app_text_shadow_color:I
+
+    sput v2, Lcom/smartisanos/launcher/data/Constants;->page_title_text_shadow_color:I
+
+    :cond_aero_constants_done
     .line 30
     iget-object v2, v0, Lcom/smartisanos/launcher/theme/v;->mPackage:Ljava/lang/String;
 

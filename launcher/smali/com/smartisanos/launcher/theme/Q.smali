@@ -496,6 +496,14 @@
     .line 56
     invoke-virtual {p0, p1}, Landroid/content/Intent;->addCategory(Ljava/lang/String;)Landroid/content/Intent;
 
+    invoke-virtual {v0}, Landroid/app/Activity;->getPackageName()Ljava/lang/String;
+
+    move-result-object p1
+
+    const-string v1, "com.smartisanos.launcher.LauncherAlias"
+
+    invoke-virtual {p0, p1, v1}, Landroid/content/Intent;->setClassName(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;
+
     .line 57
     sget-boolean p1, Lcom/smartisanos/launcher/va;->DBG:Z
 

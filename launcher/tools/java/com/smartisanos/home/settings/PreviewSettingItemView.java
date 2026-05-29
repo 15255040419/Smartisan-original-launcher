@@ -84,6 +84,12 @@ public class PreviewSettingItemView extends RelativeLayout {
         }
     }
 
+    public void setPreviewResource(int resId) {
+        if (previewImage != null && resId != 0) {
+            previewImage.setImageResource(resId);
+        }
+    }
+
     private int attrRes(AttributeSet attrs, String name) {
         if (attrs == null) return 0;
         int value = attrs.getAttributeResourceValue("http://schemas.android.com/apk/res-auto", name, 0);

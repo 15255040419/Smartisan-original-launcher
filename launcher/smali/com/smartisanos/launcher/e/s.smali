@@ -2131,6 +2131,16 @@
 
     move-result-object v1
 
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->iconOverrideDrawable(Landroid/content/pm/ResolveInfo;Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v2
+
+    if-eqz v2, :cond_icon_override_done
+
+    move-object v1, v2
+
+    :cond_icon_override_done
+
     .line 231
     sget-boolean v2, Lcom/smartisanos/launcher/va;->DBG:Z
 
@@ -8142,7 +8152,7 @@
 .end method
 
 .method public static ha(Landroid/content/Context;)Ljava/lang/String;
-    .locals 2
+    .locals 4
 
     .line 1
     sget-boolean v0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
@@ -8150,13 +8160,17 @@
     if-eqz v0, :cond_0
 
     .line 2
-    invoke-virtual {p0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
-
-    move-result-object p0
-
     sget-object v0, Lcom/smartisanos/launcher/data/M;->sr:Ljava/lang/String;
 
-    invoke-static {p0, v0}, Landroid/provider/Settings$Global;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
+    invoke-virtual {p0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
+
+    move-result-object v1
+
+    invoke-static {v1, v0}, Landroid/provider/Settings$Global;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v1
+
+    invoke-static {p0, v0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readString(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object p0
 
@@ -8164,33 +8178,33 @@
 
     .line 3
     :cond_0
+    sget-object v0, Lcom/smartisanos/launcher/data/M;->LOCKSCREEN_BACKGROUND:Ljava/lang/String;
+
     invoke-virtual {p0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
 
-    move-result-object v0
+    move-result-object v1
 
-    sget-object v1, Lcom/smartisanos/launcher/data/M;->LOCKSCREEN_BACKGROUND:Ljava/lang/String;
+    invoke-static {v1, v0}, Landroid/provider/Settings$System;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
 
-    invoke-static {v0, v1}, Landroid/provider/Settings$System;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
+    move-result-object v1
 
-    move-result-object v0
-
-    if-nez v0, :cond_1
+    if-nez v1, :cond_1
 
     .line 4
     invoke-virtual {p0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
 
-    move-result-object p0
+    move-result-object v2
 
-    sget-object v0, Lcom/smartisanos/launcher/data/M;->DEFAULT_LOCKSCREEN_URI:Ljava/lang/String;
+    sget-object v3, Lcom/smartisanos/launcher/data/M;->DEFAULT_LOCKSCREEN_URI:Ljava/lang/String;
 
-    invoke-static {p0, v0}, Landroid/provider/Settings$Global;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
+    invoke-static {v2, v3}, Landroid/provider/Settings$Global;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
 
-    move-result-object p0
-
-    goto :goto_0
+    move-result-object v1
 
     :cond_1
-    move-object p0, v0
+    invoke-static {p0, v0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readString(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object p0
 
     :goto_0
     return-object p0

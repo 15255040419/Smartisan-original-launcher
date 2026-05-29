@@ -5473,7 +5473,7 @@
     move-object/from16 v10, v20
 
     .line 295
-    invoke-virtual {v10, v8}, Landroid/content/pm/ResolveInfo;->loadIcon(Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
+    invoke-static {v10, v8}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->loadIcon(Landroid/content/pm/ResolveInfo;Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
 
     move-result-object v10
 
@@ -6462,7 +6462,7 @@
     move-result-object v8
 
     .line 246
-    invoke-virtual {v6, v8}, Landroid/content/pm/ResolveInfo;->loadIcon(Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
+    invoke-static {v6, v8}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->loadIcon(Landroid/content/pm/ResolveInfo;Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
 
     move-result-object v6
 
@@ -14533,7 +14533,7 @@
 
     move-result-object v11
 
-    invoke-virtual {v9, v11}, Landroid/content/pm/ResolveInfo;->loadIcon(Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
+    invoke-static {v9, v11}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->loadIcon(Landroid/content/pm/ResolveInfo;Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
 
     move-result-object v9
 

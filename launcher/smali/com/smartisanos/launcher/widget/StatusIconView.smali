@@ -4,258 +4,159 @@
 
 
 # instance fields
-.field private He:Landroid/graphics/drawable/Drawable;
+.field private mDegrees:I
 
-.field private Ie:Landroid/graphics/drawable/Drawable;
-
-.field private Je:I
-
-.field private Ke:Ljava/lang/Runnable;
+.field private mInvalidateRunnable:Ljava/lang/Runnable;
 
 .field private mProgress:I
 
+.field private mProgressDrawable:Landroid/graphics/drawable/Drawable;
+
 .field private mResId:I
+
+.field private mStatusDrawable:Landroid/graphics/drawable/Drawable;
 
 
 # direct methods
 .method public constructor <init>(Landroid/content/Context;)V
-    .locals 0
+    .locals 1
+    .param p1, "context"    # Landroid/content/Context;
 
-    .line 7
+    .prologue
+    .line 25
     invoke-direct {p0, p1}, Landroid/view/View;-><init>(Landroid/content/Context;)V
 
-    const/4 p1, -0x1
+    .line 14
+    const/4 v0, -0x1
 
-    .line 8
-    iput p1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mResId:I
+    iput v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mResId:I
 
-    .line 9
-    new-instance p1, Lcom/smartisanos/launcher/widget/d;
+    .line 86
+    new-instance v0, Lcom/smartisanos/launcher/widget/StatusIconView$1;
 
-    invoke-direct {p1, p0}, Lcom/smartisanos/launcher/widget/d;-><init>(Lcom/smartisanos/launcher/widget/StatusIconView;)V
+    invoke-direct {v0, p0}, Lcom/smartisanos/launcher/widget/StatusIconView$1;-><init>(Lcom/smartisanos/launcher/widget/StatusIconView;)V
 
-    iput-object p1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ke:Ljava/lang/Runnable;
+    iput-object v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mInvalidateRunnable:Ljava/lang/Runnable;
 
+    .line 26
     return-void
 .end method
 
 .method public constructor <init>(Landroid/content/Context;Landroid/util/AttributeSet;)V
-    .locals 0
+    .locals 1
+    .param p1, "context"    # Landroid/content/Context;
+    .param p2, "attrs"    # Landroid/util/AttributeSet;
 
-    .line 4
+    .prologue
+    .line 21
     invoke-direct {p0, p1, p2}, Landroid/view/View;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;)V
 
-    const/4 p1, -0x1
+    .line 14
+    const/4 v0, -0x1
 
-    .line 5
-    iput p1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mResId:I
+    iput v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mResId:I
 
-    .line 6
-    new-instance p1, Lcom/smartisanos/launcher/widget/d;
+    .line 86
+    new-instance v0, Lcom/smartisanos/launcher/widget/StatusIconView$1;
 
-    invoke-direct {p1, p0}, Lcom/smartisanos/launcher/widget/d;-><init>(Lcom/smartisanos/launcher/widget/StatusIconView;)V
+    invoke-direct {v0, p0}, Lcom/smartisanos/launcher/widget/StatusIconView$1;-><init>(Lcom/smartisanos/launcher/widget/StatusIconView;)V
 
-    iput-object p1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ke:Ljava/lang/Runnable;
+    iput-object v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mInvalidateRunnable:Ljava/lang/Runnable;
 
+    .line 22
     return-void
 .end method
 
 .method public constructor <init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V
-    .locals 0
+    .locals 1
+    .param p1, "context"    # Landroid/content/Context;
+    .param p2, "attrs"    # Landroid/util/AttributeSet;
+    .param p3, "defStyleAttr"    # I
 
-    .line 1
+    .prologue
+    .line 17
     invoke-direct {p0, p1, p2, p3}, Landroid/view/View;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V
 
-    const/4 p1, -0x1
+    .line 14
+    const/4 v0, -0x1
 
-    .line 2
-    iput p1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mResId:I
+    iput v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mResId:I
 
-    .line 3
-    new-instance p1, Lcom/smartisanos/launcher/widget/d;
+    .line 86
+    new-instance v0, Lcom/smartisanos/launcher/widget/StatusIconView$1;
 
-    invoke-direct {p1, p0}, Lcom/smartisanos/launcher/widget/d;-><init>(Lcom/smartisanos/launcher/widget/StatusIconView;)V
+    invoke-direct {v0, p0}, Lcom/smartisanos/launcher/widget/StatusIconView$1;-><init>(Lcom/smartisanos/launcher/widget/StatusIconView;)V
 
-    iput-object p1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ke:Ljava/lang/Runnable;
+    iput-object v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mInvalidateRunnable:Ljava/lang/Runnable;
 
+    .line 18
     return-void
 .end method
 
 
 # virtual methods
 .method protected onDraw(Landroid/graphics/Canvas;)V
-    .locals 6
+    .locals 5
+    .param p1, "canvas"    # Landroid/graphics/Canvas;
 
-    .line 1
+    .prologue
+    const/4 v4, 0x0
+
+    .line 64
     invoke-virtual {p1}, Landroid/graphics/Canvas;->save()I
 
-    .line 2
-    iget-object v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->He:Landroid/graphics/drawable/Drawable;
+    .line 65
+    const/16 v0, 0x24
 
-    if-eqz v0, :cond_0
+    .line 66
+    .local v0, "left":I
+    iget-object v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mStatusDrawable:Landroid/graphics/drawable/Drawable;
 
-    .line 3
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
+    if-eqz v1, :cond_0
 
-    move-result-object v1
+    .line 67
+    iget-object v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mStatusDrawable:Landroid/graphics/drawable/Drawable;
 
-    iget v1, v1, Landroid/view/ViewGroup$LayoutParams;->width:I
-
-    div-int/lit8 v1, v1, 0x2
-
-    iget-object v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->He:Landroid/graphics/drawable/Drawable;
+    iget-object v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mStatusDrawable:Landroid/graphics/drawable/Drawable;
 
     invoke-virtual {v2}, Landroid/graphics/drawable/Drawable;->getIntrinsicWidth()I
 
     move-result v2
 
-    div-int/lit8 v2, v2, 0x2
+    add-int/2addr v2, v0
 
-    sub-int/2addr v1, v2
+    iget-object v3, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mStatusDrawable:Landroid/graphics/drawable/Drawable;
 
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
-
-    move-result-object v2
-
-    iget v2, v2, Landroid/view/ViewGroup$LayoutParams;->height:I
-
-    div-int/lit8 v2, v2, 0x2
-
-    iget-object v3, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->He:Landroid/graphics/drawable/Drawable;
-
+    .line 68
     invoke-virtual {v3}, Landroid/graphics/drawable/Drawable;->getIntrinsicHeight()I
 
     move-result v3
 
-    div-int/lit8 v3, v3, 0x2
+    .line 67
+    invoke-virtual {v1, v0, v4, v2, v3}, Landroid/graphics/drawable/Drawable;->setBounds(IIII)V
 
-    sub-int/2addr v2, v3
+    .line 69
+    iget-object v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mStatusDrawable:Landroid/graphics/drawable/Drawable;
 
-    add-int/lit8 v2, v2, 0x3
+    invoke-virtual {v1, p1}, Landroid/graphics/drawable/Drawable;->draw(Landroid/graphics/Canvas;)V
 
-    .line 4
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
-
-    move-result-object v3
-
-    iget v3, v3, Landroid/view/ViewGroup$LayoutParams;->width:I
-
-    div-int/lit8 v3, v3, 0x2
-
-    iget-object v4, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->He:Landroid/graphics/drawable/Drawable;
-
-    invoke-virtual {v4}, Landroid/graphics/drawable/Drawable;->getIntrinsicWidth()I
-
-    move-result v4
-
-    div-int/lit8 v4, v4, 0x2
-
-    add-int/2addr v3, v4
-
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
-
-    move-result-object v4
-
-    iget v4, v4, Landroid/view/ViewGroup$LayoutParams;->height:I
-
-    div-int/lit8 v4, v4, 0x2
-
-    iget-object v5, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->He:Landroid/graphics/drawable/Drawable;
-
-    invoke-virtual {v5}, Landroid/graphics/drawable/Drawable;->getIntrinsicHeight()I
-
-    move-result v5
-
-    div-int/lit8 v5, v5, 0x2
-
-    add-int/2addr v4, v5
-
-    add-int/lit8 v4, v4, 0x3
-
-    .line 5
-    invoke-virtual {v0, v1, v2, v3, v4}, Landroid/graphics/drawable/Drawable;->setBounds(IIII)V
-
-    .line 6
-    iget-object v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->He:Landroid/graphics/drawable/Drawable;
-
-    invoke-virtual {v0, p1}, Landroid/graphics/drawable/Drawable;->draw(Landroid/graphics/Canvas;)V
-
-    .line 7
+    .line 71
     :cond_0
-    iget-object v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ie:Landroid/graphics/drawable/Drawable;
+    iget-object v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgressDrawable:Landroid/graphics/drawable/Drawable;
 
-    if-eqz v0, :cond_2
+    if-eqz v1, :cond_2
 
-    .line 8
-    iget v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgress:I
+    .line 72
+    iget v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgress:I
 
-    if-gez v0, :cond_1
+    if-gez v1, :cond_1
 
-    .line 9
-    iget v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Je:I
-
-    int-to-float v0, v0
-
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
-
-    move-result-object v1
-
-    iget v1, v1, Landroid/view/ViewGroup$LayoutParams;->width:I
-
-    div-int/lit8 v1, v1, 0x2
+    .line 73
+    iget v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mDegrees:I
 
     int-to-float v1, v1
 
-    .line 10
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
-
-    move-result-object v2
-
-    iget v2, v2, Landroid/view/ViewGroup$LayoutParams;->height:I
-
-    div-int/lit8 v2, v2, 0x2
-
-    add-int/lit8 v2, v2, 0x3
-
-    int-to-float v2, v2
-
-    .line 11
-    invoke-virtual {p1, v0, v1, v2}, Landroid/graphics/Canvas;->rotate(FFF)V
-
-    .line 12
-    iget v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Je:I
-
-    add-int/lit8 v0, v0, 0xa
-
-    iput v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Je:I
-
-    .line 13
-    iget v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Je:I
-
-    rem-int/lit16 v0, v0, 0x168
-
-    iput v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Je:I
-
-    .line 14
-    iget-object v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ke:Ljava/lang/Runnable;
-
-    const-wide/16 v1, 0x19
-
-    invoke-virtual {p0, v0, v1, v2}, Landroid/view/View;->postDelayed(Ljava/lang/Runnable;J)Z
-
-    .line 15
-    :cond_1
-    iget-object v0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ie:Landroid/graphics/drawable/Drawable;
-
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
-
-    move-result-object v1
-
-    iget v1, v1, Landroid/view/ViewGroup$LayoutParams;->width:I
-
-    div-int/lit8 v1, v1, 0x2
-
-    iget-object v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ie:Landroid/graphics/drawable/Drawable;
+    iget-object v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgressDrawable:Landroid/graphics/drawable/Drawable;
 
     invoke-virtual {v2}, Landroid/graphics/drawable/Drawable;->getIntrinsicWidth()I
 
@@ -263,78 +164,260 @@
 
     div-int/lit8 v2, v2, 0x2
 
-    sub-int/2addr v1, v2
+    add-int/2addr v2, v0
 
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
+    int-to-float v2, v2
 
-    move-result-object v2
+    iget-object v3, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgressDrawable:Landroid/graphics/drawable/Drawable;
 
-    iget v2, v2, Landroid/view/ViewGroup$LayoutParams;->height:I
-
-    div-int/lit8 v2, v2, 0x2
-
-    iget-object v3, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ie:Landroid/graphics/drawable/Drawable;
-
+    .line 74
     invoke-virtual {v3}, Landroid/graphics/drawable/Drawable;->getIntrinsicHeight()I
 
     move-result v3
 
     div-int/lit8 v3, v3, 0x2
 
-    sub-int/2addr v2, v3
+    int-to-float v3, v3
 
-    add-int/lit8 v2, v2, 0x3
+    .line 73
+    invoke-virtual {p1, v1, v2, v3}, Landroid/graphics/Canvas;->rotate(FFF)V
 
-    .line 16
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
+    .line 75
+    iget v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mDegrees:I
 
-    move-result-object v3
+    add-int/lit8 v1, v1, 0xa
 
-    iget v3, v3, Landroid/view/ViewGroup$LayoutParams;->width:I
+    iput v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mDegrees:I
 
-    div-int/lit8 v3, v3, 0x2
+    .line 76
+    iget v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mDegrees:I
 
-    iget-object v4, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ie:Landroid/graphics/drawable/Drawable;
+    rem-int/lit16 v1, v1, 0x168
 
-    invoke-virtual {v4}, Landroid/graphics/drawable/Drawable;->getIntrinsicWidth()I
+    iput v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mDegrees:I
 
-    move-result v4
+    .line 77
+    iget-object v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mInvalidateRunnable:Ljava/lang/Runnable;
 
-    div-int/lit8 v4, v4, 0x2
+    const-wide/16 v2, 0x19
 
-    add-int/2addr v3, v4
+    invoke-virtual {p0, v1, v2, v3}, Lcom/smartisanos/launcher/widget/StatusIconView;->postDelayed(Ljava/lang/Runnable;J)Z
 
-    invoke-virtual {p0}, Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;
+    .line 79
+    :cond_1
+    iget-object v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgressDrawable:Landroid/graphics/drawable/Drawable;
 
-    move-result-object v4
+    iget-object v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgressDrawable:Landroid/graphics/drawable/Drawable;
 
-    iget v4, v4, Landroid/view/ViewGroup$LayoutParams;->height:I
+    invoke-virtual {v2}, Landroid/graphics/drawable/Drawable;->getIntrinsicWidth()I
 
-    div-int/lit8 v4, v4, 0x2
+    move-result v2
 
-    iget-object v5, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ie:Landroid/graphics/drawable/Drawable;
+    add-int/2addr v2, v0
 
-    invoke-virtual {v5}, Landroid/graphics/drawable/Drawable;->getIntrinsicHeight()I
+    iget-object v3, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgressDrawable:Landroid/graphics/drawable/Drawable;
 
-    move-result v5
+    .line 80
+    invoke-virtual {v3}, Landroid/graphics/drawable/Drawable;->getIntrinsicHeight()I
 
-    div-int/lit8 v5, v5, 0x2
+    move-result v3
 
-    add-int/2addr v4, v5
+    .line 79
+    invoke-virtual {v1, v0, v4, v2, v3}, Landroid/graphics/drawable/Drawable;->setBounds(IIII)V
 
-    add-int/lit8 v4, v4, 0x3
+    .line 81
+    iget-object v1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgressDrawable:Landroid/graphics/drawable/Drawable;
 
-    .line 17
-    invoke-virtual {v0, v1, v2, v3, v4}, Landroid/graphics/drawable/Drawable;->setBounds(IIII)V
+    invoke-virtual {v1, p1}, Landroid/graphics/drawable/Drawable;->draw(Landroid/graphics/Canvas;)V
 
-    .line 18
-    iget-object p0, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->Ie:Landroid/graphics/drawable/Drawable;
-
-    invoke-virtual {p0, p1}, Landroid/graphics/drawable/Drawable;->draw(Landroid/graphics/Canvas;)V
-
-    .line 19
+    .line 83
     :cond_2
     invoke-virtual {p1}, Landroid/graphics/Canvas;->restore()V
 
+    .line 84
     return-void
+.end method
+
+.method public setStatusImageAndProgress(II)V
+    .locals 6
+    .param p1, "rid"    # I
+    .param p2, "progress"    # I
+
+    .prologue
+    const/16 v3, 0x64
+
+    .line 29
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/widget/StatusIconView;->getResources()Landroid/content/res/Resources;
+
+    move-result-object v2
+
+    invoke-virtual {v2, p1}, Landroid/content/res/Resources;->getDrawable(I)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v2
+
+    iput-object v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mStatusDrawable:Landroid/graphics/drawable/Drawable;
+
+    .line 30
+    iget v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgress:I
+
+    if-ne v2, p2, :cond_1
+
+    .line 32
+    iget v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mResId:I
+
+    if-eq v2, p1, :cond_0
+
+    .line 33
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/widget/StatusIconView;->invalidate()V
+
+    .line 35
+    :cond_0
+    iput p1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mResId:I
+
+    .line 60
+    :goto_0
+    return-void
+
+    .line 38
+    :cond_1
+    iput p1, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mResId:I
+
+    .line 39
+    if-le p2, v3, :cond_2
+
+    .line 40
+    const/16 p2, 0x64
+
+    .line 42
+    :cond_2
+    iput p2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgress:I
+
+    .line 43
+    const/4 v0, 0x0
+
+    .line 44
+    .local v0, "id":I
+    iget v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgress:I
+
+    if-gez v2, :cond_4
+
+    .line 45
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/widget/StatusIconView;->getResources()Landroid/content/res/Resources;
+
+    move-result-object v2
+
+    const-string v3, "btn_loading"
+
+    const-string v4, "drawable"
+
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/widget/StatusIconView;->getContext()Landroid/content/Context;
+
+    move-result-object v5
+
+    invoke-virtual {v5}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+
+    move-result-object v5
+
+    invoke-virtual {v2, v3, v4, v5}, Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I
+
+    move-result v0
+
+    .line 54
+    :cond_3
+    :goto_1
+    if-nez v0, :cond_6
+
+    .line 55
+    const/4 v2, 0x0
+
+    iput-object v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgressDrawable:Landroid/graphics/drawable/Drawable;
+
+    .line 59
+    :goto_2
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/widget/StatusIconView;->invalidate()V
+
+    goto :goto_0
+
+    .line 46
+    :cond_4
+    iget v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgress:I
+
+    if-ne v2, v3, :cond_5
+
+    .line 47
+    const/4 v0, 0x0
+
+    goto :goto_1
+
+    .line 49
+    :cond_5
+    int-to-double v2, p2
+
+    const-wide v4, 0x400a666666666666L    # 3.3
+
+    div-double/2addr v2, v4
+
+    invoke-static {v2, v3}, Ljava/lang/Math;->round(D)J
+
+    move-result-wide v2
+
+    long-to-int v1, v2
+
+    .line 50
+    .local v1, "index":I
+    if-eqz v1, :cond_3
+
+    .line 51
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/widget/StatusIconView;->getResources()Landroid/content/res/Resources;
+
+    move-result-object v2
+
+    new-instance v3, Ljava/lang/StringBuilder;
+
+    invoke-direct {v3}, Ljava/lang/StringBuilder;-><init>()V
+
+    const-string v4, "btn_loading_"
+
+    invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v3
+
+    invoke-virtual {v3, v1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
+
+    move-result-object v3
+
+    invoke-virtual {v3}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v3
+
+    const-string v4, "drawable"
+
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/widget/StatusIconView;->getContext()Landroid/content/Context;
+
+    move-result-object v5
+
+    invoke-virtual {v5}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+
+    move-result-object v5
+
+    invoke-virtual {v2, v3, v4, v5}, Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I
+
+    move-result v0
+
+    goto :goto_1
+
+    .line 57
+    .end local v1    # "index":I
+    :cond_6
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/widget/StatusIconView;->getResources()Landroid/content/res/Resources;
+
+    move-result-object v2
+
+    invoke-virtual {v2, v0}, Landroid/content/res/Resources;->getDrawable(I)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v2
+
+    iput-object v2, p0, Lcom/smartisanos/launcher/widget/StatusIconView;->mProgressDrawable:Landroid/graphics/drawable/Drawable;
+
+    goto :goto_2
 .end method

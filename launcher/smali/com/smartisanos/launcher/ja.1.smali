@@ -2360,40 +2360,8 @@
 .end method
 
 .method public l(Z)V
-    .locals 1
+    .locals 0
 
-    .line 1
-    iget-object p0, p0, Lcom/smartisanos/launcher/ja;->Jg:Landroid/app/Application;
-
-    const-string v0, "statusbar"
-
-    invoke-virtual {p0, v0}, Landroid/app/Application;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
-
-    move-result-object p0
-
-    check-cast p0, Landroid/app/StatusBarManager;
-
-    if-nez p1, :cond_0
-
-    const/high16 p1, 0x80000
-
-    .line 2
-    invoke-virtual {p0, p1}, Landroid/app/StatusBarManager;->disable(I)V
-
-    const/high16 p1, 0x10000
-
-    .line 3
-    invoke-virtual {p0, p1}, Landroid/app/StatusBarManager;->disable(I)V
-
-    goto :goto_0
-
-    :cond_0
-    const/4 p1, 0x0
-
-    .line 4
-    invoke-virtual {p0, p1}, Landroid/app/StatusBarManager;->disable(I)V
-
-    :goto_0
     return-void
 .end method
 
@@ -2898,11 +2866,7 @@
     if-eq p1, v0, :cond_2f
 
     .line 21
-    invoke-static {}, Lcom/smartisanos/launcher/data/N;->xf()Z
-
-    move-result p1
-
-    xor-int/2addr p1, v4
+    xor-int/lit8 p1, v0, 0x1
 
     sput-boolean p1, Lcom/smartisanos/launcher/data/Constants;->SHOW_APP_NAME:Z
 
@@ -3051,17 +3015,29 @@
 
     move-result p0
 
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v2
+
+    invoke-virtual {v2}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v2
+
+    const-string v5, "com.smartisanos.launcher_prefs"
+
+    invoke-virtual {v2, v5, v3}, Landroid/content/Context;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
+
+    move-result-object v2
+
+    const-string v5, "launcher_page_animation"
+
+    invoke-interface {v2, v5, p0}, Landroid/content/SharedPreferences;->getInt(Ljava/lang/String;I)I
+
+    move-result p0
+
     sput p0, Lcom/smartisanos/launcher/data/Constants;->SCROLL_ANIMATION_TYPE:I
 
     .line 37
-    sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
-
-    if-eqz p0, :cond_10
-
-    .line 38
-    sput v3, Lcom/smartisanos/launcher/data/Constants;->SCROLL_ANIMATION_TYPE:I
-
-    .line 39
     :cond_10
     sget-boolean p0, Lcom/smartisanos/launcher/va;->DBG:Z
 
@@ -3148,7 +3124,7 @@
     .line 46
     sget-object p0, Lcom/smartisanos/launcher/data/M;->cr:Ljava/lang/String;
 
-    invoke-static {v1, p0, v4}, Landroid/provider/Settings$Global;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I
+    invoke-static {v0, p0, v4}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
 
     move-result p0
 

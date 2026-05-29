@@ -627,25 +627,28 @@
 
     const-string v0, "_folder"
 
-    .line 5
     invoke-virtual {p1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
     move-result p1
 
     if-eqz p1, :cond_0
 
-    .line 6
-    iget p1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->page_view_margin_top:F
+    sget v0, Lcom/smartisanos/launcher/data/Constants;->SCALE_Y:F
 
-    sget v0, Lcom/smartisanos/launcher/data/Constants;->status_bar_height:I
+    iget v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->page_view_margin_top:F
 
-    int-to-float v0, v0
+    mul-float/2addr v1, v0
 
-    sub-float/2addr p1, v0
+    iput v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->page_view_margin_bottom:F
 
-    iput p1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->page_view_margin_top:F
+    sget v2, Lcom/smartisanos/launcher/data/Constants;->status_bar_height:I
 
-    .line 7
+    int-to-float v2, v2
+
+    sub-float/2addr v1, v2
+
+    iput v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->page_view_margin_top:F
+
     :cond_0
     sget-boolean p1, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
 

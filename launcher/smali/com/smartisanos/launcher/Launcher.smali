@@ -123,6 +123,8 @@
     .line 3
     invoke-static {p0}, Lcom/smartisanos/launcher/J;->b(Landroid/app/Activity;)V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->maybeRefreshLauncherIcons(Landroid/content/Context;)V
+
     return-void
 .end method
 

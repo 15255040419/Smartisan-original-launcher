@@ -15,6 +15,7 @@ import smartisanos.widget.SwitchEx;
 public class SettingItemSwitch extends RelativeLayout {
     private SwitchEx toggle;
     private TextView title;
+    private TextView subtitle;
 
     public SettingItemSwitch(Context context) {
         this(context, null);
@@ -50,12 +51,30 @@ public class SettingItemSwitch extends RelativeLayout {
         toggle.setChecked(checked);
     }
 
+    public void setCheckedAnimated(boolean checked) {
+        toggle.setCheckedAnimated(checked);
+    }
+
     public boolean isChecked() {
         return toggle.isChecked();
     }
 
     public SwitchEx getSwitch() {
         return toggle;
+    }
+
+    public void setTitle(CharSequence value) {
+        if (title != null) {
+            title.setText(value);
+        }
+    }
+
+    public void setSwitchSubtitle(CharSequence value) {
+        if (subtitle != null) {
+            subtitle.setText(value);
+            subtitle.setVisibility(value == null || value.length() == 0 ? GONE : VISIBLE);
+        }
+        setContentDescription(value);
     }
 
     private boolean inflateMaintainedLayout(Context context) {
@@ -77,6 +96,13 @@ public class SettingItemSwitch extends RelativeLayout {
             View titleView = findByName("item_title");
             if (titleView instanceof TextView) {
                 title = (TextView) titleView;
+            }
+            View subtitleView = findByName("item_subtitle_text");
+            if (!(subtitleView instanceof TextView)) {
+                subtitleView = findByName("item_summary");
+            }
+            if (subtitleView instanceof TextView) {
+                subtitle = (TextView) subtitleView;
             }
             return toggle != null && title != null;
         } catch (Throwable ignored) {
@@ -113,6 +139,14 @@ public class SettingItemSwitch extends RelativeLayout {
         title.setGravity(Gravity.CENTER_VERTICAL);
         title.setIncludeFontPadding(true);
         titleLayout.addView(title, new LinearLayout.LayoutParams(-2, -2));
+
+        subtitle = new TextView(context);
+        subtitle.setTextSize(14);
+        subtitle.setTextColor(0xff999999);
+        subtitle.setSingleLine(true);
+        subtitle.setGravity(Gravity.CENTER_VERTICAL);
+        subtitle.setVisibility(GONE);
+        titleLayout.addView(subtitle, new LinearLayout.LayoutParams(-2, -2));
     }
 
     private View findByName(String idName) {

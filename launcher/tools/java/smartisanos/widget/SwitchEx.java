@@ -1,24 +1,31 @@
 package smartisanos.widget;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.view.animation.PathInterpolator;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.widget.CompoundButton;
 
 public class SwitchEx extends CompoundButton {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private final PorterDuffXfermode maskMode = new PorterDuffXfermode(PorterDuff.Mode.DST_IN);
     private Bitmap bottom;
     private Bitmap frame;
     private Bitmap mask;
     private Bitmap knob;
     private boolean bitmapsLoaded;
+    private float checkedProgress;
+    private ValueAnimator animator;
 
     public SwitchEx(Context context) {
         this(context, null);
@@ -32,13 +39,14 @@ public class SwitchEx extends CompoundButton {
         super(context, attrs, defStyleAttr);
         setClickable(true);
         setButtonDrawable(null);
+        setLayerType(LAYER_TYPE_SOFTWARE, null);
         loadBitmaps();
     }
 
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         loadBitmaps();
-        int width = frame != null ? frame.getWidth() : dp(84);
-        int height = frame != null ? frame.getHeight() : dp(54);
+        int width = mask != null ? mask.getWidth() : px(252);
+        int height = mask != null ? mask.getHeight() + dp(4) : px(166);
         setMeasuredDimension(resolveSize(width, widthMeasureSpec), resolveSize(height, heightMeasureSpec));
     }
 
@@ -48,30 +56,40 @@ public class SwitchEx extends CompoundButton {
             drawFallback(canvas);
             return;
         }
+        drawSmartisanSwitch(canvas);
+    }
 
-        int w = getWidth();
-        int h = getHeight();
-        float scale = h / (float) frame.getHeight();
-        int scaledFrameW = Math.round(frame.getWidth() * scale);
-        int scaledBottomW = Math.round(bottom.getWidth() * scale);
-        int scaledKnobW = Math.round(knob.getWidth() * scale);
-        int left = (w - scaledFrameW) / 2;
-        int top = 0;
-        int hidden = Math.max(0, scaledBottomW - scaledFrameW);
-        int bottomX = isChecked() ? left : left - hidden;
-        canvas.drawBitmap(bottom, null, new Rect(bottomX, top, bottomX + scaledBottomW, top + h), paint);
-        canvas.drawBitmap(frame, null, new Rect(left, top, left + scaledFrameW, top + h), paint);
+    private void drawSmartisanSwitch(Canvas canvas) {
+        int contentW = mask.getWidth();
+        int contentH = mask.getHeight();
+        float scale = Math.min(getWidth() / (float) contentW, getHeight() / (float) (contentH + dp(4)));
+        canvas.save();
+        canvas.translate((getWidth() - contentW * scale) / 2.0f,
+                (getHeight() - contentH * scale) / 2.0f);
+        canvas.scale(scale, scale);
+        canvas.clipRect(0, 0, contentW, contentH);
 
-        float knobCenterInSource = knob.getWidth() * 0.5f * scale;
-        float offCenter = left + scaledFrameW * 0.25f;
-        float onCenter = left + scaledFrameW * 0.75f;
-        int knobX = Math.round((isChecked() ? onCenter : offCenter) - knobCenterInSource);
-        canvas.drawBitmap(knob, null, new Rect(knobX, top, knobX + scaledKnobW, top + h), paint);
+        float minX = contentW - knob.getWidth();
+        float slideX = minX + (0.0f - minX) * checkedProgress;
+        paint.setAlpha(isEnabled() ? 255 : 191);
+        int layer = canvas.saveLayer(0, 0, contentW, contentH, null, Canvas.ALL_SAVE_FLAG);
+        canvas.drawBitmap(bottom, slideX, 0, paint);
+        paint.setXfermode(maskMode);
+        canvas.drawBitmap(mask, 0, 0, paint);
+        paint.setXfermode(null);
+        canvas.restoreToCount(layer);
+        canvas.drawBitmap(frame, 0, 0, paint);
+        canvas.drawBitmap(knob, slideX, 0, paint);
+        paint.setAlpha(255);
+        canvas.restore();
     }
 
     public boolean onTouchEvent(MotionEvent event) {
+        if (!isClickable()) {
+            return false;
+        }
         if (event.getAction() == MotionEvent.ACTION_UP) {
-            toggle();
+            performClick();
             return true;
         }
         return true;
@@ -79,16 +97,45 @@ public class SwitchEx extends CompoundButton {
 
     public boolean performClick() {
         toggle();
-        return super.performClick();
+        return true;
+    }
+
+    public void toggle() {
+        setCheckedAnimated(!isChecked());
     }
 
     public void setChecked(boolean checked) {
-        if (checked != isChecked()) {
-            super.setChecked(checked);
-        } else {
-            super.setChecked(checked);
-        }
+        setCheckedInternal(checked, false);
+    }
+
+    public void setCheckedAnimated(boolean checked) {
+        setCheckedInternal(checked, true);
+    }
+
+    private void setCheckedInternal(boolean checked, boolean animate) {
+        boolean changed = checked != isChecked();
         invalidate();
+        super.setChecked(checked);
+        if (animator != null) {
+            animator.cancel();
+            animator = null;
+        }
+        float target = checked ? 1.0f : 0.0f;
+        if (!animate || !changed || getWindowToken() == null) {
+            checkedProgress = target;
+            invalidate();
+            return;
+        }
+        animator = ValueAnimator.ofFloat(checkedProgress, target);
+        animator.setDuration(260);
+        animator.setInterpolator(new PathInterpolator(0.2f, 0.0f, 0.2f, 1.0f));
+        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            public void onAnimationUpdate(ValueAnimator animation) {
+                checkedProgress = ((Float) animation.getAnimatedValue()).floatValue();
+                invalidate();
+            }
+        });
+        animator.start();
     }
 
     private void loadBitmaps() {
@@ -139,11 +186,15 @@ public class SwitchEx extends CompoundButton {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(0xffffffff);
         float r = h / 2.0f - dp(2);
-        float cx = isChecked() ? w - h / 2.0f : h / 2.0f;
+        float cx = h / 2.0f + (w - h) * checkedProgress;
         canvas.drawCircle(cx, h / 2.0f, r, paint);
     }
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private int px(int value) {
+        return value;
     }
 }

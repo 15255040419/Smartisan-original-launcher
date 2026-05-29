@@ -1,0 +1,1949 @@
+# 开发与修复记录
+
+本文件从旧 README 中拆出，用来记录每天修复了哪些 BUG、实现了哪些功能、当时采用了什么修复方式，以及历史迁移路线。
+
+注意：本文档是按时间保存的过程记录。早期条目里的“暂未实现 / 后续接入 / 当前不可用”只代表当时状态；如果和最新实现有冲突，当前项目状态以 `README.md` 为准。
+
+## 早期设置页迁移记录
+
+### 2026-05-23 设置页迁移记录
+
+- 当前主工程仍是 `smartisan-launcher-original-port`，不是 `smartisan-launcher-maintained`。
+- 本次只把 maintained/main 的“桌面主题”和“桌面翻页动画”页面作为可运行兼容层迁入当前设置宿主，避免继续从零手绘。
+- 主题页使用 maintained 的 `theme_preview_gridview` / `theme_preview_block` 布局资源，分为“本地主题”和“在线主题”两组。
+- 在线主题下载源使用 maintained 记录的 GitHub Release：`https://gh.llkk.cc/https://github.com/15255040419/smartisan-launcher/releases/download/themes-v1/<package>.apk`。
+- 主题点击逻辑：本地或已安装主题直接写入 `launcher_grid_theme` / `launcher_theme_preview_res` 并重启桌面；未安装主题调用系统 DownloadManager 下载 APK，完成后需要安装主题包。
+- 翻页动画页使用 maintained 的 `launcher_anim_chooser_layout` / `gridview_chooser_item_layout`，写入 `launcher_page_animation`。
+- 本次已通过 `build.bat` 编译签名，输出：`build\launcher-signed.apk`。
+
+重要结论：
+
+- 当前实际显示的 `NativeLauncherSettingsHost` 不是原生 Smartisan Settings 页面。
+- 当前桌面图标“桌面设置”进入的是 `ThemeChooserActivity -> NativeLauncherSettingsHost.show()`；只要这条调用还在，屏幕上看到的就一定是自绘兼容页，不是原生页面。
+- 不要继续美化、扩展、修补这个 Java 程序化页面。
+- 正确方向是迁移 `com.android.settings-100.apk` 里的原生 `LauncherSettingsActivity` / `LauncherSettingsFragment` / `ObsessionModeFragment` 及其最小依赖。
+- 普通 Android / Google 虚拟机里的系统 `com.android.settings` 不包含锤子原生 `LauncherSettingsActivity`，所以“桌面设置图标直接外跳系统 Settings”不可用。
+- 当前 `NativeLauncherSettingsHost` 只能作为临时入口验证和 key 验证用，后续应被原生迁移页面替换。
+- 之后的设置页改动必须先证明使用了 `com.android.settings-100.apk` 的原生 layout / widget / drawable / key；不能只按截图重新画。
+
+接手者请先读完本节，再动代码。不要凭截图临时仿 UI。
+
+---
+
+## 历史设置页改造路线
+
+### 设置页改造路线
+
+方向锁定：设置页不再以自写程序化 UI 作为目标。优先复用 / 迁移 `com.android.settings-100.apk` 中原生 Smartisan 桌面设置页面；只有原生类依赖普通 Android 不存在的私有 API 时，才做最小兼容替换。`smartisan-launcher-maintained` 只作为普通 Android 兼容和补缺功能的参考，不作为首选界面来源。
+
+已确认的原生设置类：
+
+```text
+scratch/settings_orig/smali/com/android/settings/LauncherSettingsActivity.smali
+scratch/settings_orig/smali/com/android/settings/LauncherSettingsFragment.smali
+scratch/settings_orig/smali/com/android/settings/ObsessionModeFragment.smali
+```
+
+已确认的原生设置资源 / key 线索：
+
+```text
+launcher_settings_fragment
+launcher_settings_theme
+launcher_settings_switcher_layout
+obsession_settings_layout
+launcher_hide_lable
+launcher_hide_badge
+```
+
+已确认的关键依赖：
+
+```text
+scratch/settings_orig/smali/com/android/settings/LauncherSettingsFragment.smali
+  -> 继承 com.android.settings.SupportFragment
+  -> 使用 smartisanos.widget.SettingItemText
+  -> 使用 smartisanos.widget.SettingItemSwitch
+  -> 使用 com.android.settings.SettingItemTextVertical
+  -> 使用 com.android.settings.PreviewSettingItemView
+  -> 使用 com.android.settings.widget.LauncherPreview
+  -> 使用 com.android.settings.widget.VerticalOptionsCheckView
+  -> 使用 com.android.settings.widget.SettingsBottomExtraView
+
+scratch/settings_orig/smali/com/android/settings/ObsessionModeFragment.smali
+  -> 使用 smartisanos.widget.SettingItemSwitch
+  -> 写入 launcher_hide_lable / launcher_hide_badge / launcher_badge_swipe_clean
+
+scratch/settings_orig/smali/com/android/settings/LauncherSettingsActivity.smali
+  -> 继承 com.android.settings.MainSettings
+  -> getBindFragment() 返回 LauncherSettingsFragment
+```
+
+注意：`com.android.settings-100.apk` 初次反编译只展开了 smali，资源解包提示缺少 Smartisan framework package ID 2。不能直接大规模复制 XML / drawable 到 launcher 里编译，因为资源 ID、style、framework attr 可能丢失。正式迁移前要用 `aapt2 dump xmltree`、`aapt2 dump resources`、APK 直接抽取资源三种方式建立依赖表。
+
+执行顺序：
+
+1. [x] 记录并冻结错误方向。
+   - 不再继续扩展 `NativeLauncherSettingsHost`。
+   - 不再新增仿原生的 Java 程序化 UI。
+   - 当前临时页只能保留为入口可用性和 key 写入验证。
+   - 保留已经验证正确的桌面入口名称、图标、隐藏 launcher 自身入口、坐标与文件夹修复。
+2. [x] 验证“直接外跳原生 Settings 页面”不可行。
+   - 普通 Google 虚拟机的 `com.android.settings` 没有 `LauncherSettingsActivity`。
+   - 不能依赖用户安装 `com.android.settings-100.apk` 替换系统 Settings。
+   - 因此桌面设置必须在 launcher 包内承载。
+3. [x] 验证“直接调用原生 Settings 页面”是否可行。
+   - 在虚拟机中尝试安装/启动 `com.android.settings-100.apk`。
+   - 如果不能替换系统 Settings，就检查当前系统是否已有对应 `com.android.settings/.LauncherSettingsActivity`。
+   - 从桌面“桌面设置”入口尝试显式 Intent 跳转：`com.android.settings/com.android.settings.LauncherSettingsActivity`。
+   - 记录失败原因：签名冲突、sharedUserId、私有 framework、未导出 Activity、缺权限或资源崩溃。
+4. [ ] 建立原生页面依赖清单，不改业务代码。
+   - 用 `aapt2 dump xmltree com.android.settings-100.apk --file res/layout/launcher_settings_activity.xml` 查看根布局。
+   - 用 `aapt2 dump xmltree com.android.settings-100.apk --file res/layout/launcher_settings_fragment.xml` 查看主页面。
+   - 用 `aapt2 dump xmltree com.android.settings-100.apk --file res/layout/launcher_settings_theme.xml` 查看主题/壁纸/图标页面。
+   - 用 `aapt2 dump xmltree com.android.settings-100.apk --file res/layout/obsession_settings_layout.xml` 查看强迫症页面。
+   - 用 `aapt2 dump resources com.android.settings-100.apk` 查出上述 layout 用到的 drawable / string / dimen / id。
+   - 把结果写入 README 的“原生设置页依赖表”后，再开始迁移。
+5. [ ] 先迁一个真正原生 Activity 宿主。
+   - 不要继续用 `NativeLauncherSettingsHost` 作为最终页。
+   - 新建包名建议：`com.smartisanos.launcher.settings.nativeui`。
+   - 新宿主 Activity 负责显示原生迁移 Fragment，并处理返回键 / 标题栏。
+   - `ThemeChooserActivity` 只作为临时入口或直接替换成新宿主。
+6. [ ] 迁移原生主页面最小闭环。
+   - 先迁 `LauncherSettingsFragment` 的页面结构。
+   - 按“桌面设置功能规格”的主页面顺序排列，不得自行调整顺序。
+   - 只保留本桌面相关项：默认桌面、单板块视图、桌面主题、桌面翻页动画、桌面图标感知光影、隐藏桌面图标名称、解锁时桌面的动画效果、单板块视图切换至多板块视图、强迫症选项。
+   - 暂时屏蔽依赖系统级 Settings 服务的项，不要用假 UI 代替。
+   - 必须使用原生抽取资源和原生 widget 结构，不能重新手写一个不同布局。
+7. [ ] 再迁 `ObsessionModeFragment`。
+   - 优先接入桌面相关项：隐藏桌面图标名称、隐藏图标上的角标、紧贴屏幕横扫清除角标。
+   - 其他系统级项如电池、状态栏、拨号键盘模式，只有当前 launcher 需要时再处理。
+8. [ ] 逐个替换 Smartisan 私有依赖。
+   - `smartisanos.widget.SettingItemText` / `SettingItemSwitch` / `SwitchEx`：优先从提取 APK 或 framework 里找原类；找不到时在 launcher 内做同名兼容类，保证 XML 和 smali 能按原接口调用。
+   - `smartisanos.api.PackageManagerSmt`：不能直接用时，替换为 Android 标准 `PackageManager` 能力或跳过默认桌面切换逻辑。
+   - `SettingsTracker` / EventBus / TNT / PC 模式相关逻辑：先 stub 成 no-op，避免影响桌面设置核心功能。
+9. [ ] 功能逐项验收。
+   - 按“桌面设置功能规格”的 1-17 项逐项验收。
+   - 每项都要记录：页面位置、原生交互、写入 key、当前 launcher 读取位置、是否需要重启 launcher、adb 验证结果。
+   - 第一阶段只要求第一优先级功能全部可用；第二、第三优先级可先显示禁用或隐藏，但必须写清楚原因。
+10. [ ] 只有原生页面确实缺失或依赖过重时，才回看 maintained。
+   - maintained 用于补普通 Android 兼容、图标资源、缺失设置项和可运行逻辑。
+   - 不再用 maintained 或手写 UI 覆盖已有原生 Smartisan 设置风格。
+
+每一步完成前先更新本节计划状态；每一步完成后记录：改动文件、真实写入 key、构建安装结果、截图或 adb 验证结果。
+
+已完成：
+
+- 已确认普通 Google 虚拟机不能直接启动 `com.android.settings/com.android.settings.LauncherSettingsActivity`，外跳方案不可作为普通手机适配方案。
+- `ThemeChooserActivity` 当前作为“桌面设置”包内宿主，直接加载 `NativeLauncherSettingsHost`，点击桌面图标不会再提示“未找到原生锤子桌面设置页”。
+- 入口清理已验证：全新 `pm clear` 后数据库 dump 中出现 `桌面设置`，组件为 `com.smartisanos.launcher.theme.ThemeChooserActivity`；launcher 自身普通启动入口没有进入桌面列表。
+- 原生 Settings 相关图片已抽入 `launcher/assets/settings_native/`，当前页面已使用原生 12 / 20 宫格预览图、主题/动画入口图。
+- 当前可运行设置 key：12 / 20 宫格切换写 `Settings.Global["launcher_mode"]`，翻页动画写 `Settings.Global["launcher_page_animation"]`，强迫症选项写 `Settings.System["launcher_hide_lable"]`、`Settings.System["launcher_hide_badge"]`、`Settings.System["launcher_badge_swipe_clean"]`。
+
+待完成：
+
+- 当前“桌面设置”虚拟图标已替换为 maintained 的 launcher settings 图标。
+- 当前包内承载页仍是迁移骨架，而且用户已明确不接受它作为界面方向；后续不要继续改它的视觉。
+- 下一步继续做“原生页面最小依赖集移植”：把 `com.android.settings-100.apk` 中的 `LauncherSettingsFragment`、`ObsessionModeFragment`、`LauncherPreview`、`VerticalOptionsCheckView`、`SettingsBottomExtraView` 及其实际依赖迁入 launcher 包内。
+- 需要继续解决 `com.android.settings-100.apk` 缺 Smartisan framework package ID 2 导致资源 XML 不能完整反编译的问题；在此之前，优先用 `aapt2 dump xmltree` 和 APK 直接抽取资源推进。
+
+---
+
+## 原生设置页依赖与接手顺序
+
+### 原生设置页依赖表
+
+接手者先补全这张表，再迁移代码。不要跳过依赖表直接复制 smali。
+
+| 页面/类 | 来源 | 当前结论 | 下一步 |
+| --- | --- | --- | --- |
+| `LauncherSettingsActivity` | `scratch/settings_orig/smali/com/android/settings/LauncherSettingsActivity.smali` | 很薄，只继承 `MainSettings` 并返回 `LauncherSettingsFragment` | 不建议原样迁 `MainSettings`；应在 launcher 内建轻量宿主 Activity，然后挂迁移后的 Fragment |
+| `LauncherSettingsFragment` | `scratch/settings_orig/smali/com/android/settings/LauncherSettingsFragment.smali` | 真正的桌面设置主逻辑 | 先拆 `onCreateView`、`onClick`、`onLauncherTypeChanged`、`onLauncherThemeChanged`、`onOptionSelected` |
+| `ObsessionModeFragment` | `scratch/settings_orig/smali/com/android/settings/ObsessionModeFragment.smali` | 强迫症选项逻辑，含桌面相关 key | 优先迁桌面相关 3 个开关，系统状态栏/电池相关项先 no-op 或隐藏 |
+| `LauncherPreview` | `scratch/settings_orig/smali_classes2/com/android/settings/widget/LauncherPreview.smali` | 单板块视图预览控件 | 迁移前先列出其 layout、图片、callback、Settings key |
+| `VerticalOptionsCheckView` | `scratch/settings_orig/smali_classes2/com/android/settings/widget/VerticalOptionsCheckView.smali` | 原生两项/多项选择控件 | 需要保留原交互和选中红勾，不要用普通 RadioButton 仿 |
+| `SettingsBottomExtraView` | `scratch/settings_orig/smali_classes2/com/android/settings/widget/SettingsBottomExtraView.smali` | 页面底部说明/扩展视图 | 迁主页面时确认是否必须；非必须先跳过但记录 |
+| `SettingItemTextVertical` | `scratch/settings_orig/smali/com/android/settings/SettingItemTextVertical.smali` | 主题/翻页动画列表项 | 优先迁，页面风格差异主要来自这些原生列表项 |
+| `PreviewSettingItemView` | `scratch/settings_orig/smali/com/android/settings/PreviewSettingItemView.smali` | 强迫症页面预览选项 | 迁 `ObsessionModeFragment` 时需要 |
+| `smartisanos.widget.SettingItemText` | 原生 framework / Settings 依赖 | 当前 launcher 包内缺失 | 先搜索提取 APK 和 framework；找不到则在 launcher 内实现同名兼容类 |
+| `smartisanos.widget.SettingItemSwitch` | 原生 framework / Settings 依赖 | 当前 launcher 包内缺失 | 先搜索提取 APK 和 framework；找不到则在 launcher 内实现同名兼容类 |
+| `smartisanos.widget.SwitchEx` | 原生 framework / Settings 依赖 | 当前 launcher 包内缺失 | `SettingItemSwitch.getSwitch()` 依赖它，必须一起解决 |
+| `smartisanos.widget.TitleBar` | 原生 framework / Settings 依赖 | 当前 launcher 包内缺失 | 宿主 Activity 标题栏需要，找不到则做同名兼容类 |
+
+### 接手顺序
+
+从这里继续，不要重新发散：
+
+1. 只改 README 或新增分析文件，先补全 `launcher_settings_fragment.xml`、`launcher_settings_theme.xml`、`obsession_settings_layout.xml` 的 xmltree 记录。
+2. 搜索 `smartisanos.widget.SettingItemText`、`SettingItemSwitch`、`SwitchEx`、`TitleBar` 是否存在于其他提取 APK、framework 或 maintained 中。
+3. 决定迁移策略：
+   - 能找到原类：复制原类和最小依赖。
+   - 找不到原类：在 launcher 内写同名兼容类，但接口必须匹配原 smali 调用。
+4. 建立新包：`com.smartisanos.launcher.settings.nativeui`。
+5. 新建原生迁移宿主，不继续改 `NativeLauncherSettingsHost`。
+6. 第一版只迁主页面静态结构，严格按“桌面设置功能规格”排列；所有不可用功能先禁用或隐藏，并在 README 写清楚。
+7. 第二版接第一优先级 key 写入：`launcher_mode`、`launcher_grid_theme`、`launcher_hide_lable`、`launcher_hide_badge`、`launcher_badge_swipe_clean`。
+8. 第三版再处理 `launcher_page_animation`、主题选择、壁纸、应用图标、图标感知光影、解锁动画等依赖更重的功能。
+
+### 当前不应继续投入的文件
+
+这些文件现在只是临时状态，不要继续扩展：
+
+```text
+launcher/tools/java/com/smartisanos/launcher/theme/NativeLauncherSettingsHost.java
+launcher/assets/settings_native/*
+```
+
+可以保留它们，直到原生迁移页能打开；到时再删除或改为 fallback。
+
+### 必须保护的已验证修复
+
+迁设置页时不要顺手改这些：
+
+```text
+launcher/smali/com/smartisanos/launcher/view/x.1.smali
+launcher/smali/com/smartisanos/launcher/data/Constants.smali
+launcher/assets/layout/portrait/**/MODE_9/layout.xml
+launcher/smali/smartisanos/app/SmartisanProgressDialog.smali
+launcher/smali/com/smartisanos/launcher/Aa.smali
+launcher/resources.arsc
+```
+
+这些文件分别涉及 dock / 编辑模式坐标、屏幕宽度适配、文件夹大小、启动加载动画、桌面设置虚拟入口、应用名和资源表。除非任务明确要求，不要动。
+
+---
+
+## 设置页执行日志
+
+### 设置页执行日志
+
+- 2026-05-15：完成入口清理。
+  - 改动文件：`launcher/resources.arsc`、`launcher/smali/com/smartisanos/launcher/Aa.smali`、`launcher/smali/com/smartisanos/launcher/data/Constants.smali`。
+  - 结果：APK 应用名为“锤子桌面”；桌面内虚拟入口为“桌面设置”；launcher 自身 MAIN/LAUNCHER 入口通过 `BLACK_COMPONENT_LIST` 隐藏。
+  - 验证：logcat 数据库 dump 中 `桌面设置` 存在，普通 launcher 入口不存在；adb 截图确认首页无自身入口。
+- 2026-05-15：完成设置主页视觉第一版。
+  - 改动文件：`launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity.smali`、`launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity$SettingsAdapter.smali`。
+  - 结果：设置主页改为浅灰背景、居中标题栏、白色双行列表；设置项保留“桌面宫格、页面翻页动画、主题设置、图标设置、强迫症选项、关于锤子桌面”。
+  - 验证：`build.bat`、`adb install -r`、直接启动 `ThemeChooserActivity` 均成功；adb 截图确认主页和宫格弹窗均可打开。
+- 2026-05-15：按原生锤子设置截图重排桌面设置第一版。
+  - 改动文件：`launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity.smali`、`launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity$SettingsClickListener.smali`、`launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity$ObsessionClickListener.smali`。
+  - 结果：主页面改为“桌面设置项”，入口顺序参考原生“桌面设置项 / 主题、壁纸、图标 / 强迫症选项”；“单板块视图”继续打开 12 / 20 宫格真实切换；“强迫症选项”使用多选弹窗承载隐藏图标名称、隐藏角标、横扫清除角标。
+  - 已接真实 key：隐藏图标名称写 `launcher_hide_lable`；隐藏角标写 `launcher_hide_badge`；横扫清除角标写 `launcher_badge_swipe_clean`。当前桌面读取位置在 `launcher/smali/com/smartisanos/launcher/data/O.smali` 的 `J(Context)`、`K(Context)`、`E(Context)`。
+  - 验证：`build.bat` 成功；本机 `adb` 位于 `C:\Users\ck\adb.exe`，但当前虚拟机状态为 `offline`，暂未完成安装截图验证。
+- 2026-05-15：设置页路线修正。
+  - 用户确认上一版自写 UI 不应作为最终方向；应优先直接复用原生提取的 `com.android.settings-100.apk` 设置页面。
+  - 已初步确认原生 Settings 中存在 `LauncherSettingsActivity`、`LauncherSettingsFragment`、`ObsessionModeFragment`，并包含桌面设置项、主题/壁纸/图标、强迫症选项等逻辑。
+  - 已将新的执行计划写入“设置页改造路线”：先完整反编译原生 Settings，验证能否直接跳转；不可跳转时再移植原生最小依赖集；maintained 仅作为兼容补缺参考。
+  - 本条只记录计划修正，尚未开始执行清理或移植。
+- 2026-05-15：撤掉自写设置页，改为原生 Settings 桥接入口。
+  - 改动文件：`launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity.smali`、`build.bat`、`launcher/scratch/java/com/smartisanos/launcher/theme/LauncherSettingsUi.java`。
+  - 结果：`ThemeChooserActivity` 不再加载自写 UI；启动后显式跳转 `com.android.settings/com.android.settings.LauncherSettingsActivity`；找不到时只提示缺少原生锤子设置页。
+  - 已清理：`LauncherSettingsUi.java`、`classes2.dex` 辅助构建、临时 `ThemeChooserActivity$ModeClickListener` 和 `ThemeChooserActivity$ObsessionClickListener`。
+  - 验证：当前 Google 虚拟机 `cmd package resolve-activity -n com.android.settings/com.android.settings.LauncherSettingsActivity` 返回 `No activity found`，说明普通系统不能直接复用外部原生 Settings，下一步要做原生最小依赖移植。
+- 2026-05-15：继续追原生 Settings 页面依赖。
+  - `aapt2 dump xmltree` 可读取原生 `launcher_settings_fragment.xml`、`launcher_settings_theme.xml`、`launcher_settings_switcher_layout.xml`、`obsession_settings_layout.xml`，即使 apktool 因缺 framework 不能完整解包。
+  - 原生桌面设置主页面依赖：`smartisanos.widget.SettingItemText`、`smartisanos.widget.SettingItemSwitch`、`com.android.settings.SettingItemTextVertical`、`com.android.settings.widget.LauncherPreview`、`VerticalOptionsCheckView`、`SettingsBottomExtraView`。
+  - 当前 launcher 包内没有 `smartisanos.widget.SettingItemText / SettingItemSwitch / TitleBar`，也没有 `com.android.settings.widget.LauncherPreview` 等控件；所以不能只复制 `LauncherSettingsFragment.smali`，必须同时迁控件和对应资源。
+  - 原生 Settings 资源中已确认有 12 / 20 宫格预览图：`launcher_preview_grid_12*`、`launcher_preview_grid_20*`、`launcher_large_preview_grid_12`、`launcher_large_preview_grid_20`。
+- 2026-05-15：撤掉外跳失败提示，改为包内迁移承载页。
+  - 改动文件：`launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity.smali`、`launcher/tools/java/com/smartisanos/launcher/theme/NativeLauncherSettingsHost.java`、`build.bat`。
+  - 结果：点击桌面“桌面设置”不再外跳系统 `com.android.settings`，而是在 launcher 包内打开可运行设置页。
+  - 已接入 key：`launcher_mode`、`launcher_page_animation`、`launcher_hide_lable`、`launcher_hide_badge`、`launcher_badge_swipe_clean`。
+  - 构建验证：`build.bat` 成功，输出 `build/launcher-signed.apk`。
+  - 安装验证：`C:\Users\ck\adb.exe install -r build\launcher-signed.apk` 成功；`am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity` 成功。
+- 2026-05-15：抽取原生 Settings 素材并接入当前承载页。
+  - 新增目录：`launcher/assets/settings_native/`。
+  - Java 源码位置：`launcher/tools/java/`，构建中间产物仍放在忽略的 `launcher/scratch/`。
+  - 抽取来源：`com.android.settings-100.apk` 的 `res/drawable-xxhdpi-v4/`。
+  - 已用素材：`launcher_large_preview_grid_12.png`、`launcher_large_preview_grid_20.png`、`launcher_preview_grid_12.png`、`launcher_preview_grid_20.png`、`launcher_anim_video_preview.png`、`setting_item_icon_launcher.png`。
+  - 结果：单板块视图预览、12 / 20 宫格图、主题入口图、翻页动画入口图改为原生 Settings 素材；选中态不再写死 12 宫格，会读取 `launcher_mode`。
+  - 验证截图：`build/settings-host-native-assets-2.png`。
+- 2026-05-15：冻结设置页方向，只更新文档。
+  - 用户确认当前 `NativeLauncherSettingsHost` 仍不像原生 Smartisan Settings，不能继续沿这个方向乱改。
+  - 本次只改 README，不改代码。
+  - 已明确下一步必须迁移 `com.android.settings-100.apk` 的原生页面最小依赖集。
+  - 已新增“原生设置页依赖表”“接手顺序”“当前不应继续投入的文件”“必须保护的已验证修复”。
+  - 接手者应先补全依赖表，再迁移代码；不要继续美化或扩展 `NativeLauncherSettingsHost`。
+- 2026-05-15：确定桌面设置功能规格，只更新文档。
+  - 本次只改 README，不改代码。
+  - 已新增“桌面设置功能规格”，明确主页面、主题页、强迫症页的功能、排列和原生交互。
+  - 主页面顺序锁定为：默认桌面、单板块视图、桌面主题、桌面翻页动画、桌面图标感知光影、隐藏桌面图标名称、解锁时桌面的动画效果、单板块视图切换至多板块视图、强迫症选项。
+  - 强迫症页第一阶段只做桌面相关三项：隐藏桌面图标名称、隐藏图标上的角标、紧贴屏幕横扫清除角标。
+  - 已明确逐项实现顺序：先静态原生骨架，再原生控件兼容层，再 12/20 和主题开关，再强迫症三项，最后处理主题/动画/壁纸/图标等重依赖功能。
+- 2026-05-15：实现页面布局第一版。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/NativeLauncherSettingsHost.java`。
+  - 本次只做布局和层级，不继续扩展复杂业务逻辑。
+  - 主页面标题改为“桌面设置项”。
+  - 主页面按用户确认顺序排列：默认桌面、单板块视图、桌面主题、锁屏壁纸、桌面翻页动画、应用图标、桌面图标感知光影、隐藏桌面图标名称、解锁时桌面的动画效果、单板块视图切换至多板块视图、强迫症选项。
+  - 新增强迫症二级页面，标题为“强迫症选项”，第一阶段显示：隐藏桌面图标名称、隐藏图标上的角标、紧贴屏幕横扫清除角标；拨号面板模式、隐藏唱机中轴作为禁用占位项。
+  - 暂未接入的功能使用禁用开关或 toast 占位，不假装已经可用。
+  - 构建验证：`build.bat` 成功，输出 `build/launcher-signed.apk`。
+  - 安装/截图验证：安装命令传输 APK 成功但 adb 后续多次重启后设备变为 `offline`；已截到主页面顶部 `build/settings-layout-main.png`，底部和强迫症二级页待 adb 恢复后复测。
+- 2026-05-15：实现“默认桌面”入口。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/NativeLauncherSettingsHost.java`。
+  - 参考 maintained 的默认桌面逻辑：Android 10+ 优先通过 `RoleManager` 请求 `ROLE_HOME`；失败或低版本时依次尝试 `android.settings.HOME_SETTINGS`、`android.settings.MANAGE_DEFAULT_APPS_SETTINGS`、MIUI 默认应用设置和普通系统设置。
+  - 副标题会读取当前默认 Home；如果当前默认 Home 是本包或 `com.smartisanos.launcher`，显示 `Smartisan 桌面`，否则显示当前默认桌面名称。
+  - 说明：Android 不允许普通应用静默把自己设为默认桌面，这里只能拉起系统确认/选择界面。
+  - 构建验证：`build.bat` 成功，输出 `build/launcher-signed.apk`。
+  - 安装验证：`adb install -r build\launcher-signed.apk` 成功。
+  - 功能验证：启动 `com.smartisanos.launcher/.theme.ThemeChooserActivity` 后，默认桌面副标题显示当前默认 Home 为 `Pixel 启动器`；点击“默认桌面”进入系统 `com.google.android.permissioncontroller.role.ui.RequestRoleActivity`，参数包含 `android.app.role.HOME` 和 `com.smartisanos.launcher`。
+- 2026-05-15：开始原生 Settings 迁移，先补同名控件兼容层。
+  - 本次不继续美化 `NativeLauncherSettingsHost`，只为后续迁 `LauncherSettingsFragment` / `ObsessionModeFragment` 铺依赖。
+  - 新增 `smartisanos.widget.SwitchEx`、`smartisanos.widget.SettingItemText`、`smartisanos.widget.SettingItemSwitch`。
+  - 新增 `com.android.settings.SettingItemTextVertical`、`com.android.settings.PreviewSettingItemView`。
+  - 新增 `com.android.settings.widget.PreviewOptionItemView`、`LauncherPreview`、`VerticalOptionsCheckView`、`SettingsBottomExtraView`。
+  - 这些类是最小兼容骨架，类名和常用方法先对齐原生 Settings；视觉和完整行为后续继续按原生控件补齐。
+  - 构建验证：`build.bat` 成功，说明兼容类可以编进 `classes2.dex`。
+- 2026-05-16：纠正当前可见设置页的锤子风格和关键交互。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/NativeLauncherSettingsHost.java`。
+  - 行尾箭头改用原生 Settings 抽取素材 `launcher/assets/settings_native/setting_item_arrow.png`，不再使用文本 `>`。
+  - “默认桌面”即使当前已经是锤子桌面，也不再只 toast，而是继续进入系统默认桌面/默认应用设置，方便切换。
+  - 12 / 20 宫格切换改为确认弹窗流程，确认后写 `Settings.Global["launcher_mode"]`，同步调用 `com.smartisanos.launcher.data.N.d(Context, int)` 写入桌面偏好，然后重启桌面。
+  - 构建验证：`build.bat` 成功，输出 `build/launcher-signed.apk`。
+  - 安装验证：`adb install -r build\launcher-signed.apk` 成功。
+  - 功能验证：点击 20 宫格弹出“切换桌面宫格”确认框，包含“取消 / 切换”按钮。
+- 2026-05-16：修复 20 宫格实际不生效，并继续修正锤子风格细节。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/NativeLauncherSettingsHost.java`。
+  - 原因：`com.smartisanos.launcher.data.N.d(Context, int)` 参数不是 cell count，而是 page mode；12 宫格 page mode 为 `0x0c`，20 宫格 page mode 为 `0x09`，再由 `Constants.getModeFromPageMode(0x09)` 映射保存为 `prefs_key_launcher_mode = 20`。
+  - 修复：20 宫格确认后传入 `pageMode=9`，12 宫格传入 `pageMode=12`；设置页读取状态优先读 `com.smartisanos.launcher_prefs/prefs_key_launcher_mode`，其次兼容 `Settings.Global["launcher_mode"]` 的 `9 / 20`。
+  - 顶部返回箭头从文本 `<` 改为自绘左折线 View，避免显示成普通字符箭头。
+  - 选中态红圈和白勾重新调整颜色、线宽、圆角端点，向原生 Smartisan 勾选态靠近。
+  - 构建验证：`build.bat` 成功。
+  - 安装验证：`adb install -r build\launcher-signed.apk` 成功；后续点选复测时 ADB 变为 `offline`，需要设备恢复后补截图和最终 20 宫格桌面验证。
+- 2026-05-16：再次纠偏设置页方向，只更新文档和依赖确认。
+  - 用户指出当前屏幕上的设置页仍然不是原生 Smartisan Settings；确认属实。
+  - 当前入口仍是 `launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity.smali -> NativeLauncherSettingsHost.show(Activity)`，所以显示的一定是自绘兼容页。
+  - 本次不继续修改 `NativeLauncherSettingsHost` 外观。
+  - 已用 `aapt2 dump xmltree` 直接从 `com.android.settings-100.apk` 确认原生页面结构：
+    - `res/layout/launcher_settings_activity.xml`：根布局是 `RelativeLayout`，包含 `smartisanos.widget.TitleBar`，再 include `launcher_settings_fragment`。
+    - `res/layout/launcher_settings_fragment.xml`：主页面包含 `SettingItemText`、`LauncherPreview`、`launcher_settings_theme`、`launcher_settings_switcher_layout`、多个 `SettingItemSwitch`、`VerticalOptionsCheckView`、`SettingsBottomExtraView`。
+    - `res/layout/launcher_settings_theme.xml`：主题/壁纸/图标页使用 `SettingItemTextVertical`。
+    - `res/layout/obsession_settings_layout.xml`：强迫症页使用 `TitleBar`、`SettingItemSwitch`、预览图和 `SettingsBottomExtraView`。
+  - 已确认关键原生资源 ID / 文件：
+    - `layout/launcher_settings_activity = 0x7f0d015e`
+    - `layout/launcher_settings_fragment = 0x7f0d015f`
+    - `layout/launcher_settings_switcher_layout = 0x7f0d0160`
+    - `layout/launcher_settings_theme = 0x7f0d0161`
+    - `layout/obsession_settings_layout = 0x7f0d01c1`
+    - `drawable/selector_check_icon_smartisan`
+    - `drawable/vertical_option_check_bg`
+    - `drawable/setting_item_arrow`
+- 2026-05-24：修正 maintained 兼容设置页的下载、宫格切换、标题和功能边界。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`。
+  - 12 / 20 宫格切换：保留加载遮罩后杀当前 launcher 进程，并延后重启闹钟，避免先 `finish()` 设置页导致返回桌面或白屏闪一下。
+  - 主题下载：在线主题通过系统 `DownloadManager` 下载到公共 Download 目录，记录下载 id 和本地路径；主题页和主题详情页显示下载进度；下载完成后拉起安装，安装器返回后轮询主题包状态并刷新按钮。
+  - 主题安装复测补丁：构建脚本仍保留 `launcher/original/AndroidManifest.xml` 原始二进制清单注入，已在该二进制清单中补入 `android.permission.REQUEST_INSTALL_PACKAGES`，否则 Android 12 安装器会拒绝 launcher 拉起 APK 安装确认页。
+  - 标题：当前临时兼容主页标题改为“桌面设置”。
+  - 翻页动画：继续写 `Settings.Global["launcher_page_animation"]`、`Settings.System["launcher_page_animation"]` 和 `com.smartisanos.launcher_prefs/launcher_page_animation`，并直接刷新运行时 `Constants.SCROLL_ANIMATION_TYPE`。不要在保存动画后调用 `com.smartisanos.launcher.data.O.W(Context)`；同时已去掉 `O.W(Context)` / `ja.1` 里透明主题强制把 `SCROLL_ANIMATION_TYPE` 重置为默认动画的逻辑，避免切换后仍显示默认动画。
+  - 应用图标：按功能规格确认该功能依赖原生主题/图标包服务，第一阶段不应伪造“锤子桌面图标”映射。当前临时兼容页隐藏错误的图标替换列表，只显示“应用图标功能后续接入”说明，避免把普通应用图标或默认图标误标为已实现。
+  - 构建验证：使用仓库内 `build/tools/jdk17/jdk-17.0.19+10` 执行 `build.bat` 成功，输出 `build/launcher-signed.apk`；`apksigner verify` 通过 v1/JAR 签名。
+    - `drawable/ic_launcher_settings`
+    - `drawable/smartisan_home`
+  - 下一步代码改动必须从这些原生 layout/widget/resource 迁移开始；不要再按截图补 UI。
+- 2026-05-16：开始把入口切到“原生 Settings 资源 inflate”方案。
+  - 改动文件：
+    - `launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity.smali`
+    - `launcher/tools/java/com/smartisanos/launcher/theme/SmartisanNativeSettingsHost.java`
+    - `launcher/tools/java/smartisanos/widget/TitleBar.java`
+    - `launcher/tools/java/smartisanos/widget/SettingItemText.java`
+    - `launcher/assets/settings_native/com.android.settings-100.apk`
+  - 方案：不再把原生设置页按截图重画；把 `com.android.settings-100.apk` 作为资源包打入 launcher assets，运行时复制到 cache，通过 `AssetManager.addAssetPath()` 加载它自己的 `Resources`，再 inflate 原生 `layout/launcher_settings_activity`。
+  - 入口：`ThemeChooserActivity.onCreate()` 已从 `NativeLauncherSettingsHost.show(Activity)` 改为 `SmartisanNativeSettingsHost.show(Activity)`。
+  - 回退：如果运行时加载原生资源失败，才回退到 `NativeLauncherSettingsHost` 临时页，并 toast “原生 Smartisan 设置页加载失败，使用临时页”。
+  - 已补兼容控件：`smartisanos.widget.TitleBar`；`SettingItemText` 开始读取原生 XML 中 `smartisanos:title`、`setting:title`、`setting:subTitle`、`setting:icon` 等属性。
+  - 构建验证：`build.bat` 成功。
+  - APK 验证：`build/launcher-signed.apk` 已包含 `classes2.dex`、`assets/settings_native/com.android.settings-100.apk`、`assets/settings_native/setting_item_arrow.png`。
+  - ADB 验证：当前 `C:\Users\ck\adb.exe devices -l` 无在线设备，暂未完成安装和截图；下一步有设备后必须确认是否真正显示原生资源页，还是触发了 fallback。
+- 2026-05-16：修复原生资源页 fallback 的第一处可疑点。
+  - 用户截图显示 toast “原生 Smartisan 设置页加载失败，使用临时页”，说明入口已走到 `SmartisanNativeSettingsHost`，但 inflate 原生资源失败后回退到了 `NativeLauncherSettingsHost`。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/SmartisanNativeSettingsHost.java`。
+  - 修复：`SettingsResourceContext.getTheme()` 不再把 launcher Theme `setTo()` 到 Settings 资源 Theme，避免跨 AssetManager 拷贝 Theme 导致运行时异常；改为 Settings 资源包自己创建 `Theme_Material_Light_NoActionBar`。
+  - 增加诊断：fallback 前写 `Log.e("SmartisanNativeSettings", ...)`，并把异常链写到应用 cache 的 `smartisan-native-settings-error.txt`；toast 追加异常类型，方便没有 logcat 时判断。
+  - 构建验证：`build.bat` 成功。
+  - 下一步：重新安装后打开桌面设置。如果仍 fallback，先抓 `adb logcat -d | findstr SmartisanNativeSettings` 或取 cache 错误文件，再按具体异常补缺失控件/资源。
+- 2026-05-16：去掉旧临时设置页 fallback，避免误以为仍在使用原生页。
+  - 用户复测后仍显示旧绘制页，toast 只有 `InflateException`，说明原生 XML 仍失败且代码回退到了 `NativeLauncherSettingsHost`。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/SmartisanNativeSettingsHost.java`。
+  - 调整：不再 inflate 原生 `launcher_settings_activity` 外壳，改为 launcher 内轻量宿主标题栏 + 直接 inflate 原生 `launcher_settings_fragment`，先绕开原生 `TitleBar` 外层 style/include 风险。
+  - 调整：原生 inflate 失败后不再回退到 `NativeLauncherSettingsHost`，而是显示诊断页；toast 会展示异常链前 3 层，例如 `InflateException <- ClassNotFoundException ...`。
+  - 目的：彻底停止“失败后显示假设置页”的假象，后续按具体异常补齐原生依赖。
+  - 构建验证：`build.bat` 成功。
+- 2026-05-16：处理设置宿主显示成第二个最近任务的问题。
+  - 用户反馈打开“桌面设置”后最近任务里出现两个“锤子桌面”。
+  - 原因确认：最终 APK 的二进制 Manifest 里 `ThemeChooserActivity` 仍有 `taskAffinity="com.android.settings"`；文本 `launcher/AndroidManifest.xml` 修改未生效，因为 `build.bat` 会把 `launcher/original/AndroidManifest.xml` 重新注入 APK。
+  - 尝试过直接停用二进制 Manifest 注入，但 apktool 当前构建产物会缺失 `AndroidManifest.xml`，因此已恢复原构建流程，不能用这个办法。
+  - 正式修复：已二进制修改 `launcher/original/AndroidManifest.xml`，把 Manifest 字符串池里的 `com.android.settings` 改为等长字符串 `smartisanos.launcher`。
+  - 备份文件：`launcher/original/AndroidManifest.xml.before-affinity-patch.bak`。
+  - 验证：用 `aapt2 dump xmltree --file AndroidManifest.xml build\launcher-signed.apk` 确认最终 APK 中 `ThemeChooserActivity` 的 `taskAffinity` 已变为 `smartisanos.launcher`，不再单独进入 `com.android.settings` 任务。
+  - 注意：因为这是二进制 Manifest 字符串池替换，同一个字符串引用的 `ThemeItemActivity` taskAffinity 和 `smartisanos.PACKAGELOCK_PACKAGENAME` meta-data 也一起变成了 `smartisanos.launcher`。当前目的是解决最近任务拆成两个“锤子桌面”；如果后续恢复主题选择页时出现 package lock 相关异常，需要改成按属性粒度修 AXML，而不是全局替换字符串池。
+  - 同时增强诊断页：显示最多 8 层异常链和 deepest cause，方便继续定位 `launcher_settings_fragment.xml line #15` 的真实失败原因。
+  - 构建验证：`build.bat` 成功。
+- 2026-05-16：确认原生 XML 直接 inflate 失败的根因，并加入安全 inflater。
+  - 用户复测显示 deepest cause：`UnsupportedOperationException: Can't convert value at index 16 to dimension: type=0x1`。
+  - 用 `aapt2 dump resources com.android.settings-100.apk` 确认 `dimen/settings_item_top_bottom_margin (0x7f0702cc)` 实际值是 `@0x02070032`，即 Smartisan framework package id 2 的资源。
+  - 结论：只带 `com.android.settings-100.apk` 不足以直接 inflate 原生 XML；原生 Settings 的 style / dimen 大量依赖 Smartisan framework package id 2。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/SmartisanNativeSettingsHost.java`。
+  - 处理：加入 `SafeSettingsFactory`，继续读取原生 `launcher_settings_fragment.xml`，但拦截基础 `LinearLayout / ScrollView / TextView / ImageView / FrameLayout`，用无 XML attrs 构造方式避开缺失 framework dimen/style；自定义同名控件继续读取原生 XML 中的 title / subTitle / icon。
+  - 这不是最终完整原生 inflate，只是“原生 XML 结构 + 原生资源 + 兼容控件”的迁移路径。真正完整原生需要补齐 package id 2 的 Smartisan framework。
+  - 构建验证：`build.bat` 成功。
+- 2026-05-16：停止把完整 `com.android.settings-100.apk` 打进 launcher，并回退必崩设置入口。
+  - 用户复测仍然进入诊断页，最新异常为 `launcher_settings_fragment.xml line #30 -> Resource ID #0x7f0d0150`；`aapt2 dump resources` 确认该 ID 是原生 Settings 的 `layout/item_bottom_shadow_layout`。
+  - 结论：运行时直接把整包 `com.android.settings-100.apk` 作为资源包加载仍不稳定；它会继续暴露原生 Settings 对 Smartisan framework / 资源 ID / include layout 的链式依赖。
+  - 体积问题确认：`launcher/assets/settings_native/com.android.settings-100.apk` 单独约 61.72MB，导致最终 APK 从正常体积膨胀到约 148MB。
+  - 已删除：`launcher/assets/settings_native/com.android.settings-100.apk`。
+  - 已调整：`ThemeChooserActivity` 设置入口从 `SmartisanNativeSettingsHost.show()` 暂时切回 `NativeLauncherSettingsHost.show()`，避免用户继续看到原生加载失败页。
+  - 当前 APK 体积：重新构建后 `build/launcher-signed.apk` 约 102.44MB；完整 Settings APK 已确认不再包含在最终 APK 内。
+  - 剩余体积来源：最终 APK 内 `assets/Textures` 约 72.57MB，`assets/theme_preview` 约 14.8MB，`assets/settings_native` 约 3.53MB。后续若继续瘦身，应先建立资源使用清单，不能直接删除原版桌面贴图。
+  - 后续方向：原生 Settings 继续作为结构/资源/交互参考；可运行逻辑优先参考 maintained，最终仍要保持 Smartisan 风格。
+- 2026-05-16：开始迁移 maintained 桌面设置结构。
+  - 背景：用户确认当前主线继续使用 original-port；maintained 只迁设置页和普通 Android 兼容逻辑，不迁桌面主体。
+  - 参考来源：`smartisan-launcher-maintained` 的 `res/layout/setting_main.xml`、`res/layout/launcher_single_block_options.xml`、`SettingMainActivity.smali`。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/NativeLauncherSettingsHost.java`。
+  - 调整：主页面标题改为“桌面设置”，页面顺序改向 maintained 靠拢，顶部直接显示“单板块视图”预览选项；“默认桌面”移动到“更多”区域，不再使用原生 Settings 截图那种大卡片布局。
+  - 调整：单板块视图卡片改为 maintained 式两个预览选项，当前项目对应为“十二宫格 / 二十宫格”。
+  - 修复：20 宫格保存值从错误的 `9` 改为 `20`；读取逻辑也改为按 `12 / 20` 判断，避免点击 20 后落入旧 9 宫格逻辑。
+  - 说明：这一步仍是 Java 宿主承载的 maintained 结构迁移第一版，还不是完整复制 maintained 的 XML Activity；下一步应继续把 maintained 的 `SettingItemSwitch`、`PreviewSettingItemView` 视觉细节和弹窗样式补齐。
+  - 构建验证：`build.bat` 成功，输出 `build/launcher-signed.apk`，体积约 102.44MB。
+- 2026-05-16：补 maintained 风格的开关、勾选态、弹窗和字体细节。
+  - 改动文件：`launcher/tools/java/com/smartisanos/launcher/theme/NativeLauncherSettingsHost.java`。
+  - 开关：移除 Android 默认 `Switch`，新增自绘 `ToggleView`，使用浅灰轨道、白色圆形滑块、蓝色开启指示点，禁用态使用更淡的灰色。
+  - 勾选态：调整 12 / 20 和主题选项的红色圆形勾选尺寸、颜色、勾线圆角和间距，继续向 maintained / Smartisan 预览项靠近。
+  - 字体：标题改用 `sans-serif-medium`，普通文字用 `sans-serif`，降低全粗体导致的 Android 默认感。
+  - 弹窗：调整圆角、宽度、按钮高度、按钮字体权重、确认按钮红色和分割线，减少系统默认 AlertDialog 味道。
+  - 构建验证：`build.bat` 成功。
+- 2026-05-16：确认当前设置页仍不是 maintained 原版页面。
+  - 用户反馈“还是像自己画的，不像 maintained”，判断属实。
+  - 当前 `NativeLauncherSettingsHost.java` 是 Java 程序化 UI，只参考了 maintained 的顺序和部分样式，并没有真正加载 maintained 的 `setting_main.xml` / `SettingMainActivity`。
+  - 技术原因：当前 original-port 工程没有正常 `launcher/res` 目录，只有 raw `resources.arsc` 和 `unknown/res`；`build.bat` 还会注入二进制 Manifest。这种结构下不能像普通 Android 工程一样直接把 maintained 的 XML layout / drawable / style 复制进来编译。
+  - 结论：不要再把当前 Java 宿主页描述为“迁移 maintained 设置页”。它只是临时兼容页。
+  - 真正使用 maintained 设置页只有两条路：
+    1. 重建 original-port 的资源工程，把 `resources.arsc` 解回可维护 `res/`，再迁 maintained 的 `setting_main.xml`、控件、drawable、style 和 Activity。
+    2. 以 maintained 为资源/设置页基底，但只迁当前 original-port 已验证的 12 / 20 桌面核心逻辑；这条路此前用户已试过，桌面和编辑动画错位，风险更大。
+  - 当前主线建议：继续保留 original-port 桌面主体，但设置页不要再堆 Java 仿 UI；下一步若要像 maintained，必须先解决资源工程化问题。
+
+---
+
+## 历史风险、坐标适配和完整移植路线
+
+## 当前风险
+
+- `ThemeChooserActivity` 原本是主题选择页，现在临时作为设置页宿主。后续如果恢复原主题选择功能，要把主题入口移到设置页子页面中，不要直接覆盖这个宿主。
+- 当前构建仍依赖 `launcher/original/AndroidManifest.xml` 的二进制 Manifest 注入，文本 Manifest 修改不会自动生效。
+- 底部桌面 / 编辑模式交互已按原始 `com.smartisanos.launcher-3.apk` 恢复。关键修复是把 `launcher/smali/com/smartisanos/launcher/view/x.1.smali` 的 dock / 编辑坐标算法恢复为原版逻辑，避免此前用 `window_width / n` 等分屏宽导致齿轮遮挡 dock 图标、拖拽落点错位。
+- 底部按钮组的重点计算点已经确认在 `launcher/smali/com/smartisanos/launcher/view/x.1.smali` 的 `sx()`、`b(V)`、`l(II)` 等方法里，尤其是 `dock_delete_btn_width`、`dock_create_folder_width`、`dock_*_margin_left` 这一组。
+- 当前设置页仍是程序化 View，不是最终方向；不要再继续对它做视觉纠偏。除非只是为了验证 launcher key，否则下一步必须迁原生 Settings 页面。
+- 启动加载动画不属于 SMEngine 桌面坐标系统。它走 `LoadingUI` / `SmartisanProgressDialog` 的 Android Dialog 布局，不能用 dock 坐标修复方式处理。
+
+## 不要做的事
+
+- 不要继续扩展临时 `LauncherSettingsDialog`。
+- 不要把 `NativeLauncherSettingsHost` 当最终页面。它只是临时承载页；不要继续投入视觉细节。最终目标是迁原生 Settings 页面。
+- 不要再按截图手写一个“像锤子”的设置页。目标是迁移 `com.android.settings-100.apk` 的原生页面和依赖。
+- 不要跳过 README 的“原生设置页依赖表”直接复制 smali。先列依赖，再迁代码。
+- 不要把编辑/总览底部齿轮改成设置页入口。这个齿轮属于原版桌面的编辑/选择功能，必须保持原用途。
+- 不要只修某一个底部按钮。底部齿轮、排序/切换、主题/颜色、确认等按钮是一组，应按同一套 720P / 1080P / 其他宽度自适应规则处理。
+- 不要把底部错位修成某个固定分辨率，例如 720 / 1080 / 1440。
+- 不要直接用 `smartisan-launcher-maintained` 替换当前工程。
+- 不要随意重新解包覆盖 `launcher/` 目录。当前 `launcher/` 里有大量已修补 smali，如果要重新解包，必须先备份并逐项迁移现有补丁。
+- 不要改变原版 12 / 20 宫格图标大小。用户明确要求保留原本比例。
+
+## 坐标适配记录
+
+此前截图中的问题不是单纯图标大小问题，而是桌面主题资源和运行时坐标基准没有完全统一。底部错位只是其中一个表现。表现为：
+
+- 底部齿轮偏左，不在屏幕中心。
+- 右侧底部图标露出一部分，被屏幕边缘裁切。
+- 进入桌面加载动画也可能偏左，但它后续确认是 Dialog 布局问题，不是 dock / 编辑坐标问题。
+- 写死 `dock_width=1080` 后仍不能完整解决，而且无法适配其他分辨率。
+- 12/20 桌面页、dock、编辑 / 总览按钮依赖同一套 `window_width/window_height` 和 `LayoutProperty`，所以不能只改某一个 View 的 X/Y。
+
+当前桌面页和编辑模式坐标已经验证正常。关键记录：
+
+- `Constants.setPhysicalScreenSize(Context)`：大屏分支改为标准 `Display.getRealMetrics()`，替代 Smartisan 私有 `DisplaySmtEx.getSmRealMetrics()`。
+- `Constants.initDockSize(I)`：运行时用 `Constants.window_width` 覆盖 `dock_width`，并同步把 `dock_margin_left/right` 归零，避免旧固定宽度和新屏幕宽度混算。
+- `launcher/smali/com/smartisanos/launcher/view/x.1.smali`：恢复原版 dock / 编辑交互坐标算法，撤掉此前按 `window_width / n` 重算底部图标位置的改法，避免齿轮遮挡 dock 图标和拖拽落点错误。
+- 文件夹打开态：缩小 `MODE_9/layout.xml` 中 `folder_bookcase_*`、`icon_size_with_shadow_folder`、folder 文本字号和标题范围；当前虚拟机命中 `layout/portrait/values-sw411dp/MODE_9/layout.xml`，同类 1080 资源目录已同步。
+
+启动加载动画单独修复：
+
+- 参考 maintained 的 `com.smartisanos.launcher.widget.SmartisanProgressDialog` 和 `ProgressDialogStyle`。
+- 当前工程的 `smartisanos/app/SmartisanProgressDialog` 原本只是继承系统 `ProgressDialog` 的薄兼容壳，导致 Android 默认布局把 indeterminate 图标放在内容左侧。
+- 已将 `launcher/smali/smartisanos/app/SmartisanProgressDialog.smali` 改为自绘 `Dialog`：全屏黑底，中间暗色圆角容器，`ProgressBar` 居中显示 `loading_progress`。
+- 验证：`build.bat` 成功，`adb install -r build\launcher-signed.apk` 成功，冷启动未崩溃；loading 截图由于启动过快未稳定抓到动画帧。
+
+### 为什么 1080P 也会错位
+
+这个桌面来自 Smartisan 坚果 Pro 3，assets 中确实有大量 `1080` 宽基准资源，例如：
+
+```text
+launcher/assets/layout/portrait/*x1080/MODE_12/layout.xml
+launcher/assets/layout/portrait/*x1080/MODE_20/layout.xml
+```
+
+但“设备也是 1080 宽”不等于坐标一定正确，原因是原系统环境还隐含了以下条件：
+
+- 原机型的真实屏幕高度、状态栏高度、导航栏高度和桌面可绘制区域高度。
+- Smartisan 私有显示 API，例如 `DisplaySmtEx.getSmRealMetrics()`。
+- smengine 世界坐标和 Android 屏幕像素之间的转换基准。
+- dock / loading / overview 使用的 `LayoutProperty` 可能来自不同 page mode，但最终叠加到同一场景。
+- 数据库中的 dock `cellIndex` 可能保留了原机预置应用的位置；普通 Android 上部分原机应用不存在后，会出现“可见图标占着旧空槽”的情况。
+
+所以 1080 宽设备仍可能错位，尤其是现在常见的 `1080x2400`、`1080x2412`、`1080x2520` 和 Pro 3 原始基准不完全一致。
+
+### maintained 为什么更容易自适应
+
+`E:\FANG\smartisan\smartisan-launcher-maintained` 更像普通 Android 应用，它主要依赖：
+
+```text
+res/layout
+res/values
+res/values-h720dp-v13
+res/values-sw411dp-v13
+res/values-w820dp-v13
+match_parent / wrap_content / dp
+```
+
+也就是说，maintained 很多设置页和普通 UI 由 Android View 系统按密度、dp、屏幕宽高自动布局；而当前原版桌面核心是 smengine 场景，很多坐标来自 assets XML 和 smali 计算，Android 不会自动帮它重排。
+
+因此本工程的正确做法不是“把 1080 改成 720”或“固定某个按钮坐标”，而是：
+
+```text
+运行时读取真实 DisplayMetrics
+选出最接近的 assets 基准资源
+计算 scaleX / scaleY / offsetY
+统一应用到 page / dock / overview / loading animation
+清理或重映射旧 dock cellIndex 空槽
+```
+
+当前已做的 dock cell 改动只属于第一步：让部分 dock X 坐标开始基于运行时 `Constants.window_width` 计算。它是宽度自适应方向的改动，不是完整自适应完成。完整修复还必须继续处理 `LayoutProperty` 高度基准、dock 容器偏移、加载动画坐标和旧数据库 cellIndex。
+
+已验证的关键点：
+
+- 12/20 资源在 `launcher/assets/layout/portrait/*/MODE_12/layout.xml` 和 `MODE_20/layout.xml`，不是普通 `res/layout`。
+- `P.smali` 会从 assets 中选择 layout 目录并解析 `global.xml` / `MODE_x/layout.xml`。
+- 资源里有 1080 宽的多套高度基准，例如 `2160x1080`、`2242x1080`、`2340x1080`。
+- 当前普通 Android 设备可能是 `1080x2400`，高于原资源基准；如果直接用真实高度覆盖 `window_height`，cell/dock/动画会被拉到新的世界坐标里。
+- 大屏分支原本会调用 Smartisan 私有 `DisplaySmtEx.getSmRealMetrics()`，移植版应使用标准 `Display.getRealMetrics()`。
+
+正确方向：
+
+1. 找到编辑/多页总览底部按钮的坐标来源。
+
+   重点搜索：
+
+   ```text
+   SettingButton.java
+   Ec.smali
+   V.Ao()
+   x.b(V)
+   x.l(...)
+   DockViewAnimation
+   PageAnimation
+   dock_width
+   window_width
+   PHYSICAL_SCREEN_SIZE
+   ```
+
+2. 统一使用运行时屏幕宽度计算底部区域。
+
+   当前应以 `Constants.window_width` / `PHYSICAL_SCREEN_SIZE.x` / 实际 DisplayMetrics 宽度为准，而不是资产 XML 中的固定 `720` 或 `1080`。
+
+   如果把 `dock_width` 覆盖为运行时宽度，同时必须同步修正 `dock_margin_left/right`，否则旧 margin 会参与计算并产生负值。
+
+3. 让底部按钮组整体按比例缩放或重新按屏幕宽度分布。
+
+   例如原始坐标如果基于 720 宽：
+
+   ```java
+   scaleX = runtimeWidth / baseWidth;
+   fixedX = originalX * scaleX;
+   ```
+
+   对成组底部按钮，不要单独把齿轮放到屏幕中心。应保留原有相对布局，例如：
+
+   ```java
+   leftButtonX  = originalLeftButtonX  * scaleX
+   midButtonX   = originalMidButtonX   * scaleX
+   rightButtonX = originalRightButtonX * scaleX
+   x = runtimeWidth - originalRightMargin
+   ```
+
+4. 加载动画也要查同一类基准宽度和高度。
+
+   如果启动动画和底部总览都偏，优先怀疑共享的 `window_width/window_height`、Camera、SceneNode、DockView 或 overview transform 使用了旧资源基准。
+
+5. 适配目标是所有分辨率。
+
+   至少要在以下宽度上逻辑成立：
+
+   ```text
+   720
+   1080
+   1440
+   其他 16:9 / 18:9 / 20:9 手机
+   ```
+
+6. 下一步要做的是 12/20 `LayoutProperty` 级别的统一适配。
+
+   不要改原版图标比例；应让主题坐标根据运行时宽度/高度选择或计算基准：
+
+   ```text
+   读取真实 DisplayMetrics
+   选择最接近的 assets/layout/portrait/<height>x<width> 基准
+   对 dock/page/loading 共用的 LayoutProperty 做同一套 scale/offset
+   重新生成 pageCellCenterPoints、pageWorldCenterPointsInWindow、dock cell points
+   ```
+
+## 完整设置页移植方向
+
+用户需要的是 `smartisan-launcher-maintained` 那种完整设置页，不是临时弹窗。
+
+设置页应包含 maintained 中已有的能力，例如：
+
+- 12 / 20 宫格切换
+- 页面翻页动画
+- 解锁动画
+- 主题相关入口
+- 图标显示设置
+- 隐藏导航栏等桌面行为设置
+- 关于页面等基础设置项
+
+移植原则：
+
+1. 先阅读 maintained 设置页结构。
+
+   重点目录：
+
+   ```text
+   E:\FANG\smartisan\smartisan-launcher-maintained\smali\com\smartisanos\home\settings
+   E:\FANG\smartisan\smartisan-launcher-maintained\res\layout
+   E:\FANG\smartisan\smartisan-launcher-maintained\res\values
+   ```
+
+2. 不要照搬 9 / 16 宫格数值。
+
+   本项目应使用：
+
+   ```text
+   12宫格: page mode = 0x0c
+   20宫格: page mode = 0x09，对应本项目映射后的 20 宫格 cell count 0x14
+   ```
+
+   maintained 中常见的：
+
+   ```text
+   9宫格:  0x09
+   16宫格: 0x10
+   ```
+
+   必须替换为 12 / 20 逻辑。
+
+3. 优先做独立完整 Activity，而不是 Dialog。
+
+   目标是完整设置页 Activity，类似 maintained 的 `SettingMainActivity`。临时 Dialog 会和后续设置项、生命周期、主题、跳转逻辑冲突。
+
+   入口方式必须像 maintained：桌面里有一个“设置”图标，点击图标进入设置页。不要借用编辑/总览底部齿轮。
+
+4. Manifest 是关键限制。
+
+   当前构建脚本会把 `launcher/original/AndroidManifest.xml` 的二进制 Manifest 注入到最终 APK。也就是说，仅修改 `launcher/AndroidManifest.xml` 文本文件可能不会生效。
+
+   如果新增设置 Activity，必须解决二进制 Manifest 注册问题。可选路线：
+
+   - 修改构建脚本，不再覆盖为旧二进制 Manifest，并验证重编译 Manifest 后 APK 可安装。
+   - 使用已有 Manifest 中已经声明的 Activity 作为设置页承载入口。
+   - 直接修改二进制 Manifest，风险较高，不推荐作为第一选择。
+
+5. 资源体系是第二个限制。
+
+   当前 `launcher/` 是 raw resource 形态：
+
+   ```text
+   launcher/resources.arsc
+   launcher/unknown/res/*
+   launcher/res 不存在
+   ```
+
+   不能简单复制 maintained 的 `res/layout` 就期待生效。完整设置页需要解决资源解包/合并/ID 对齐问题。
+
+   在动资源前，应先确认：
+
+   ```bat
+   java -jar tools\apktool.jar b launcher
+   ```
+
+   是否能在非 raw 资源模式下重建，并且最终 APK 安装启动不回退。
+
+## 推荐实施路线
+
+### 阶段 1：先回收临时方案
+
+- [x] 移除 `LauncherSettingsDialog*.smali`。
+- [x] 移除 `wc.smali` 中调用临时 Dialog 的逻辑。
+- [x] 保留当前能构建/启动的其他兼容性补丁。
+- [x] 回退 `wc.smali` 中把底部齿轮改为设置页入口的错误尝试。
+- [x] 增加桌面“设置”图标入口，点击进入 `ThemeChooserActivity` 设置页宿主。
+
+验收：
+
+```text
+APK 可构建、可安装、可启动。
+不再出现临时弹窗设置入口。
+日志中可看到 `title = [设置] packageName = [com.smartisanos.launcher] componentName = [com.smartisanos.launcher.theme.ThemeChooserActivity]`。
+```
+
+### 阶段 2：修底部自适应
+
+- [x] 不再依赖写死 `dock_width=1080` 作为主要方案。
+- [x] `Constants.initDockSize(I)` 已把 `dock_width` 运行时覆盖为 `Constants.window_width`。
+- [x] `Constants.initDockSize(I)` 已把 `dock_margin_left/right` 同步归零，避免负 margin。
+- [x] `Constants.setPhysicalScreenSize(Context)` 大屏分支已改为标准 `Display.getRealMetrics()`。
+- [x] 回退单独居中底部齿轮的错误尝试。
+- [x] `view/x.1.smali` 已按原始 APK 恢复 `ra()` / `rx()` / `sx()` 的 dock 与编辑模式坐标算法，桌面和编辑模式底部交互已验证正常。
+- [ ] 统一 12/20 的 `LayoutProperty` 适配：宽度缩放、高度基准、dock/page/loading 动画共用坐标。
+- [ ] 验证 720P、1080P、1440P，以及 18:9 / 20:9 高屏比例。
+- [ ] 同步检查启动动画偏移是否共用同一套宽度/Camera/SceneNode 逻辑。
+
+验收：
+
+```text
+1080 宽设备：桌面和编辑模式底部图标不遮挡，dock 图标拖入拖出后位置正确。
+720 / 1440 或其他宽度：位置按比例正确。
+启动动画居中。
+```
+
+### 阶段 3：验证完整设置页移植可行性
+
+先不要大规模复制 maintained 文件。先做最小闭环：
+
+1. [x] 选定设置页承载 Activity：复用已注册的 `ThemeChooserActivity`。
+2. [x] 规避新增 Manifest 注册：沿用二进制 Manifest 中已有声明。
+3. [x] 先用程序化布局完成最简单设置页。
+4. [ ] 能通过桌面里的“设置”图标进入设置 Activity。
+5. [ ] 继续移植 maintained 风格标题栏、列表样式和子页面。
+
+验收：
+
+```text
+点击设置入口进入完整 Activity。
+Activity 有 maintained 风格标题栏和列表容器。
+返回桌面不崩溃。
+```
+
+### 阶段 4：移植 maintained 设置项
+
+按模块迁移，不要一次性全搬：
+
+1. 宫格切换：9/16 改为 12/20。
+2. 动画设置。
+3. 主题入口。
+4. 图标设置。
+5. 导航栏/状态栏相关设置。
+6. 关于页。
+
+每移植一组都要构建安装测试。
+
+### 阶段 5：清理和文档更新
+
+- 删除临时类和废弃入口。
+- 更新 README 的“当前状态”。
+- 记录每个设置项对应的 key、写入位置、读取位置。
+
+## 已知关键文件
+
+当前工程关键文件：
+
+```text
+launcher/smali/com/smartisanos/launcher/data/Constants.smali
+launcher/smali/com/smartisanos/launcher/data/N.smali
+launcher/smali/com/smartisanos/launcher/data/O.smali
+launcher/smali/com/smartisanos/launcher/view/Ec.smali
+launcher/smali/com/smartisanos/launcher/view/wc.smali
+launcher/smali/com/smartisanos/launcher/ua.1.smali
+launcher/smali/com/smartisanos/launcher/e/s.smali
+build.bat
+```
+
+临时设置入口文件，后续应移除：
+
+```text
+launcher/smali/com/smartisanos/launcher/settings/LauncherSettingsDialog.smali
+launcher/smali/com/smartisanos/launcher/settings/LauncherSettingsDialog$1.smali
+```
+
+以上两个文件目前已经删除。如果后续又出现，说明有人重新引入了临时方案，应优先回滚这部分。
+
+布局资产中与底部相关的文件：
+
+```text
+launcher/assets/layout/portrait/values-xhdpi/MODE_12/layout.xml
+launcher/assets/layout/portrait/values-xhdpi/MODE_20/layout.xml
+launcher/assets/layout/portrait/values-xhdpi/MODE_48/layout.xml
+launcher/assets/layout/portrait/values-xhdpi/MODE_80/layout.xml
+```
+
+## 构建验证
+
+标准流程：
+
+```bat
+build.bat
+adb install -r build\launcher-signed.apk
+adb logcat -c
+adb shell am start -n com.smartisanos.launcher/.Launcher
+adb logcat -d -t 400
+```
+
+重点检查：
+
+```text
+FATAL EXCEPTION
+AndroidRuntime
+VerifyError
+ClassNotFoundException
+Resources$NotFoundException
+SecurityException
+```
+
+`SecurityException` 不一定都是致命问题，之前普通 Android 系统上会出现部分 Provider/私有权限警告。是否致命以桌面是否闪退、进程是否存活为准。
+
+## 当前结论
+
+当前可运行成果要保留。临时设置弹窗已移除，设置页宿主已能启动，但入口方式必须改为桌面“设置”图标，不能复用编辑/总览底部齿轮。桌面和编辑模式底部交互已通过恢复原版 `x.1.smali` 坐标算法修正，后续适配必须在这套原版逻辑上扩展，不能再单独移动齿轮或把 dock 图标改成简单等分屏宽。
+
+后续正确方向：
+
+1. 回退底部齿轮打开设置页和单独居中齿轮的错误尝试。
+2. 增加桌面“设置”图标入口，点击进入设置页宿主。
+3. 按底部按钮组整体修复 720P / 1080P / 其他分辨率自适应。
+4. 以 maintained 为参考，把设置页从当前宿主扩展为完整设置页。
+5. 把 maintained 的 9 / 16 宫格设置逻辑替换为原版桌面的 12 / 20 宫格逻辑。
+6. 逐项接入动画、主题、图标、导航栏等设置。
+
+---
+
+## 每日修复与功能记录
+
+### 2026-05-27 追加：主入口缩略图清晰度、宫格预览资源还原、开关动画继续对齐
+
+用户反馈：
+
+- 桌面设置主入口前三个图标不清楚，maintained 原版更清晰；
+- 12 / 20 宫格预览希望恢复成可手工 PS 的图片资源；
+- 开关左右滑动仍不像 maintained，移动不够自然。
+
+本轮修正：
+
+- 主设置页“桌面主题”不再把 `thumbnail_settings.png / thumbnail_settings_16.png` 二次合成到 72dp 位图里，改为直接使用 maintained 原始资源，避免重复缩放导致发糊。
+- 主设置页“桌面翻页动画”不再走二次合成，直接使用 `page_flip_animation_default_upper.png`。
+- 主设置页“桌面壁纸”改为生成 256x233 的高分辨率纹理缩略图，再交给 ImageView 缩放，避免之前 96x96 纹理被放大或重采样后不清楚。
+- 12 / 20 宫格预览撤掉运行时动态绘制，恢复为 maintained 设置资源中的 PNG：
+  - `launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/grids_9_preview_normal.png`
+  - `launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/grids_16_preview_normal.png`
+- `PreviewSettingItemView` 新增 `setPreviewResource(...)`，让宫格预览可以直接绑定图片资源。
+- `SwitchEx` 的点击逻辑避免再走 `CompoundButton.performClick()` 的二次 toggle 风险，开关只由自身切换一次状态。
+- `SwitchEx` 的滑动动画改为 260ms + `PathInterpolator(0.2, 0, 0.2, 1)`，比之前更接近 maintained 的缓入缓出手感。
+
+验证结果：
+
+- `build.bat` 成功，输出 `build/launcher-signed.apk`。
+- `adb install -r build/launcher-signed.apk` 成功。
+- `adb shell am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity` 成功。
+- 截图确认主入口“桌面主题 / 桌面壁纸 / 桌面翻页动画”缩略图已明显更清晰，12 / 20 宫格预览已恢复为资源图片。
+- 最近 logcat 未出现 `FATAL EXCEPTION` / `AndroidRuntime` / `VerifyError` / `NoSuchMethodError`。
+
+## 2026-05-16：maintained 设置页真实迁移记录
+
+本次开始停用 `NativeLauncherSettingsHost` 作为桌面设置入口。它是 Java 程序化临时页，不是 maintained 页面，后续不要继续美化或扩展它。
+
+新的入口链路：
+
+```text
+桌面“桌面设置”图标
+-> com.smartisanos.launcher.theme.ThemeChooserActivity
+-> com.smartisanos.launcher.theme.MaintainedLauncherSettingsHost.show(Activity)
+-> 加载 assets/settings_maintained/maintained-settings-res.apk
+-> inflate maintained 的 res/layout/setting_main.xml
+```
+
+本次改动文件：
+
+```text
+build.bat
+launcher/smali/com/smartisanos/launcher/theme/ThemeChooserActivity.smali
+launcher/tools/maintained_settings_res/AndroidManifest.xml
+launcher/tools/maintained_settings_res/res/**
+launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java
+launcher/tools/java/com/smartisanos/home/settings/PreviewSettingItemView.java
+launcher/tools/java/com/smartisanos/home/settings/SettingItemSwitch.java
+launcher/tools/java/com/smartisanos/home/settings/SettingItemTextVertical.java
+launcher/tools/java/com/smartisanos/home/widget/sys/Title.java
+launcher/tools/java/com/smartisanos/home/widget/sys/TipsView.java
+```
+
+实现方式：
+
+- `launcher/tools/maintained_settings_res/res` 直接来自 `smartisan-launcher-maintained` 的资源目录。
+- `build.bat` 会先用 `aapt2` 把 maintained 资源编译为 `launcher/assets/settings_maintained/maintained-settings-res.apk`，再构建当前桌面。
+- `MaintainedLauncherSettingsHost` 运行时把这个资源 APK 复制到 cache，通过 `AssetManager.addAssetPath()` 加载，然后用外部 `Resources` inflate `setting_main.xml`。
+- maintained XML 中的自定义 View 需要在当前包里提供同名兼容类，否则 inflate 会失败；目前已补 `Title`、`TipsView`、`PreviewSettingItemView`、`SettingItemSwitch`、`SettingItemTextVertical`。
+- 宫格项仍使用 maintained 的 `smartisan_launcher_9_grids` / `smartisan_launcher_16_grids` id，但显示文字和逻辑改为“十二宫格 / 二十宫格”。
+- 12 / 20 宫格确认后写入 `Settings.Global["launcher_mode"]`，并调用 `com.smartisanos.launcher.data.N.d(Context, int)` 同步当前桌面的 `prefs_key_launcher_mode`，最后重启桌面生效。
+- 如果 maintained XML 加载失败，不再回退到旧的 `NativeLauncherSettingsHost`，而是显示错误页；这样可以避免误以为已经加载 maintained 页面。
+
+已验证：
+
+```text
+cmd /c build.bat                         成功
+adb install -r build\launcher-signed.apk 成功
+adb shell am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity 成功
+```
+
+运行截图：
+
+```text
+build/maintained-settings-screen.png
+build/maintained-grid-dialog.png
+```
+
+当前 APK 大小约 107.3 MiB。比只用 maintained 独立桌面大，主要原因是当前项目仍保留原提取桌面的完整资源、so 和历史素材；本次只额外加入 maintained 设置资源包，约 6.6 MiB，没有再把 `com.android.settings-100.apk` 整包塞进 assets。
+
+补充修正：
+
+- `PreviewSettingItemView` 已改为 maintained 结构：宫格预览图使用 maintained 的灰色 `grids_9_preview_normal` / `grids_16_preview_normal` 资源，选中态使用 maintained 的 `preview_picture_selected` 叠在预览图右上角；只把文字和逻辑映射为 12 / 20。
+- 设置页标题恢复为 maintained 的“锤子桌面”，不再强制显示自绘返回箭头。
+- 设置页窗口状态栏改成浅色，接近 maintained 页面截图。
+- 二进制 Manifest 字符串池已把 `ThemeChooserActivity` 的 taskAffinity 改为 `smartisanos.task.launcher`，与主桌面 `Launcher` 保持一致，避免设置页使用单独的 `smartisanos.launcher` 任务。备份：`launcher/original/AndroidManifest.xml.before-maintained-taskaffinity.bak`。
+- 注意：当前二进制 Manifest 仍未真正新增 `excludeFromRecents` 属性；如果实机从桌面图标进入设置后最近任务里仍出现两个“锤子桌面”，下一步要做 AXML 属性级补丁，而不是只改文本 `launcher/AndroidManifest.xml`。
+
+下一步：
+
+1. 如果还要更像 maintained，需要继续迁真实 maintained 自定义 View 的 smali/Java 行为，而不是再用程序化绘制。
+2. 接入 maintained 的二级页面：主题、壁纸、图标、翻页动画。
+3. 把 unsupported 的 maintained 项逐项决定：隐藏、Toast 提示，或接入当前桌面的真实 key。
+4. 清理旧的 `SmartisanNativeSettingsHost` / `NativeLauncherSettingsHost` 文档痕迹，避免后续误走旧路线。
+
+### 2026-05-16 补充：maintained 二级页面入口
+
+本次继续沿用 maintained 资源，不再新增“自己画”的设置页。主设置页里的以下入口已经改为真实二级页面：
+
+```text
+桌面主题      -> inflate maintained 的 theme_preview_gridview.xml
+桌面壁纸      -> inflate maintained 的 app_icon_settings_layout.xml 作为壁纸操作页外壳
+桌面翻页动画  -> inflate maintained 的 page_flip_anim_chooser_layout.xml + page_scroll_anim_list_item.xml
+应用图标      -> inflate maintained 的 app_icon_settings_layout.xml + app_icon_settings_item_layout.xml
+```
+
+本次主要改动文件：
+
+```text
+launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java
+README.md
+```
+
+验证结果：
+
+```text
+cmd /c build.bat                         成功
+adb install -r build\launcher-signed.apk 成功
+adb shell am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity 成功
+```
+
+已保存验证截图：
+
+```text
+build/settings-main-secondary-entry.png
+build/settings-theme-page.png
+build/settings-pageflip-page.png
+build/settings-icon-page.png
+```
+
+当前边界：
+
+- 主题页已经使用 maintained 的主题预览页面结构和 `theme_preview_block.xml`，但完整的主题包下载、应用、颜色点、详情页逻辑还没有迁移；目前只接本地“材质主题 / 透明主题”的预览壳。
+- 应用图标页已经使用 maintained 的图标设置列表 item，列表数据先用当前系统可启动应用填充；完整的“官方图标 / 改进图标包 / 作者信息 / 替换写入”逻辑还需要继续迁 maintained 的 adapter 与图标映射表。
+- 翻页动画页已经接入选择列表，并写入 `Settings.Global["launcher_page_animation"]`；当前值映射为 maintained 常见的 4 项：默认动画、立体翻转、百叶窗、切牌。
+- 壁纸页现在只提供 maintained 风格外壳和“选择图片 / 恢复默认壁纸”入口；真正把图片写入当前桌面背景资源的逻辑还未接入。
+
+后续继续迁移时不要回到 `NativeLauncherSettingsHost`，也不要再用新的程序化页面替代 maintained XML。正确路线是：优先找 maintained 的 layout / drawable / adapter / smali 行为，缺少 Android 系统私有类时才补最薄的兼容类。
+
+### 2026-05-16 补充：开关控件改为 maintained 资源
+
+用户指出主设置页里的滑块不像 maintained。已修正：
+
+```text
+launcher/tools/java/smartisanos/widget/SwitchEx.java
+launcher/tools/java/com/smartisanos/home/settings/SettingItemSwitch.java
+```
+
+实现方式：
+
+- `SwitchEx` 不再继承 Android 默认 `Switch`，也不再手绘圆角轨道。
+- `SwitchEx` 直接使用 maintained 的原始资源绘制：
+
+```text
+switch_ex_bottom.png
+switch_ex_frame.png
+switch_ex_mask.png
+switch_ex_unpressed.png
+```
+
+- `SettingItemSwitch` 优先 inflate maintained 的 `res/layout/setting_item_switch_layout.xml`，拿到其中的 `smartisanos.widget.SwitchEx`、`item_title`、`item_summary`。
+- 只有 maintained layout 加载失败时，才走极简 fallback。
+- 开关本身不抢点击，仍由整行设置项处理点击和保存，避免点滑块时只改变 UI 不写入设置 key。
+
+验证：
+
+```text
+cmd /c build.bat                         成功
+adb install -r build\launcher-signed.apk 成功
+```
+
+截图：
+
+```text
+build/settings-switch-maintained-layout.png
+```
+
+### 2026-05-16 补充：全分辨率自适应路线
+
+用户反馈：当前 APK 装到 720p 分辨率手机后，图标偏大、编辑页错位；maintained 桌面不会错位，而且 APK 更小。
+
+结论：
+
+- 当前 `original-port` 的桌面主体仍是原生锤子提取版的布局系统。
+- 它不是 Android View/dp 自适应布局，而是从 `launcher/assets/layout/portrait/<机型或资源目录>/MODE_x/layout.xml` 解析大量固定坐标，写入 `LayoutProperty` 后直接交给 smengine 渲染。
+- 现在主要覆盖的是 1080 宽设备：`2160x1080_400dpi`、`2160x1080_480dpi`、`2242x1080`、`2340x1080`、`values-sw411dp`、`values-xhdpi`、`values-xxhdpi`。
+- 720p / 小宽度设备如果命中不合适的 layout 目录，就会出现图标太大、dock / 编辑页 / loading / folder 坐标比例不一致。
+- maintained 之所以小且不偏，是因为它更多使用 Android 资源分桶和运行时尺寸计算；它没有这个原生提取版的大量机型贴图、固定坐标和 smengine 场景资源。
+
+不要继续做的方案：
+
+- 不要只复制一个 `720x1280` 目录来救某台机器。这样只能修一个分辨率，720x1600、1080x2400、不同 dpi 还会继续偏。
+- 不要只改桌面图标大小。编辑页、dock、文件夹、loading 动画、拖拽命中区域都依赖同一套 `LayoutProperty`，单点改动会继续制造新的错位。
+- 不要把 maintained 整个桌面反向移植 12/20 和文件夹作为第一选择；之前已经验证过移植后桌面、编辑页、交互动画会错位，成本比修当前布局核心更高。
+
+正确路线：
+
+1. 保留当前 `original-port` 作为主体，因为它已经有可用的 12/20 宫格、文件夹、dock 编辑交互。
+2. 设置页继续迁 maintained 的页面、资源和控件，不影响桌面主体布局。
+3. 桌面主体新增一层“运行时布局适配器”：
+
+```text
+读取当前屏幕 width / height / density
+选择最接近的 1080 基准 layout 目录
+解析 MODE_12 / MODE_20 / MODE_9 的 LayoutProperty
+按实际屏幕做统一 scale：
+  scaleX = 当前宽度 / 基准宽度
+  scaleY = 当前可用高度 / 基准高度
+  icon / cell / text / shadow 使用 min(scaleX, scaleY) 或按字段分类缩放
+  page / dock / folder 的位置字段使用同一套 yOffset / heightScale
+最后再 initAfterLoadRes
+```
+
+优先修改入口：
+
+```text
+launcher/smali/com/smartisanos/launcher/data/P.smali
+  LayoutPropertyParser，负责从 assets/layout/**/layout.xml 解析 LayoutProperty
+
+launcher/smali/com/smartisanos/launcher/data/Constants.smali
+  保存 mode -> LayoutProperty，所有桌面/编辑/文件夹/动画都会通过 Constants.mode(mode) 取值
+
+launcher/smali/com/smartisanos/launcher/view/x*.smali
+launcher/smali/com/smartisanos/launcher/view/Fb.smali
+launcher/smali/com/smartisanos/launcher/view/b/N.smali
+  dock、编辑页、folder 场景会二次使用 LayoutProperty，需要验证是否还有硬编码 window_width/window_height 的偏移
+```
+
+第一阶段目标：
+
+- 不新增 720p 专用目录，先让 720p 能通过同一套 1080 基准缩放正常显示。
+- 只处理 `MODE_12` 和 `MODE_20` 的桌面、dock、编辑页、loading、folder 打开态。
+- 每次只验证一组分辨率：
+
+```text
+1080x1920 / 480dpi 当前基准设备
+720x1280 / 320dpi  720p 目标设备
+720x1600 / 320dpi  常见 20:9 目标设备
+```
+
+验收标准：
+
+- 桌面图标大小合理，不超出宫格。
+- dock 正常居中，编辑模式切换时图标和齿轮不遮挡。
+- loading 动画居中。
+- 文件夹打开后书架居中，文件夹内每一行图标居中。
+- 12/20 宫格切换后重启桌面生效。
+
+当前已做但还未完整收口：
+
+- `MaintainedLauncherSettingsHost` 已递归关闭宿主页系统默认滚动条，避免露出 Android 默认粗滚动条。
+- 桌面设置图标点击问题已定位：桌面图标发出的 Intent 带 `MAIN + LAUNCHER + 0x10200000`，系统会把当前 launcher 任务拉回前台，导致 `ThemeChooserActivity` 没真正显示。后续应在 launcher 点击路径里对 `ThemeChooserActivity` 特判，移除 task reset flag 或改为普通显式启动。
+
+### 2026-05-16 补充：运行时 LayoutProperty 适配器
+
+已开始实现“全分辨率自适应”的第一阶段，不再继续为 720p 单独改 XML 坐标。
+
+新增文件：
+
+```text
+launcher/tools/java/com/smartisanos/launcher/data/LayoutPropertyAdapter.java
+```
+
+接入点：
+
+```text
+launcher/smali/com/smartisanos/launcher/data/P.smali
+```
+
+实现方式：
+
+- `P.smali` 在 `LayoutProperty` 从 `layout.xml` 读完之后、调用 `initAfterLoadRes()` 之前，调用 `LayoutPropertyAdapter.adapt(property, suffix)`。
+- `LayoutPropertyAdapter` 使用运行时反射读取：
+
+```text
+Constants.window_width
+Constants.window_height
+LayoutProperty public fields
+```
+
+- 当前以已经验证正常的 `1080x1920` 为基准：
+
+```text
+scaleX = window_width / 1080
+scaleY = window_height / 1920
+scale  = min(scaleX, scaleY)
+```
+
+- 字段按名字分类缩放：
+
+```text
+横向位置/宽度：margin_left、margin_right、offset_x、width、_w 等使用 scaleX
+纵向位置/高度：margin_top、margin_bottom、offset_y、height、_h 等使用 scaleY
+图标/文字/圆角：icon_size、font、radius 等使用 scale
+计数/比例：page_cell_row_num、page_cell_col_num、dock_app_count、scale、factor、modulus 不缩放
+```
+
+- `_folder` 文件夹模式单独处理：文件夹书架和图标网格不是同一套坐标来源，720p 下不能简单把全部 folder page margin 等比例压缩，所以当前对文件夹纵向位置加了一个轻量补偿，后续还需要继续做“每一行图标按当前行数量居中”的逻辑。
+
+已验证：
+
+```text
+cmd /c build.bat                         成功
+adb install -r build\launcher-signed.apk 成功
+adb shell wm size 720x1280
+adb shell wm density 320
+```
+
+720p 当前效果：
+
+```text
+build/launcher-720-adapted.png  桌面首屏：图标/dock/宫格已按 720 宽度收缩
+build/launcher-720-edit.png     编辑页：四宫格和底部 dock/齿轮不再按 1080 宽度遮挡
+build/launcher-720-folder-3.png 文件夹：书架尺寸已收缩，但行内图标居中还未完成
+```
+
+### 2026-05-16 补充：对齐 maintained 的图标比例，关闭旧二次缩放
+
+用户指出 720p 下桌面图标大小和进入编辑页后 dock / 齿轮图标大小不协调。
+
+原因：
+
+- 之前已有一段其他 AI 注入的旧缩放逻辑：
+
+```text
+launcher/smali/com/smartisanos/launcher/data/LayoutProperty.smali
+  # --- Injected Global Scaling Logic (Dock Buttons & Layout Fix) ---
+```
+
+- 这段逻辑在 `LayoutProperty.initAfterLoadRes()` 里再次乘 `Constants.SCALE_X / SCALE_Y`。
+- 新增的 `LayoutPropertyAdapter` 已经在 `initAfterLoadRes()` 之前统一缩放过桌面、dock、folder 字段，所以旧逻辑会导致 dock、setting_button、folder 等字段二次缩放，出现桌面态和编辑态图标比例不一致。
+
+本次处理：
+
+```text
+launcher/smali/com/smartisanos/launcher/data/Constants.smali
+  SCALE_X / SCALE_Y 固定为 1.0
+  旧 Global Scaling Logic 不再产生二次缩放
+
+launcher/tools/java/com/smartisanos/launcher/data/LayoutPropertyAdapter.java
+  对齐 maintained 的 xhdpi 图标节奏
+```
+
+maintained 参考值：
+
+```text
+E:\FANG\smartisan\smartisan-launcher-maintained\res\values-xhdpi-v4\integers.xml
+
+9 宫格：
+  icon_size_origin_9 = 128
+  icon_size_with_shadow_9 = 164
+  setting_button_9 = 90
+
+16 宫格：
+  icon_size_origin_16 = 92
+  icon_size_with_shadow_16 = 118
+  setting_button_16 = 70
+```
+
+当前映射：
+
+```text
+12 宫格 / 3 列：按 maintained 9 宫格大图标节奏
+20 宫格 / 4 列：按 maintained 16 宫格密集图标节奏
+```
+
+验证截图：
+
+```text
+build/launcher-720-no-double-home.png
+build/launcher-720-no-double-edit.png
+```
+
+后续继续顺序：
+
+1. 文件夹打开态：在 `FolderPageView` / `CellOnFolderPage` 的坐标计算处做“按当前行图标数量居中”，不要只靠全局 margin。
+2. 720x1600 / 320dpi 再验证一次，避免只修 16:9。
+3. 恢复并验证 1080x1920 / 480dpi，确保当前基准设备没有回退。
+4. 再看 loading 动画是否仍需要单独按 `window_width/window_height` 居中。
+
+### 2026-05-16 补充：720p 图标文字节奏与文件夹行内居中
+
+用户反馈：
+
+```text
+1. 720p 下主桌面图标和文字不在同一个宫格里，文字压在横向格线附近。
+2. 文件夹打开态里图标没有按所在行居中，尤其 2 个图标时明显偏左，并且图标/文字基准会压到书架分隔线。
+```
+
+本次改动：
+
+```text
+launcher/tools/java/com/smartisanos/launcher/data/LayoutPropertyAdapter.java
+launcher/tools/java/com/smartisanos/launcher/data/FolderCellPositionAdapter.java
+launcher/smali/com/smartisanos/launcher/view/b/M.smali
+```
+
+处理方式：
+
+- `LayoutPropertyAdapter` 继续作为全分辨率运行时适配层，不新增 720p 固定 XML。
+- 普通桌面模式不再只缩放图标大小，也会按 maintained 的 720p 节奏同步修正：
+
+```text
+12 宫格 / 3 列：
+  text_font_size = 27 * (screenWidth / 720)
+  name_off_set_y = -55 * (screenWidth / 720)
+  max_app_name_length = 206 * (screenWidth / 720)
+
+20 宫格 / 4 列：
+  text_font_size = 24 * (screenWidth / 720)
+  name_off_set_y = -44 * (screenWidth / 720)
+  max_app_name_length = 146 * (screenWidth / 720)
+```
+
+- `_folder` 模式不再使用之前的粗暴 `page_view_margin_top += screenHeight * 0.045`。
+- `_folder` 的 `page_view_margin_top/page_view_margin_bottom` 恢复按屏幕高度缩放，让文件夹书架内部可用高度跟分辨率一致。
+- `_folder` 图标和文字使用更小的文件夹内节奏，避免压到书架分隔线：
+
+```text
+icon_size_origin = 96 * (screenWidth / 720)
+icon_size_with_shadow = 122 * (screenWidth / 720)
+text_font_size = 18 * (screenWidth / 720)
+name_off_set_y = -38 * (screenWidth / 720)
+```
+
+- 新增 `FolderCellPositionAdapter.adjustX(page, row, column, x)`。
+- 在 `M.smali` 两处 cell `setTranslate()` 前调用该 helper：
+
+```text
+M.a(int row, int column, RenderTarget, String)
+M.fn()
+```
+
+- helper 只在 `com.smartisanos.launcher.view.b.a`（FolderPage）生效。它读取当前 page 的 `AI` 列表和 `Nn.page_cell_col_num/cell_width`，计算当前行真实图标数量：
+
+```text
+rowStart = row * columns
+rowItemCount = min(columns, items.size - rowStart)
+if rowItemCount < columns:
+    x += (columns - rowItemCount) * cell_width / 2
+```
+
+这样最后一行只有 1 个或 2 个图标时，会自动向中间偏移；普通桌面、编辑页、dock 不受影响。
+
+验证：
+
+```text
+cmd /c build.bat 成功
+输出 build/launcher-signed.apk
+```
+
+当前限制：
+
+- 本次构建已通过，但当前 `adb devices -l` 没有在线设备，尚未完成 720p / 1080p 实机截图复测。
+- 下一次有设备后必须先执行：
+
+```text
+adb shell wm size 720x1280
+adb shell wm density 320
+adb install -r build\launcher-signed.apk
+adb shell am force-stop com.smartisanos.launcher
+adb shell am start -n com.smartisanos.launcher/.Launcher
+```
+
+- 复测重点：
+
+```text
+1. 720p 主桌面：图标和文字是否都回到同一个格子内部。
+2. 720p 文件夹：2 个图标是否在第一行居中，且不压书架分隔线。
+3. 1080p 基准设备：原本正常的桌面和编辑模式不能回退。
+```
+
+### 2026-05-16 结论：停止在 original-port 上用偏移量修自适应
+
+最新 720p 截图已经证明，当前 `smartisan-launcher-original-port` 的问题不是单个图标大小、文字偏移或文件夹 X 坐标能彻底解决的，而是结构性问题：
+
+```text
+1. original-port 来自原生锤子桌面提取版，核心布局仍依赖固定设备坐标、固定资源和 smengine 场景数据。
+2. `LayoutPropertyAdapter` 可以临时缩小图标，但不能把桌面、编辑页、dock、文件夹、加载动画、拖拽动画全部统一成真正的响应式坐标系统。
+3. 不同分辨率下继续补 offset 会造成 1080p 正常、720p 错位，或者主桌面正常、编辑页/文件夹错位的循环。
+```
+
+因此，`LayoutPropertyAdapter` / `FolderCellPositionAdapter` 这条路线记录为失败实验，只保留为排查资料，不再作为最终产品方向继续扩大。
+
+#### maintained 为什么能自适应
+
+`smartisan-launcher-maintained` 不是简单把原生坐标按比例缩放，它已经把桌面改成 Android 通用桌面的做法：
+
+```text
+1. 使用不同 density / 分辨率资源桶：
+   res/values-xhdpi-v4/integers.xml
+   res/values-xxhdpi-v4/integers.xml
+   res/values-xxxhdpi-v4/integers.xml
+
+2. 在运行时根据当前 window_width / window_height / status_bar_height / dock_height
+   重新计算 page、cell、icon、文字和编辑页中心点。
+
+3. 关键逻辑在 maintained：
+   smali/com/smartisanos/launcher/data/Constants.smali
+   pageCellAdjustScaleForSpacing(FF)
+
+4. 桌面、编辑页和动画都读取同一套计算后的 cell center points，
+   所以 720p、1080p、不同 dpi 不会各走各的偏移量。
+```
+
+#### maintained 为什么能自动替换锤子图标
+
+maintained 的图标替换不是设置页外观问题，而是接进了图标加载链路：
+
+```text
+smali/com/smartisanos/home/settings/icons/IconPackManager.smali
+smali/com/smartisanos/home/settings/icons/IconLoader.smali
+smali/com/smartisanos/home/settings/icons/IconManager.smali
+smali/com/smartisanos/home/settings/icons/RedirectIconDB.smali
+smali/com/smartisanos/home/settings/icons/DatabaseHandler.smali
+smali/com/smartisanos/home/settings/icons/Utils.smali
+```
+
+它会读取选中的 icon pack，解析 `res/xml/appfilter.xml`，把应用包名 / component 映射到锤子图标资源；桌面加载应用图标时直接走这套 `IconPackManager.getPackedIcon(...)` / `IconLoader` 逻辑，所以系统默认图标会被替换。
+
+#### maintained 为什么 APK 小
+
+maintained 小，是因为它没有把原生提取桌面的整套冗余资源、Settings 资源、旧 native 库、固定布局 XML 和临时反编译产物都塞进最终 APK。它保留的是：
+
+```text
+1. 通用 launcher 代码。
+2. 必要的锤子视觉资源。
+3. density resource bucket。
+4. icon pack / redirect icon 数据链路。
+```
+
+original-port 如果继续把原生资源、设置资源、临时 native settings、scratch 资源都合进去，体积会天然比 maintained 大很多，而且仍然不一定自适应。
+
+#### 新主线：以 maintained 为底座迁移 12/20 宫格和文件夹
+
+最终目标改为：
+
+```text
+用 smartisan-launcher-maintained 做主工程。
+保留它已有的：
+- 自适应布局
+- 小体积资源组织
+- 桌面设置页
+- 锤子图标替换链路
+
+从 original-port 只迁移必要能力：
+- 12 宫格
+- 20 宫格
+- 文件夹视觉和交互中确实缺失的部分
+```
+
+注意：迁移 12/20 宫格时，不能再复制 original-port 的固定坐标 XML。正确方式是把 12/20 当成 maintained 的一等布局模式接入：
+
+```text
+1. 在 maintained 中新增 MODE_12 / MODE_20 常量和设置项。
+2. 给 xhdpi / xxhdpi / xxxhdpi 等资源桶补齐 12/20 的 cell_width、cell_height、dock_height、icon_size、text_font_size、name_offset。
+3. 修改 maintained 的 Constants.pageCellAdjustScaleForSpacing(FF)，让 12/20 也走同一套运行时中心点计算。
+4. 修改 maintained 设置页，把原来的 9/16 入口替换或扩展为 12/20。
+5. 文件夹优先复用 maintained 现有 FolderInfo / FolderCell / FolderPageView 数据结构，只迁移锤子书架视觉和必要动画。
+6. 保留 maintained 的 IconPackManager / IconLoader / RedirectIconDB，不再在 original-port 里重造图标替换。
+```
+
+验证顺序：
+
+```text
+1. 720x1280 / 320dpi：主桌面、编辑页、dock、文件夹。
+2. 1080x1920 / 480dpi：确认 12/20 基准显示正确。
+3. 720x1600 / 320dpi：确认非 16:9 设备不再错位。
+4. 图标替换：相机、设置、图库、文件、浏览器等默认应用必须自动替换成锤子风格图标。
+5. APK 体积：以 maintained 的 41MB 级别为参考，只允许因 12/20 和文件夹必要资源小幅增长。
+```
+
+### 2026-05-18 original-port 回退修复记录
+
+当前又回到 `smartisan-launcher-original-port` 修复。最新结论：
+
+```text
+1. 1080P 截图证明不是只有 720P 太大，1080P 基准资源本身也偏大。
+2. 已先下调 MODE_12 / MODE_20 的 icon_size、text_font_size、name_off_set_y、dock_height、setting_button。
+3. 20 宫格设置已经能写入 SharedPreferences：com.smartisanos.launcher_prefs / prefs_key_launcher_mode=20。
+4. 但原桌面对 20 宫格的内部映射有两套概念：
+   - 用户设置值：20
+   - Smartisan 原 pageMode：9 / PAGE_1_4X5_MODE
+   这里不能简单把 pageMode 改成 20，否则会走到多板块/普通桌面显示路径。
+5. 下一步不要继续盲目改设置页，应该先理清 Constants.getPageModeFromMode、getPAGE_1_4X5_MODE、
+   isPAGE_1_4X5_MODE、checkSinglePageMode 和资源 MODE_9 / MODE_20 的对应关系。
+6. 文件夹问题仍未完成：1080P 下文件夹里第一行图标虽然横向大致居中，但整体 Y 位置靠上；
+   720P 下文件夹错位更明显，需要单独修 folder bookcase / folder page 的运行时比例。
+```
+
+临时验证命令：
+
+```text
+cmd /c build.bat
+C:\Users\ck\AppData\Local\Android\Sdk\platform-tools\adb.exe install -r build\launcher-signed.apk
+C:\Users\ck\AppData\Local\Android\Sdk\platform-tools\adb.exe shell wm size 1080x1920
+C:\Users\ck\AppData\Local\Android\Sdk\platform-tools\adb.exe shell wm density 480
+C:\Users\ck\AppData\Local\Android\Sdk\platform-tools\adb.exe shell am force-stop com.smartisanos.launcher
+C:\Users\ck\AppData\Local\Android\Sdk\platform-tools\adb.exe shell am start -n com.smartisanos.launcher/.Launcher
+```
+
+### 2026-05-18 original-port 当前修复进展
+
+本轮继续以 `smartisan-launcher-original-port` 为主工程，不再切到 maintained。
+
+已确认并修复的核心点：
+
+```text
+1. 12 / 20 宫格切换的正确数据链路：
+   - Settings.Global["launcher_mode"] 必须保存用户模式值：12 或 20。
+   - com.smartisanos.launcher_prefs / prefs_key_launcher_mode 同样保存：12 或 20。
+   - 调用 N.d(Context, pageMode) 时才传内部 pageMode：12 宫格传 12，20 宫格传 9。
+   - 不能把 Settings.Global["launcher_mode"] 写成 9，否则启动时会被 getPageModeFromMode(9) 当成 9 宫格处理。
+2. MODE_9 不能改成 4x5。
+   - 原版代码里 MODE_9 还会被 folder / 中间态路径使用。
+   - 真正 20 宫格资源由 cellCount(9)=20 触发加载 MODE_20。
+   - 把 MODE_9 改成 20 会导致启动崩溃：cell points size is not same : 9 , 20。
+3. 1080P / 720P 图标自适应：
+   - 已下调 MODE_12 / MODE_20 在 1080 桶与 xhdpi 桶里的 icon_size、text_font_size、name_off_set_y、dock_height、setting_button。
+   - 已验证 720x1280 / 320dpi 下 12 宫格、20 宫格都能正常缩放显示。
+4. 文件夹居中补丁：
+   - FolderCellPositionAdapter 只能作用在文件夹页类 `com.smartisanos.launcher.view.b.a` 及其子类。
+   - 不能作用到普通桌面 Page，否则 20 宫格最后一行会被错误居中，左侧出现空格。
+```
+
+已生成用于对比的截图：
+
+```text
+build/original-1080-20-global20.png
+build/original-720-12.png
+build/original-720-20.png
+build/original-720-20-final3.png
+```
+
+下一步顺序：
+
+```text
+1. 用真实/构造的文件夹数据验证 folder 页横向居中和 Y 坐标；必要时继续调整 folder_bookcase_*、page_view_margin_top_folder、name_off_set_y_folder。
+2. 从设置页真实点击 12 / 20，确认 UI 写入、重启、读取三段都走通，而不是只用 adb settings 验证。
+3. 接入主题下载：优先复用原包已有 ThemeChooserActivity / ThemeItemActivity / ThemeManager / DownloadManagerDelegate 逻辑；如果继续以 ThemeChooserActivity 当设置宿主，需要先拆出独立设置宿主，否则主题选择器和设置宿主会互相覆盖。
+```
+
+### 2026-05-18 启动崩溃修复
+
+用户反馈点击桌面图标后提示“锤子桌面屡次停止运行”。logcat 结果：
+
+```text
+java.lang.VerifyError: Verifier rejected class com.smartisanos.launcher.data.O
+O.ua(Context): tried to get class from non-reference register v8 (type=Undefined)
+```
+
+原因是 `launcher/smali/com/smartisanos/launcher/data/O.smali` 中为了让启动读取
+`com.smartisanos.launcher_prefs / prefs_key_launcher_mode` 而保存 `Context` 到 `v8`，
+但 `move-object v8, p1` 被放在了 `DBG` 调试分支里。普通运行时不走该分支，后续读取
+SharedPreferences 时使用了未初始化寄存器，Android 直接拒绝加载 `O` 类。
+
+修复：
+
+```text
+把 move-object v8, p1 移到 DBG 判断之前，保证所有路径下 v8 都是有效 Context。
+重新编译安装后，进程 com.smartisanos.launcher 可正常启动，未再出现 VerifyError。
+验证截图：build/launcher_after_crash_fix.png
+```
+
+### 2026-05-18 当前工程边界确认
+
+```text
+当前主工程：E:\FANG\smartisan\smartisan-launcher-original-port
+来源定位：反编译提取的原生 Smartisan 桌面，保留原生 12 / 20 宫格、文件夹、桌面动画等逻辑。
+
+参考工程：E:\FANG\smartisan\smartisan-launcher-maintained
+参考分支：main
+参考范围：桌面设置页面的排版、控件风格、默认桌面入口、宫格设置交互等。
+
+不能再混淆：
+1. 不把 maintained 当主工程继续迁 12 / 20。
+2. 不使用 maintained 的其他分支作为参考。
+3. original-port 里设置页可以参考 maintained，但桌面网格、文件夹、编辑页仍以原生桌面逻辑为主。
+4. README 只追加事实记录，不删除已有分析和方案，除非用户明确要求整理/重写。
+```
+
+### 2026-05-18 文件夹与宫格切换修复追加
+
+```text
+1. 文件夹缩略图错位原因：
+   MODE_12 的 folder_preview_* 仍使用 70 / 56 等大尺寸参数，在 720P 下会导致文件夹内小图标越过文件夹框。
+   已把 MODE_12 的 folder_preview_* 调整到 MODE_16 / MODE_20 同一套较小参数：
+   side 50 / 32，left 40 / 41，top 23 / 21，space -2 / 0。
+
+2. 12 / 20 切换闪退原因：
+   设置页调用 Settings.Global.putInt("launcher_mode") 时，普通安卓没有 WRITE_SECURE_SETTINGS 权限，
+   抛出 SecurityException 导致 ThemeChooserActivity 崩溃。
+   修复方向：
+   - 优先写入 com.smartisanos.launcher_prefs / prefs_key_launcher_mode。
+   - Settings.Global 写入失败时忽略，不允许崩溃。
+   - 旧方案曾尝试显式启动 `LauncherAlias` 后结束旧进程；该方案在 Android 10+ 会遇到后台启动限制，已被 2026-05-19 的前台过渡方案替代。
+```
+## 2026-05-18 720/1080 图标比例与文件夹 Y 坐标微调
+
+本轮继续在 `smartisan-launcher-original-port` 主工程中修改，`smartisan-launcher-maintained` 只作为 main 分支参考，不切换主工程。
+
+确认到实际资源加载路径：
+
+- 1080x1920 / 480dpi：加载 `launcher/assets/layout/portrait/values-xxhdpi/*/layout.xml`
+- 720x1280 / 320dpi：加载 `launcher/assets/layout/portrait/values-xhdpi/*/layout.xml`
+- 打开文件夹时：使用 `MODE_9` 的 `_folder` 后缀参数
+
+本轮修改：
+
+- 让 `values-xhdpi` 的 12/20 宫格关键图标、文字、dock 参数以 1080 基准为来源，再由 `LayoutPropertyAdapter` 按屏幕比例缩放，避免 720P 因“资源已缩小 + 运行时再缩小”导致图标和编辑页缩略图过小。
+- 调整 `values-xhdpi` / `values-xxhdpi` 的 `MODE_12`、`MODE_20` 编辑页缩略图参数：
+  - `page_width_trans`
+  - `page_height_trans`
+  - `cell_width_trans`
+  - `cell_height_trans`
+- 调整 `values-xhdpi` / `values-xxhdpi` 的 `MODE_9` 文件夹打开态 Y 坐标：
+  - `page_view_margin_top_folder`
+  - `page_view_margin_bottom_folder`
+- 验证截图：
+  - `build/tuned4_720_home.png`
+  - `build/tuned4_720_edit.png`
+  - `build/tuned3_720_folder.png`
+  - `build/tuned4_1080_home.png`
+  - `build/tuned4_1080_edit.png`
+  - `build/tuned4_1080_folder.png`
+
+当前结论：
+
+- 720P 不再使用一套被二次缩小的图标参数，和 1080P 的视觉比例更一致。
+- 编辑页缩略图中的应用图标已放大，不再明显小于右侧齿轮。
+- 文件夹打开态第一行已向行内中线靠近，文字没有再压到分隔线。
+- 还需要继续微调的点：1080P 正常桌面图标是否偏大、dock 齿轮最终大小、文件夹第一行和原生截图的精确 Y 坐标。
+
+## 2026-05-19 12/20 宫格切换加载过渡
+
+本轮仍然只修改 `smartisan-launcher-original-port` 主工程，`smartisan-launcher-maintained` 继续作为 main 分支参考。
+
+问题：
+
+- 12 / 20 宫格切换保存后需要重启 Launcher 才会重新读取布局资源。
+- 之前设置页保存后立即拉起桌面并结束进程，视觉上会出现一段白屏，不像 maintained 的切换体验。
+
+修改：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/NativeLauncherSettingsHost.java`
+
+两处 `restartLauncher()` 都改为：
+
+1. 先把当前设置 Activity 替换成黑底 loading 过渡层；
+2. 约 500ms 后启动 `com.smartisanos.launcher.LauncherAlias`；
+3. 约 1150ms 后结束当前进程，让桌面重新加载 12 / 20 宫格布局。
+
+注意：这套 `LauncherAlias + killProcess` 方案已在后续验证中废弃；Android 10+ 会拦截后台 Activity 启动。最终以“前台设置页直接启动 `com.smartisanos.launcher.Launcher`，不杀进程”的方案为准。
+
+验证：
+
+- 720x1280 / 320dpi 下从设置页点击 20 宫格：
+  - 显示黑底胶囊 loading，不再直接白屏；
+  - 之后进入 20 宫格桌面；
+  - 未出现新的 `FATAL EXCEPTION`。
+- 验证截图：
+  - `build/switch_loading.png`
+  - `build/switch_after.png`
+
+当前自适应结论：
+
+- 已实际验证并调过的分辨率是 720x1280 / 320dpi 和 1080x1920 / 480dpi。
+- 运行时缩放入口是 `LayoutPropertyAdapter`，理论上其它接近 16:9 的分辨率会跟随屏幕比例缩放，但目前不能承诺“所有安卓手机都完全正常”。
+- 下一步应该继续补测 900x1600、1080x2400、1440x2560 等分辨率，并针对非 16:9 或长屏单独调整资源选择 / 缩放边界。
+
+## 2026-05-19 长屏自适应与切换过渡二次修正
+
+本轮继续确认主工程是 `smartisan-launcher-original-port`，`E:\FANG\smartisan\smartisan-launcher-maintained` 只作为 main 分支参考。
+
+长屏自适应修改：
+
+- 修改 `launcher/tools/java/com/smartisanos/launcher/data/LayoutPropertyAdapter.java`：
+  - 图标、文字、圆角等统一缩放值改为 `min(1.0f, min(scaleX, scaleY))`。
+  - 目的：小屏幕继续缩小，长屏/高分屏不再把 1080 基准资源继续放大，避免 1440x2560 图标和文字过大。
+- 修改 `launcher/assets/layout/portrait/values-sw411dp/MODE_9/layout.xml`：
+  - `page_view_margin_top_folder` 调整为 `510`。
+  - `name_off_set_y_folder` 当前为 `-80`。
+  - 原因：1440x2560 / 560dpi 实际命中的是 `values-sw411dp/MODE_9` 的 folder 参数，不是 `values-xhdpi` 或 `values-xxhdpi`。
+
+长屏补测结果：
+
+- `900x1600 / 360dpi`
+  - 主页图标、文字和格线位置正常；
+  - folder 第一行图标和文字已在第一层内居中，没有压线。
+- `1080x2400 / 420dpi`
+  - 主页图标不再被长屏比例放大；
+  - folder 第一行整体位置可用，仍可作为后续精细对齐项。
+- `1440x2560 / 560dpi`
+  - 主页图标、文字已随 1080 基准收敛，不再异常巨大；
+  - folder 第一行使用 `values-sw411dp` 参数后已明显改善。
+
+验证截图：
+
+- `build/900x1600_home.png`
+- `build/900x1600_folder.png`
+- `build/1080x2400_home.png`
+- `build/1080x2400_folder.png`
+- `build/1440x2560_home.png`
+- `build/1440x2560_folder.png`
+
+12 / 20 宫格切换过渡二次修正：
+
+- 原先尝试用 `AlarmManager + PendingIntent` 在杀掉设置进程后重新拉起桌面，但 Android 10+ 会拦截后台 Activity 启动，导致动画结束后回到上一个应用或浏览器。
+- 现在改为前台设置页自己完成过渡：
+  1. 设置页先显示黑底居中的 Smartisan loading；
+  2. 650ms 后用当前前台 Activity 显式启动 `com.smartisanos.launcher.Launcher`；
+  3. 不再杀进程，也不再用后台 PendingIntent；
+  4. Launcher 直接读取新的 `prefs_key_launcher_mode` 并显示 12 / 20 宫格。
+
+验证结果：
+
+- 720x1280 / 320dpi 下从 12 宫格切换到 20 宫格：
+  - loading 胶囊在当前内容区域居中；
+  - 之后直接进入桌面，没有再掉回浏览器；
+  - 抽样截图未再看到白屏帧；
+  - logcat 未出现 Launcher 的 `FATAL EXCEPTION`。
+- 验证截图：
+  - `build/switch3_loading_120.png`
+  - `build/switch3_loading_420.png`
+  - `build/switch3_after_1120.png`
+  - `build/switch3_after.png`
+
+后续仍需注意：
+
+- `Settings.Global.putInt("launcher_mode")` 在普通 Android 上仍会因为没有 `WRITE_SECURE_SETTINGS` 抛 `SecurityException`，这是预期的兼容性问题；当前代码已经捕获并改用 app 内 prefs，不允许因此崩溃。
+- folder 的精确 Y 坐标还可以继续按原机截图做像素级微调，但 900x1600、1080x2400、1440x2560 已不再出现第一行严重错位。
+
+2026-05-23 maintained 主题页迁移记录：
+
+- 主工程仍是 `smartisan-launcher-original-port`，`smartisan-launcher-maintained` 的 main 分支只作为界面和交互参考。
+- 修改 `launcher/tools/java/com/smartisanos/home/widget/sys/Title.java`：
+  - 旧实现是自绘纯箭头，已改为使用 maintained 资源里的 `selector_title_button_back` 和 `title_button_text_back`，二级页面左上角显示为锤子风格“返回”按钮。
+- 修改 `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`：
+  - 主题列表点击后不再直接下载/设定，而是进入 maintained 的 `activity_theme_item.xml` 详情页。
+  - 详情页使用 maintained 的 `btn_back`、`btn_ok`、`btn_download`、`theme_color_dot_item`、`theme_preview_img_large` 和底部主题圆点条。
+  - 本地主题显示“设定”按钮，当前主题按钮禁用；在线主题显示 maintained 蓝色下载按钮。
+  - 下载路径继续使用 GitHub release 镜像地址，调用系统 DownloadManager，下载完成后由通知栏安装。
+  - 12 / 20 宫格切换 loading 的胶囊位置改为视图真实中心，不再扣 status bar 高度。
+- 已编译并安装验证：
+  - `build/theme-list3.png`：主题列表页返回按钮已变为 maintained 风格。
+  - `build/theme-online-detail.png`：在线主题详情页已显示 maintained 风格下载按钮、手机预览和底部主题圆点条。
+  - logcat 未出现 `FATAL EXCEPTION` / `InflateException`。
+
+## 2026-05-23 主题下载、主题入口预览、翻页动画生效修正
+
+本轮继续确认主工程是 `smartisan-launcher-original-port`，`smartisan-launcher-maintained` 的 main 分支只作为设置页 UI、主题资源和下载逻辑参考。
+
+修正内容：
+
+- `MaintainedLauncherSettingsHost` 的 12 / 20 宫格切换 loading：
+  - 胶囊位置改为按 `RestartLoadingView` 的真实宽高做几何居中；
+  - 不再扣 `status_bar_height`，避免在不同分辨率 / 状态栏高度下偏上或偏下。
+- 一级菜单“桌面主题”：
+  - 已把左侧图标从灰色占位图改为当前主题预览图；
+  - 使用 `SettingItemTextVertical.setIconBitmap()` 动态绑定 `theme_preview/<theme>/thumbnail_settings.png`。
+- 在线主题列表：
+  - 对齐 maintained main 分支的 release 资产，当前可下载主题来源为 `themes-v1`；
+  - 下载基址改为 maintained 文档记录的 `https://gh-proxy.org/https://github.com/15255040419/smartisan-launcher/releases/download/themes-v1/`；
+  - 白雾主题改为真实的 `smartisan_theme_mist` / `com.smartisanos.launcher.theme.mist`，并从 maintained 补入白雾预览资源；
+  - 移除 release 中不存在的 `copperred`、`gintama` 下载项，避免点击后 404；
+  - 经典蓝使用本地 `smartisan_theme_light_blue` 预览，但下载包对应 release 中存在的 `com.smartisanos.launcher.theme.blue.apk`。
+- 主题下载：
+  - Manifest 已包含 `INTERNET`、`ACCESS_NETWORK_STATE`、`WRITE_EXTERNAL_STORAGE`、`READ_EXTERNAL_STORAGE`、`REQUEST_INSTALL_PACKAGES`；
+  - 主题 APK 通过系统 `DownloadManager` 下载，普通应用不能静默安装 APK，下载完成后需要用户从通知栏或下载应用继续安装；
+  - 已在 1080x1920 / 480dpi 模拟器验证：DownloadManager 从 `Starting` 到 `Finished with status SUCCESS`。
+- 桌面翻页动画：
+  - 选择项继续使用 maintained 的 4 个值：默认 `0`、立体翻转 `3`、百叶窗 `4`、切牌 `6`；
+  - `Settings.Global` 在普通安卓系统上会因为缺少 `WRITE_SECURE_SETTINGS` 拒绝写入，所以现在拆成独立 try：Global 失败不影响 `Settings.System` 和私有 `com.smartisanos.launcher_prefs["launcher_page_animation"]` 写入；
+  - 选择翻页动画后不再调用 `restartLauncher()`，避免误表现为闪退 / 回桌面；同进程内通过反射即时更新 `Constants.SCROLL_ANIMATION_TYPE`，下次启动也会从私有 prefs 覆盖读取。
+
+ADB 复测结论：
+
+- 打开“桌面主题”：PID 不变，top Activity 保持 `ThemeChooserActivity`，未出现 `FATAL EXCEPTION`。
+- 选择“桌面翻页动画”：PID 不变，top Activity 保持 `ThemeChooserActivity`，未出现 `FATAL EXCEPTION`；logcat 中仍可能看到系统拒绝写 `Settings.Global` 的 `SecurityException`，但不会阻断私有 prefs 写入。
+- 12 / 20 宫格切换属于需要桌面重载的操作，会主动回到 `LauncherAlias`；本轮复测未看到 Java 崩溃日志。
+
+验证记录：
+
+- `build/settings_after_final.png`：一级菜单“桌面主题”左侧已显示当前主题预览图。
+- `build/theme_list_now.png`：主题列表页显示 maintained 风格的本地主题 / 在线主题网格。
+- `build/theme_detail_now.png`：主题详情页显示 maintained 风格手机预览、底部圆点和下载按钮，白雾圆点有预览。
+- `build/download_after_fix.png`：点击下载后无崩溃，DownloadManager 成功完成下载。
+
+## 2026-05-26 应用图标自动识别与自定义替换迁移
+
+本轮继续以 `smartisan-launcher-original-port` 为主工程，参考 `smartisan-launcher-maintained` 的图标包链路修正当前“应用图标”功能。
+
+改动内容：
+
+- 新增 `launcher/tools/java/com/smartisanos/home/settings/icons/IconPackManager.java`：
+  - 扫描已安装 APK 中是否存在 `res/xml/appfilter.xml`；
+  - 读取 icon pack 的 `item component="ComponentInfo{pkg/class}" drawable="xxx"` 映射；
+  - 支持按 package 和 component 精确查找图标；
+  - 使用 `com.smartisanos.launcher_prefs["prefs_key_selected_icon_pack"]` 保存当前图标包，兼容 maintained 的 key。
+- 修改 `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`：
+  - 桌面图标加载入口 `iconOverrideDrawable(...)` 改为统一顺序：redirect 自定义/手动图标 -> 已选 icon pack -> 系统原图；
+  - “应用图标”页面顶部显示当前图标包，点击可选择“自动选择第一个可用图标包 / 不使用图标包 / 已安装图标包”；
+  - 单个应用点击后可选择“自动识别改进版图标 / 保持系统原图 / 从相册选择图片 / 指定内置图标”；
+  - 应用图标变更后发送 `com.smartisanos.launcher.update_icon`，刷新原桌面设置缓存并重启桌面。
+- maintained 设置资源包中已包含 `app_icon_*`、`default_icon_*`、`calendar`、`launcher_settings`、`smartisan_icon_*` 等图标资源，保证手动选择能取到 drawable；自动识别优先依赖已选 icon pack 的 `appfilter.xml`。
+
+验证结果：
+
+- `build.bat` 构建成功，输出 `build/launcher-signed.apk`。
+- `aapt2 dump resources launcher/assets/settings_maintained/maintained-settings-res.apk` 已确认包含 `app_icon_phone`、`default_icon_1`、`smartisan_icon_settings`、`calendar`、`launcher_settings`。
+- `adb install -r build/launcher-signed.apk` 成功。
+- `adb shell am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity` 成功，top Activity 保持 `ThemeChooserActivity`。
+- 启动后 logcat 最近记录未出现 `FATAL EXCEPTION` / `AndroidRuntime`。
+
+### 2026-05-26 追加：相机/图库错误图标与相册自定义
+
+用户截图确认“相机”“图库”的右侧改进版图标分别显示为旧蓝色镜头和小电视图，视觉明显错误。检查后确认这些资源不是 maintained 主工程里的可靠锤子图标，而是之前补进来的旧/错配资源。
+
+修正内容：
+
+- `MaintainedLauncherSettingsHost.smartisanIconFor(...)` 不再自动把相机、图库/相册映射到 `smartisan_icon_camera` / `smartisan_icon_gallery`，没有 icon pack 或用户自定义时回退系统原图，避免显示错误改进版。
+- “选择图标”弹窗新增“从相册选择图片”：
+  - 使用 `ACTION_OPEN_DOCUMENT image/*` 打开系统图片选择器；
+  - `ThemeChooserActivity.onActivityResult(...)` 转发给 `MaintainedLauncherSettingsHost.onActivityResult(...)`；
+  - 选中图片会裁成 192x192 PNG，写入 `RedirectIconDB.MODE_CUSTOM`，并在应用私有目录保留一份兼容副本；
+  - 桌面图标加载链路优先读取 redirect 自定义图片。
+- 手动图标列表移除了相机/图库这两个错误内置项，保留“保持系统原图”和“从相册选择图片”作为修正路径。
+
+验证结果：
+
+- `build.bat` 主体构建成功；因 Windows 短暂占用旧 `launcher-signed.apk`，本轮先输出并安装 `build/launcher-iconfix-signed.apk`，随后已覆盖回常规 `build/launcher-signed.apk`。
+- `adb install -r build/launcher-iconfix-signed.apk` 成功。
+- 启动 `ThemeChooserActivity` 成功，top Activity 保持设置页。
+- 最近 logcat 未出现 `FATAL EXCEPTION` / `AndroidRuntime` / `VerifyError`。
+
+### 2026-05-26 追加：图标替换从临时 prefs 迁到 maintained 风格 redirect 数据层
+
+用户继续确认目标不是“能用的兼容层”，而是 maintained 的完整图标链路。经对照 maintained：
+
+- `IconPackManager` 负责 icon pack/appfilter；
+- `IconManager` 负责生成可替换应用列表、官方图标、改进图标状态；
+- `RedirectIconDB` / `RedirectIconInfo` 负责记录每个应用的图标状态；
+- 桌面加载入口最终从 redirect/icon pack 取图，不应依赖设置页里散落的包名猜测。
+
+本轮修正：
+
+- 新增同包名兼容类：
+  - `launcher/tools/java/com/smartisanos/launcher/data/redirectIcon/RedirectIconInfo.java`
+  - `launcher/tools/java/com/smartisanos/launcher/data/redirectIcon/RedirectIconDB.java`
+  - `launcher/tools/java/com/smartisanos/home/settings/icons/IconManager.java`
+- `RedirectIconDB` 暂以应用私有 `SharedPreferences + files/redirect_icons/*.png` 保存状态，不直接改原版数据库 schema，避免破坏 original-port 现有 `DatabaseProvider`。
+- `MaintainedLauncherSettingsHost.iconOverrideDrawable(...)` 改为：
+  1. redirect 自定义图片；
+  2. redirect 手动资源图标；
+  3. 已选 icon pack/appfilter；
+  4. 系统原图。
+- 删除设置页里的自动包名猜测 fallback，不再把相机/图库等误映射到旧资源。
+- 单应用图标选择现在写入 `RedirectIconDB`：
+  - 自动识别改进版图标 -> `MODE_AUTO`；
+  - 保持系统原图 -> `MODE_ORIGINAL`；
+  - 从相册选择图片 -> `MODE_CUSTOM`；
+  - 指定内置图标 -> `MODE_RESOURCE:<drawable>`。
+
+验证结果：
+
+- `build.bat` 成功，输出 `build/launcher-signed.apk`。
+
+### 2026-05-27 追加：maintained 设置页开关和主入口图标细节
+
+用户反馈 maintained 主设置页的四个入口图标更协调，同时要求“隐藏桌面图标名称 / 解锁动画 / 多板块视图快速启动应用”可用。
+
+本轮修正：
+
+- 主设置页四个入口继续复用 maintained 设置资源包，并调整 `SettingItemTextVertical` 的图标槽位、文字间距和箭头尺寸。
+- 新增 `LauncherSettingBridge.readBool(...)`，统一从 `Settings.System`、`Settings.Global` 和应用私有 `launcher_settings` 读取布尔设置，避免普通 Android 上无法写系统 Settings 时桌面主体读不到开关状态。
+- `O.smali` 启动加载阶段改为通过 `LauncherSettingBridge` 读取：
+  - `launcher_hide_lable`
+  - `launcher_unlock_animation_enabled`
+  - `fast_launch_app_on`
+- `ja.1.smali` 的配置变化回调同步改为通过 `LauncherSettingBridge` 读取解锁动画开关。
+- `MaintainedLauncherSettingsHost.applyLauncherSettingChange(...)` 不再只调用 `O.W(...)`；改为调用 `O.getInstance().init(context)` 并通知原桌面 `ja.r(key)`，让设置页开关能即时刷新桌面配置。
+- 确认“隐藏桌面图标名称”在真正的 `com.smartisanos.launcher/.Launcher` 中生效；此前看起来不生效的截图实际前台 Home 是 `app.lawnchair/.LawnchairLauncher`。
+- 修正主设置页“桌面主题 / 桌面壁纸 / 桌面翻页动画 / 应用图标”四个入口预览图宽窄不一：
+  - 四个入口不再混用原始 drawable 尺寸和 View background；
+  - 统一合成为 72dp 白色圆角预览框；
+  - 框内统一 7dp 边距并等比缩放内容；
+  - 壁纸预览只绘制纹理内容，再放入同规格预览框，避免双层白块或纹理溢出。
+
+验证结果：
+
+- 使用临时便携 JDK 构建，`build.bat` 成功，输出 `build/launcher-signed.apk`。
+- `adb install -r build/launcher-signed.apk` 成功。
+- `adb shell am start -n com.smartisanos.launcher/.Launcher` 成功。
+- `launcher_hide_lable=false/true` 分别验证桌面名称显示/隐藏正常。
+- `adb shell am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity` 成功。
+
+### 2026-05-27 追加：maintained 三个开关动画和即时生效
+
+用户反馈“隐藏桌面图标名称 / 解锁动画 / 多板块视图快速启动应用”三个开关没有滑动动画，且关闭后没有立即生效。
+
+本轮修正：
+
+- `SwitchEx` 增加 `ValueAnimator` 驱动的 180ms 滑动进度，底图和滑块位置都按动画进度绘制。
+- `SettingItemSwitch` 增加 `setCheckedAnimated(...)`，设置页点击时不再瞬间跳状态。
+- 修正滑块本体触摸只改变 UI、不保存配置的问题：
+  - 点整行和点滑块本体都会进入同一套保存与通知逻辑；
+  - 滑块本体点击也走 `SwitchEx.toggle()` 的动画路径；
+  - 不再出现“开关看起来变了，但桌面没收到设置”的假状态。
+- `writeBoolSetting(...)` 改为同步写入应用私有配置，并尽量写 `Settings.System/Global`，普通 Android 上没有系统写权限时仍能让桌面读取到设置。
+- `applyLauncherSettingChange(...)` 调整为先通知 maintained 原配置回调，再重新加载 `O.init(context)`，避免旧值被提前覆盖导致回调不执行。
+- 修正 `ja.1.smali` 里 `launcher_hide_lable` 回调使用旧值计算 `SHOW_APP_NAME` 的问题，改为按新值计算并触发原 `W` 刷新任务。
+
+验证结果：
+
+- `build.bat` 成功，输出 `build/launcher-signed.apk`。
+- `adb install -r build/launcher-signed.apk` 成功。
+- ADB 实测：
+  - 设置 `launcher_hide_lable=false` 后桌面名称显示正常；
+  - 在 maintained 设置页点击“隐藏桌面图标名称”滑块本体，开关滑到开启，返回桌面后名称立即隐藏；
+  - 再次点击同一滑块关闭，返回桌面后名称立即恢复显示；
+  - `uiautomator dump` 确认三个开关均为可点击 `CompoundButton`，状态能随设置页操作更新。
+
+### 2026-05-27 追加：设置页预览图、壁纸和开关细节
+
+用户继续反馈：
+
+- “十二宫格 / 二十宫格”预览图实际仍像旧 9/16 宫格；
+- 主设置页“桌面主题 / 桌面壁纸”缩略图偏小；
+- 更换桌面壁纸没有生效；
+- 点击“桌面主题”进入时有卡顿；
+- 开关滑动时蓝色点会闪出边框。
+
+本轮修正：
+
+- `PreviewSettingItemView` 继续承载 maintained 布局，但 `bindGrid(...)` 不再直接使用 maintained 的 `grids_9_preview_normal.png / grids_16_preview_normal.png` 旧图，改为动态绘制真正 3x4 和 4x5 预览。
+  - 2026-05-27 后续修正：用户要求恢复为可手工 PS 的图片资源后，动态绘制方案已撤回，当前重新使用下面两个 PNG 资源。
+- 原旧宫格图所在目录记录如下，如需手工 PS 可替换：
+  - `launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/grids_9_preview_normal.png`
+  - `launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/grids_16_preview_normal.png`
+- 主设置页“桌面主题”缩略图改用 maintained 自带 `thumbnail_settings.png / thumbnail_settings_16.png`，不再把真实桌面大图硬缩到小框导致观感偏小。
+- `thumbnailFramedPreviewBitmap(...)` 的内容区扩大，桌面壁纸缩略图显示面积更接近 maintained。
+- maintained 设置资源 APK 和外部 `Resources` 增加静态缓存，避免每次点击“桌面主题”都在主线程重复拷贝资源 APK，减少进入页面卡顿。
+- `onActivityResult(...)` 增加 requestCode `10` 的桌面壁纸选择处理：
+  - 读取图片选择器返回的 URI；
+  - 通过 `WallpaperManager.setBitmap(...)` 应用系统桌面壁纸；
+  - 写入 `launcher_wallpaper_uri` 并通知桌面刷新。
+- `SwitchEx` 绘制时对 bottom/knob 图层按 frame 区域裁剪，避免蓝色底图或圆点闪出边框。
+
+验证结果：
+
+- `build.bat` 成功，输出 `build/launcher-signed.apk`。
+- `adb install -r build/launcher-signed.apk` 成功。
+- ADB 截图确认主设置页显示 3x4 / 4x5 宫格预览，主题缩略图放大并使用 maintained 风格图。
+- `adb install -r build/launcher-signed.apk` 成功。
+- `adb shell am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity` 成功。
+- 最近 logcat 未出现 `FATAL EXCEPTION` / `AndroidRuntime` / `VerifyError` / `ClassNotFoundException` / `NoSuchMethodError`。
+
+后续差异：
+
+- 这一步已经把状态管理迁成 maintained 风格，但没有接入 maintained 可能依赖的在线/预置官方改进图标数据库；自动正确替换仍依赖已安装 icon pack 的 `appfilter.xml` 或用户手动 redirect 记录。
+
+### 2026-05-26 追加：对齐 maintained 的应用图标交互与稳定刷新
+
+用户反馈原实现仍有三类差异：桌面图标会被错误自动替换、切换图标时经常返回桌面、应用图标页和弹窗不像 maintained。
+
+本轮修正：
+
+- “应用图标”页顶部改成 maintained 风格的“改进图标 / 图标包”两行设置项，不再显示临时的“已重绘/未重绘 图标包：点此切换”头部。
+- 单应用行改成 maintained 风格的左右选择：
+  - 点左侧图标：使用系统原图；
+  - 点右侧图标：有 icon pack/custom 候选则启用改进图标；
+  - 右侧没有候选图标时，直接打开相册选择图片；
+  - 不再弹出“自动识别/保持系统原图/内置图标”的临时列表弹窗。
+- 新安装或无 redirect 记录的应用默认保持系统原图，不再默认自动使用 icon pack，避免相机、图库等被错误替换。
+- 图标切换刷新改为 maintained 风格的 `com.smartisanos.launcher.update_icon` 广播 + 原桌面刷新入口，不再调用 `restartLauncher()` / `Process.killProcess()`，避免切换时跳回桌面。
+- `SettingItemSwitch` 补齐 `setTitle(...)` / `setSwitchSubtitle(...)`，用于承载 maintained 图标页顶部设置项。
+
+验证结果：
+
+- `build.bat` 成功，输出 `build/launcher-signed.apk`。
+- 当前 ADB 未检测到在线设备，因此本轮未完成安装实测；需设备在线后再执行 `adb install -r build/launcher-signed.apk` 和页面点击复测。
+
+### 2026-05-26 追加：桌面主图标加载入口接入 maintained 链路
+
+用户继续反馈桌面图标仍显示系统原图。复查发现 original-port 桌面数据库生成图标时主要在 `launcher/smali/com/smartisanos/launcher/data/A.smali` 中直接调用 `ResolveInfo.loadIcon(...)`，此前只补了 `e/s.smali` 的工具入口，导致大量桌面图标不会经过 maintained 的 `IconPackManager`。
+
+本轮修正：
+
+- 新增 `MaintainedLauncherSettingsHost.loadIcon(ResolveInfo, PackageManager)`：
+  - 先读取 redirect 自定义/手动状态；
+  - 再读取 selected icon pack 的 `appfilter.xml`；
+  - 最后回退系统原图。
+- 将 `A.smali` 中三处桌面图标生成入口从 `ResolveInfo.loadIcon(...)` 改为 `MaintainedLauncherSettingsHost.loadIcon(...)`。
+- 在 `Launcher.onCreate(...)` 后追加一次性迁移刷新 `maybeRefreshLauncherIcons(...)`，新版首次启动会延迟触发全量 `com.smartisanos.launcher.update_icon`，让旧数据库缓存图标重算。
+
+验证结果：
+
+- `build.bat` 成功，输出 `build/launcher-signed.apk`。
+
+### 2026-05-29 修复：12/20宫格经典黑主题顶底底图色差与半透明白蒙版问题
+
+用户反馈在选择“经典黑”（smartisan_theme_black）主题时，顶部的桌面背景格子颜色是偏灰绿色（鸦青色），而底部的 Dock 栏是黑色的，导致顶部和底部完全割裂，视觉效果极其错位。
+
+**原因定位**：
+1. 本地内置默认主题 `smartisan_theme_black`（经典黑）在 12 宫格和 20 宫格布局下，其静态资源所在的 `launcher/assets/Textures/1080p/12` 和 `launcher/assets/Textures/1080p/20` 文件夹内被前任开发者替换为了**半透明白色蒙版（RGBA）**或者残留了原装底包的**鸦青色（Raven，偏深灰绿）**的 `back*.png` 底图，但单独把 `dock_back.png` 改成了经典黑的深色。
+2. 导致当用户使用 12 宫格或 20 宫格经典黑主题时，顶部网格区域由于不正确的白蒙版和灰绿色纹理底色，与纯黑皮质纹理的 Dock 栏形成了严重偏色差。
+
+**修复方案**：
+1. 经过比对原版 ROM 提取桌面 `com.smartisanos.launcher-3.apk` 中的原生内置资源，发现其中完美的 12 宫格和 20 宫格 `back*.png` 和 `dock_back.png` 本身就代表了最纯正的官方 **经典黑** 拟物化高清晰度皮质纹理设计（网格平均 RGB 为 `[59.92, 62.90, 67.14]`，Dock 平均 RGB 为 `[40.18, 43.71, 47.36]`）。
+2. 编写并运行了 Python 自动化提取脚本，将 `com.smartisanos.launcher-3.apk` 中的 `assets/Textures/1080p/12/` 和 `assets/Textures/1080p/20/` 目录下包含的全部 **277个原汁原味高质感经典黑原生资源文件** 全量提取并覆盖写入到当前工程的 `launcher/assets/Textures/1080p/12` 和 `launcher/assets/Textures/1080p/20` 目录中。
+3. 彻底清除了之前被胡乱修改的半透明白色蒙版以及残留的鸦青色资源，实现了经典黑主题下桌面顶部微皮质纹理与底部深黑底色 Dock 栏的像素级色彩与深度统一。
+
+**验证结果**：
+- 执行 `.\build.bat` 对 Launcher 进行了全量重新编译、合并 dex、zipalign 及重签名，成功输出并覆盖 `build/launcher-signed.apk`。
+- 对生成的 APK 进行解包并用 Python 提取底层通道 RGB 数据分析，证实 12/20 宫格网格背景和 Dock 背景的 RGB 均值完全吻合经典黑配色方案：
+  - 12 宫格背景 `back1.png`: Mean RGB `[59.92, 62.90, 67.14]`
+  - 12 宫格 Dock `dock_back.png`: Mean RGB `[40.18, 43.71, 47.36]`
+  - 20 宫格背景 `back1.png`: Mean RGB `[53.62, 57.56, 61.69]`
+  - 20 宫格 Dock `dock_back.png`: Mean RGB `[42.40, 45.98, 49.65]`
+- 用户反馈实际装机显示完全正确，色差和杂色已全部消失。
