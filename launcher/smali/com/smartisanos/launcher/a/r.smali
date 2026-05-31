@@ -150,7 +150,7 @@
 
     move-result-object p0
 
-    sget-object v0, Lcom/smartisanos/launcher/theme/ChangeThemeHandler$RequireChangeFrom;->SETTING:Lcom/smartisanos/launcher/theme/ChangeThemeHandler$RequireChangeFrom;
+    sget-object v0, Lcom/smartisanos/launcher/theme/ChangeThemeHandler$RequireChangeFrom;->Eaa:Lcom/smartisanos/launcher/theme/ChangeThemeHandler$RequireChangeFrom;
 
     invoke-virtual {p0, v0}, Lcom/smartisanos/launcher/theme/t;->a(Lcom/smartisanos/launcher/theme/ChangeThemeHandler$RequireChangeFrom;)V
 
@@ -236,56 +236,7 @@
 .end method
 
 .method public static a(Landroid/os/Message;)V
-    .locals 6
-
-    iget v0, p0, Landroid/os/Message;->arg1:I
-
-    if-ltz v0, :cond_delay_theme_change
-
-    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isLauncherReadyForThemeAnimation()Z
-
-    move-result v0
-
-    if-nez v0, :cond_ready
-
-    iget v0, p0, Landroid/os/Message;->arg1:I
-
-    const/16 v1, 0x32
-
-    if-ge v0, v1, :cond_ready
-
-    :cond_delay_theme_change
-    add-int/lit8 v0, v0, 0x1
-
-    invoke-static {p0}, Landroid/os/Message;->obtain(Landroid/os/Message;)Landroid/os/Message;
-
-    move-result-object v1
-
-    iput v0, v1, Landroid/os/Message;->arg1:I
-
-    sput-object v1, Lcom/smartisanos/launcher/a/r;->sj:Landroid/os/Message;
-
-    invoke-static {}, Lcom/smartisanos/launcher/Sa;->getHandler()Landroid/os/Handler;
-
-    move-result-object v1
-
-    const/16 v2, 0x12
-
-    invoke-virtual {v1, v2}, Landroid/os/Handler;->removeMessages(I)V
-
-    invoke-static {p0}, Landroid/os/Message;->obtain(Landroid/os/Message;)Landroid/os/Message;
-
-    move-result-object v2
-
-    iput v0, v2, Landroid/os/Message;->arg1:I
-
-    const-wide/16 v3, 0xc8
-
-    invoke-virtual {v1, v2, v3, v4}, Landroid/os/Handler;->sendMessageDelayed(Landroid/os/Message;J)Z
-
-    return-void
-
-    :cond_ready
+    .locals 3
 
     const/4 v0, 0x0
 
@@ -488,12 +439,6 @@
     invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/J;->H(I)V
 
     .line 19
-    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->consumePendingThemeScreenshotForAnimation()Z
-
-    move-result v0
-
-    if-nez v0, :cond_1
-
     invoke-static {}, Lcom/smartisanos/launcher/theme/t;->getInstance()Lcom/smartisanos/launcher/theme/t;
 
     move-result-object v0
@@ -501,8 +446,6 @@
     const/4 v2, 0x0
 
     invoke-virtual {v0, v2}, Lcom/smartisanos/launcher/theme/t;->f(Landroid/graphics/Bitmap;)V
-
-    :cond_1
 
     .line 20
     new-instance v0, Lcom/smartisanos/launcher/a/p;

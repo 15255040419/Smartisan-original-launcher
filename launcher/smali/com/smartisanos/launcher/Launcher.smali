@@ -224,7 +224,7 @@
 .end method
 
 .method protected onResume()V
-    .locals 0
+    .locals 1
 
     .line 1
     invoke-super {p0}, Landroid/app/Activity;->onResume()V
@@ -232,9 +232,11 @@
     .line 2
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
 
-    move-result-object p0
+    move-result-object v0
 
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/J;->onResume()V
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->onResume()V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->maybeRefreshLauncherWallpaper(Landroid/content/Context;)V
 
     return-void
 .end method

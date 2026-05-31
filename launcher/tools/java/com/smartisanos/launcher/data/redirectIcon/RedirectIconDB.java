@@ -53,6 +53,25 @@ public final class RedirectIconDB {
         write(context, info);
     }
 
+    public static void resetIconToDefault(Context context, String pkg, String cmp) {
+        RedirectIconInfo info = ensure(context, pkg, cmp);
+        if (info == null) {
+            return;
+        }
+        String key = key(pkg, cmp);
+        try {
+            File file = customFile(context, key);
+            if (file.exists()) {
+                file.delete();
+            }
+        } catch (Throwable ignored) {
+        }
+        info.useImprovedAppIcon = false;
+        info.drawableName = MODE_ORIGINAL;
+        info.iconData = null;
+        write(context, info);
+    }
+
     public static void updateResourceIcon(Context context, String pkg, String cmp, String drawableName) {
         RedirectIconInfo info = ensure(context, pkg, cmp);
         if (info == null) {
@@ -60,6 +79,17 @@ public final class RedirectIconDB {
         }
         info.useImprovedAppIcon = true;
         info.drawableName = MODE_RESOURCE + ":" + drawableName;
+        info.iconData = null;
+        write(context, info);
+    }
+
+    public static void updateAutoIcon(Context context, String pkg, String cmp) {
+        RedirectIconInfo info = ensure(context, pkg, cmp);
+        if (info == null) {
+            return;
+        }
+        info.useImprovedAppIcon = true;
+        info.drawableName = MODE_AUTO;
         info.iconData = null;
         write(context, info);
     }

@@ -156,7 +156,7 @@
 
     sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
 
-    if-nez p0, :cond_4
+    nop
 
     .line 15
     invoke-static {}, Lcom/smartisanos/launcher/view/Eb;->getInstance()Lcom/smartisanos/launcher/view/Eb;
