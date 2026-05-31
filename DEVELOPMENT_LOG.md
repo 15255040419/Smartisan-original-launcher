@@ -12,16 +12,17 @@
 - 桌面主入口、桌面内“桌面设置”虚拟入口、12 / 20 宫格、主题页、壁纸页、翻页动画页、应用图标页、三个设置开关均已接入。
 - 经典黑主题 12 / 20 宫格顶部网格和底部 Dock 资源已从原版 `com.smartisanos.launcher-3.apk` 重新抽取覆盖，顶底色差问题已修复。
 - 桌面设置页和桌面已尽量保持在同一个 `smartisanos.task.launcher` 任务栈内，修复主题设定后“返回桌面 -> 又闪回设置页 -> 再回桌面”的双跳问题。
+- 首次切换主题不播放翻页过渡动画已修复：主题设定消息不再因为桌面冷启动、数据异步加载或设置页任务栈切换而丢失动画快照，桌面就绪后会继续消费待执行主题动画。
 - 普通不透明主题切换时不再把用户壁纸作为背景传入，避免所有主题都透出系统壁纸。
-- 透明主题壁纸链路已接入 `launcher_wallpaper_uri`、私有壁纸副本、缩略图和 `gaussian_wallpaper.png` 兜底。
+- 透明主题壁纸链路已接入 `launcher_wallpaper_uri`、私有壁纸副本、缩略图和 `gaussian_wallpaper.png` 兜底；“恢复默认壁纸”会清理自定义副本并回到当前主题内置背景。
 - 主设置页缩略图已按 maintained 方向调整：桌面主题 / 桌面壁纸 / 桌面翻页动画使用竖向带框缩略图，应用图标不额外加白色外框。
 - 应用图标替换链路已从设置页预览扩展到桌面主图标加载入口，支持 redirect、自定义图片、图标包 appfilter 和系统原图回退。
 
 ### 已完成但需要继续回归
 
-- 首次主题切换动画：已加入快照、冷启动队列和任务栈修复，但仍需用多主题、多次清数据冷启动验证“第一次设定主题就加载翻页动画”。
-- 透明主题换壁纸：已改为优先读取新选择的 launcher 壁纸并写入 ready 标记，但仍需验证“已切换毛玻璃/白雾后再次选择不同图片”是否立即生效。
-- 主设置页缩略图：当前显示上限为 `53dp x 63dp`，源图为 `180 x 210 px`、四周 `12 px` 内边距；视觉仍按用户截图继续微调。
+- 首次主题切换动画：主问题已修复，仍需用更多主题、多次清数据冷启动验证是否还有边缘竞态。
+- 透明主题换壁纸：选择、即时刷新、恢复默认主链路已修复，仍需分别回归毛玻璃 / 白雾主题。
+- 主设置页缩略图：当前 ImageView 显示上限为 `53dp x 63dp`，三项带框缩略图源 bitmap 为 `180 x 210 px`、四周 `12 px` 内边距；这些尺寸是为修复边框不等宽、图标过大、双层边框后固定下来的基准。
 
 ### 未完成 / 待处理
 
@@ -41,7 +42,7 @@
 
 ## 最新时间线索引（倒序）
 
-- 2026-05-31：主题切换任务栈、透明主题壁纸、主设置页缩略图继续对齐 maintained。
+- 2026-05-31：首次主题切换翻页动画、主题设定后设置页闪回、透明主题壁纸选择 / 恢复默认、应用图标三态继续修复；主设置页缩略图继续对齐 maintained。
 - 2026-05-29：经典黑 12 / 20 宫格顶底资源色差修复，恢复原版 APK 资源。
 - 2026-05-27：主入口缩略图、宫格预览、壁纸选择、开关动画、即时生效继续修正。
 - 2026-05-26：应用图标页迁移 maintained 交互，桌面主图标加载入口接入 redirect / icon pack 链路。
@@ -2046,3 +2047,118 @@ ADB 复测结论：
 
 - `build/` 目录中 APK 产物有新增/删除/覆盖变化，多数是编译输出，不应作为源码修复重点提交。
 - 当前工作区还包含此前多轮主题动画和资源修复的 smali 改动，提交前需要按功能分组检查，避免把无关产物混入。
+
+### 2026-05-31 追加：首次主题动画、设置页闪回、壁纸选择与恢复默认
+
+用户继续确认：即使把锤子桌面设为默认桌面，第一次在主题页点击“设定”后仍可能没有桌面翻页过渡动画；主题设定后会先回桌面，又短暂闪回主题设置页，再回桌面加载动画；毛玻璃 / 白雾透明主题选择壁纸后缩略图已变化但桌面仍不刷新；点击“恢复默认壁纸”也不能回到主题自带背景。
+
+本轮原因定位：
+
+- 首次主题切换动画不是单纯“没设为默认桌面”的问题，而是冷启动和主题设定消息之间存在竞态：
+  - 主题页写入主题后，`Launcher` 可能刚启动，桌面数据、页面和快照还没准备好；
+  - 旧逻辑会在桌面未就绪时直接消费主题切换消息，导致用于翻页动画的桌面快照为空或被后续重建覆盖；
+  - 第二次切换时桌面已热启动，数据已加载完成，所以动画看起来正常。
+- 主题设定后的闪回来自设置页和桌面任务栈 / 收尾动作不一致：
+  - 设置页承载在 `ThemeChooserActivity`，之前启动桌面和关闭设置页的时机不稳定；
+  - 系统把设置页与桌面当成两个可切换界面处理时，就会出现“桌面 -> 设置页残影 -> 桌面动画”的短暂跳转。
+- 透明主题壁纸不生效来自两个问题叠加：
+  - original-port 中 `Constants.isTransparentTheme` 有时与当前主题 ID 不同步，毛玻璃 / 白雾会被当成普通主题；
+  - `launcher_wallpaper_uri`、私有副本、`gaussian_wallpaper.png` 和旧 Settings 值之间优先级混乱，导致缩略图更新了，桌面仍拿旧图或主题默认图。
+- “恢复默认壁纸”之前只是 UI 占位或只清一部分 key，没有把 launcher 私有壁纸副本、ready 标记和桌面缓存一起清掉，所以桌面没有真正回退到主题资源。
+
+本轮修复：
+
+- 首次主题切换动画：
+  - 在 `launcher/smali/com/smartisanos/launcher/a/r.smali` 的主题切换消息处理链路中保留待执行消息，等桌面就绪后再执行主题变更；
+  - 通过 `MaintainedLauncherSettingsHost.isLauncherReadyForThemeAnimation()` 判断桌面是否已有可参与动画的页面和快照；
+  - 通过 `consumePendingThemeScreenshotForAnimation()` 消费设置页预先准备的主题切换快照，避免冷启动第一次切换没有可渲染内容；
+  - 保留 `sj` pending message 兜底，避免第一次切换消息在桌面数据初始化期间丢失。
+- 设置主题后的闪回：
+  - 主题设定完成后不再额外启动一个新的设置页 / 桌面任务；
+  - `finishSettingsTask(...)` 统一以无转场方式关闭设置页，让 `Launcher` 留在同一个 `smartisanos.task.launcher` 任务里承接动画；
+  - `ThemeChooserActivity` 和 `Launcher` 的任务栈关系通过 `dumpsys activity activities` 验证过，同属 launcher 任务。
+- 透明主题壁纸选择：
+  - `MaintainedLauncherSettingsHost.onActivityResult(...)` 处理壁纸选择时，不再依赖系统 `WallpaperManager` 作为桌面背景来源，而是保存一份 launcher 私有副本；
+  - 写入 `launcher_wallpaper_uri`、`launcher_wallpaper_thumb`、`launcher_wallpaper_ready`，同时生成 / 刷新 `gaussian_wallpaper.png`；
+  - `refreshLauncherWallpaperNow(...)` 会立即通知桌面刷新，并延迟二次刷新，解决返回桌面后仍显示旧默认图的问题；
+  - `Launcher.onResume()` 追加 `maybeRefreshLauncherWallpaper(...)`，用于从图片选择器返回后补一次刷新。
+- 透明主题识别：
+  - `e/s.smali` 不再只看 `Constants.isTransparentTheme`，同时通过 `MaintainedLauncherSettingsHost.isLauncherWallpaperTheme(context)` 判断当前主题是否为 `smartisan_theme_aero` 或 `smartisan_theme_mist`；
+  - 普通不透明主题继续使用主题自己的背景，不再透出用户选择的图片壁纸；
+  - 毛玻璃 / 白雾才读取 launcher 自定义壁纸。
+- 恢复默认壁纸：
+  - `restoreDefaultWallpaper(...)` 清理 `launcher_wallpaper_uri`、`desktop_wallpaper_uri`、`lockscreen_background`、缩略图和 ready / pending 标记；
+  - 删除 `gaussian_wallpaper.png`、`launcher_wallpaper.jpg`、`launcher_wallpaper_*` 等私有壁纸副本；
+  - 将内存中的 launcher wallpaper 常量清空，并立即刷新桌面壁纸层；
+  - `e/s.smali` 在没有自定义壁纸时返回 `null`，让后续主题加载链路使用主题包内置 `background.png`，而不是继续回退到旧系统壁纸。
+- 应用图标三态继续补齐：
+  - 左侧图标：写入 `RedirectIconDB.MODE_ORIGINAL`，强制桌面使用应用系统原图；
+  - 右侧推荐图标：写入 `MODE_AUTO`，走 Smartisan 改进图标 / 图标包识别；
+  - 选择图片：写入 `MODE_CUSTOM`，使用相册自定义 PNG；
+  - 桌面主图标入口 `MaintainedLauncherSettingsHost.loadIcon(...)` 优先识别 `MODE_ORIGINAL`，避免左侧恢复原图后仍被自动替换。
+
+验证结果：
+
+- `build.bat` 成功，输出 `build\launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 成功安装。
+- `adb shell am start -n com.smartisanos.launcher/.Launcher` 可正常启动桌面。
+- 在毛玻璃主题下选择壁纸后，缩略图会更新，桌面壁纸会刷新到新图；普通不透明主题不会透出该壁纸。
+- 点击“恢复默认壁纸”后，再回桌面确认不再显示用户选择的灰色 / 截图壁纸，而是回到毛玻璃主题内置模糊背景。
+- 应用图标页已显示左侧系统原图、右侧推荐 / 自定义入口；浏览器不再被自动映射成搜索放大镜候选图标，但桌面历史缓存仍需通过点击左侧原图或刷新图标后确认最终状态。
+
+当前注意点：
+
+- 主题动画主链路已修复，但第一次切换主题仍建议继续做“清数据冷启动 + 多主题连续切换”的回归，防止个别主题包资源加载慢时再次触发竞态。
+- 应用图标三态已补代码，仍需要继续实机点击验证：左侧系统图标、右侧推荐图标、自定义图片三者是否都能在桌面立即刷新。
+- `build/` 下 APK 文件和截图均为验证产物，用户已明确 build 不需要推送。
+
+### 2026-05-31 追加：桌面设置四个入口图标尺寸与边框基准
+
+用户多次反馈桌面设置主页面里“桌面主题 / 桌面壁纸 / 桌面翻页动画 / 应用图标”四个入口图标和 maintained 截图不一致，具体表现包括：缩略图太大、太宽、上下和左右边框不等宽、外面有一层边框里面又有一层边框、应用图标和前三个入口的文字列不对齐、应用图标不应该加白色外框。
+
+当前最终设定如下，后续如果相关 UI 再出问题，优先按这些基准回查：
+
+- 控件位置与槽位：
+  - 类：`launcher/tools/java/com/smartisanos/home/settings/SettingItemTextVertical.java`。
+  - 左侧图标容器 `frameLayout` 使用 `WRAP_CONTENT x WRAP_CONTENT`，`leftMargin = 21dp`，垂直居中。
+  - 文本列通过 `RIGHT_OF frameLayout` 对齐，不再固定一个过宽图标槽，避免应用图标和前三个入口文字错位。
+  - 箭头右侧 padding 为 `30dp`。
+- ImageView 显示上限：
+  - `icon.setAdjustViewBounds(true)`。
+  - `icon.setMaxWidth(dp(53))`。
+  - `icon.setMaxHeight(dp(63))`。
+  - 这个尺寸是从此前较大的 `60dp x 70dp` 缩小后确定的，约整体缩小 20px；目的是接近 maintained 截图中的竖向小预览比例。
+- 三个带框入口的生成方式：
+  - 入口：`桌面主题`、`桌面壁纸`、`桌面翻页动画`。
+  - 绑定方法：`setPreviewIconBitmap(thumbnailFramedPreviewBitmap(...))`。
+  - 显示缩放：`setPreviewIconBitmap(...)` 内使用 `ImageView.ScaleType.FIT_CENTER`。
+  - 不再依赖 `iconFrame` 外层边框，调用前会 `setIconFrameVisible(false)`，避免双层边框。
+- 带框缩略图 bitmap 参数：
+  - 方法：`MaintainedLauncherSettingsHost.thumbnailFramedPreviewBitmap(...)`。
+  - 外框 bitmap：`180 x 210 px`。
+  - 白色圆角底：`Color.WHITE`。
+  - 圆角半径：`9 px`。
+  - 内容内边距：四周 `12 px`。
+  - 内容区：`156 x 186 px`。
+  - 源图裁剪：使用 `centerCropRect(...)` 按内容区比例居中裁剪，再绘制到内容区。
+  - 描边：`2 px`，颜色 `Color.argb(35, 0, 0, 0)`。
+  - 描边矩形：`RectF(1, 1, width - 1, height - 1)`，避免描边半像素被裁掉。
+- 为什么不能回退到旧做法：
+  - 不能把白框作为 `iconFrame` 再把缩略图放进去，否则会出现“外框一层、图里又一层”的双层边框。
+  - 不能让 ImageView 对三项带框缩略图使用 `CENTER_CROP`，否则会裁掉左右白边，出现“上下有边、左右没边”的问题。
+  - 不能直接显示原始主题 / 壁纸 / 动画图，因为原图比例不同，会导致四周边距不一致。
+  - 不能给“应用图标”入口加同样白框；maintained 里应用图标是独立图标，不是带框缩略图。
+- 应用图标入口：
+  - 入口：`应用图标`。
+  - 绑定方法：普通 `setIconResource(...)` / `setIconBitmap(...)`。
+  - 显示缩放：普通图标仍走 `CENTER_CROP`，但受 `53dp x 63dp` 最大尺寸限制。
+  - 不显示 `iconFrame`，不包白色预览框。
+
+已遇到并修过的问题记录：
+
+- “图标太大”：通过把 `SettingItemTextVertical` 里的 maxWidth / maxHeight 调到 `53dp x 63dp` 修复。
+- “图标太宽，不像 maintained 的竖向长方形”：通过把预览源合成为 `180 x 210 px` 竖向比例修复。
+- “上下有边框、左右没有边框”：通过 `setPreviewIconBitmap(...)` 改用 `FIT_CENTER`，并把边框合进 bitmap 内部修复。
+- “边框里面还有一层边框”：通过隐藏 `iconFrame`，只保留 `thumbnailFramedPreviewBitmap(...)` 生成的一层白框修复。
+- “应用图标和前三项不对齐”：通过图标容器 `WRAP_CONTENT` 和文本 `RIGHT_OF frameLayout` 对齐修复。
+- “应用图标不应该有边框”：应用图标入口不走 `thumbnailFramedPreviewBitmap(...)`，只显示原图标资源。
