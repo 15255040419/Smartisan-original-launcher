@@ -1060,10 +1060,6 @@
 
     move-result p0
 
-    invoke-static {p1, p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isTransparentThemeWithWallpaper(Landroid/content/Context;Z)Z
-
-    move-result p0
-
     sput-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
 
     .line 2

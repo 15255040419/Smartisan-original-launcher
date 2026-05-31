@@ -77,6 +77,7 @@ public final class MaintainedLauncherSettingsHost {
     private static Runnable sThemePageRunnable;
     private static Resources sSettingsResources;
     private static File sSettingsApk;
+    private static Bitmap sPendingThemeScreenshot;
     private static final String SETTINGS_ASSET = "settings_maintained/maintained-settings-res.apk";
     private static final String SETTINGS_PKG = "com.smartisanos.home";
     private static final String THEME_DOWNLOAD_PREFS = "theme_download_prefs";
@@ -84,6 +85,7 @@ public final class MaintainedLauncherSettingsHost {
     private static final String WALLPAPER_PREFS = "launcher_settings";
     private static final String PREF_WALLPAPER_URI = "launcher_wallpaper_uri";
     private static final String PREF_WALLPAPER_THUMB = "launcher_wallpaper_thumb";
+    private static final String PREF_WALLPAPER_READY = "launcher_wallpaper_ready";
     private static final String KEY_DESKTOP_WALLPAPER_URI = "desktop_wallpaper_uri";
     private static final String KEY_LOCKSCREEN_BACKGROUND = "lockscreen_background";
     private static final String PREF_PENDING_CUSTOM_ICON_KEY = "pending_custom_icon_key";
@@ -333,7 +335,7 @@ public final class MaintainedLauncherSettingsHost {
         hide(resources, root, "launcher_flip_animation");
         bindCurrentThemePreviewIcon(activity, resources, root, "item_id_themes");
         bindWallpaperSettingIcon(activity, resources, root);
-        bindMainSettingIcon(resources, root, "item_page_flip_anims", "page_flip_animation_default_upper");
+        bindMainSettingIcon(resources, root, "item_page_flip_anims", "page_flip_animation_default_upper", true);
         bindMainSettingIcon(resources, root, "item_id_icons", "icon_setting_icon");
 
         click(activity, resources, root, "item_id_themes", new View.OnClickListener() {
@@ -379,7 +381,8 @@ public final class MaintainedLauncherSettingsHost {
         if (item instanceof SettingItemTextVertical && drawableId != 0) {
             SettingItemTextVertical settingItem = (SettingItemTextVertical) item;
             if (framed) {
-                settingItem.setIconBitmap(thumbnailFramedPreviewBitmap(resources, drawableBitmap(resources, drawableId)));
+                settingItem.setIconFrameVisible(false);
+                settingItem.setPreviewIconBitmap(thumbnailFramedPreviewBitmap(resources, drawableBitmap(resources, drawableId)));
             } else {
                 settingItem.setIconResource(drawableId);
             }
@@ -482,6 +485,7 @@ public final class MaintainedLauncherSettingsHost {
             if (launcherUri == null || launcherUri.length() == 0) {
                 launcherUri = uri.toString();
             }
+            saveGaussianWallpaperCopy(activity, Uri.parse(launcherUri));
             String thumbPath = saveWallpaperThumbnail(activity, Uri.parse(launcherUri));
             syncLauncherWallpaperUri(activity, launcherUri);
             try {
@@ -489,6 +493,7 @@ public final class MaintainedLauncherSettingsHost {
                         .edit()
                         .putString(PREF_WALLPAPER_URI, launcherUri)
                         .putString(PREF_WALLPAPER_THUMB, thumbPath == null ? "" : thumbPath)
+                        .putBoolean(PREF_WALLPAPER_READY, true)
                         .commit();
             } catch (Throwable ignored) {
             }
@@ -609,6 +614,24 @@ public final class MaintainedLauncherSettingsHost {
             return;
         }
         try {
+            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(PREF_WALLPAPER_URI, uri)
+                    .putString(KEY_DESKTOP_WALLPAPER_URI, uri)
+                    .putString(KEY_LOCKSCREEN_BACKGROUND, uri)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        try {
+            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(PREF_WALLPAPER_URI, uri)
+                    .putString(KEY_DESKTOP_WALLPAPER_URI, uri)
+                    .putString(KEY_LOCKSCREEN_BACKGROUND, uri)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        try {
             Settings.System.putString(context.getContentResolver(), PREF_WALLPAPER_URI, uri);
             Settings.System.putString(context.getContentResolver(), KEY_LOCKSCREEN_BACKGROUND, uri);
         } catch (Throwable ignored) {
@@ -618,14 +641,69 @@ public final class MaintainedLauncherSettingsHost {
             Settings.Global.putString(context.getContentResolver(), KEY_DESKTOP_WALLPAPER_URI, uri);
         } catch (Throwable ignored) {
         }
+    }
+
+    private static void saveGaussianWallpaperCopy(Context context, Uri uri) {
+        Bitmap bitmap = decodeUriBitmap(context, uri, 1440);
+        if (bitmap == null) {
+            return;
+        }
+        FileOutputStream out = null;
         try {
-            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
-            constants.getField("sWallpaperUri").set(null, uri);
+            File file = new File(context.getFilesDir(), "gaussian_wallpaper.png");
+            out = new FileOutputStream(file);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            out.flush();
         } catch (Throwable ignored) {
+        } finally {
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (Throwable ignored) {
+                }
+            }
+            try {
+                bitmap.recycle();
+            } catch (Throwable ignored) {
+            }
         }
     }
 
+    public static Bitmap decodeLauncherWallpaperBitmap(Context context, String uri) {
+        if (context == null) {
+            return null;
+        }
+        if (uri == null || uri.length() == 0) {
+            uri = selectedWallpaperUri(context);
+        }
+        if (uri == null || uri.length() == 0) {
+            return null;
+        }
+        return decodeUriBitmap(context, Uri.parse(uri), 1440);
+    }
+
+    public static String currentLauncherWallpaperUri(Context context) {
+        return selectedWallpaperUri(context);
+    }
+
     private static Bitmap decodeUriBitmap(Context context, Uri uri, int target) {
+        if (uri != null && "file".equalsIgnoreCase(uri.getScheme())) {
+            try {
+                BitmapFactory.Options bounds = new BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(uri.getPath(), bounds);
+                int sample = 1;
+                int max = Math.max(bounds.outWidth, bounds.outHeight);
+                while (max / sample > target * 2) {
+                    sample *= 2;
+                }
+                BitmapFactory.Options opts = new BitmapFactory.Options();
+                opts.inSampleSize = sample;
+                opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                return BitmapFactory.decodeFile(uri.getPath(), opts);
+            } catch (Throwable ignored) {
+            }
+        }
         InputStream in = null;
         try {
             BitmapFactory.Options bounds = new BitmapFactory.Options();
@@ -670,7 +748,14 @@ public final class MaintainedLauncherSettingsHost {
         View item = find(resources, root, "item_id_launcher_wallpaper");
         if (item instanceof SettingItemTextVertical) {
             SettingItemTextVertical settingItem = (SettingItemTextVertical) item;
-            settingItem.setIconResource(drawable(resources, "wallpaper_setting_icon_frame"));
+            bindIconFrame(resources, settingItem);
+            settingItem.setIconFrameVisible(false);
+            Bitmap selected = selectedWallpaperThumbnail(context);
+            if (selected != null) {
+                settingItem.setPreviewIconBitmap(thumbnailFramedPreviewBitmap(resources, selected));
+            } else {
+                settingItem.setPreviewIconBitmap(thumbnailFramedPreviewBitmap(resources, wallpaperSettingBitmap(context, resources)));
+            }
         }
     }
 
@@ -689,14 +774,15 @@ public final class MaintainedLauncherSettingsHost {
         View item = find(resources, root, viewName);
         if (item instanceof SettingItemTextVertical) {
             SettingItemTextVertical settingItem = (SettingItemTextVertical) item;
-            int drawableId = drawable(resources, readLauncherMode(context) == 20
-                    ? "thumbnail_settings_16" : "thumbnail_settings");
-            if (drawableId != 0) {
-                settingItem.setIconResource(drawableId);
-                return;
-            }
+            bindIconFrame(resources, settingItem);
+            settingItem.setIconFrameVisible(false);
             Bitmap bitmap = themePreviewBitmap(context, currentTheme(context));
-            settingItem.setIconBitmap(thumbnailFramedPreviewBitmap(resources, bitmap));
+            if (bitmap == null) {
+                int drawableId = drawable(resources, readLauncherMode(context) == 20
+                        ? "thumbnail_settings_16" : "thumbnail_settings");
+                bitmap = drawableBitmap(resources, drawableId);
+            }
+            settingItem.setPreviewIconBitmap(thumbnailFramedPreviewBitmap(resources, bitmap));
         }
     }
 
@@ -1226,12 +1312,9 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void applyWallpaperChange(Context context) {
-        String uri = "";
-        try {
-            uri = context.getSharedPreferences(WALLPAPER_PREFS, Context.MODE_PRIVATE)
-                    .getString(PREF_WALLPAPER_URI, "");
+        String uri = selectedWallpaperUri(context);
+        if (uri != null && uri.length() > 0) {
             syncLauncherWallpaperUri(context, uri);
-        } catch (Throwable ignored) {
         }
         try {
             Intent intent = new Intent("com.smartisanos.launcher.wallpaper_changed");
@@ -1254,6 +1337,7 @@ public final class MaintainedLauncherSettingsHost {
             notifyOriginalConfigChanged(KEY_DESKTOP_WALLPAPER_URI);
         } catch (Throwable ignored) {
         }
+        setLauncherWallpaperConstant(uri);
         try {
             Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
                     .getMethod("getInstance").invoke(null);
@@ -1388,10 +1472,7 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void scheduleLauncherRestart(Context context) {
         try {
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.setClassName(context.getPackageName(), "com.smartisanos.launcher.LauncherAlias");
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-            intent.addCategory(Intent.CATEGORY_HOME);
+            Intent intent = launcherHomeIntent(context);
             int flags = PendingIntent.FLAG_CANCEL_CURRENT;
             if (Build.VERSION.SDK_INT >= 23) {
                 flags |= PendingIntent.FLAG_IMMUTABLE;
@@ -1410,16 +1491,46 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void startLauncherFromForeground(Context context) {
         try {
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.setClassName(context.getPackageName(), "com.smartisanos.launcher.LauncherAlias");
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-            intent.addCategory(Intent.CATEGORY_HOME);
-            context.startActivity(intent);
+            Context launchContext = context;
             if (context instanceof Activity) {
-                finishSettingsTask((Activity) context);
+                Activity activity = (Activity) context;
+                launchContext = activity.getApplicationContext();
+                try {
+                    activity.overridePendingTransition(0, 0);
+                } catch (Throwable ignored) {
+                }
+                activity.finish();
+            }
+            launchContext.startActivity(launcherHomeIntent(launchContext));
+            if (context instanceof Activity) {
+                try {
+                    ((Activity) context).overridePendingTransition(0, 0);
+                } catch (Throwable ignored) {
+                }
             }
         } catch (Throwable ignored) {
         }
+    }
+
+    private static void setLauncherWallpaperConstant(String uri) {
+        if (uri == null || uri.length() == 0) {
+            return;
+        }
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            constants.getField("sWallpaperUri").set(null, uri);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static Intent launcherHomeIntent(Context context) {
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.setClassName(context.getPackageName(), "com.smartisanos.launcher.Launcher");
+        intent.addCategory(Intent.CATEGORY_HOME);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        return intent;
     }
 
     private static void finishSettingsTask(Activity activity) {
@@ -1877,8 +1988,18 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void applyTheme(Activity activity, String id, String pkg, String name) {
         pkg = normalizeThemePackage(activity, id, pkg);
-        submitThemeSnapshot(activity);
-        boolean originalApplied = applyThemeViaOriginalStack(activity, id, pkg);
+        boolean queued = queueThemeChangeForLauncher(id);
+        if (queued) {
+            Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                public void run() {
+                    prepareThemeTransitionScreenshot(activity);
+                    startLauncherFromForeground(activity);
+                }
+            }, 120);
+            return;
+        }
+        boolean stored = applyThemeViaOriginalStack(activity, id, pkg);
         try {
             SharedPreferences.Editor editor = activity.getSharedPreferences("com.smartisanos.launcher_prefs", 0).edit();
             editor.putString("launcher_theme", id);
@@ -1895,12 +2016,77 @@ public final class MaintainedLauncherSettingsHost {
             }
         } catch (Throwable ignored) {
         }
-        Toast.makeText(activity, (originalApplied ? "正在应用：" : "已记录：") + name, Toast.LENGTH_SHORT).show();
+        Toast.makeText(activity, (stored ? "正在应用：" : "已记录：") + name, Toast.LENGTH_SHORT).show();
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             public void run() {
+                prepareThemeTransitionScreenshot(activity);
                 startLauncherFromForeground(activity);
             }
-        }, 500);
+        }, 120);
+    }
+
+    private static void prepareThemeTransitionScreenshot(Activity activity) {
+        Bitmap bitmap = captureActivityBitmap(activity);
+        if (bitmap != null) {
+            Bitmap old = sPendingThemeScreenshot;
+            sPendingThemeScreenshot = bitmap;
+            if (old != null && old != bitmap && !old.isRecycled()) {
+                old.recycle();
+            }
+        }
+    }
+
+    private static Bitmap captureActivityBitmap(Activity activity) {
+        try {
+            View decor = activity.getWindow().getDecorView();
+            int width = decor.getWidth();
+            int height = decor.getHeight();
+            if (width <= 0 || height <= 0) {
+                return null;
+            }
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            decor.draw(canvas);
+            return bitmap;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    public static void consumePendingThemeScreenshotIfAny() {
+        consumePendingThemeScreenshotForAnimation();
+    }
+
+    public static boolean consumePendingThemeScreenshotForAnimation() {
+        Bitmap bitmap = sPendingThemeScreenshot;
+        if (bitmap == null) {
+            return false;
+        }
+        try {
+            Class<?> handler = Class.forName("com.smartisanos.launcher.theme.t");
+            Object instance = handler.getMethod("getInstance").invoke(null);
+            if (instance != null) {
+                handler.getMethod("f", Bitmap.class).invoke(instance, bitmap);
+                sPendingThemeScreenshot = null;
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    private static boolean queueThemeChangeForLauncher(String id) {
+        try {
+            android.os.Message message = android.os.Message.obtain();
+            message.what = 0x12;
+            message.obj = id;
+            message.arg1 = -5;
+            Class<?> flow = Class.forName("com.smartisanos.launcher.a.r");
+            flow.getField("sj").set(null, message);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private static boolean applyThemeViaOriginalStack(Activity activity, String id, String pkg) {
@@ -1980,6 +2166,32 @@ public final class MaintainedLauncherSettingsHost {
                 handler.getMethod("f", Bitmap.class).invoke(handlerInstance, shot);
             }
         } catch (Throwable ignored) {
+        }
+    }
+
+    public static boolean isLauncherReadyForThemeAnimation() {
+        try {
+            Class<?> mainViewClass = Class.forName("com.smartisanos.launcher.view.Eb");
+            Object mainView = mainViewClass.getMethod("getInstance").invoke(null);
+            if (mainView == null) {
+                return false;
+            }
+            Object currentPages = mainViewClass.getMethod("Gh").invoke(mainView);
+            if (currentPages == null) {
+                return false;
+            }
+            Object pagesReady = currentPages.getClass().getMethod("Am").invoke(currentPages);
+            if (!Boolean.TRUE.equals(pagesReady)) {
+                return false;
+            }
+            Object windowPages = mainViewClass.getMethod("Ih").invoke(mainView);
+            if (windowPages == null) {
+                return false;
+            }
+            Object currentPage = windowPages.getClass().getMethod("Wq").invoke(windowPages);
+            return currentPage != null;
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 
@@ -2594,7 +2806,7 @@ public final class MaintainedLauncherSettingsHost {
                 "theme_preview/" + themeId + "/" + mode + "/delta_L.jpg",
         };
         for (int i = 0; i < candidates.length; i++) {
-            Bitmap bitmap = sampledAssetBitmap(context, candidates[i], 90, 150);
+            Bitmap bitmap = sampledAssetBitmap(context, candidates[i], 180, 210);
             if (bitmap != null) {
                 return bitmap;
             }
@@ -2603,35 +2815,25 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static Bitmap thumbnailFramedPreviewBitmap(Resources resources, Bitmap source) {
-        int size = 72;
-        Bitmap out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        int width = 180;
+        int height = 210;
+        Bitmap out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(out);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
-        Bitmap frame = null;
-        int frameId = resources.getIdentifier("thumbnail_bg", "drawable", SETTINGS_PKG);
-        if (frameId != 0) {
-            frame = drawableBitmap(resources, frameId);
-        }
-        if (frame != null) {
-            canvas.drawBitmap(frame, new Rect(0, 0, frame.getWidth(), frame.getHeight()),
-                    new Rect(0, 0, size, size), paint);
-        } else {
-            RectF outer = new RectF(0, 0, size, 72);
-            paint.setColor(Color.WHITE);
-            canvas.drawRoundRect(outer, 3, 3, paint);
-        }
+        RectF frameRect = new RectF(0, 0, width, height);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE);
+        canvas.drawRoundRect(frameRect, 9, 9, paint);
         if (source != null && source.getWidth() > 0 && source.getHeight() > 0) {
-            int contentW = 58;
-            int contentH = 68;
-            float scale = Math.min((float) contentW / source.getWidth(), (float) contentH / source.getHeight());
-            int width = Math.max(1, Math.round(source.getWidth() * scale));
-            int height = Math.max(1, Math.round(source.getHeight() * scale));
-            int left = (size - width) / 2;
-            int top = (size - height) / 2;
-            Rect src = new Rect(0, 0, source.getWidth(), source.getHeight());
-            Rect dst = new Rect(left, top, left + width, top + height);
+            Rect dst = new Rect(12, 12, width - 12, height - 12);
+            Rect src = centerCropRect(source.getWidth(), source.getHeight(), dst.width(), dst.height());
             canvas.drawBitmap(source, src, dst, paint);
         }
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2);
+        paint.setColor(Color.argb(35, 0, 0, 0));
+        canvas.drawRoundRect(new RectF(1, 1, width - 1, height - 1), 9, 9, paint);
+        paint.setStyle(Paint.Style.FILL);
         return out;
     }
 
@@ -2724,9 +2926,139 @@ public final class MaintainedLauncherSettingsHost {
         return bitmap;
     }
 
+    private static String selectedWallpaperUri(Context context) {
+        if (context == null) {
+            return "";
+        }
+        String uri = "";
+        if (isWallpaperReady(context, WALLPAPER_PREFS)) {
+            uri = readWallpaperUriFromPrefs(context, WALLPAPER_PREFS);
+            if (uri.length() > 0) {
+                return uri;
+            }
+        }
+        if (isWallpaperReady(context, "com.smartisanos.launcher_prefs")) {
+            uri = readWallpaperUriFromPrefs(context, "com.smartisanos.launcher_prefs");
+            if (uri.length() > 0) {
+                return uri;
+            }
+        }
+        uri = localGaussianWallpaperUri(context);
+        if (uri.length() > 0) {
+            return uri;
+        }
+        uri = readWallpaperUriFromSettings(context, false);
+        if (uri.length() > 0) {
+            return uri;
+        }
+        uri = readWallpaperUriFromSettings(context, true);
+        if (uri.length() > 0) {
+            return uri;
+        }
+        return localLauncherWallpaperUri(context);
+    }
+
+    private static String readWallpaperUriFromPrefs(Context context, String prefs) {
+        try {
+            SharedPreferences shared = context.getSharedPreferences(prefs, Context.MODE_PRIVATE);
+            String uri = shared.getString(PREF_WALLPAPER_URI, "");
+            if (uri == null || uri.length() == 0) {
+                uri = shared.getString(KEY_DESKTOP_WALLPAPER_URI, "");
+            }
+            if (uri == null || uri.length() == 0) {
+                uri = shared.getString(KEY_LOCKSCREEN_BACKGROUND, "");
+            }
+            return uri == null ? "" : uri;
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    private static String readWallpaperUriFromSettings(Context context, boolean global) {
+        try {
+            String uri = global
+                    ? Settings.Global.getString(context.getContentResolver(), PREF_WALLPAPER_URI)
+                    : Settings.System.getString(context.getContentResolver(), PREF_WALLPAPER_URI);
+            if (uri == null || uri.length() == 0) {
+                uri = global
+                        ? Settings.Global.getString(context.getContentResolver(), KEY_DESKTOP_WALLPAPER_URI)
+                        : Settings.System.getString(context.getContentResolver(), KEY_DESKTOP_WALLPAPER_URI);
+            }
+            if (uri == null || uri.length() == 0) {
+                uri = global
+                        ? Settings.Global.getString(context.getContentResolver(), KEY_LOCKSCREEN_BACKGROUND)
+                        : Settings.System.getString(context.getContentResolver(), KEY_LOCKSCREEN_BACKGROUND);
+            }
+            return uri == null ? "" : uri;
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    private static String localLauncherWallpaperUri(Context context) {
+        try {
+            File file = new File(context.getFilesDir(), "launcher_wallpaper.jpg");
+            if (file.exists() && file.length() > 0) {
+                return Uri.fromFile(file).toString();
+            }
+        } catch (Throwable ignored) {
+        }
+        return "";
+    }
+
+    private static boolean isWallpaperReady(Context context, String prefs) {
+        try {
+            return context.getSharedPreferences(prefs, Context.MODE_PRIVATE)
+                    .getBoolean(PREF_WALLPAPER_READY, false);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static String localGaussianWallpaperUri(Context context) {
+        try {
+            File file = new File(context.getFilesDir(), "gaussian_wallpaper.png");
+            if (file.exists() && file.length() > 0) {
+                return Uri.fromFile(file).toString();
+            }
+        } catch (Throwable ignored) {
+        }
+        return "";
+    }
+
+    private static String newestLocalWallpaperUri(Context context) {
+        try {
+            File launcher = new File(context.getFilesDir(), "launcher_wallpaper.jpg");
+            File gaussian = new File(context.getFilesDir(), "gaussian_wallpaper.png");
+            boolean launcherOk = launcher.exists() && launcher.length() > 0;
+            boolean gaussianOk = gaussian.exists() && gaussian.length() > 0;
+            if (launcherOk && (!gaussianOk || launcher.lastModified() >= gaussian.lastModified())) {
+                return Uri.fromFile(launcher).toString();
+            }
+            if (gaussianOk) {
+                return Uri.fromFile(gaussian).toString();
+            }
+            if (launcherOk) {
+                return Uri.fromFile(launcher).toString();
+            }
+        } catch (Throwable ignored) {
+        }
+        return "";
+    }
+
     private static Bitmap selectedWallpaperThumbnail(Context context) {
         if (context == null) {
             return null;
+        }
+        String uri = selectedWallpaperUri(context);
+        try {
+            if (uri != null && uri.length() > 0) {
+                Bitmap bitmap = decodeUriBitmap(context, Uri.parse(uri), 256);
+                if (bitmap != null) {
+                    return bitmap;
+                }
+            }
+        } catch (Throwable ignored) {
         }
         try {
             String path = context.getSharedPreferences(WALLPAPER_PREFS, Context.MODE_PRIVATE)
@@ -2736,14 +3068,6 @@ public final class MaintainedLauncherSettingsHost {
                 if (bitmap != null) {
                     return bitmap;
                 }
-            }
-        } catch (Throwable ignored) {
-        }
-        try {
-            String uri = context.getSharedPreferences(WALLPAPER_PREFS, Context.MODE_PRIVATE)
-                    .getString(PREF_WALLPAPER_URI, "");
-            if (uri != null && uri.length() > 0) {
-                return decodeUriBitmap(context, Uri.parse(uri), 256);
             }
         } catch (Throwable ignored) {
         }

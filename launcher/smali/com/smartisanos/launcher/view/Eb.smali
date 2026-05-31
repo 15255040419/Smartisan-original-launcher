@@ -5393,7 +5393,18 @@
     move-result-object v3
 
     .line 38
+    sget-boolean v5, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
+
+    if-eqz v5, :cond_normal_theme_wallpaper_uri
+
     sget-object v5, Lcom/smartisanos/launcher/data/Constants;->sWallpaperUri:Ljava/lang/String;
+
+    goto :goto_theme_wallpaper_uri
+
+    :cond_normal_theme_wallpaper_uri
+    const/4 v5, 0x0
+
+    :goto_theme_wallpaper_uri
 
     invoke-static {v3, v5}, Lcom/smartisanos/launcher/e/s;->n(Landroid/content/Context;Ljava/lang/String;)Landroid/graphics/Bitmap;
 

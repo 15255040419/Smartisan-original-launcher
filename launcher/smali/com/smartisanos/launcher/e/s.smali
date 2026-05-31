@@ -1573,6 +1573,31 @@
 
     .line 179
     :cond_1
+    sget-boolean p1, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
+
+    if-eqz p1, :cond_port_wallpaper_fallback
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->currentLauncherWallpaperUri(Landroid/content/Context;)Ljava/lang/String;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_port_wallpaper_fallback
+
+    invoke-virtual {v0}, Ljava/lang/String;->length()I
+
+    move-result v1
+
+    if-lez v1, :cond_port_wallpaper_fallback
+
+    invoke-static {p0, v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->decodeLauncherWallpaperBitmap(Landroid/content/Context;Ljava/lang/String;)Landroid/graphics/Bitmap;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_port_wallpaper_fallback
+
+    return-object v0
+
+    :cond_port_wallpaper_fallback
     invoke-static {p0}, Lcom/smartisanos/launcher/ua;->d(Landroid/content/Context;)Landroid/graphics/drawable/Drawable;
 
     move-result-object p0
@@ -9985,7 +10010,7 @@
 
     .line 13
     :cond_0
-    sget-object v1, Lcom/smartisanos/launcher/data/Constants;->sWallpaperUri:Ljava/lang/String;
+    const/4 v1, 0x0
 
     invoke-static {v0, v1}, Lcom/smartisanos/launcher/e/s;->n(Landroid/content/Context;Ljava/lang/String;)Landroid/graphics/Bitmap;
 

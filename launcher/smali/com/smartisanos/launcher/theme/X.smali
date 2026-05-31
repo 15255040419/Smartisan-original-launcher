@@ -2148,7 +2148,7 @@
 .end method
 
 .method public static da(Landroid/content/Context;)V
-    .locals 3
+    .locals 4
 
     .line 1
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/X;->va(Landroid/content/Context;)Lcom/smartisanos/launcher/theme/v;

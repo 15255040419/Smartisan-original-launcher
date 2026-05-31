@@ -40,6 +40,7 @@ public class SettingItemTextVertical extends RelativeLayout {
         if (defaultFrame != 0) {
             iconFrame.setImageResource(defaultFrame);
         }
+        iconFrame.setVisibility(INVISIBLE);
         frameLayout.addView(iconFrame, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -48,10 +49,13 @@ public class SettingItemTextVertical extends RelativeLayout {
         icon = new ImageView(context);
         icon.setDuplicateParentStateEnabled(true);
         icon.setAdjustViewBounds(true);
-        icon.setMaxWidth(dp(60));
-        icon.setMaxHeight(dp(70));
+        icon.setMaxWidth(dp(53));
+        icon.setMaxHeight(dp(63));
         icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        frameLayout.addView(icon, new FrameLayout.LayoutParams(dp(60), dp(70), Gravity.CENTER));
+        frameLayout.addView(icon, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER));
 
         int iconRes = attrRes(attrs, "setting_item_text_vertical_icon");
         if (iconRes != 0) {
@@ -135,7 +139,12 @@ public class SettingItemTextVertical extends RelativeLayout {
     public void setIconFrameResource(int resId) {
         if (resId != 0) {
             iconFrame.setImageResource(resId);
+            iconFrame.setVisibility(VISIBLE);
         }
+    }
+
+    public void setIconFrameVisible(boolean visible) {
+        iconFrame.setVisibility(visible ? VISIBLE : INVISIBLE);
     }
 
     public void setIconScale(int width, int height) {

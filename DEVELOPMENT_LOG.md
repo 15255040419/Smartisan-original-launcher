@@ -2,7 +2,60 @@
 
 本文件从旧 README 中拆出，用来记录每天修复了哪些 BUG、实现了哪些功能、当时采用了什么修复方式，以及历史迁移路线。
 
-注意：本文档是按时间保存的过程记录。早期条目里的“暂未实现 / 后续接入 / 当前不可用”只代表当时状态；如果和最新实现有冲突，当前项目状态以 `README.md` 为准。
+注意：本文档保留了大量过程记录。早期条目里的“暂未实现 / 后续接入 / 当前不可用”只代表当时状态；如果和最新实现有冲突，当前项目状态以 `README.md` 和下面的“当前状态总览”为准。
+
+## 当前状态总览（2026-05-31）
+
+### 已完成
+
+- APK 可通过 `build.bat` 构建、签名并输出 `build\launcher-signed.apk`，最近多次安装到 `emulator-5554` 验证通过。
+- 桌面主入口、桌面内“桌面设置”虚拟入口、12 / 20 宫格、主题页、壁纸页、翻页动画页、应用图标页、三个设置开关均已接入。
+- 经典黑主题 12 / 20 宫格顶部网格和底部 Dock 资源已从原版 `com.smartisanos.launcher-3.apk` 重新抽取覆盖，顶底色差问题已修复。
+- 桌面设置页和桌面已尽量保持在同一个 `smartisanos.task.launcher` 任务栈内，修复主题设定后“返回桌面 -> 又闪回设置页 -> 再回桌面”的双跳问题。
+- 普通不透明主题切换时不再把用户壁纸作为背景传入，避免所有主题都透出系统壁纸。
+- 透明主题壁纸链路已接入 `launcher_wallpaper_uri`、私有壁纸副本、缩略图和 `gaussian_wallpaper.png` 兜底。
+- 主设置页缩略图已按 maintained 方向调整：桌面主题 / 桌面壁纸 / 桌面翻页动画使用竖向带框缩略图，应用图标不额外加白色外框。
+- 应用图标替换链路已从设置页预览扩展到桌面主图标加载入口，支持 redirect、自定义图片、图标包 appfilter 和系统原图回退。
+
+### 已完成但需要继续回归
+
+- 首次主题切换动画：已加入快照、冷启动队列和任务栈修复，但仍需用多主题、多次清数据冷启动验证“第一次设定主题就加载翻页动画”。
+- 透明主题换壁纸：已改为优先读取新选择的 launcher 壁纸并写入 ready 标记，但仍需验证“已切换毛玻璃/白雾后再次选择不同图片”是否立即生效。
+- 主设置页缩略图：当前显示上限为 `53dp x 63dp`，源图为 `180 x 210 px`、四周 `12 px` 内边距；视觉仍按用户截图继续微调。
+
+### 未完成 / 待处理
+
+- 白雾主题显示异常仍未最终确认修复。
+- 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
+- 原生 Smartisan Settings Activity / Fragment 还没有完整迁移，当前仍由 launcher 包内 `ThemeChooserActivity` 承载 maintained 风格兼容页。
+- 在线主题 APK 下载后仍依赖用户手动安装，普通应用没有静默安装能力。
+- 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画仍需要更多分辨率和真机回归。
+
+## 阅读顺序
+
+建议按下面顺序接手，不要从文件中间的旧计划直接开始：
+
+1. 先读本节“当前状态总览”，确认哪些已经完成、哪些还待验证。
+2. 再读“最新时间线索引”，按日期倒序查最近改动。
+3. 需要追溯原因时，再读后面的“历史记录原文”。历史记录保留早期判断，其中部分结论已被后续实现覆盖。
+
+## 最新时间线索引（倒序）
+
+- 2026-05-31：主题切换任务栈、透明主题壁纸、主设置页缩略图继续对齐 maintained。
+- 2026-05-29：经典黑 12 / 20 宫格顶底资源色差修复，恢复原版 APK 资源。
+- 2026-05-27：主入口缩略图、宫格预览、壁纸选择、开关动画、即时生效继续修正。
+- 2026-05-26：应用图标页迁移 maintained 交互，桌面主图标加载入口接入 redirect / icon pack 链路。
+- 2026-05-23：主题下载、主题入口预览、翻页动画写入与刷新修正。
+- 2026-05-19：12 / 20 宫格切换加载过渡、长屏自适应和切换过渡二次修正。
+- 2026-05-18：original-port 回退修复、启动崩溃、文件夹与宫格切换修复。
+- 2026-05-16：maintained 设置页真实迁移、二级页面入口、开关控件和布局自适应探索。
+- 2026-05-15 及更早：入口清理、原生 Settings 依赖调查、错误路线冻结。
+
+---
+
+## 历史记录原文
+
+下面内容是按当时开发过程保留下来的原文，里面的“当前”“下一步”“不要继续”等说法只对对应日期有效。若和文件顶部“当前状态总览”冲突，以顶部总览和 `README.md` 为准；不要从历史原文中直接判断今天的完成状态。
 
 ## 早期设置页迁移记录
 
@@ -16,14 +69,14 @@
 - 翻页动画页使用 maintained 的 `launcher_anim_chooser_layout` / `gridview_chooser_item_layout`，写入 `launcher_page_animation`。
 - 本次已通过 `build.bat` 编译签名，输出：`build\launcher-signed.apk`。
 
-重要结论：
+当时的重要结论：
 
-- 当前实际显示的 `NativeLauncherSettingsHost` 不是原生 Smartisan Settings 页面。
-- 当前桌面图标“桌面设置”进入的是 `ThemeChooserActivity -> NativeLauncherSettingsHost.show()`；只要这条调用还在，屏幕上看到的就一定是自绘兼容页，不是原生页面。
-- 不要继续美化、扩展、修补这个 Java 程序化页面。
+- 当时实际显示的 `NativeLauncherSettingsHost` 不是原生 Smartisan Settings 页面。
+- 当时桌面图标“桌面设置”进入的是 `ThemeChooserActivity -> NativeLauncherSettingsHost.show()`；只要这条调用还在，屏幕上看到的就一定是自绘兼容页，不是原生页面。
+- 当时的判断是不继续美化、扩展、修补这个 Java 程序化页面。
 - 正确方向是迁移 `com.android.settings-100.apk` 里的原生 `LauncherSettingsActivity` / `LauncherSettingsFragment` / `ObsessionModeFragment` 及其最小依赖。
 - 普通 Android / Google 虚拟机里的系统 `com.android.settings` 不包含锤子原生 `LauncherSettingsActivity`，所以“桌面设置图标直接外跳系统 Settings”不可用。
-- 当前 `NativeLauncherSettingsHost` 只能作为临时入口验证和 key 验证用，后续应被原生迁移页面替换。
+- 当时 `NativeLauncherSettingsHost` 只能作为临时入口验证和 key 验证用，后续应被原生迁移页面替换。
 - 之后的设置页改动必须先证明使用了 `com.android.settings-100.apk` 的原生 layout / widget / drawable / key；不能只按截图重新画。
 
 接手者请先读完本节，再动代码。不要凭截图临时仿 UI。
@@ -1947,3 +2000,49 @@ ADB 复测结论：
   - 20 宫格背景 `back1.png`: Mean RGB `[53.62, 57.56, 61.69]`
   - 20 宫格 Dock `dock_back.png`: Mean RGB `[42.40, 45.98, 49.65]`
 - 用户反馈实际装机显示完全正确，色差和杂色已全部消失。
+
+### 2026-05-31 追加：主题切换任务栈、透明主题壁纸与桌面设置缩略图对齐
+
+用户继续反馈三类问题：主题设置页与桌面被系统识别成两个应用导致切换主题后前后台来回闪；毛玻璃/白雾透明主题更换壁纸后仍可能显示旧默认壁纸；桌面设置页中“桌面主题 / 桌面壁纸 / 桌面翻页动画 / 应用图标”四个图标尺寸、边框和对齐与 maintained 项目不一致。
+
+本轮修正：
+
+- 修复桌面设置页任务栈：
+  - 在 `launcher/smali/com/smartisanos/launcher/a/P.smali` 中移除打开 `ThemeChooserActivity` 时强制添加的 `FLAG_ACTIVITY_NEW_TASK`。
+  - 使 `ThemeChooserActivity` 与 `Launcher` 保持在同一个 `smartisanos.task.launcher` 任务中，避免“返回桌面 -> 又闪回设置页 -> 再回桌面”的双跳。
+
+- 修复透明主题壁纸读取：
+  - 在 `launcher/smali/com/smartisanos/launcher/e/s.smali` 中，透明主题优先通过 `MaintainedLauncherSettingsHost.currentLauncherWallpaperUri(...)` 读取当前壁纸，再调用 `decodeLauncherWallpaperBitmap(...)` 解码。
+  - 普通不透明主题切换时不再把 `Constants.sWallpaperUri` 作为背景传入，避免普通主题错误透出用户壁纸。
+  - 在 `MaintainedLauncherSettingsHost` 中新增当前壁纸 URI 解析逻辑，支持从 prefs、Settings、`gaussian_wallpaper.png`、`launcher_wallpaper.jpg` 多路径兜底。
+  - 选择新壁纸时同步写入 `launcher_wallpaper.jpg`、缩略图、`gaussian_wallpaper.png`，并写入 `launcher_wallpaper_ready` 标记，避免透明主题一直使用旧的默认女孩壁纸。
+
+- 修复桌面设置页缩略图样式：
+  - 在 `launcher/tools/java/com/smartisanos/home/settings/SettingItemTextVertical.java` 中：
+    - 默认隐藏 `iconFrame`，只有需要外部 frame 时才显示；
+    - 新增 `setIconFrameVisible(...)`；
+    - 将四个设置项图标显示上限从 maintained 原始 `60dp x 70dp` 调小为 `53dp x 63dp`，约比之前整体小 20px；
+    - 保持图标区域 `wrap_content`，不强行固定槽位，避免文字列错位。
+  - 在 `MaintainedLauncherSettingsHost.thumbnailFramedPreviewBitmap(...)` 中统一生成完整带框缩略图：
+    - 外框 bitmap：`180 x 210 px`；
+    - 内容内边距：四周 `12 px`；
+    - 内容区：`156 x 186 px`；
+    - 圆角：`9 px`；
+    - 描边：`2 px`。
+  - “桌面主题 / 桌面壁纸 / 桌面翻页动画”三项使用 `setPreviewIconBitmap(...)` 完整显示带框缩略图，避免 `centerCrop` 把左右白边裁掉。
+  - “应用图标”项不显示白色缩略图框，只随统一 maxWidth/maxHeight 缩小。
+
+验证结果：
+
+- 多次执行 `.\build.bat` 成功，输出 `build/launcher-signed.apk`。
+- 多次执行 `adb install -r -d build\launcher-signed.apk` 成功安装到 `emulator-5554`。
+- `dumpsys activity activities` 确认 `ThemeChooserActivity` 与 `Launcher` 同在一个 `smartisanos.task.launcher` 任务栈中。
+- ADB 截图确认：
+  - 透明主题桌面可读取 `gaussian_wallpaper.png` 壁纸；
+  - 设置页三项带框缩略图四边都有白边，不再出现左右边框被裁掉；
+  - 缩略图比例已改成竖向长方形，并整体缩小。
+
+当前注意点：
+
+- `build/` 目录中 APK 产物有新增/删除/覆盖变化，多数是编译输出，不应作为源码修复重点提交。
+- 当前工作区还包含此前多轮主题动画和资源修复的 smali 改动，提交前需要按功能分组检查，避免把无关产物混入。
