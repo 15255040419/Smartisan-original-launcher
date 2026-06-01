@@ -86,9 +86,9 @@ public final class IconPackManager {
 
     public static String getSelectedIconPackPackage(Context context) {
         if (context == null) {
-            return "";
+            return DISABLED;
         }
-        return prefs(context).getString(PREF_KEY_SELECTED_ICON_PACK, "");
+        return prefs(context).getString(PREF_KEY_SELECTED_ICON_PACK, DISABLED);
     }
 
     public static void setSelectedIconPackPackage(Context context, String packageName) {
@@ -100,8 +100,11 @@ public final class IconPackManager {
     }
 
     public static String getIconPackLabel(Context context, String packageName) {
-        if (context == null || TextUtils.isEmpty(packageName) || DISABLED.equals(packageName)) {
-            return "未使用";
+        if (TextUtils.isEmpty(packageName)) {
+            return "自动选择";
+        }
+        if (context == null || DISABLED.equals(packageName)) {
+            return "不使用图标包";
         }
         try {
             PackageManager pm = context.getPackageManager();
@@ -119,7 +122,13 @@ public final class IconPackManager {
 
     public static boolean hasSelectedIconPack(Context context) {
         String pkg = getSelectedIconPackPackage(context);
-        return !TextUtils.isEmpty(pkg) && !DISABLED.equals(pkg) && hasAppFilter(context.getPackageManager(), pkg);
+        if (DISABLED.equals(pkg)) {
+            return false;
+        }
+        if (TextUtils.isEmpty(pkg)) {
+            return !getIconPackPackages(context).isEmpty();
+        }
+        return hasAppFilter(context.getPackageManager(), pkg);
     }
 
     public static boolean hasPackedIcon(Context context, String packageName) {
@@ -150,7 +159,6 @@ public final class IconPackManager {
                 return;
             }
             selected = packs.get(0);
-            setSelectedIconPackPackage(context, selected);
         }
         if (selected.equals(sLoadedPackage)) {
             return;
