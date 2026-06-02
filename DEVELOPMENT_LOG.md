@@ -4,7 +4,7 @@
 
 注意：本文档顶部的“当前状态总览”和“每日修复记录（倒序）”是当前可信记录。后面的“历史归档”保留旧记录原文，其中有些日期和标题不是严格排序，且早期条目里的“暂未实现 / 后续接入 / 当前不可用”只代表当时状态；如果和顶部记录或 `README.md` 冲突，以顶部记录和 `README.md` 为准。
 
-## 当前状态总览（2026-06-01）
+## 当前状态总览（2026-06-02）
 
 ### 已完成
 
@@ -18,6 +18,7 @@
 - 主设置页缩略图已按 maintained 方向调整：桌面主题 / 桌面壁纸 / 桌面翻页动画使用竖向带框缩略图，应用图标不额外加白色外框。
 - 应用图标替换链路已从设置页预览扩展到桌面主图标加载入口，支持 redirect、自定义图片、图标包 appfilter 和系统原图回退。
 - 应用图标页顶部“改进版图标”已改为复用首页同款 `SettingItemSwitch` / `SwitchEx`，不再手写开关；“图标包”行改用 maintained 卡片背景，与上方开关行组成一组。
+- 应用图标页新增“桌面图标大小”滑块，位置在“改进版图标”和“图标包”之间；支持 50% - 150% 连续调节，并可点击“小 / 中 / 大”快速跳到 50% / 100% / 150%；保存后回到桌面并完整重启 Launcher，让 12 / 20 宫格里的所有普通应用和桌面设置虚拟入口统一应用新尺寸。
 - 应用图标页单应用切换已改为行级刷新：选择左侧默认图标、右侧推荐图标或相册自定义图标后，当前页面和滚动位置保持不变；只有找不到当前行时才兜底重建并恢复滚动位置。
 - 应用图标页点击范围已收窄：只有左侧默认图标块和右侧推荐/加号图标块响应选择，右侧应用名称/说明文字区域不再弹出选择框。
 
@@ -32,6 +33,7 @@
 - 白雾主题显示异常仍未最终确认修复。
 - 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
 - 原生 Smartisan Settings Activity / Fragment 还没有完整迁移，当前仍由 launcher 包内 `ThemeChooserActivity` 承载 maintained 风格兼容页。
+- 对照 `E:\FANG\smartisan\smartisan-launcher-maintained`，当前桌面设置仍缺少或只做占位的 maintained 功能：桌面隐藏虚拟键、检查更新、关闭电池优化、分享此应用给朋友、用户体验改进计划、关于我们 / 问题反馈 / 关注我们等“更多”区域入口。桌面隐藏虚拟键写入 key 为 `launcher_hide_navigation_bar`，应优先移植并限制只对 Launcher 主界面生效。
 - 在线主题 APK 下载后仍依赖用户手动安装，普通应用没有静默安装能力。
 - 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画仍需要更多分辨率和真机回归。
 
@@ -44,6 +46,55 @@
 3. 需要追溯原因时，再读后面的“历史归档”。历史归档保留早期判断，其中部分结论已被后续实现覆盖。
 
 ## 每日修复记录（倒序）
+
+### 2026-06-02：桌面图标大小滑块接入 12 / 20 宫格
+
+背景：
+
+- 用户希望参考 `rianlu/smartisan-launcher-maintained` 的图标大小调节能力，但必须适配当前 original-port 的 12 / 20 宫格，而不是退回 maintained 的 9 / 16 宫格语义。
+- 用户要求设置入口放在应用图标页顶部“改进版图标”和“图标包”之间，并且调节后要立即生效。
+
+修复内容：
+
+- 应用图标设置页：
+  - 在顶部卡片组中新增“桌面图标大小”行，位于“改进版图标”和“图标包”之间。
+  - 三行共用 maintained 的 top / middle / bottom 卡片背景，保持为一个整体。
+  - 右侧显示当前百分比，例如 `100%`、`150%`。
+  - 点击“桌面图标大小”整行弹出滑块；“图标包”仍保持只点击右侧状态文字弹窗。
+- 图标大小弹窗：
+  - 使用 `SeekBar` 支持 50% - 150% 连续调节。
+  - 弹窗内实时显示当前百分比，按 `liying2008/SmartisanDialog` 的标准弹窗比例整理为 53dp 标题栏、内容区和 47dp 底部按钮区。
+  - 预览区不再使用具体图标，改为“小 / 中 / 大”三个文字，文字字号对应三档大小。
+  - 点击“小 / 中 / 大”所在等宽区域会立即把滑块跳到 50% / 100% / 150%，百分比同步刷新。
+  - 进度条、滑块和“确定”使用蓝色强调；“取消”保持灰色；底部按钮背景不会遮住弹窗圆角，上下四角保持一致圆角。
+  - 点击确定后写入 `launcher_icon_size` 本地 prefs；`Settings.Global` / `Settings.System` 只作为兼容兜底读取来源。
+- 桌面生效逻辑：
+  - 在 `Constants.initLayoutParams()` 中于 `initLayoutProperty()` 后应用图标大小比例。
+  - 通过 `LauncherSettingBridge.readIconSizePercent(Context)` 读取并规范化百分比，读取顺序与设置页保持一致：本地 prefs 优先，系统 Settings 兜底。
+  - 缩放 `LayoutProperty` 的 `icon_size_origin`、`icon_size_with_shadow`、`icon_size_origin_resize` 和 `name_off_set_y`。
+  - 覆盖 `layoutPropertyMap` 中所有桌面布局 mode，确保当前 12 宫格、20 宫格以及内部映射 mode 都能命中。
+  - 保存后发 HOME intent 回到桌面，再重启当前 Launcher 进程；这是参考 maintained 后确认的可靠路径，因为 `Constants` 只在 Launcher 启动时完整初始化，运行时只刷新 `LayoutProperty` 会出现只有“桌面设置”等特殊节点变大/变小、普通应用图标不更新的问题。
+
+验证：
+
+- `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 进入“桌面设置 -> 应用图标”确认新增行显示在“改进版图标”和“图标包”之间，弹窗可正常打开。
+- 通过 UI 从 100% 调到 50%，确认后自动回桌面并重启，截图确认 12 宫格所有图标统一缩小。
+- 再通过 UI 从 50% 调到 150%，确认后自动回桌面并重启，截图确认相机、图库、设置、浏览器、文件、游戏中心、应用分身、Google、Root Explorer 和“桌面设置”全部统一放大。
+- 重新安装后打开图标大小弹窗，确认点击“小”直接跳到 50%，点击“大”直接跳到 150%，弹窗底部圆角和顶部圆角一致。
+
+maintained 对照结论：
+
+- `smartisan-launcher-maintained/res/layout/setting_main.xml` 中除当前已接入功能外，还有 `item_id_hide_navigation_bar`、`more_check_upgradation`、`setting_battery_optimization`、`setting_share`、`setting_user_experience`、`setting_about_us` 等入口。
+- maintained 文档 `docs/compatibility-fixes.md` 明确记录过“桌面隐藏虚拟键”应写入 `launcher_hide_navigation_bar`，并且只对 Launcher 主界面生效，不应影响设置、主题、搜索等界面。
+- 当前 original-port 中 `MaintainedLauncherSettingsHost.show(...)` 仍主动隐藏 `item_id_hide_navigation_bar`，检查更新、用户体验和电池优化仅是 Toast 占位，因此后续优先级建议为：桌面隐藏虚拟键 -> 检查更新 -> 电池优化 -> 更多区域的分享 / 用户体验 / 关于入口。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java`
+- `launcher/smali/com/smartisanos/launcher/data/Constants.smali`
 
 ### 2026-06-01：应用图标页交互、样式和刷新稳定性修复
 

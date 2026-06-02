@@ -8152,6 +8152,8 @@
     .line 49
     invoke-static {v2}, Lcom/smartisanos/launcher/data/Constants;->initLayoutProperty(Landroid/content/res/Resources;)V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/data/Constants;->applyLauncherIconSize(Landroid/content/Context;)V
+
     .line 50
     invoke-static {}, Lcom/smartisanos/launcher/data/Constants;->initPoints()V
 
@@ -8280,6 +8282,134 @@
     invoke-virtual {p0, v0}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     :cond_7
+    return-void
+.end method
+
+.method private static applyIconSizeToMode(IF)V
+    .locals 4
+
+    sget-object v0, Lcom/smartisanos/launcher/data/Constants;->layoutPropertyMap:Ljava/util/HashMap;
+
+    invoke-static {p0}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+
+    move-result-object p0
+
+    invoke-virtual {v0, p0}, Ljava/util/HashMap;->get(Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object p0
+
+    check-cast p0, Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/data/Constants;->applyIconSizeToProperty(Lcom/smartisanos/launcher/data/LayoutProperty;F)V
+
+    return-void
+.end method
+
+.method private static applyIconSizeToProperty(Lcom/smartisanos/launcher/data/LayoutProperty;F)V
+    .locals 4
+
+    if-nez p0, :cond_0
+
+    return-void
+
+    :cond_0
+    iget v0, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->icon_size_origin:F
+
+    move v1, v0
+
+    mul-float/2addr v1, p1
+
+    iput v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->icon_size_origin:F
+
+    iget v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->icon_size_with_shadow:F
+
+    mul-float/2addr v1, p1
+
+    iput v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->icon_size_with_shadow:F
+
+    iget v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->icon_size_origin_resize:F
+
+    mul-float/2addr v1, p1
+
+    iput v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->icon_size_origin_resize:F
+
+    iget v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->name_off_set_y:I
+
+    int-to-float v1, v1
+
+    const/high16 v2, 0x3f800000    # 1.0f
+
+    add-float/2addr v2, p1
+
+    const/high16 v3, 0x3f000000    # 0.5f
+
+    mul-float/2addr v2, v3
+
+    mul-float/2addr v1, v2
+
+    invoke-static {v1}, Ljava/lang/Math;->round(F)I
+
+    move-result v1
+
+    iput v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->name_off_set_y:I
+
+    return-void
+.end method
+
+.method private static applyLauncherIconSize(Landroid/content/Context;)V
+    .locals 5
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readIconSizePercent(Landroid/content/Context;)I
+
+    move-result p0
+
+    const/16 v0, 0x64
+
+    if-ne p0, v0, :cond_0
+
+    return-void
+
+    :cond_0
+    int-to-float p0, p0
+
+    const/high16 v0, 0x42c80000    # 100.0f
+
+    div-float/2addr p0, v0
+
+    sget-object v0, Lcom/smartisanos/launcher/data/Constants;->layoutPropertyMap:Ljava/util/HashMap;
+
+    if-nez v0, :cond_1
+
+    return-void
+
+    :cond_1
+    invoke-virtual {v0}, Ljava/util/HashMap;->values()Ljava/util/Collection;
+
+    move-result-object v0
+
+    invoke-interface {v0}, Ljava/util/Collection;->iterator()Ljava/util/Iterator;
+
+    move-result-object v0
+
+    :goto_0
+    invoke-interface {v0}, Ljava/util/Iterator;->hasNext()Z
+
+    move-result v1
+
+    if-eqz v1, :cond_2
+
+    invoke-interface {v0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+
+    move-result-object v1
+
+    check-cast v1, Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    invoke-static {v1, p0}, Lcom/smartisanos/launcher/data/Constants;->applyIconSizeToProperty(Lcom/smartisanos/launcher/data/LayoutProperty;F)V
+
+    goto :goto_0
+
+    :cond_2
+
     return-void
 .end method
 

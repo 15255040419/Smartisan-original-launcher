@@ -25,6 +25,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
@@ -50,6 +51,7 @@ import android.widget.ListView;
 import android.widget.RadioButton;
 import android.widget.RelativeLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -93,6 +95,11 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_WALLPAPER_READY = "launcher_wallpaper_ready";
     private static final String PREF_WALLPAPER_REFRESH_PENDING = "launcher_wallpaper_refresh_pending";
     private static final String PREF_IMPROVED_ICON_ENABLED = "launcher_improved_icon_enabled";
+    private static final String KEY_LAUNCHER_ICON_SIZE = "launcher_icon_size";
+    private static final String TAG_ICON_SIZE_SUBTITLE = "launcher_icon_size_subtitle";
+    private static final String PREF_ICON_SIZE_RUNTIME_DIRTY = "launcher_icon_size_runtime_dirty";
+    private static final String PREF_ICON_SIZE_RUNTIME_OLD = "launcher_icon_size_runtime_old";
+    private static final String PREF_ICON_SIZE_RUNTIME_NEW = "launcher_icon_size_runtime_new";
     private static final String KEY_DESKTOP_WALLPAPER_URI = "desktop_wallpaper_uri";
     private static final String KEY_LOCKSCREEN_BACKGROUND = "lockscreen_background";
     private static final String PREF_PENDING_CUSTOM_ICON_KEY = "pending_custom_icon_key";
@@ -1173,14 +1180,44 @@ public final class MaintainedLauncherSettingsHost {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         content.addView(iconPageHeader(activity, context, resources));
-        AppIconAdapter adapter = new AppIconAdapter(activity, context, resources);
-        int count = adapter.getCount();
-        for (int i = 0; i < count; i++) {
-            content.addView(adapter.getView(i, null, content));
-        }
-        content.addView(iconPageFooter(activity, context, resources));
+        final TextView loading = text(context, "正在加载应用图标...", 16, 0xff9d9fa6, false);
+        loading.setGravity(Gravity.CENTER);
+        content.addView(loading, new LinearLayout.LayoutParams(-1, dp(context, 88)));
         scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
         parent.addView(scroll, index, listLp);
+        final Activity targetActivity = activity;
+        final SettingsResourceContext targetContext = context;
+        final Resources targetResources = resources;
+        final LinearLayout targetContent = content;
+        final ScrollView targetScroll = scroll;
+        final int restoreY = sRestoreIconPageScrollY;
+        new Thread(new Runnable() {
+            public void run() {
+                final List<RedirectIconInfo> entries = AppIconAdapter.loadEntries(targetActivity);
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    public void run() {
+                        try {
+                            AppIconAdapter adapter = new AppIconAdapter(targetActivity, targetContext, targetResources, entries);
+                            targetContent.removeView(loading);
+                            int count = adapter.getCount();
+                            for (int i = 0; i < count; i++) {
+                                targetContent.addView(adapter.getView(i, null, targetContent));
+                            }
+                            targetContent.addView(iconPageFooter(targetActivity, targetContext, targetResources));
+                            if (restoreY > 0) {
+                                targetScroll.post(new Runnable() {
+                                    public void run() {
+                                        targetScroll.scrollTo(0, restoreY);
+                                    }
+                                });
+                            }
+                        } catch (Throwable ignored) {
+                            loading.setText("应用图标加载失败");
+                        }
+                    }
+                });
+            }
+        }, "smartisan-icon-list-loader").start();
     }
 
     private static void bindBackTitle(final Activity activity, Resources resources, View root, String idName, String titleText) {
@@ -3444,7 +3481,7 @@ public final class MaintainedLauncherSettingsHost {
     private static View iconPageHeader(final Activity activity, SettingsResourceContext context, Resources resources) {
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setLayoutParams(new AbsListView.LayoutParams(-1, dp(context, 112)));
+        root.setLayoutParams(new AbsListView.LayoutParams(-1, dp(context, 168)));
 
         root.addView(iconHeaderRow(activity, context, resources, "改进版图标", null,
                 "selector_setting_sub_item_bg_top", new View.OnClickListener() {
@@ -3453,6 +3490,17 @@ public final class MaintainedLauncherSettingsHost {
             }
         }, true),
                 new LinearLayout.LayoutParams(-1, dp(context, 56)));
+
+        View.OnClickListener iconSizeClick = new View.OnClickListener() {
+            public void onClick(View v) {
+                showIconSizeDialog(activity);
+            }
+        };
+        View iconSizeRow = iconHeaderRow(activity, context, resources, "桌面图标大小", iconSizeSubtitle(activity),
+                "selector_setting_sub_item_bg_middle", iconSizeClick, false);
+        iconSizeRow.setClickable(true);
+        iconSizeRow.setOnClickListener(iconSizeClick);
+        root.addView(iconSizeRow, new LinearLayout.LayoutParams(-1, dp(context, 56)));
 
         root.addView(iconHeaderRow(activity, context, resources, "图标包", iconPackSubtitle(activity),
                 "selector_setting_sub_item_bg_bottom", new View.OnClickListener() {
@@ -3521,6 +3569,9 @@ public final class MaintainedLauncherSettingsHost {
             lp.addRule(RelativeLayout.CENTER_VERTICAL);
             lp.rightMargin = dp(context, 24);
             row.addView(subtitle, lp);
+            if ("桌面图标大小".equals(titleText)) {
+                subtitle.setTag(TAG_ICON_SIZE_SUBTITLE);
+            }
             if (click != null) {
                 subtitle.setClickable(true);
                 subtitle.setOnClickListener(click);
@@ -3530,6 +3581,531 @@ public final class MaintainedLauncherSettingsHost {
             row.setOnClickListener(click);
         }
         return row;
+    }
+
+    private static String iconSizeSubtitle(Context context) {
+        return normalizeIconSizePercent(readIconSizePercent(context)) + "%";
+    }
+
+    private static int readIconSizePercent(Context context) {
+        int percent = 100;
+        try {
+            SharedPreferences prefs = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE);
+            if (prefs.contains(KEY_LAUNCHER_ICON_SIZE)) {
+                percent = prefs.getInt(KEY_LAUNCHER_ICON_SIZE, 100);
+            } else {
+                SharedPreferences launcherPrefs =
+                        context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE);
+                if (launcherPrefs.contains(KEY_LAUNCHER_ICON_SIZE)) {
+                    percent = launcherPrefs.getInt(KEY_LAUNCHER_ICON_SIZE, 100);
+                } else {
+                    try {
+                        percent = Settings.Global.getInt(context.getContentResolver(), KEY_LAUNCHER_ICON_SIZE, 100);
+                    } catch (Throwable ignored) {
+                        percent = Settings.System.getInt(context.getContentResolver(), KEY_LAUNCHER_ICON_SIZE, 100);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return normalizeIconSizePercent(percent);
+    }
+
+    private static int normalizeIconSizePercent(int percent) {
+        if (percent == 0) {
+            return 100;
+        }
+        if (percent == 1) {
+            return 110;
+        }
+        if (percent == 2) {
+            return 120;
+        }
+        if (percent < 50) {
+            return 50;
+        }
+        if (percent > 150) {
+            return 150;
+        }
+        return percent;
+    }
+
+    private static void showIconSizeDialog(final Activity activity) {
+        final int current = normalizeIconSizePercent(readIconSizePercent(activity));
+        final Dialog dialog = new Dialog(activity);
+        LinearLayout root = new LinearLayout(activity);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(0, 0, 0, 0);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xfff5f5f5);
+        background.setCornerRadius(dp(activity, 5));
+        background.setStroke(1, 0xffd0d0d0);
+        root.setBackgroundDrawable(background);
+
+        TextView title = new TextView(activity);
+        title.setGravity(Gravity.CENTER);
+        title.setSingleLine(true);
+        title.setText("桌面图标大小");
+        title.setTextColor(0xff5c5c5c);
+        title.setTextSize(18);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER_HORIZONTAL);
+        content.setBackgroundColor(0xfffafafa);
+        content.setPadding(dp(activity, 16), dp(activity, 16), dp(activity, 16), dp(activity, 18));
+
+        final TextView percentText = new TextView(activity);
+        percentText.setGravity(Gravity.CENTER);
+        percentText.setTextColor(0xff454a5c);
+        percentText.setTextSize(25);
+        percentText.setText(current + "%");
+        LinearLayout.LayoutParams percentLp = new LinearLayout.LayoutParams(-1, dp(activity, 36));
+        content.addView(percentText, percentLp);
+
+        LinearLayout previewPanel = new LinearLayout(activity);
+        previewPanel.setOrientation(LinearLayout.VERTICAL);
+        previewPanel.setPadding(dp(activity, 10), dp(activity, 10), dp(activity, 10), dp(activity, 8));
+        GradientDrawable previewBg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xffffffff, 0xfff3f3f3});
+        previewBg.setCornerRadius(dp(activity, 4));
+        previewBg.setStroke(1, 0xffdddddd);
+        previewPanel.setBackgroundDrawable(previewBg);
+        LinearLayout.LayoutParams previewPanelLp = new LinearLayout.LayoutParams(-1, -2);
+        previewPanelLp.topMargin = dp(activity, 10);
+        content.addView(previewPanel, previewPanelLp);
+
+        LinearLayout preview = new LinearLayout(activity);
+        preview.setGravity(Gravity.CENTER);
+        preview.setOrientation(LinearLayout.HORIZONTAL);
+        final TextView smallPreview = iconSizePreviewText(activity, "小", 16);
+        final TextView standardPreview = iconSizePreviewText(activity, "中", 24);
+        final TextView largePreview = iconSizePreviewText(activity, "大", 32);
+        preview.addView(smallPreview, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
+        preview.addView(standardPreview, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
+        preview.addView(largePreview, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
+        previewPanel.addView(preview, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+
+        final SeekBar seekBar = new SeekBar(activity);
+        seekBar.setMax(100);
+        seekBar.setProgress(current - 50);
+        seekBar.setProgressDrawable(iconSizeSeekBarProgress(activity));
+        seekBar.setThumb(iconSizeSeekBarThumb(activity));
+        LinearLayout.LayoutParams seekLp = new LinearLayout.LayoutParams(-1, dp(activity, 34));
+        seekLp.leftMargin = dp(activity, 4);
+        seekLp.rightMargin = dp(activity, 4);
+        previewPanel.addView(seekBar, seekLp);
+
+        LinearLayout labels = new LinearLayout(activity);
+        labels.setOrientation(LinearLayout.HORIZONTAL);
+        labels.setGravity(Gravity.CENTER_VERTICAL);
+        TextView small = iconSizeLabel(activity, "50%");
+        TextView standard = iconSizeLabel(activity, "100%");
+        TextView large = iconSizeLabel(activity, "150%");
+        labels.setPadding(dp(activity, 2), 0, dp(activity, 2), 0);
+        labels.addView(small, new LinearLayout.LayoutParams(0, dp(activity, 23), 1));
+        labels.addView(standard, new LinearLayout.LayoutParams(0, dp(activity, 23), 1));
+        labels.addView(large, new LinearLayout.LayoutParams(0, dp(activity, 23), 1));
+        previewPanel.addView(labels, new LinearLayout.LayoutParams(-1, dp(activity, 24)));
+        root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+        LinearLayout buttons = new LinearLayout(activity);
+        buttons.setGravity(Gravity.CENTER);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        TextView cancel = smartisanDialogActionButton(activity, "取消", false, -1);
+        TextView ok = smartisanDialogActionButton(activity, "确定", true, 1);
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 47), 1));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 47)));
+        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 47), 1));
+        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
+
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                percentText.setText((progress + 50) + "%");
+            }
+
+            public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            public void onStopTrackingTouch(SeekBar bar) {
+            }
+        });
+        smallPreview.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                seekBar.setProgress(0);
+                percentText.setText("50%");
+            }
+        });
+        standardPreview.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                seekBar.setProgress(50);
+                percentText.setText("100%");
+            }
+        });
+        largePreview.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                seekBar.setProgress(100);
+                percentText.setText("150%");
+            }
+        });
+
+        cancel.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+        ok.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                int percent = normalizeIconSizePercent(seekBar.getProgress() + 50);
+                if (percent != current) {
+                    saveIconSizePercent(activity, current, percent);
+                }
+                dialog.dismiss();
+            }
+        });
+
+        dialog.setContentView(root);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        }
+        dialog.show();
+        window = dialog.getWindow();
+        if (window != null) {
+            WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
+            lp.copyFrom(window.getAttributes());
+            lp.width = activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 116);
+            lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            window.setAttributes(lp);
+        }
+    }
+
+    private static TextView iconSizeLabel(Context context, String text) {
+        TextView label = new TextView(context);
+        label.setGravity(Gravity.CENTER);
+        label.setSingleLine(true);
+        label.setText(text);
+        label.setTextColor(0xff9d9fa6);
+        label.setTextSize(12);
+        return label;
+    }
+
+    private static TextView iconSizePreviewText(Context context, String text, int textSize) {
+        TextView view = new TextView(context);
+        view.setGravity(Gravity.CENTER);
+        view.setSingleLine(true);
+        view.setText(text);
+        view.setTextColor(0xff4d5a73);
+        view.setTextSize(textSize);
+        view.setTypeface(null, android.graphics.Typeface.BOLD);
+        return view;
+    }
+
+    private static View smartisanDivider(Context context) {
+        View view = new View(context);
+        view.setBackgroundColor(0xffdfdfdf);
+        return view;
+    }
+
+    private static TextView smartisanDialogActionButton(Context context, String text, boolean primary, int side) {
+        TextView button = new TextView(context);
+        button.setGravity(Gravity.CENTER);
+        button.setSingleLine(true);
+        button.setText(text);
+        button.setTextColor(primary ? 0xff5f8fe9 : 0xff5f6268);
+        button.setTextSize(14);
+        button.setTypeface(null, android.graphics.Typeface.NORMAL);
+        button.setBackgroundDrawable(smartisanButtonBackground(context, side));
+        return button;
+    }
+
+    private static Drawable smartisanButtonBackground(Context context, int side) {
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_pressed},
+                smartisanButtonShape(context, side, true));
+        states.addState(new int[]{}, smartisanButtonShape(context, side, false));
+        return states;
+    }
+
+    private static Drawable smartisanButtonShape(Context context, int side, boolean pressed) {
+        int[] colors = pressed
+                ? new int[]{0xffe8eefb, 0xffdfe8f8}
+                : new int[]{0xfff2f2f2, 0xffebebeb};
+        GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, colors);
+        float radius = dp(context, 5);
+        if (side < 0) {
+            drawable.setCornerRadii(new float[]{0, 0, 0, 0, 0, 0, radius, radius});
+        } else if (side > 0) {
+            drawable.setCornerRadii(new float[]{0, 0, 0, 0, radius, radius, 0, 0});
+        }
+        return drawable;
+    }
+
+    private static Drawable iconSizeSeekBarProgress(Context context) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xffc9c9c9);
+        background.setCornerRadius(dp(context, 2));
+        background.setSize(1, dp(context, 4));
+
+        GradientDrawable progress = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xff79a7f3, 0xff5f8fe9});
+        progress.setCornerRadius(dp(context, 2));
+        progress.setSize(1, dp(context, 4));
+
+        android.graphics.drawable.ClipDrawable clip =
+                new android.graphics.drawable.ClipDrawable(progress, Gravity.LEFT, android.graphics.drawable.ClipDrawable.HORIZONTAL);
+        android.graphics.drawable.LayerDrawable layer =
+                new android.graphics.drawable.LayerDrawable(new Drawable[]{background, clip});
+        layer.setId(0, android.R.id.background);
+        layer.setId(1, android.R.id.progress);
+        int inset = dp(context, 5);
+        layer.setLayerInset(0, inset, dp(context, 15), inset, dp(context, 15));
+        layer.setLayerInset(1, inset, dp(context, 15), inset, dp(context, 15));
+        return layer;
+    }
+
+    private static Drawable iconSizeSeekBarThumb(Context context) {
+        int size = dp(context, 24);
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        float cx = size / 2f;
+        float cy = size / 2f;
+        paint.setColor(0x26000000);
+        canvas.drawCircle(cx, cy + dp(context, 1), dp(context, 10), paint);
+        paint.setColor(0xffffffff);
+        canvas.drawCircle(cx, cy, dp(context, 10), paint);
+        paint.setColor(0xff5f8fe9);
+        canvas.drawCircle(cx, cy, dp(context, 7), paint);
+        paint.setColor(0x66ffffff);
+        canvas.drawCircle(cx - dp(context, 3), cy - dp(context, 4), dp(context, 2), paint);
+        return new android.graphics.drawable.BitmapDrawable(context.getResources(), bitmap);
+    }
+
+    private static TextView dialogButton(Context context, String text) {
+        TextView button = new TextView(context);
+        button.setGravity(Gravity.CENTER);
+        button.setSingleLine(true);
+        button.setText(text);
+        button.setTextColor(0xff9d4d45);
+        button.setTextSize(17);
+        return button;
+    }
+
+    private static void refreshIconSizeSubtitle(Activity activity, int percent) {
+        try {
+            refreshIconSizeSubtitleInTree(activity.getWindow().getDecorView(), percent);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static boolean refreshIconSizeSubtitleInTree(View view, int percent) {
+        if (view == null) {
+            return false;
+        }
+        Object tag = view.getTag();
+        if (TAG_ICON_SIZE_SUBTITLE.equals(tag) && view instanceof TextView) {
+            ((TextView) view).setText(normalizeIconSizePercent(percent) + "%");
+            return true;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                if (refreshIconSizeSubtitleInTree(group.getChildAt(i), percent)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void applyRuntimeIconSizePercent(int oldPercent, int newPercent) {
+        oldPercent = normalizeIconSizePercent(oldPercent);
+        newPercent = normalizeIconSizePercent(newPercent);
+        if (oldPercent <= 0 || oldPercent == newPercent) {
+            return;
+        }
+        float scale = ((float) newPercent) / ((float) oldPercent);
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            java.lang.reflect.Field mapField = constants.getDeclaredField("layoutPropertyMap");
+            mapField.setAccessible(true);
+            Object value = mapField.get(null);
+            if (!(value instanceof Map)) {
+                return;
+            }
+            Map map = (Map) value;
+            for (Object item : map.values()) {
+                scaleLayoutProperty(item, scale);
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
+                    .getMethod("getInstance").invoke(null);
+            if (mainView != null) {
+                mainView.getClass().getMethod("requestLayout").invoke(mainView);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void scaleLayoutProperty(Object property, float scale) {
+        if (property == null || scale <= 0f) {
+            return;
+        }
+        try {
+            scaleFloatField(property, "icon_size_origin", scale);
+            scaleFloatField(property, "icon_size_with_shadow", scale);
+            scaleFloatField(property, "icon_size_origin_resize", scale);
+            scaleIntField(property, "name_off_set_y", (1f + scale) * 0.5f);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void scaleFloatField(Object target, String name, float scale) {
+        try {
+            java.lang.reflect.Field field = target.getClass().getField(name);
+            field.setFloat(target, field.getFloat(target) * scale);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void scaleIntField(Object target, String name, float scale) {
+        try {
+            java.lang.reflect.Field field = target.getClass().getField(name);
+            field.setInt(target, Math.round(field.getInt(target) * scale));
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void saveIconSizePercent(Context context, int oldPercent, int percent) {
+        percent = normalizeIconSizePercent(percent);
+        try {
+            Settings.System.putInt(context.getContentResolver(), KEY_LAUNCHER_ICON_SIZE, percent);
+        } catch (Throwable ignored) {
+        }
+        try {
+            Settings.Global.putInt(context.getContentResolver(), KEY_LAUNCHER_ICON_SIZE, percent);
+        } catch (Throwable ignored) {
+        }
+        context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                .edit()
+                .putInt(KEY_LAUNCHER_ICON_SIZE, percent)
+                .commit();
+        try {
+            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt(KEY_LAUNCHER_ICON_SIZE, percent)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        notifyOriginalConfigChanged(KEY_LAUNCHER_ICON_SIZE);
+        if (context instanceof Activity) {
+            refreshIconSizeSubtitle((Activity) context, percent);
+            restartLauncherForIconSizeChange((Activity) context);
+        }
+    }
+
+    private static void restartLauncherForIconSizeChange(Activity activity) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_HOME);
+            intent.setPackage("com.smartisanos.launcher");
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            activity.startActivity(intent);
+        } catch (Throwable ignored) {
+        }
+        try {
+            activity.finish();
+        } catch (Throwable ignored) {
+        }
+        try {
+            android.os.Process.killProcess(android.os.Process.myPid());
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void markPendingIconSizeRuntimeChange(Context context, int oldPercent, int percent) {
+        try {
+            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_ICON_SIZE_RUNTIME_DIRTY, oldPercent != percent)
+                    .putInt(PREF_ICON_SIZE_RUNTIME_OLD, normalizeIconSizePercent(oldPercent))
+                    .putInt(PREF_ICON_SIZE_RUNTIME_NEW, normalizeIconSizePercent(percent))
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public static void clearPendingIconSizeRuntimeChange(Context context) {
+        try {
+            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_ICON_SIZE_RUNTIME_DIRTY, false)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public static void maybeApplyLauncherIconSize(Context context) {
+        try {
+            android.content.SharedPreferences prefs =
+                    context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE);
+            if (!prefs.getBoolean(PREF_ICON_SIZE_RUNTIME_DIRTY, false)) {
+                return;
+            }
+            int oldPercent = normalizeIconSizePercent(prefs.getInt(
+                    PREF_ICON_SIZE_RUNTIME_OLD, 100));
+            int newPercent = normalizeIconSizePercent(prefs.getInt(
+                    PREF_ICON_SIZE_RUNTIME_NEW, readIconSizePercent(context)));
+            prefs.edit().putBoolean(PREF_ICON_SIZE_RUNTIME_DIRTY, false).commit();
+            if (oldPercent == newPercent) {
+                return;
+            }
+            applyRuntimeIconSizePercent(oldPercent, newPercent);
+            applyIconChange(context);
+            rebuildLauncherLayoutForIconSize();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void rebuildLauncherLayoutForIconSize() {
+        try {
+            Object launcher = Class.forName("com.smartisanos.launcher.J")
+                    .getMethod("getInstance").invoke(null);
+            if (launcher != null) {
+                launcher.getClass().getMethod("onConfigurationChanged").invoke(launcher);
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
+                    .getMethod("getInstance").invoke(null);
+            if (mainView != null) {
+                try {
+                    mainView.getClass().getMethod("ph").invoke(mainView);
+                } catch (Throwable ignored) {
+                }
+                try {
+                    mainView.getClass().getMethod("update").invoke(mainView);
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            Object renderer = Class.forName("com.smartisanos.smengine.Ra")
+                    .getMethod("getInstance").invoke(null);
+            if (renderer != null) {
+                renderer.getClass().getMethod("wt").invoke(renderer);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void setBackground(View view, Resources resources, String drawableName) {
@@ -4425,16 +5001,37 @@ public final class MaintainedLauncherSettingsHost {
             this.resources = resources;
             this.inflater = LayoutInflater.from(activity).cloneInContext(context);
             this.iconManager = new IconManager(activity);
+            this.apps.addAll(loadEntries(activity, this.iconManager));
+        }
+
+        AppIconAdapter(Activity activity, SettingsResourceContext context, Resources resources,
+                       List<RedirectIconInfo> entries) {
+            this.activity = activity;
+            this.context = context;
+            this.resources = resources;
+            this.inflater = LayoutInflater.from(activity).cloneInContext(context);
+            this.iconManager = new IconManager(activity);
+            if (entries != null) {
+                this.apps.addAll(entries);
+            }
+        }
+
+        static List<RedirectIconInfo> loadEntries(Activity activity) {
+            return loadEntries(activity, new IconManager(activity));
+        }
+
+        private static List<RedirectIconInfo> loadEntries(Activity activity, final IconManager iconManager) {
+            final ArrayList<RedirectIconInfo> result = new ArrayList<RedirectIconInfo>();
             try {
                 List<RedirectIconInfo> resolved = iconManager.getIconRedirectedApplications();
                 for (int i = 0; i < resolved.size(); i++) {
                     RedirectIconInfo info = resolved.get(i);
                     ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
                     if (shouldShowIconEntry(resolveInfo)) {
-                        apps.add(info);
+                        result.add(info);
                     }
                 }
-                Collections.sort(apps, new Comparator<RedirectIconInfo>() {
+                Collections.sort(result, new Comparator<RedirectIconInfo>() {
                     public int compare(RedirectIconInfo a, RedirectIconInfo b) {
                         String la = a == null ? "" : iconManager.getLableForPackage(a.packageName, a.componentName);
                         String lb = b == null ? "" : iconManager.getLableForPackage(b.packageName, b.componentName);
@@ -4443,6 +5040,7 @@ public final class MaintainedLauncherSettingsHost {
                 });
             } catch (Throwable ignored) {
             }
+            return result;
         }
 
         public int getCount() {

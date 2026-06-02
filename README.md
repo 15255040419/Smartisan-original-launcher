@@ -47,9 +47,9 @@ adb install -r build\launcher-signed.apk
 build\launcher-signed.apk
 ```
 
-桌面主体、桌面设置入口、12 / 20 宫格、主题页、壁纸入口、翻页动画页、应用图标页和三个设置开关都已经接入。设置页当前由 `com.smartisanos.launcher.theme.ThemeChooserActivity` 承载，内部加载 maintained 风格资源和当前工程的兼容逻辑。
+桌面主体、桌面设置入口、12 / 20 宫格、主题页、壁纸入口、翻页动画页、应用图标页、桌面图标大小滑块和三个设置开关都已经接入。设置页当前由 `com.smartisanos.launcher.theme.ThemeChooserActivity` 承载，内部加载 maintained 风格资源和当前工程的兼容逻辑。
 
-最近状态：2026-05-31 修正设置页任务栈、首次主题动画和透明主题壁纸链路；2026-06-01 重点修复应用图标页，顶部开关复用首页同款 `SettingItemSwitch` / `SwitchEx`，图标包行和开关行组成同一组，单应用图标选择与相册返回改为当前行刷新并保持滚动位置。详细过程见 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) 顶部“每日修复记录（倒序）”。
+最近状态：2026-06-01 重点修复应用图标页，顶部开关复用首页同款 `SettingItemSwitch` / `SwitchEx`，图标包行和开关行组成同一组，单应用图标选择与相册返回改为当前行刷新并保持滚动位置；2026-06-02 新增桌面图标大小滑块，支持 50% - 150% 调节，弹窗已按 SmartisanDialog 风格整理为标题栏、内容区、底部按钮区三段式布局，并支持点击“小 / 中 / 大”快速跳到 50% / 100% / 150%。详细过程见 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) 顶部“每日修复记录（倒序）”。
 
 ## 功能进度
 
@@ -60,13 +60,14 @@ build\launcher-signed.apk
 | 主题 | 已接入，继续回归 | 本地 / 在线主题、详情页、下载按钮、设定流程、经典黑资源修复已接入；首次切换主题的翻页过渡动画已通过冷启动队列和桌面就绪触发修复，仍建议多主题回归。 |
 | 壁纸 | 已接入，继续回归 | 系统图片选择、`launcher_wallpaper_uri`、私有壁纸副本、缩略图、gaussian 兜底和恢复默认已接入；毛玻璃 / 白雾使用自定义壁纸，普通主题不透出用户壁纸。 |
 | 翻页动画 | 已接入 | 支持默认、立体翻转、百叶窗、切牌等 maintained 常见动画值，并保存兼容配置。 |
-| 应用图标 | 已接入 | 支持系统原图、图标包 appfilter、redirect、自定义图片和桌面主图标加载链路。 |
+| 应用图标 | 已接入 | 支持系统原图、图标包 appfilter、redirect、自定义图片、桌面图标大小调节和桌面主图标加载链路。 |
 | 设置开关 | 已接入 | 隐藏图标名称、解锁动画、多板块视图快速启用应用已接入读取、写入和即时刷新；应用图标页的改进版图标开关已复用同款控件。 |
 
 ## 重点修复记录
 
 - 修正桌面主图标加载入口，图标不只在设置页预览里变化，也会进入桌面图标加载链路。
 - 应用图标页顶部全局项已对齐 maintained 样式：改进版图标使用首页同款开关，图标包默认显示“不使用图标包”，点击可选择自动选择、不使用或已安装图标包。
+- 应用图标页新增“桌面图标大小”行，位于改进版图标和图标包之间；支持 50% - 150% 滑块调节，弹窗内“小 / 中 / 大”可快速跳转三档，保存后回桌面并重启 Launcher，确保 12 / 20 宫格所有图标统一应用新尺寸。
 - 应用图标页单应用图标选择改为行级刷新：点击左侧默认图标、右侧推荐/加号图标、自定义相册图标后保持当前位置，不再整页刷新回顶部。
 - 主设置页入口缩略图继续对齐 maintained 风格：桌面主题 / 桌面壁纸 / 桌面翻页动画使用统一竖向预览图，应用图标不再额外加白色外框。
 - 12 / 20 宫格预览图已替换为当前工程专用资源，不再沿用 maintained 的旧 9 / 16 宫格含义。
@@ -82,6 +83,7 @@ build\launcher-signed.apk
 - 白雾主题显示异常还没有最终确认修复。
 - 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
 - 设置页宿主仍复用 `ThemeChooserActivity`，还不是完整移植的原生 Smartisan `Settings` Activity。
+- 对照 `smartisan-launcher-maintained`，桌面设置主页面仍缺少或仅占位的功能包括：桌面隐藏虚拟键、检查更新、关闭电池优化、分享此应用给朋友、用户体验改进计划、关于我们 / 问题反馈 / 关注我们等“更多”区域入口。其中“桌面隐藏虚拟键”属于桌面体验相关功能，优先级最高。
 - 在线主题 APK 通过系统 `DownloadManager` 下载，普通应用不能静默安装，下载完成后仍需要用户手动安装主题包。
 - 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画在更多分辨率和真机上仍需要继续回归。
 
@@ -106,6 +108,7 @@ adb shell dumpsys activity activities
 | --- | --- |
 | 设置页宿主与功能迁移 | `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java` |
 | 设置桥接 | `launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java` |
+| 桌面布局尺寸参数 | `launcher/smali/com/smartisanos/launcher/data/Constants.smali` |
 | maintained 风格资源 | `launcher/tools/maintained_settings_res/` |
 | 设置页原生素材 | `launcher/assets/settings_native/` |
 | 图标包扫描 | `launcher/tools/java/com/smartisanos/home/settings/icons/IconPackManager.java` |
