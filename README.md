@@ -83,7 +83,17 @@ build\launcher-signed.apk
 - 白雾主题显示异常还没有最终确认修复。
 - 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
 - 设置页宿主仍复用 `ThemeChooserActivity`，还不是完整移植的原生 Smartisan `Settings` Activity。
-- 对照 `smartisan-launcher-maintained`，桌面设置主页面仍缺少或仅占位的功能包括：桌面隐藏虚拟键、检查更新、关闭电池优化、分享此应用给朋友、用户体验改进计划、关于我们 / 问题反馈 / 关注我们等“更多”区域入口。其中“桌面隐藏虚拟键”属于桌面体验相关功能，优先级最高。
+- 对照 `smartisan-launcher-maintained`，桌面设置和桌面能力仍需按下面优先级继续移植；“分享此应用给朋友”和“用户体验改进计划”不再作为移植目标。
+  1. 桌面隐藏虚拟键：优先级最高，key 为 `launcher_hide_navigation_bar`，需要限制只对 Launcher 主界面生效。
+  2. 检查更新：当前仍是占位 / Toast，需要决定接 maintained 逻辑还是做本项目版本提示。
+  3. 关闭电池优化：当前仍是占位 / Toast，需要接系统电池优化设置或做兼容兜底。
+  4. 关于我们：当前更多区域还未完整接入，可优先做本项目版本、仓库和构建信息。
+  5. 紧贴屏幕横扫清除角标：key 为 `launcher_badge_swipe_clean`，当前有旧代码痕迹但 maintained 风格设置页未接入。
+  6. 隐藏图标上的角标：key 为 `launcher_hide_badge`，当前有旧代码痕迹但 maintained 风格设置页未接入。
+  7. 下滑 / 上滑搜索：当前保留 `StartActivityForSearch`、`SearchProvider`、搜索动画和 quicksearch 入口痕迹，但默认搜索引擎设置项被隐藏，手势触发、权限和分身结果兼容还没完整回归。
+  8. 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议按 maintained 的方向优先拉起系统 / 已安装天气应用。
+  9. 日历：当前保留日历权限和动态图标资源线索，但桌面日期刷新、点击入口和系统日历兼容还未单独回归。
+- 提醒角标底层存在 `launcher_hide_badge`、`launcher_badge_swipe_clean` 和 badge 读取 / 刷新痕迹，若应用或系统提供旧 Smartisan / 厂商未读数广播则有机会显示；普通 Android 通知角标仍需要额外通知监听或 badge 兼容桥，当前不能保证所有应用通知都会显示桌面角标。
 - 在线主题 APK 通过系统 `DownloadManager` 下载，普通应用不能静默安装，下载完成后仍需要用户手动安装主题包。
 - 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画在更多分辨率和真机上仍需要继续回归。
 

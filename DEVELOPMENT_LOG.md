@@ -33,7 +33,17 @@
 - 白雾主题显示异常仍未最终确认修复。
 - 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
 - 原生 Smartisan Settings Activity / Fragment 还没有完整迁移，当前仍由 launcher 包内 `ThemeChooserActivity` 承载 maintained 风格兼容页。
-- 对照 `E:\FANG\smartisan\smartisan-launcher-maintained`，当前桌面设置仍缺少或只做占位的 maintained 功能：桌面隐藏虚拟键、检查更新、关闭电池优化、分享此应用给朋友、用户体验改进计划、关于我们 / 问题反馈 / 关注我们等“更多”区域入口。桌面隐藏虚拟键写入 key 为 `launcher_hide_navigation_bar`，应优先移植并限制只对 Launcher 主界面生效。
+- 对照 `E:\FANG\smartisan\smartisan-launcher-maintained`，当前桌面设置和桌面能力仍需按优先级继续移植；“分享此应用给朋友”和“用户体验改进计划”不再作为移植目标。
+  1. 桌面隐藏虚拟键：优先级最高，key 为 `launcher_hide_navigation_bar`，需要限制只对 Launcher 主界面生效。
+  2. 检查更新：当前仍是占位 / Toast，需要决定接 maintained 逻辑还是做本项目版本提示。
+  3. 关闭电池优化：当前仍是占位 / Toast，需要接系统电池优化设置或做兼容兜底。
+  4. 关于我们：当前更多区域还未完整接入，可优先做本项目版本、仓库和构建信息。
+  5. 紧贴屏幕横扫清除角标：key 为 `launcher_badge_swipe_clean`，当前有旧代码痕迹但 maintained 风格设置页未接入。
+  6. 隐藏图标上的角标：key 为 `launcher_hide_badge`，当前有旧代码痕迹但 maintained 风格设置页未接入。
+  7. 下滑 / 上滑搜索：当前保留搜索 Activity / Provider / 动画和 quicksearch 入口痕迹，但手势触发、权限和结果兼容还没完整回归。
+  8. 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议按 maintained 的方向优先拉起系统 / 已安装天气应用。
+  9. 日历：当前保留日历权限和动态图标资源线索，但桌面日期刷新、点击入口和系统日历兼容还未单独回归。
+- 提醒角标可以作为后续功能实现目标，但不能简单等同于“应用有通知就一定显示”。当前 old Smartisan / 厂商未读数广播或系统 badge 数据能接入时才有机会显示；普通 Android 通知角标需要额外接入通知监听或 badge 兼容桥。
 - 在线主题 APK 下载后仍依赖用户手动安装，普通应用没有静默安装能力。
 - 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画仍需要更多分辨率和真机回归。
 
@@ -88,7 +98,12 @@ maintained 对照结论：
 
 - `smartisan-launcher-maintained/res/layout/setting_main.xml` 中除当前已接入功能外，还有 `item_id_hide_navigation_bar`、`more_check_upgradation`、`setting_battery_optimization`、`setting_share`、`setting_user_experience`、`setting_about_us` 等入口。
 - maintained 文档 `docs/compatibility-fixes.md` 明确记录过“桌面隐藏虚拟键”应写入 `launcher_hide_navigation_bar`，并且只对 Launcher 主界面生效，不应影响设置、主题、搜索等界面。
-- 当前 original-port 中 `MaintainedLauncherSettingsHost.show(...)` 仍主动隐藏 `item_id_hide_navigation_bar`，检查更新、用户体验和电池优化仅是 Toast 占位，因此后续优先级建议为：桌面隐藏虚拟键 -> 检查更新 -> 电池优化 -> 更多区域的分享 / 用户体验 / 关于入口。
+- 当前 original-port 中 `MaintainedLauncherSettingsHost.show(...)` 仍主动隐藏 `item_id_hide_navigation_bar`，检查更新和电池优化仅是 Toast 占位；“分享此应用给朋友”和“用户体验改进计划”已明确不需要移植。
+- 强迫症相关除“隐藏桌面图标名称”外，旧原生 / 临时页面还记录过“隐藏图标上的角标”和“紧贴屏幕横扫清除角标”，当前 maintained 风格主页面未接入这两个开关；后续优先级建议为：桌面隐藏虚拟键 -> 隐藏图标角标 -> 横扫清除角标 -> 检查更新 -> 电池优化 / 关于入口。
+- 下滑 / 上滑搜索：当前工程保留 `StartActivityForSearch`、`SearchProvider`、`LauncherCallProvider.method_system_show_search`、`method_start_swipe_anim`、`fling_down_open_search_anim` 和 quicksearch 入口痕迹；maintained 记录过搜索权限、搜索结果和分身应用结果兼容修复。当前设置宿主仍隐藏默认搜索引擎设置项，后续需要先确认桌面手势触发链路，再补权限、搜索入口和结果适配。
+- 天气：当前工程保留天气权限、天气资源、旧 Smartisan 天气库和旧天气接口痕迹；maintained 的兼容方向是不要依赖旧天气接口，天气图标优先作为入口拉起系统 / 已安装天气应用。后续建议按这个方向做，避免旧接口失效导致桌面入口不可用。
+- 日历：当前工程保留日历权限、日历名称和动态图标资源线索；后续要单独验证桌面日历图标是否能跟随日期刷新、点击是否能拉起系统 / 已安装日历应用，并处理没有日历应用时的兜底。
+- 提醒角标：当前工程已有 `launcher_hide_badge`、`launcher_badge_swipe_clean`、badge 读取 / 刷新和滑动清除痕迹；maintained 文档记录过多厂商 unread broadcast 兼容。后续要分两层做：先恢复旧 Smartisan / 厂商未读数广播显示，再评估是否接入现代 Android 通知监听或 badge 兼容桥，让普通应用通知也能稳定转成桌面角标。
 
 涉及文件：
 
