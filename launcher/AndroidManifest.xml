@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="15" android:versionName="v1.4.1" package="com.smartisanos.launcher">
-  <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="29" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="16" android:versionName="v1.4.2" package="com.smartisanos.launcher">
+  <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
   <uses-feature android:glEsVersion="0x00020000" />
   <permission android:name="com.smartisanos.launcher.READ_DATABASE" android:protectionLevel="signature" />
   <permission android:name="com.smartisanos.launcher.WRITE_DATABASE" android:protectionLevel="signature" />

@@ -597,64 +597,11 @@
 .end method
 
 .method public static getResolution()Ljava/lang/String;
-    .locals 3
-
-    .line 1
-    sget v0, Lcom/smartisanos/launcher/data/Constants;->density_mode:I
-
-    const/4 v1, 0x1
-
-    if-ne v0, v1, :cond_0
-
-    const-string v0, "720p"
-
-    return-object v0
-
-    :cond_0
-    const/4 v1, 0x2
-
-    if-ne v0, v1, :cond_1
+    .locals 1
 
     const-string v0, "1080p"
 
     return-object v0
-
-    :cond_1
-    const/4 v1, 0x3
-
-    if-ne v0, v1, :cond_2
-
-    const-string v0, "1440p"
-
-    return-object v0
-
-    .line 2
-    :cond_2
-    new-instance v0, Ljava/lang/IllegalArgumentException;
-
-    new-instance v1, Ljava/lang/StringBuilder;
-
-    invoke-direct {v1}, Ljava/lang/StringBuilder;-><init>()V
-
-    const-string v2, "unknown density mode ["
-
-    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    sget v2, Lcom/smartisanos/launcher/data/Constants;->density_mode:I
-
-    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
-
-    const-string v2, "] !!!"
-
-    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
-
-    move-result-object v1
-
-    invoke-direct {v0, v1}, Ljava/lang/IllegalArgumentException;-><init>(Ljava/lang/String;)V
-
-    throw v0
 .end method
 
 .method public static path(Ljava/lang/String;)Ljava/lang/String;

@@ -49,7 +49,15 @@ build\launcher-signed.apk
 
 桌面主体、桌面设置入口、12 / 20 宫格、主题页、壁纸入口、翻页动画页、应用图标页、桌面图标大小滑块和三个设置开关都已经接入。设置页当前由 `com.smartisanos.launcher.theme.ThemeChooserActivity` 承载，内部加载 maintained 风格资源和当前工程的兼容逻辑。
 
-最近状态：2026-06-01 重点修复应用图标页，顶部开关复用首页同款 `SettingItemSwitch` / `SwitchEx`，图标包行和开关行组成同一组，单应用图标选择与相册返回改为当前行刷新并保持滚动位置；2026-06-02 新增桌面图标大小滑块，并补齐隐藏虚拟键、角标开关、下滑 / 上滑搜索、检查更新、关闭电池优化和原版风格“关于我们”页面；2026-06-03 将版本调整为 `v1.4.1`，继续修复内置搜索页顶部横向应用列表和搜索结果行对齐。详细过程见 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) 顶部“每日修复记录（倒序）”。
+最近状态：2026-06-01 重点修复应用图标页，顶部开关复用首页同款 `SettingItemSwitch` / `SwitchEx`，图标包行和开关行组成同一组，单应用图标选择与相册返回改为当前行刷新并保持滚动位置；2026-06-02 新增桌面图标大小滑块，并补齐隐藏虚拟键、角标开关、下滑 / 上滑搜索、检查更新、关闭电池优化和原版风格“关于我们”页面；2026-06-03 发布 `v1.4.1` 搜索页修正版后，继续整理兼容安装、签名和包体瘦身，随后提升到 `v1.4.2`：最低系统版本降到 Android 6.0，纹理资源统一走 `1080p`，删除冗余 `720p` 纹理后 APK 降到约 64MB，并改用 apksigner 输出 v1/v2/v3 签名。详细过程见 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) 顶部“每日修复记录（倒序）”。
+
+当前兼容安装基线：
+
+```text
+minSdkVersion: 23
+targetSdkVersion: 28
+APK size: about 64 MB after first resource slimming pass
+```
 
 ## 功能进度
 
@@ -71,6 +79,9 @@ build\launcher-signed.apk
 - 应用图标页新增“桌面图标大小”行，位于改进版图标和图标包之间；支持 50% - 150% 滑块调节，弹窗内“小 / 中 / 大”可快速跳转三档，保存后回桌面并重启 Launcher，确保 12 / 20 宫格所有图标统一应用新尺寸。
 - 应用图标页单应用图标选择改为行级刷新：点击左侧默认图标、右侧推荐/加号图标、自定义相册图标后保持当前位置，不再整页刷新回顶部。
 - 内置搜索页去掉自绘 T9 键盘，点击搜索框调用系统输入法；顶部常用应用横向滑动展示，输入关键词后的搜索结果行固定高度并保持图标、文字垂直居中。
+- 对照 maintained 的安装兼容和资源结构，已把最终二进制 Manifest 的 `minSdkVersion` 从 29 降到 23、`targetSdkVersion` 调整为 28；`pb.getResolution()` 统一返回 `1080p`，删除 `assets/Textures/720p` 后 APK 从约 106MB 降到约 64MB。
+- 构建签名流程已从 `jarsigner` 旧 v1 签名改为 `zipalign -p` 后使用 `apksigner` 输出 v1/v2/v3 签名；这能改善 Android 12 等新系统通过文件管理器安装时直接报“安装失败”的问题。
+- 检查更新依赖 GitHub Release 的最新 tag 与当前安装版本对比；如果本机已经安装 `v1.4.1`，而 GitHub 最新 release 也是 `v1.4.1`，就会提示“当前已经是最新版本”。后续功能或兼容修复需要同步提升版本号并发布新 release，例如 `v1.4.2`。
 - 主设置页入口缩略图继续对齐 maintained 风格：桌面主题 / 桌面壁纸 / 桌面翻页动画使用统一竖向预览图，应用图标不再额外加白色外框。
 - 12 / 20 宫格预览图已替换为当前工程专用资源，不再沿用 maintained 的旧 9 / 16 宫格含义。
 - 主题切换流程已加入切换动画、主题快照和冷启动队列处理，修复第一次切换主题不显示翻页过渡动画的问题；主题设定后由桌面直接承接动画，避免设置页短暂闪回。
@@ -85,6 +96,7 @@ build\launcher-signed.apk
 - 白雾主题显示异常还没有最终确认修复。
 - 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
 - 设置页宿主仍复用 `ThemeChooserActivity`，还不是完整移植的原生 Smartisan `Settings` Activity。
+- 包体仍有继续压缩空间：`theme_preview` 约 16MB，`assets/Textures/1080p` 约 28MB，内嵌 `settings_maintained/maintained-settings-res.apk` 约 6.6MB；后续需要逐项替代或合并资源，不能直接删除。
 - 对照 `smartisan-launcher-maintained`，桌面设置和桌面能力仍需按下面优先级继续移植；“分享此应用给朋友”和“用户体验改进计划”不再作为移植目标。
   - [x] 桌面隐藏虚拟键：优先级最高，key 为 `launcher_hide_navigation_bar`，已接入首页开关并限制只由 Launcher 主界面应用系统 UI flags。
   - [x] 检查更新：已接入当前项目 GitHub Release 检测；存在 APK 资产时提示下载，普通应用更新仍需系统安装确认。

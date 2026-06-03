@@ -37,6 +37,7 @@ if "%BUILD_TOOLS%"=="" set "BUILD_TOOLS=%ANDROID_SDK%\build-tools\35.0.0"
 set "ZIPALIGN=%BUILD_TOOLS%\zipalign.exe"
 set "D8=%BUILD_TOOLS%\d8.bat"
 set "AAPT2=%BUILD_TOOLS%\aapt2.exe"
+set "APKSIGNER=%BUILD_TOOLS%\apksigner.bat"
 
 rem Dynamically detect the latest version of android.jar
 set "ANDROID_JAR="
@@ -134,28 +135,44 @@ if exist "%ROOT%launcher\tools\java" (
 
 echo [2/2] Signing APK...
 if exist "%OUT_DIR%\launcher-presigned.apk" del /f /q "%OUT_DIR%\launcher-presigned.apk"
+if exist "%OUT_DIR%\launcher-aligned.apk" del /f /q "%OUT_DIR%\launcher-aligned.apk"
 if exist "%OUT_DIR%\launcher-signed.apk" del /f /q "%OUT_DIR%\launcher-signed.apk"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Milliseconds 500"
-copy /y "%OUT_DIR%\launcher-unsigned.apk" "%OUT_DIR%\launcher-presigned.apk" >nul
-if errorlevel 1 (
-  echo FAIL: copy presigned APK failed.
-  exit /b 1
-)
-jarsigner -keystore "%KEYSTORE%" -storepass android -keypass android "%OUT_DIR%\launcher-presigned.apk" smartisan
-if errorlevel 1 (
-  echo FAIL: jarsigner failed.
-  exit /b 1
-)
 
 if exist "%ZIPALIGN%" (
-  if exist "%OUT_DIR%\launcher-signed.apk" del /f /q "%OUT_DIR%\launcher-signed.apk"
-  "%ZIPALIGN%" -f 4 "%OUT_DIR%\launcher-presigned.apk" "%OUT_DIR%\launcher-signed.apk"
+  "%ZIPALIGN%" -p -f 4 "%OUT_DIR%\launcher-unsigned.apk" "%OUT_DIR%\launcher-aligned.apk"
   if errorlevel 1 (
     echo FAIL: zipalign failed.
     exit /b 1
   )
 ) else (
   echo WARN: zipalign not found, using unaligned APK.
+  copy /y "%OUT_DIR%\launcher-unsigned.apk" "%OUT_DIR%\launcher-aligned.apk" >nul
+)
+
+if exist "%APKSIGNER%" (
+  call "%APKSIGNER%" sign ^
+    --ks "%KEYSTORE%" ^
+    --ks-key-alias smartisan ^
+    --ks-pass pass:android ^
+    --key-pass pass:android ^
+    --v1-signing-enabled true ^
+    --v2-signing-enabled true ^
+    --v3-signing-enabled true ^
+    --out "%OUT_DIR%\launcher-signed.apk" ^
+    "%OUT_DIR%\launcher-aligned.apk"
+  if errorlevel 1 (
+    echo FAIL: apksigner failed.
+    exit /b 1
+  )
+) else (
+  echo WARN: apksigner not found, falling back to jarsigner-only APK.
+  copy /y "%OUT_DIR%\launcher-aligned.apk" "%OUT_DIR%\launcher-presigned.apk" >nul
+  jarsigner -keystore "%KEYSTORE%" -storepass android -keypass android "%OUT_DIR%\launcher-presigned.apk" smartisan
+  if errorlevel 1 (
+    echo FAIL: jarsigner failed.
+    exit /b 1
+  )
   copy /y "%OUT_DIR%\launcher-presigned.apk" "%OUT_DIR%\launcher-signed.apk" >nul
 )
 

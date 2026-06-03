@@ -9,7 +9,9 @@
 ### 已完成
 
 - APK 可通过 `build.bat` 构建、签名并输出 `build\launcher-signed.apk`，最近多次安装到 `emulator-5554` 验证通过。
-- 当前发布版本调整为 `v1.4.1`，Manifest `versionCode=15`，`versionName=v1.4.1`；最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单为准。
+- 当前发布版本调整为 `v1.4.2`，Manifest `versionCode=16`，`versionName=v1.4.2`；最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单为准。
+- 第一轮兼容安装与包体瘦身完成：最终 APK 的 `minSdkVersion` 从 29 降到 23，`targetSdkVersion` 调整为 28；纹理资源统一走 `1080p`，删除冗余 `assets/Textures/720p` 后，`build\launcher-signed.apk` 从约 105.9MB 降到约 63.9MB。
+- 构建签名流程已从 `jarsigner` 旧 v1 签名改为 `zipalign -p` 后用 `apksigner` 输出 v1/v2/v3 签名，修复 Android 12 等新系统上可能因只有 v1/JAR 签名而安装失败的问题。
 - 桌面主入口、桌面内“桌面设置”虚拟入口、12 / 20 宫格、主题页、壁纸页、翻页动画页、应用图标页、三个设置开关均已接入。
 - 经典黑主题 12 / 20 宫格顶部网格和底部 Dock 资源已从原版 `com.smartisanos.launcher-3.apk` 重新抽取覆盖，顶底色差问题已修复。
 - 桌面设置页和桌面已尽量保持在同一个 `smartisanos.task.launcher` 任务栈内，修复主题设定后“返回桌面 -> 又闪回设置页 -> 再回桌面”的双跳问题。
@@ -23,6 +25,7 @@
 - 应用图标页单应用切换已改为行级刷新：选择左侧默认图标、右侧推荐图标或相册自定义图标后，当前页面和滚动位置保持不变；只有找不到当前行时才兜底重建并恢复滚动位置。
 - 应用图标页点击范围已收窄：只有左侧默认图标块和右侧推荐/加号图标块响应选择，右侧应用名称/说明文字区域不再弹出选择框。
 - 内置搜索页已继续按 Smartisan PRO3 搜索体验方向调整：设置页提供“启用下滑搜索”开关；搜索页不再显示自绘 T9 键盘，点击搜索框调用系统输入法；顶部常用应用列表支持横向滑动；输入关键词后的结果行修正为固定高度，图标和文字垂直居中。
+- 对照 maintained 的 APK 结构确认：maintained `minSdkVersion=19`、`targetSdkVersion=28`，且只保留 `assets/Textures/1080p`；当前工程第一轮先降到 `minSdkVersion=23`，保留更多运行安全余量，后续如需覆盖 Android 5.x / 4.x 再继续做 API 兼容回归。
 
 ### 已完成但需要继续回归
 
@@ -59,6 +62,30 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-06-03：v1.4.2 兼容签名发布
+
+修复内容：
+
+- 版本号：
+  - 文本 `launcher/AndroidManifest.xml` 从 `versionCode=15` / `versionName=v1.4.1` 调整为 `versionCode=16` / `versionName=v1.4.2`。
+  - 同步修正最终构建会注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 的真实版本也为 `v1.4.2 (16)`。
+  - 设置页“检查更新”右侧默认版本字符串同步为 `v1.4.2`。
+- 检查更新说明：
+  - `v1.4.1` 安装包检查不到新版，是因为 GitHub 最新 release 仍然是 `v1.4.1`，当前安装版本和远端最新版本一致。
+  - 后续每次想让旧版检测到更新，都必须同时完成版本号提升、GitHub push、GitHub release 和 APK 资产上传。
+- 兼容安装：
+  - 延续本日第一轮兼容修复，最终 APK 保持 `minSdkVersion=23`、`targetSdkVersion=28`。
+  - 构建脚本继续使用 `zipalign -p` 和 `apksigner` 输出 v1/v2/v3 签名，改善 Android 12 等新系统通过文件管理器安装时失败的问题。
+- 包体：
+  - 保持 `pb.getResolution()` 统一返回 `1080p`，并继续使用移除冗余 `720p` 纹理后的瘦身构建输入，当前 APK 约 64MB。
+
+验证计划：
+
+- `build.bat` 构建通过。
+- `aapt dump badging build\launcher-signed.apk` 应显示 `versionCode='16'`、`versionName='v1.4.2'`、`sdkVersion:'23'`、`targetSdkVersion:'28'`。
+- `apksigner verify --verbose --print-certs build\launcher-signed.apk` 应显示 v1 / v2 / v3 签名均为 true。
+- 发布到 GitHub Release 后，安装 `v1.4.1` 的设备再次点击“检查更新”应能检测到 `v1.4.2`。
+
 ### 2026-06-03：v1.4.1 版本与内置搜索页继续修复
 
 修复内容：
@@ -91,6 +118,60 @@
 - `launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml`
 - `README.md`
 - `DEVELOPMENT_LOG.md`
+
+### 2026-06-03：兼容安装与第一轮包体瘦身
+
+背景：
+
+- 用户反馈同一个 APK 发给其他手机安装失败，同时 maintained 能在更多手机上安装、分辨率适配更好，且包体更小。
+- 对比 `smartisan-launcher-maintained` 后确认，当前 original-port 主要问题有两类：
+  - 安装兼容：当前 APK 原本 `minSdkVersion=29`，Android 10 以下设备会直接安装失败；maintained 为 `minSdkVersion=19`、`targetSdkVersion=28`。
+  - 包体过大：当前 APK 约 105.9MB，其中 `assets` 占约 97.5MB；maintained APK 约 44.4MB，其中 `assets` 约 33.9MB。
+
+修复内容：
+
+- 安装兼容：
+  - 文本 `launcher/AndroidManifest.xml` 的 `uses-sdk` 从 `minSdkVersion=29` / `targetSdkVersion=29` 调整为 `minSdkVersion=23` / `targetSdkVersion=28`。
+  - 同步修正最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 真实输出 `sdkVersion:'23'`、`targetSdkVersion:'28'`。
+  - `launcher/apktool.yml` 同步记录 `minSdkVersion: 23`、`targetSdkVersion: 28`。
+- 包体瘦身：
+  - 对照 maintained，确认 maintained 只保留 `assets/Textures/1080p`，没有 `720p` 目录。
+  - 将 `com.smartisanos.launcher.pb.getResolution()` 改为统一返回 `1080p`，避免低密度设备继续选择 `Textures/720p`。
+  - 删除未跟踪的构建输入目录 `launcher/assets/Textures/720p`，减少约 36.9MB 纹理资源。
+- 签名兼容：
+  - 原构建脚本使用 `jarsigner`，`apksigner verify` 显示只有 `Verified using v1 scheme: true`，v2/v3 均为 false。
+  - Android 12 及部分厂商安装器对重打包 APK 的旧 v1/JAR 签名兼容较差，容易在文件管理器安装时只显示“安装失败”。
+  - `build.bat` 改为先 `zipalign -p -f 4`，再使用 `apksigner sign` 输出 v1/v2/v3 签名。
+
+验证：
+
+- `build.bat` 构建通过。
+- `aapt dump badging build\launcher-signed.apk` 验证：
+  - `versionCode='15'`
+  - `versionName='v1.4.1'`
+  - `sdkVersion:'23'`
+  - `targetSdkVersion:'28'`
+- `apksigner verify --verbose --print-certs build\launcher-signed.apk` 验证：
+  - `Verified using v1 scheme: true`
+  - `Verified using v2 scheme: true`
+  - `Verified using v3 scheme: true`
+- 新 APK 体积约 `63.92MB`，相比瘦身前约 `105.9MB` 明显降低。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 启动桌面成功，截图确认 12 宫格主界面显示正常。
+- 打开桌面设置成功，截图确认设置页可进入；删除 `720p` 后没有出现启动崩溃。
+
+后续优化方向：
+
+- 继续瘦身的主要大头：
+  - `assets/Textures/1080p` 约 27.8MB。
+  - `assets/theme_preview` 约 16.2MB。
+  - `assets/settings_maintained/maintained-settings-res.apk` 约 6.6MB。
+  - `assets/settings_native` 约 3.5MB。
+- 下一轮不建议直接删除这些目录，应先确认引用点：
+  - 主题预览图可以考虑改成更小尺寸或 WebP/JPG。
+  - `settings_maintained` 可以考虑把实际用到的资源合并进主 APK，取消内嵌 APK。
+  - `Textures/1080p` 需要继续按实际 12 / 20 宫格、主题和文件夹引用逐项裁剪。
+- Manifest 里仍存在大量原版系统级 / Smartisan 私有权限，部分普通 ROM 可能会提示风险；要真正清理需要对二进制 Manifest 做节点级删除或改造构建流程，不宜只改文本 Manifest。
 
 ### 2026-06-02：桌面设置缺口第一批补齐
 
