@@ -395,7 +395,7 @@
 
     move-result-object p0
     :try_end_0
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
 
     return-object p0
 
@@ -403,7 +403,7 @@
     move-exception p0
 
     .line 32
-    invoke-virtual {p0}, Ljava/lang/Exception;->printStackTrace()V
+    invoke-virtual {p0}, Ljava/lang/Throwable;->printStackTrace()V
 
     const/4 p0, 0x0
 
@@ -663,6 +663,29 @@
     iput v1, v0, Landroid/view/WindowManager$LayoutParams;->flags:I
 
     :goto_0
+    invoke-virtual {p0}, Landroid/view/Window;->getDecorView()Landroid/view/View;
+
+    move-result-object v1
+
+    invoke-virtual {v1}, Landroid/view/View;->getSystemUiVisibility()I
+
+    move-result v2
+
+    or-int/lit16 v2, v2, 0x500
+
+    invoke-virtual {v1, v2}, Landroid/view/View;->setSystemUiVisibility(I)V
+
+    sget v1, Landroid/os/Build$VERSION;->SDK_INT:I
+
+    const/16 v2, 0x1c
+
+    if-lt v1, v2, :cond_cutout_done
+
+    const/4 v1, 0x1
+
+    iput v1, v0, Landroid/view/WindowManager$LayoutParams;->layoutInDisplayCutoutMode:I
+
+    :cond_cutout_done
     const-string v1, "smt_launcher"
 
     .line 13
@@ -2228,11 +2251,21 @@
 
     .line 3
     :cond_1
+    :try_start_session_unlock_all
     invoke-static {}, Lsmartisanos/api/PackageManagerSmt;->getInstance()Lsmartisanos/api/PackageManagerSmt;
 
     move-result-object v1
 
     invoke-virtual {v1, v0}, Lsmartisanos/api/PackageManagerSmt;->sessionUnlockAllPackages(Landroid/content/pm/PackageManager;)V
+    :try_end_session_unlock_all
+    .catch Ljava/lang/Throwable; {:try_start_session_unlock_all .. :try_end_session_unlock_all} :catch_session_unlock_all
+
+    return-void
+
+    :catch_session_unlock_all
+    move-exception v0
+
+    invoke-virtual {v0}, Ljava/lang/Throwable;->printStackTrace()V
 
     return-void
 .end method
@@ -2272,7 +2305,7 @@
 
     invoke-virtual {v1, v0, p0, p1}, Lsmartisanos/api/PackageManagerSmt;->sessionUnlockPackageLPw(Landroid/content/pm/PackageManager;Ljava/lang/String;I)V
     :try_end_0
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
 
     goto :goto_0
 
@@ -2280,7 +2313,7 @@
     move-exception p0
 
     .line 4
-    invoke-virtual {p0}, Ljava/lang/Exception;->printStackTrace()V
+    invoke-virtual {p0}, Ljava/lang/Throwable;->printStackTrace()V
 
     :goto_0
     return-void
@@ -2356,7 +2389,7 @@
     move-result-object v1
     :try_end_0
     .catch Landroid/content/pm/PackageManager$NameNotFoundException; {:try_start_0 .. :try_end_0} :catch_1
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
 
     goto :goto_0
 
@@ -2376,7 +2409,7 @@
 
     .line 4
     :cond_0
-    invoke-virtual {p0}, Ljava/lang/Exception;->printStackTrace()V
+    invoke-virtual {p0}, Ljava/lang/Throwable;->printStackTrace()V
 
     :catch_1
     :goto_0
@@ -2408,11 +2441,21 @@
 
     .line 2
     :cond_0
+    :try_start_unlock_package
     invoke-static {}, Lsmartisanos/api/PackageManagerSmt;->getInstance()Lsmartisanos/api/PackageManagerSmt;
 
     move-result-object v1
 
     invoke-virtual {v1, v0, p0}, Lsmartisanos/api/PackageManagerSmt;->unlockPackage(Landroid/content/pm/PackageManager;Ljava/lang/String;)V
+    :try_end_unlock_package
+    .catch Ljava/lang/Throwable; {:try_start_unlock_package .. :try_end_unlock_package} :catch_unlock_package
+
+    return-void
+
+    :catch_unlock_package
+    move-exception p0
+
+    invoke-virtual {p0}, Ljava/lang/Throwable;->printStackTrace()V
 
     return-void
 .end method
@@ -2442,7 +2485,7 @@
 
     invoke-virtual {v1, v0, p0, p1}, Lsmartisanos/api/PackageManagerSmt;->unlockPackage(Landroid/content/pm/PackageManager;Ljava/lang/String;I)V
     :try_end_0
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
 
     goto :goto_0
 
@@ -2450,7 +2493,7 @@
     move-exception p0
 
     .line 5
-    invoke-virtual {p0}, Ljava/lang/Exception;->printStackTrace()V
+    invoke-virtual {p0}, Ljava/lang/Throwable;->printStackTrace()V
 
     :goto_0
     return-void

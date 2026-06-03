@@ -9,9 +9,13 @@ import android.app.PendingIntent;
 import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.LauncherActivityInfo;
+import android.content.pm.LauncherApps;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.AssetManager;
@@ -33,6 +37,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.StrictMode;
+import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextUtils;
@@ -42,6 +47,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
@@ -122,6 +128,8 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_PENDING_ICON_SCROLL_Y = "pending_icon_scroll_y";
     private static final int REQUEST_PICK_CUSTOM_ICON = 53026;
     private static int sRestoreIconPageScrollY = -1;
+    private static int sMainSettingsScrollY = -1;
+    private static int sThemePageScrollY = -1;
     private static final Map<String, Bitmap> sThemePreviewCache = new HashMap<String, Bitmap>();
     private static final Map<String, Bitmap> sSmartisanIconCache = new HashMap<String, Bitmap>();
     private static final String THEME_DOWNLOAD_BASE =
@@ -177,6 +185,10 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static void show(Activity activity) {
+        show(activity, -1);
+    }
+
+    private static void show(Activity activity, int restoreScrollY) {
         try {
             Intent intent = activity.getIntent();
             if (intent != null && intent.getBooleanExtra("launcher_show_search", false)) {
@@ -196,6 +208,7 @@ public final class MaintainedLauncherSettingsHost {
             bindPage(activity, resources, root);
             tuneScrollBars(root);
             activity.setContentView(root);
+            restoreScroll(root, restoreScrollY);
         } catch (Throwable t) {
             showFailure(activity, t);
         }
@@ -455,7 +468,7 @@ public final class MaintainedLauncherSettingsHost {
     private static void bindPage(final Activity activity, Resources resources, View root) {
         View title = find(resources, root, "view_title");
         if (title instanceof Title) {
-            ((Title) title).setTitle("桌面设置");
+            ((Title) title).setTitle(getString(resources, "launcher_setting_name", "Launcher Settings"));
         }
 
         bindGrid(activity, resources, root);
@@ -474,6 +487,13 @@ public final class MaintainedLauncherSettingsHost {
         hide(resources, root, "item_id_enable_cellular");
         hide(resources, root, "id_enable_cellular_tips");
         hide(resources, root, "launcher_flip_animation");
+        hide(resources, root, "item_id_hide_lable");
+        hide(resources, root, "item_id_hide_navigation_bar");
+        hide(resources, root, "item_id_hide_badge");
+        hide(resources, root, "item_id_badge_swipe_clean");
+        hide(resources, root, "item_id_unlock_anim");
+        setFirstChildText(resources, root, "setting_ocd_options",
+                getString(resources, "ocd_setting", "OCD Settings"));
         bindCurrentThemePreviewIcon(activity, resources, root, "item_id_themes");
         bindWallpaperSettingIcon(activity, resources, root);
         bindMainSettingIcon(resources, root, "item_page_flip_anims", "page_flip_animation_default_upper", true);
@@ -485,22 +505,32 @@ public final class MaintainedLauncherSettingsHost {
 
         click(activity, resources, root, "item_id_themes", new View.OnClickListener() {
             public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
                 showThemePage(activity);
             }
         });
         click(activity, resources, root, "item_id_launcher_wallpaper", new View.OnClickListener() {
             public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
                 showWallpaperPage(activity);
             }
         });
         click(activity, resources, root, "item_page_flip_anims", new View.OnClickListener() {
             public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
                 showPageFlipPage(activity);
             }
         });
         click(activity, resources, root, "item_id_icons", new View.OnClickListener() {
             public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
                 showIconPage(activity);
+            }
+        });
+        click(activity, resources, root, "setting_ocd_options", new View.OnClickListener() {
+            public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
+                showOcdOptionsPage(activity);
             }
         });
         click(activity, resources, root, "setting_switch_launcher", new View.OnClickListener() {
@@ -528,6 +558,7 @@ public final class MaintainedLauncherSettingsHost {
         });
         click(activity, resources, root, "setting_about_us", new View.OnClickListener() {
             public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
                 showAboutPage(activity);
             }
         });
@@ -544,18 +575,31 @@ public final class MaintainedLauncherSettingsHost {
                 return;
             }
             int visibility = decor.getSystemUiVisibility();
+            visibility |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+            visibility |= View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
             boolean hideNavigation = LauncherSettingBridge.readBool(
                     activity, "launcher_hide_navigation_bar", false);
             if (hideNavigation) {
                 visibility |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
                 visibility |= View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
                 visibility |= View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
-                visibility |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
             } else {
                 visibility &= ~View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
                 visibility &= ~View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                visibility &= ~View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
             }
             decor.setSystemUiVisibility(visibility);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            if (Build.VERSION.SDK_INT >= 21) {
+                window.setStatusBarColor(Color.TRANSPARENT);
+            }
+            if (Build.VERSION.SDK_INT >= 28) {
+                WindowManager.LayoutParams attrs = window.getAttributes();
+                attrs.layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                window.setAttributes(attrs);
+            }
         } catch (Throwable ignored) {
         }
     }
@@ -1076,6 +1120,10 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showThemePage(final Activity activity) {
+        showThemePage(activity, -1);
+    }
+
+    private static void showThemePage(final Activity activity, final int restoreScrollY) {
         try {
             tuneWindow(activity);
             final SettingsResourceContext context = createSettingsContext(activity);
@@ -1092,6 +1140,7 @@ public final class MaintainedLauncherSettingsHost {
                 installed.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
                     public void onItemClick(android.widget.AdapterView<?> parent, View view, int position, long id) {
                         stopThemePagePolling();
+                        sThemePageScrollY = currentScrollY(activity);
                         showThemeItemPage(activity, installedAdapter.entryAt(position));
                     }
                 });
@@ -1108,6 +1157,7 @@ public final class MaintainedLauncherSettingsHost {
                 notInstalled.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
                     public void onItemClick(android.widget.AdapterView<?> parent, View view, int position, long id) {
                         stopThemePagePolling();
+                        sThemePageScrollY = currentScrollY(activity);
                         showThemeItemPage(activity, onlineAdapter.entryAt(position));
                     }
                 });
@@ -1144,6 +1194,7 @@ public final class MaintainedLauncherSettingsHost {
 
             tuneScrollBars(root);
             activity.setContentView(root);
+            restoreScroll(root, restoreScrollY);
         } catch (Throwable t) {
             showFailure(activity, t);
         }
@@ -1176,7 +1227,7 @@ public final class MaintainedLauncherSettingsHost {
             if (btnBack != null) {
                 btnBack.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
-                        showThemePage(activity);
+                        showThemePage(activity, sThemePageScrollY);
                     }
                 });
             }
@@ -1190,9 +1241,33 @@ public final class MaintainedLauncherSettingsHost {
 
             tuneScrollBars(root);
             activity.setContentView(root);
+            centerThemeDetailPreview(resources, root);
         } catch (Throwable t) {
             showFailure(activity, t);
         }
+    }
+
+    private static void centerThemeDetailPreview(final Resources resources, final View root) {
+        final View preview = find(resources, root, "phone_detail_preview");
+        final View title = find(resources, root, "view_title");
+        final View dots = find(resources, root, "theme_color_dot_list");
+        if (preview == null || title == null || dots == null) {
+            return;
+        }
+        root.post(new Runnable() {
+            public void run() {
+                int top = title.getBottom();
+                int bottom = dots.getTop();
+                int availableHeight = bottom - top;
+                int previewHeight = preview.getHeight();
+                if (availableHeight <= previewHeight || previewHeight <= 0) {
+                    preview.setTranslationY(0);
+                    return;
+                }
+                int targetTop = top + (availableHeight - previewHeight) / 2;
+                preview.setTranslationY(targetTop - preview.getTop());
+            }
+        });
     }
 
     private static void showWallpaperPage(final Activity activity) {
@@ -1404,7 +1479,7 @@ public final class MaintainedLauncherSettingsHost {
             btnBack.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
                     stopThemePagePolling();
-                    show(activity);
+                    show(activity, sMainSettingsScrollY);
                 }
             });
         }
@@ -1418,7 +1493,7 @@ public final class MaintainedLauncherSettingsHost {
             smartisanTitle.setTitle(titleText);
             smartisanTitle.setBackClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    show(activity);
+                    show(activity, sMainSettingsScrollY);
                 }
             });
         }
@@ -1430,6 +1505,37 @@ public final class MaintainedLauncherSettingsHost {
 
     private static ListView asList(View view) {
         return view instanceof ListView ? (ListView) view : null;
+    }
+
+    private static void restoreScroll(final View root, final int scrollY) {
+        if (root == null || scrollY < 0) {
+            return;
+        }
+        final ViewTreeObserver observer = root.getViewTreeObserver();
+        if (observer == null || !observer.isAlive()) {
+            root.post(new Runnable() {
+                public void run() {
+                    ScrollView scrollView = firstScrollView(root);
+                    if (scrollView != null) {
+                        scrollView.scrollTo(0, scrollY);
+                    }
+                }
+            });
+            return;
+        }
+        observer.addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+            public boolean onPreDraw() {
+                ViewTreeObserver currentObserver = root.getViewTreeObserver();
+                if (currentObserver != null && currentObserver.isAlive()) {
+                    currentObserver.removeOnPreDrawListener(this);
+                }
+                ScrollView scrollView = firstScrollView(root);
+                if (scrollView != null) {
+                    scrollView.scrollTo(0, scrollY);
+                }
+                return true;
+            }
+        });
     }
 
     private static void tuneScrollBars(View view) {
@@ -1645,6 +1751,183 @@ public final class MaintainedLauncherSettingsHost {
         if ("launcher_hide_lable".equals(key)) {
             applyShowAppName(!readSystemBool(context, key, false));
         }
+    }
+
+    public static List<ResolveInfo> queryLauncherActivitiesWithProfiles(
+            PackageManager packageManager, Intent intent, int flags) {
+        List<ResolveInfo> result = new ArrayList<ResolveInfo>();
+        if (packageManager != null) {
+            try {
+                List<ResolveInfo> base = packageManager.queryIntentActivities(intent, flags);
+                if (base != null) {
+                    result.addAll(base);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        Context context = currentApplicationContext();
+        if (context == null || Build.VERSION.SDK_INT < 21) {
+            return result;
+        }
+
+        try {
+            LauncherApps launcherApps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (launcherApps == null) {
+                return result;
+            }
+            Map<String, Boolean> seen = new HashMap<String, Boolean>();
+            for (ResolveInfo info : result) {
+                String key = resolveInfoKey(info);
+                if (key != null) {
+                    seen.put(key, Boolean.TRUE);
+                }
+            }
+
+            List<UserHandle> profiles = launcherApps.getProfiles();
+            if (profiles == null || profiles.size() <= 1) {
+                return result;
+            }
+            UserHandle current = Process.myUserHandle();
+            String packageFilter = intent == null ? null : intent.getPackage();
+            for (UserHandle profile : profiles) {
+                if (profile == null || profile.equals(current)) {
+                    continue;
+                }
+                List<LauncherActivityInfo> activities = launcherApps.getActivityList(packageFilter, profile);
+                if (activities == null) {
+                    continue;
+                }
+                for (LauncherActivityInfo activityInfo : activities) {
+                    ResolveInfo clone = resolveInfoFromLauncherActivity(packageManager, activityInfo, flags);
+                    String key = resolveInfoKey(clone);
+                    if (clone != null && key != null && !seen.containsKey(key)) {
+                        result.add(clone);
+                        seen.put(key, Boolean.TRUE);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return result;
+    }
+
+    public static int userIdForResolveInfo(ResolveInfo info) {
+        try {
+            if (info != null && info.activityInfo != null
+                    && info.activityInfo.applicationInfo != null) {
+                return userIdFromUid(info.activityInfo.applicationInfo.uid);
+            }
+        } catch (Throwable ignored) {
+        }
+        return 0;
+    }
+
+    public static void startActivityForUser(Context context, Intent intent, android.os.Bundle options,
+                                            int userId) throws Exception {
+        if (context == null || intent == null) {
+            return;
+        }
+        if (userId < 0) {
+            context.startActivity(intent, options);
+            return;
+        }
+        java.lang.reflect.Constructor<UserHandle> constructor =
+                UserHandle.class.getDeclaredConstructor(Integer.TYPE);
+        constructor.setAccessible(true);
+        UserHandle user = constructor.newInstance(Integer.valueOf(userId));
+        Method method = Context.class.getMethod("startActivityAsUser",
+                Intent.class, android.os.Bundle.class, UserHandle.class);
+        method.setAccessible(true);
+        method.invoke(context, intent, options, user);
+    }
+
+    public static void openLauncherPasswordFallback(int requestCode) {
+        try {
+            Class<?> launcherClass = Class.forName("com.smartisanos.launcher.J");
+            Object launcher = launcherClass.getMethod("getInstance").invoke(null);
+            Context context = (Context) launcherClass.getMethod("getContext").invoke(launcher);
+            if (context == null) {
+                return;
+            }
+            try {
+                Class<?> mainViewClass = Class.forName("com.smartisanos.launcher.view.Eb");
+                Object mainView = mainViewClass.getMethod("getInstance").invoke(null);
+                if (mainView != null) {
+                    mainViewClass.getMethod("ca", Boolean.TYPE).invoke(mainView, Boolean.FALSE);
+                }
+            } catch (Throwable ignored) {
+            }
+            Intent intent = new Intent();
+            intent.setClassName(context.getPackageName(),
+                    "com.smartisanos.launcher.ConfirmPasswordActivity");
+            intent.putExtra("FROM_LAUNCHER", true);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            launcherClass.getMethod("startActivityForResult", Intent.class, Integer.TYPE)
+                    .invoke(launcher, intent, Integer.valueOf(requestCode));
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+    }
+
+    private static ResolveInfo resolveInfoFromLauncherActivity(PackageManager packageManager,
+                                                               LauncherActivityInfo launcherInfo,
+                                                               int flags) {
+        if (launcherInfo == null || launcherInfo.getComponentName() == null) {
+            return null;
+        }
+        try {
+            ComponentName component = launcherInfo.getComponentName();
+            ActivityInfo activityInfo = null;
+            try {
+                if (packageManager != null) {
+                    activityInfo = packageManager.getActivityInfo(component, flags);
+                }
+            } catch (Throwable ignored) {
+            }
+            if (activityInfo == null) {
+                activityInfo = new ActivityInfo();
+            }
+            activityInfo.packageName = component.getPackageName();
+            activityInfo.name = component.getClassName();
+            ApplicationInfo appInfo = launcherInfo.getApplicationInfo();
+            if (appInfo != null) {
+                activityInfo.applicationInfo = appInfo;
+            }
+            ResolveInfo result = new ResolveInfo();
+            result.activityInfo = activityInfo;
+            result.nonLocalizedLabel = launcherInfo.getLabel();
+            return result;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static String resolveInfoKey(ResolveInfo info) {
+        try {
+            if (info == null || info.activityInfo == null) {
+                return null;
+            }
+            String pkg = info.activityInfo.packageName;
+            String cls = info.activityInfo.name;
+            if (pkg == null || cls == null) {
+                return null;
+            }
+            int userId = 0;
+            if (info.activityInfo.applicationInfo != null) {
+                userId = userIdFromUid(info.activityInfo.applicationInfo.uid);
+            }
+            return pkg + "/" + cls + "#" + userId;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static int userIdFromUid(int uid) {
+        if (uid <= 0) {
+            return 0;
+        }
+        return uid / 100000;
     }
 
     private static void applyWallpaperChange(Context context) {
@@ -3524,6 +3807,25 @@ public final class MaintainedLauncherSettingsHost {
         parent.addView(line, new LinearLayout.LayoutParams(-1, 1));
     }
 
+    private static void showOcdOptionsPage(final Activity activity) {
+        try {
+            final SettingsResourceContext context = createSettingsContext(activity);
+            Resources resources = context.getResources();
+            View root = inflate(activity, context, "setting_ocd_options");
+            bindBackTitle(activity, resources, root, "view_title",
+                    getString(resources, "obsession_header_title", "OCD Settings"));
+            bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
+            bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
+            bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
+            bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
+            bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
+            tuneScrollBars(root);
+            activity.setContentView(root);
+        } catch (Throwable t) {
+            showInfoDialog(activity, "OCD Settings", "Unable to open OCD settings");
+        }
+    }
+
     private static void showInfoDialog(final Activity activity, String title, String message) {
         final Dialog dialog = new Dialog(activity);
         LinearLayout root = new LinearLayout(activity);
@@ -3646,7 +3948,9 @@ public final class MaintainedLauncherSettingsHost {
         query.setTextColor(0xff3f4656);
         query.setHintTextColor(0xffc6cbd1);
         query.setTextSize(17);
-        query.setPadding(0, 0, 0, 0);
+        query.setIncludeFontPadding(false);
+        query.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+        query.setPadding(dp(activity, 2), 0, dp(activity, 2), dp(activity, 1));
         query.setBackgroundColor(Color.TRANSPARENT);
         query.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
@@ -5050,6 +5354,21 @@ public final class MaintainedLauncherSettingsHost {
                 view.setBackgroundDrawable(resources.getDrawable(resId));
             }
         } catch (Throwable ignored) {
+        }
+    }
+
+    private static void setFirstChildText(Resources resources, View root, String idName, String value) {
+        View row = find(resources, root, idName);
+        if (!(row instanceof ViewGroup)) {
+            return;
+        }
+        ViewGroup group = (ViewGroup) row;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (child instanceof TextView) {
+                ((TextView) child).setText(value);
+                return;
+            }
         }
     }
 

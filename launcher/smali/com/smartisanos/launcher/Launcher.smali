@@ -120,6 +120,8 @@
     .line 2
     invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyLauncherNavigationBarSetting(Landroid/app/Activity;)V
+
     .line 3
     invoke-static {p0}, Lcom/smartisanos/launcher/J;->b(Landroid/app/Activity;)V
 

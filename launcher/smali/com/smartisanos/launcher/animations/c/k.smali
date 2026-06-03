@@ -1190,12 +1190,18 @@
 .end method
 
 .method public isPlaying()Z
-    .locals 0
+    .locals 1
 
     .line 1
     iget-object p0, p0, Lcom/smartisanos/launcher/animations/c/k;->Mn:Lcom/smartisanos/smengine/g;
 
     if-eqz p0, :cond_0
+
+    invoke-virtual {p0}, Lcom/smartisanos/smengine/g;->isFinished()Z
+
+    move-result v0
+
+    if-nez v0, :cond_0
 
     const/4 p0, 0x1
 

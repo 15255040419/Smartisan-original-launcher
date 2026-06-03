@@ -122,6 +122,13 @@
     :cond_1
     const/16 v5, 0xa
 
+    .line 6
+    iget-object v5, p0, Lcom/smartisanos/launcher/a/N;->Mj:Landroid/content/Intent;
+
+    invoke-static {v0, v5, v3, v2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->startActivityForUser(Landroid/content/Context;Landroid/content/Intent;Landroid/os/Bundle;I)V
+
+    goto :goto_0
+
     if-ne v2, v5, :cond_2
 
     .line 7

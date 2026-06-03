@@ -3311,6 +3311,7 @@
 
     .line 8
     :cond_0
+    :try_start_lock_password
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
 
     move-result-object p0
@@ -3318,6 +3319,19 @@
     const/16 v1, 0x14
 
     invoke-virtual {p0, v0, v1}, Lcom/smartisanos/launcher/J;->startActivityForResult(Landroid/content/Intent;I)V
+    :try_end_lock_password
+    .catch Ljava/lang/Throwable; {:try_start_lock_password .. :try_end_lock_password} :catch_lock_password
+
+    return-void
+
+    :catch_lock_password
+    move-exception p0
+
+    invoke-virtual {p0}, Ljava/lang/Throwable;->printStackTrace()V
+
+    const/16 p0, 0x14
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherPasswordFallback(I)V
 
     return-void
 .end method
@@ -3467,7 +3481,21 @@
 
     const/16 v0, 0x14
 
+    :try_start_change_lock_password
     invoke-virtual {p1, p0, v0}, Lcom/smartisanos/launcher/J;->startActivityForResult(Landroid/content/Intent;I)V
+    :try_end_change_lock_password
+    .catch Ljava/lang/Throwable; {:try_start_change_lock_password .. :try_end_change_lock_password} :catch_change_lock_password
+
+    return-void
+
+    :catch_change_lock_password
+    move-exception p0
+
+    invoke-virtual {p0}, Ljava/lang/Throwable;->printStackTrace()V
+
+    const/16 p0, 0x14
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherPasswordFallback(I)V
 
     return-void
 .end method

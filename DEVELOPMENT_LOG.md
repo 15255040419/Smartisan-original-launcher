@@ -4,12 +4,12 @@
 
 注意：本文档顶部的“当前状态总览”和“每日修复记录（倒序）”是当前可信记录。后面的“历史归档”保留旧记录原文，其中有些日期和标题不是严格排序，且早期条目里的“暂未实现 / 后续接入 / 当前不可用”只代表当时状态；如果和顶部记录或 `README.md` 冲突，以顶部记录和 `README.md` 为准。
 
-## 当前状态总览（2026-06-03）
+## 当前状态总览（2026-06-04）
 
 ### 已完成
 
 - APK 可通过 `build.bat` 构建、签名并输出 `build\launcher-signed.apk`，最近多次安装到 `emulator-5554` 验证通过。
-- 当前发布版本调整为 `v1.4.2`，Manifest `versionCode=16`，`versionName=v1.4.2`；最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单为准。
+- 当前发布版本调整为 `v1.4.5`，Manifest `versionCode=19`，`versionName=v1.4.5`；最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单为准。
 - 第一轮兼容安装与包体瘦身完成：最终 APK 的 `minSdkVersion` 从 29 降到 23，`targetSdkVersion` 调整为 28；纹理资源统一走 `1080p`，删除冗余 `assets/Textures/720p` 后，`build\launcher-signed.apk` 从约 105.9MB 降到约 63.9MB。
 - 构建签名流程已从 `jarsigner` 旧 v1 签名改为 `zipalign -p` 后用 `apksigner` 输出 v1/v2/v3 签名，修复 Android 12 等新系统上可能因只有 v1/JAR 签名而安装失败的问题。
 - 桌面主入口、桌面内“桌面设置”虚拟入口、12 / 20 宫格、主题页、壁纸页、翻页动画页、应用图标页、三个设置开关均已接入。
@@ -25,6 +25,9 @@
 - 应用图标页单应用切换已改为行级刷新：选择左侧默认图标、右侧推荐图标或相册自定义图标后，当前页面和滚动位置保持不变；只有找不到当前行时才兜底重建并恢复滚动位置。
 - 应用图标页点击范围已收窄：只有左侧默认图标块和右侧推荐/加号图标块响应选择，右侧应用名称/说明文字区域不再弹出选择框。
 - 内置搜索页已继续按 Smartisan PRO3 搜索体验方向调整：设置页提供“启用下滑搜索”开关；搜索页不再显示自绘 T9 键盘，点击搜索框调用系统输入法；顶部常用应用列表支持横向滑动；输入关键词后的结果行修正为固定高度，图标和文字垂直居中。
+- 强迫症选项已从设置首页零散开关收纳到二级页；主页入口和二级页标题走资源字符串，英文系统显示 `OCD Settings`，中文系统显示“强迫症选项”。
+- 双开 / 多用户应用显示和启动已补入 LauncherApps 查询与 `startActivityAsUser` 兼容路径，避免双开应用只显示主用户图标或点击后启动错用户。
+- 主题详情页预览图已改为外层居中容器，手机壳和主题截图保持原版层级叠加；从主题详情返回主题列表、从关于我们返回设置首页时会保持原滚动位置，并在首帧绘制前恢复，避免上下晃动。
 - 对照 maintained 的 APK 结构确认：maintained `minSdkVersion=19`、`targetSdkVersion=28`，且只保留 `assets/Textures/1080p`；当前工程第一轮先降到 `minSdkVersion=23`，保留更多运行安全余量，后续如需覆盖 Android 5.x / 4.x 再继续做 API 兼容回归。
 
 ### 已完成但需要继续回归
@@ -61,6 +64,72 @@
 3. 需要追溯原因时，再读后面的“历史归档”。历史归档保留早期判断，其中部分结论已被后续实现覆盖。
 
 ## 每日修复记录（倒序）
+
+### 2026-06-04：v1.4.5 设置体验、主题详情和英文文案修复
+
+修复内容：
+
+- 版本发布：
+  - 文本 `launcher/AndroidManifest.xml` 调整为 `versionCode=19` / `versionName=v1.4.5`。
+  - 同步修正最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，避免 APK 真实版本和文本 Manifest 不一致。
+  - 设置页“检查更新”默认版本字符串同步为 `v1.4.5`。
+- 强迫症选项：
+  - `launcher/tools/maintained_settings_res/res/values/strings.xml` 补齐 `ocd_setting=OCD Settings`，中文资源继续使用“强迫症选项”。
+  - 主设置页标题改用 `launcher_setting_name`，强迫症入口改用 `ocd_setting`，强迫症二级页标题改用 `obsession_header_title`。
+  - 修复英文系统下强迫症入口仍显示中文的问题；后续不要在 Java 中硬编码“强迫症选项 / 桌面设置”等标题。
+- 设置返回位置：
+  - 从“关于我们”、壁纸、翻页动画、应用图标、强迫症选项等子页返回主设置页时记录并恢复进入前的滚动位置。
+  - 从桌面主题列表进入主题详情后返回时恢复主题列表位置。
+  - 滚动恢复从 `post()` 延后滚动改为 `OnPreDrawListener` 首帧绘制前恢复，修复返回时先跳顶部再滚回当前位置造成的上下晃动。
+- 主题详情页：
+  - `activity_theme_item.xml` 改为外层 `phone_detail_preview` 填满标题栏和底部主题标签栏之间区域，内层保留原版手机预览图层并居中。
+  - 取消依赖运行时 `translationY` 硬调预览位置，避免手机外壳和主题截图错位。
+- 已纳入本轮发布记录的前序功能 / BUG：
+  - 应用图标页：改进版图标开关复用首页同款控件；图标包行和图标大小行补齐箭头与点击范围；单应用默认图标、推荐图标、相册自定义图标切换后只刷新当前行并保持滚动位置。
+  - 桌面图标大小：50% - 150% 连续调节，小 / 中 / 大三档快捷选择，保存后所有 12 / 20 宫格普通应用和桌面设置虚拟入口统一生效。
+  - 图标包兼容：支持 appfilter / component 精确匹配，图标包优先级高于锤子自动识别，单应用自定义图标优先级最高。
+  - 内置搜索页：设置页提供“启用下滑搜索”开关；搜索页去掉自绘键盘，改为系统输入法；顶部常用应用横向滑动；搜索结果行固定高度并垂直居中。
+  - 双开应用：通过 `LauncherApps.getProfiles()` 补齐多用户可启动 Activity，保存 `ItemInfo.userId` 并通过 `startActivityAsUser` 启动对应用户应用。
+  - 刘海屏 / 编辑态：Launcher 主窗口持续保留 fullscreen layout 和 cutout short edges，避免长按图标、进入编辑模式时露出系统状态栏并顶下桌面。
+  - 解锁动画：修正动画播放状态判断，让锁屏返回桌面时能按设置开关执行解锁动画。
+  - 设置体验：关于我们改为 maintained / 原版风格页面；检查更新、关闭电池优化、默认桌面、隐藏虚拟键、角标开关等入口已接入。
+
+验证计划：
+
+- `build.bat` 构建通过。
+- `aapt dump badging build\launcher-signed.apk` 应显示 `versionCode='19'`、`versionName='v1.4.5'`、`sdkVersion:'23'`、`targetSdkVersion:'28'`。
+- `apksigner verify --verbose --print-certs build\launcher-signed.apk` 应显示 v1 / v2 / v3 签名均为 true。
+- 英文系统进入桌面设置时，主标题应显示 `Launcher Settings`，强迫症入口和二级页标题应显示 `OCD Settings`。
+- 从主题列表滚动后进入某个主题详情再返回，应保持主题列表位置；从“关于我们”返回设置首页也应保持原位置且不再上下晃动。
+- 主题详情页手机预览应在标题栏与底部主题标签之间居中，手机壳和截图不应错位。
+
+### 2026-06-03：刘海屏编辑态状态栏下移修复
+
+背景：
+
+- 用户反馈刘海屏手机上长按图标或进入桌面编辑模式时，会露出原本的系统状态栏，桌面内容整体向下移动，底部图标显示不全。
+- 对照 maintained 的 `docs/compatibility-fixes.md`，同类问题的根因是编辑、排序、拖拽等特殊模式切换系统 fullscreen / status bar 状态，导致系统状态栏和桌面自绘状态栏坐标脱节。
+
+修复内容：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+  - `applyLauncherNavigationBarSetting()` 不再只处理隐藏虚拟键。
+  - 每次 `onResume()` / `onWindowFocusChanged()` 应用设置时，都强制保留 `View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN`。
+  - 关闭“桌面隐藏虚拟键”时只清理 `HIDE_NAVIGATION` / `IMMERSIVE_STICKY` / `LAYOUT_HIDE_NAVIGATION`，不再清掉顶部 fullscreen layout。
+  - Android 9 及以上设置 `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES`，让 Launcher 主窗口可以延伸到刘海短边区域。
+  - 同步保持透明状态栏和 `FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS`，避免系统白色状态栏重新参与布局。
+- `launcher/smali/com/smartisanos/launcher/ua.1.smali`
+  - 原版窗口初始化 `ua.a(Window)` 不再依赖 `Constants.IS_NAVIGATION_BAR` 才设置 fullscreen layout。
+  - 无论是否存在虚拟导航栏，都保留 `0x500`（`LAYOUT_STABLE | LAYOUT_FULLSCREEN`）。
+  - Android 9 及以上同步写入 `layoutInDisplayCutoutMode = SHORT_EDGES`。
+
+验证：
+
+- `build.bat` 构建通过。
+- `adb -s emulator-5556 install -r -d build\launcher-signed.apk` 安装成功。
+- `adb -s emulator-5556 shell am start -n com.smartisanos.launcher/.Launcher` 启动成功。
+- 截图 `build\cutout_statusbar_fix_desktop.png` 验证普通态仍使用桌面自绘状态栏，没有出现白色系统状态栏顶下桌面。
+- 该问题仍建议在实际刘海屏真机上补充回归：长按桌面图标、进入桌面编辑模式、多页预览、拖动图标到底部 Dock 附近，确认顶部不露系统状态栏、底部图标不被裁切。
 
 ### 2026-06-03：v1.4.2 兼容签名发布
 

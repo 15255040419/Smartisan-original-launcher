@@ -2279,7 +2279,7 @@
 .end method
 
 .method public static a(Landroid/content/Context;Landroid/content/pm/ResolveInfo;)Lcom/smartisanos/launcher/data/ItemInfo;
-    .locals 2
+    .locals 3
 
     if-nez p1, :cond_0
 
@@ -2362,6 +2362,12 @@
 
     .line 11
     iput p0, v0, Lcom/smartisanos/launcher/data/ItemInfo;->messagesNumber:I
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->userIdForResolveInfo(Landroid/content/pm/ResolveInfo;)I
+
+    move-result p0
+
+    iput p0, v0, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I
 
     .line 12
     iget-object p0, v0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
@@ -4577,7 +4583,7 @@
     const/4 v1, 0x0
 
     .line 4
-    invoke-virtual {p0, v0, v1}, Landroid/content/pm/PackageManager;->queryIntentActivities(Landroid/content/Intent;I)Ljava/util/List;
+    invoke-static {p0, v0, v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->queryLauncherActivitiesWithProfiles(Landroid/content/pm/PackageManager;Landroid/content/Intent;I)Ljava/util/List;
 
     move-result-object p0
 
