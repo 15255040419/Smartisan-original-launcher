@@ -1296,7 +1296,7 @@
 .end method
 
 .method public dispatchTouchEvent(Landroid/view/MotionEvent;)Z
-    .locals 3
+    .locals 4
 
     .line 1
     sget-boolean v0, Lcom/smartisanos/launcher/va;->_h:Z
@@ -1328,6 +1328,27 @@
 
     .line 3
     :cond_0
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/RootView;->getContext()Landroid/content/Context;
+
+    move-result-object v0
+
+    instance-of v1, v0, Landroid/app/Activity;
+
+    if-eqz v1, :cond_search_0
+
+    check-cast v0, Landroid/app/Activity;
+
+    invoke-static {v0, p1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->handleLauncherSearchGesture(Landroid/app/Activity;Landroid/view/MotionEvent;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_search_0
+
+    const/4 v0, 0x1
+
+    return v0
+
+    :cond_search_0
     invoke-super {p0, p1}, Landroid/widget/RelativeLayout;->dispatchTouchEvent(Landroid/view/MotionEvent;)Z
 
     move-result p0

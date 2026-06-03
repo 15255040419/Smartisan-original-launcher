@@ -1439,12 +1439,18 @@
 
     invoke-direct {v0, v1}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V
 
-    const-string v1, "com.smartisanos.quicksearch"
+    const-string v1, "com.smartisanos.launcher"
 
-    const-string v2, "com.android.quicksearchbox.SearchActivity"
+    const-string v2, "com.smartisanos.launcher.theme.ThemeChooserActivity"
 
     .line 2
     invoke-virtual {v0, v1, v2}, Landroid/content/Intent;->setClassName(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;
+
+    const-string v1, "launcher_show_search"
+
+    const/4 v2, 0x1
+
+    invoke-virtual {v0, v1, v2}, Landroid/content/Intent;->putExtra(Ljava/lang/String;Z)Landroid/content/Intent;
 
     const v1, 0x34208000
 

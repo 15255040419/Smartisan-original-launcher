@@ -4,11 +4,12 @@
 
 注意：本文档顶部的“当前状态总览”和“每日修复记录（倒序）”是当前可信记录。后面的“历史归档”保留旧记录原文，其中有些日期和标题不是严格排序，且早期条目里的“暂未实现 / 后续接入 / 当前不可用”只代表当时状态；如果和顶部记录或 `README.md` 冲突，以顶部记录和 `README.md` 为准。
 
-## 当前状态总览（2026-06-02）
+## 当前状态总览（2026-06-03）
 
 ### 已完成
 
 - APK 可通过 `build.bat` 构建、签名并输出 `build\launcher-signed.apk`，最近多次安装到 `emulator-5554` 验证通过。
+- 当前发布版本调整为 `v1.4.1`，Manifest `versionCode=15`，`versionName=v1.4.1`；最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单为准。
 - 桌面主入口、桌面内“桌面设置”虚拟入口、12 / 20 宫格、主题页、壁纸页、翻页动画页、应用图标页、三个设置开关均已接入。
 - 经典黑主题 12 / 20 宫格顶部网格和底部 Dock 资源已从原版 `com.smartisanos.launcher-3.apk` 重新抽取覆盖，顶底色差问题已修复。
 - 桌面设置页和桌面已尽量保持在同一个 `smartisanos.task.launcher` 任务栈内，修复主题设定后“返回桌面 -> 又闪回设置页 -> 再回桌面”的双跳问题。
@@ -21,6 +22,7 @@
 - 应用图标页新增“桌面图标大小”滑块，位置在“改进版图标”和“图标包”之间；支持 50% - 150% 连续调节，并可点击“小 / 中 / 大”快速跳到 50% / 100% / 150%；保存后回到桌面并完整重启 Launcher，让 12 / 20 宫格里的所有普通应用和桌面设置虚拟入口统一应用新尺寸。
 - 应用图标页单应用切换已改为行级刷新：选择左侧默认图标、右侧推荐图标或相册自定义图标后，当前页面和滚动位置保持不变；只有找不到当前行时才兜底重建并恢复滚动位置。
 - 应用图标页点击范围已收窄：只有左侧默认图标块和右侧推荐/加号图标块响应选择，右侧应用名称/说明文字区域不再弹出选择框。
+- 内置搜索页已继续按 Smartisan PRO3 搜索体验方向调整：设置页提供“启用下滑搜索”开关；搜索页不再显示自绘 T9 键盘，点击搜索框调用系统输入法；顶部常用应用列表支持横向滑动；输入关键词后的结果行修正为固定高度，图标和文字垂直居中。
 
 ### 已完成但需要继续回归
 
@@ -34,15 +36,15 @@
 - 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
 - 原生 Smartisan Settings Activity / Fragment 还没有完整迁移，当前仍由 launcher 包内 `ThemeChooserActivity` 承载 maintained 风格兼容页。
 - 对照 `E:\FANG\smartisan\smartisan-launcher-maintained`，当前桌面设置和桌面能力仍需按优先级继续移植；“分享此应用给朋友”和“用户体验改进计划”不再作为移植目标。
-  1. 桌面隐藏虚拟键：优先级最高，key 为 `launcher_hide_navigation_bar`，需要限制只对 Launcher 主界面生效。
-  2. 检查更新：当前仍是占位 / Toast，需要决定接 maintained 逻辑还是做本项目版本提示。
-  3. 关闭电池优化：当前仍是占位 / Toast，需要接系统电池优化设置或做兼容兜底。
-  4. 关于我们：当前更多区域还未完整接入，可优先做本项目版本、仓库和构建信息。
-  5. 紧贴屏幕横扫清除角标：key 为 `launcher_badge_swipe_clean`，当前有旧代码痕迹但 maintained 风格设置页未接入。
-  6. 隐藏图标上的角标：key 为 `launcher_hide_badge`，当前有旧代码痕迹但 maintained 风格设置页未接入。
-  7. 下滑 / 上滑搜索：当前保留搜索 Activity / Provider / 动画和 quicksearch 入口痕迹，但手势触发、权限和结果兼容还没完整回归。
-  8. 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议按 maintained 的方向优先拉起系统 / 已安装天气应用。
-  9. 日历：当前保留日历权限和动态图标资源线索，但桌面日期刷新、点击入口和系统日历兼容还未单独回归。
+  - [x] 桌面隐藏虚拟键：优先级最高，key 为 `launcher_hide_navigation_bar`，已接入首页开关并限制只由 Launcher 主界面应用系统 UI flags。
+  - [x] 检查更新：已接入当前项目 GitHub Release 检测；存在 APK 资产时提示下载，普通应用更新仍需系统安装确认。
+  - [x] 关闭电池优化：优先请求当前包名 `com.smartisanos.launcher` 的电池优化弹窗，系统不允许时回退当前应用详情页。
+  - [x] 关于我们：已从信息弹窗改为完整 maintained / 原版锤子风格页面。
+  - [x] 紧贴屏幕横扫清除角标：key 为 `launcher_badge_swipe_clean`，已接入 maintained 风格设置页开关。
+  - [x] 隐藏图标上的角标：key 为 `launcher_hide_badge`，已接入 maintained 风格设置页开关。
+  - [x] 下滑 / 上滑搜索：已修正旧逻辑只认上滑、前三次只提示、依赖缺失 QuickSearch provider 的问题，统一打开本项目内置应用搜索页。
+  - [ ] 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议按 maintained 的方向优先拉起系统 / 已安装天气应用。
+  - [ ] 日历：当前保留日历权限和动态图标资源线索，但桌面日期刷新、点击入口和系统日历兼容还未单独回归。
 - 提醒角标可以作为后续功能实现目标，但不能简单等同于“应用有通知就一定显示”。当前 old Smartisan / 厂商未读数广播或系统 badge 数据能接入时才有机会显示；普通 Android 通知角标需要额外接入通知监听或 badge 兼容桥。
 - 在线主题 APK 下载后仍依赖用户手动安装，普通应用没有静默安装能力。
 - 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画仍需要更多分辨率和真机回归。
@@ -56,6 +58,80 @@
 3. 需要追溯原因时，再读后面的“历史归档”。历史归档保留早期判断，其中部分结论已被后续实现覆盖。
 
 ## 每日修复记录（倒序）
+
+### 2026-06-03：v1.4.1 版本与内置搜索页继续修复
+
+修复内容：
+
+- 版本号：
+  - 文本 `launcher/AndroidManifest.xml` 从 `versionCode=14` / `versionName=v1.4` 调整为 `versionCode=15` / `versionName=v1.4.1`。
+  - 同步修正最终构建会注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 的 `aapt dump badging` 能读到 `versionCode=15` / `versionName=v1.4.1`。
+  - 设置页“检查更新”右侧默认版本字符串同步为 `v1.4.1`。
+- 内置搜索页：
+  - 去掉自绘 T9 键盘，改为点击顶部输入框后由系统输入法接管。
+  - 设置首页新增“启用下滑搜索”开关，绑定 `launcher_search_page_enabled`，关闭后桌面下滑不再进入内置搜索页。
+  - 搜索页顶部常用应用区从固定 5 个等分项改成横向可滑动列表，最多展示前 20 个可启动应用。
+  - 修复搜索结果行文字错位：结果行固定 84dp 高度，图标和标题都垂直居中，标题使用单行省略。
+  - 启动搜索页时使用 `CLEAR_TOP | SINGLE_TOP`，减少最近任务里重复出现两个“锤子桌面”窗口的概率。
+
+验证：
+
+- `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 直接启动搜索页，确认顶部常用应用可以横向滑动，滑动后能看到“文件 / 浏览器 / 游戏中心”等后续应用。
+- 输入 `root` 后确认搜索结果行中 Root Explorer 图标和文字同一行垂直居中，不再出现标题贴到上方的问题。
+
+涉及文件：
+
+- `launcher/AndroidManifest.xml`
+- `launcher/original/AndroidManifest.xml`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/maintained_settings_res/res/layout/setting_main.xml`
+- `launcher/tools/maintained_settings_res/res/values/strings.xml`
+- `launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml`
+- `README.md`
+- `DEVELOPMENT_LOG.md`
+
+### 2026-06-02：桌面设置缺口第一批补齐
+
+修复内容：
+
+- 桌面隐藏虚拟键：
+  - restored maintained 首页 `item_id_hide_navigation_bar` 开关，绑定 key `launcher_hide_navigation_bar`。
+  - Launcher 主 Activity 在 `onCreate()`、`onResume()`、`onWindowFocusChanged()` 中读取该 key，只在桌面主界面应用 `HIDE_NAVIGATION`、`IMMERSIVE_STICKY`、`LAYOUT_HIDE_NAVIGATION`、`LAYOUT_STABLE`。
+  - 设置页、主题页、图标页不直接应用隐藏虚拟键，避免影响非桌面界面。
+- 角标相关强迫症选项：
+  - maintained 风格设置首页新增“隐藏图标上的角标”和“紧贴屏幕横扫清除角标”两个开关。
+  - 分别绑定 `launcher_hide_badge` 和 `launcher_badge_swipe_clean`，沿用旧桌面读取 / 刷新链路。
+- 更多区域：
+  - “检查更新”从静态本地版本弹窗改为请求 `https://api.github.com/repos/15255040419/Smartisan-original-launcher/releases/latest`；如果 Release 中存在 `.apk` asset，提示“发现新版本”并通过 DownloadManager 下载，下载完成后仍需要用户走系统安装确认。
+  - “关闭电池优化”优先使用 `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + 当前包名 `com.smartisanos.launcher`，目标是直接弹出当前锤子桌面的电池优化确认；系统或权限不允许时回退当前应用详情页，不再默认进入所有应用的电池优化列表。
+  - “关于我们”从简短信弹窗改为完整页面：顶部锤子风格标题栏、Smartisan OS 标识卡片、“更多 Smartisan 的应用软件”列表和“关注我们”分组。
+  - 隐藏“分享此应用给朋友”“问题反馈”“用户体验改进计划 / Smartisan 服务条款”，并修正更多区域卡片背景。
+- 下滑 / 上滑搜索：
+  - 原桌面手势代码实际只认上滑，已改为上下滑方向都可进入搜索，满足“下拉搜索”的使用预期。
+  - 移除旧逻辑中前三次只弹 `fling_down_tips` 提示、不真正打开搜索的分支，第一次触发就直接进入搜索页。
+  - `CallStubUtils.Q()` 不再调用缺失的 `com.smartisanos.quicksearch.provider.extra`，改为直接启动本项目内置搜索页。
+  - 将旧 `ua.fc()` 搜索目标从缺失的 `com.smartisanos.quicksearch / com.android.quicksearchbox.SearchActivity` 改为已注册的 `ThemeChooserActivity`，并通过 `launcher_show_search=true` extra 进入搜索模式。
+  - `MaintainedLauncherSettingsHost.show(...)` 根据 extra 切换为内置搜索页，支持应用名 / 包名过滤和点击启动。
+  - Launcher 主 Activity、RootView 和 SMGLSurfaceView 均加了 Android View 层兜底；真实桌面手势仍以原 SMEngine 链路为主。
+
+验证：
+
+- `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 设置首页截图确认“桌面隐藏虚拟键”“隐藏图标上的角标”“紧贴屏幕横扫清除角标”均显示为同款锤子开关。
+- 直接启动 `ThemeChooserActivity --ez launcher_show_search true` 可打开内置搜索页；输入 `root` 后列表过滤到 Root Explorer。
+- adb 模拟下拉在当前 MuMu / Lawnchair 并存环境中不稳定经过 Smartisan 的 SMEngine 手势分发；代码层已修复方向判断、前三次提示吞掉搜索、QuickSearch provider 缺失三处实际阻断点，仍建议在真实手势操作中补一次截图回归。
+- 通过系统设置值和桌面启动路径确认 Launcher 可读取 `launcher_hide_navigation_bar` 并应用隐藏虚拟键 flags；当前模拟器本身底部虚拟键不可见，仍建议在有三键导航的设备上补充截图回归。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/maintained_settings_res/res/layout/setting_main.xml`
+- `launcher/smali/com/smartisanos/launcher/Launcher.smali`
+- `README.md`
+- `DEVELOPMENT_LOG.md`
 
 ### 2026-06-02：桌面图标大小滑块接入 12 / 20 宫格
 

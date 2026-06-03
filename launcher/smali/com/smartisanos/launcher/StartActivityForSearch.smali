@@ -198,12 +198,14 @@
 
     move-result-object p1
 
-    if-eqz p1, :cond_0
+    if-eqz p1, :cond_show_search
 
     .line 4
     invoke-virtual {p1}, Landroid/content/Intent;->getData()Landroid/net/Uri;
 
     move-result-object p1
+
+    if-eqz p1, :cond_show_search
 
     .line 5
     invoke-direct {p0, p1}, Lcom/smartisanos/launcher/StartActivityForSearch;->b(Landroid/net/Uri;)V
@@ -211,6 +213,11 @@
     .line 6
     :cond_0
     invoke-virtual {p0}, Landroid/app/Activity;->finish()V
+
+    return-void
+
+    :cond_show_search
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->showSearchPage(Landroid/app/Activity;)V
 
     return-void
 .end method

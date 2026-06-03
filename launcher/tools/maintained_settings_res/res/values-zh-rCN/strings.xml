@@ -189,6 +189,7 @@
     <string name="search_hint_content_detail">目前可搜索应用程序，联系人和网页内容</string>
     <string name="search_hint_title">搜索</string>
     <string name="search_keywordeditor_hint">搜索</string>
+    <string name="search_page_enabled_title">启用下滑搜索</string>
     <string name="search_searchapp_toast">当前应用</string>
     <string name="search_text">"可搜索应用程序 
  邮件，短信"</string>

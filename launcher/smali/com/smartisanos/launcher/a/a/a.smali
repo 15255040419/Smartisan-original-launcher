@@ -189,6 +189,10 @@
     :cond_2
     sub-float/2addr p1, p5
 
+    invoke-static {p1}, Ljava/lang/Math;->abs(F)F
+
+    move-result p1
+
     const/high16 p2, 0x43160000    # 150.0f
 
     cmpl-float p2, p1, p2
@@ -247,25 +251,7 @@
     move-result-object p0
 
     .line 14
-    invoke-static {p0}, Lcom/smartisanos/launcher/data/N;->H(Landroid/content/Context;)I
-
-    move-result p1
-
-    const/4 p2, 0x3
-
-    if-ge p1, p2, :cond_4
-
-    add-int/2addr p1, p3
-
-    .line 15
-    sget p2, Lcom/smartisanos/launcher/ob;->fling_down_tips:I
-
-    invoke-static {p2, p5}, Lcom/smartisanos/launcher/Bb;->showToast(II)V
-
-    .line 16
-    invoke-static {p0, p1}, Lcom/smartisanos/launcher/data/N;->f(Landroid/content/Context;I)V
-
-    goto :goto_1
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherSearch(Landroid/content/Context;)V
 
     .line 17
     :cond_4

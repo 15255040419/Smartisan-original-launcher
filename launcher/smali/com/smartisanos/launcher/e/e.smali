@@ -131,16 +131,7 @@
 
     .line 8
     :cond_4
-    invoke-virtual {v0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
-
-    move-result-object v0
-
-    .line 9
-    new-instance v1, Lcom/smartisanos/launcher/e/d;
-
-    invoke-direct {v1, p0, v0}, Lcom/smartisanos/launcher/e/d;-><init>(ZLandroid/content/ContentResolver;)V
-
-    invoke-static {v1}, Lcom/smartisanos/launcher/wb;->post(Ljava/lang/Runnable;)V
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherSearch(Landroid/content/Context;)V
 
     return-void
 .end method

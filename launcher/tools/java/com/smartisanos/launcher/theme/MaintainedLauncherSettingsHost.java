@@ -30,9 +30,13 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.Process;
 import android.os.StrictMode;
 import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -43,8 +47,10 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.BaseAdapter;
 import android.widget.AbsListView;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridView;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -68,6 +74,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -79,6 +87,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 public final class MaintainedLauncherSettingsHost {
     private static android.os.Handler sThemePageHandler;
     private static Runnable sThemePageRunnable;
@@ -86,6 +97,10 @@ public final class MaintainedLauncherSettingsHost {
     private static File sSettingsApk;
     private static Bitmap sPendingThemeScreenshot;
     private static final String SETTINGS_ASSET = "settings_maintained/maintained-settings-res.apk";
+    private static float sSearchGestureStartX;
+    private static float sSearchGestureStartY;
+    private static long sSearchGestureStartTime;
+    private static boolean sSearchGestureConsumed;
     private static final String SETTINGS_PKG = "com.smartisanos.home";
     private static final String THEME_DOWNLOAD_PREFS = "theme_download_prefs";
     private static final String ICON_OVERRIDE_PREFS = "icon_override_prefs";
@@ -95,6 +110,7 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_WALLPAPER_READY = "launcher_wallpaper_ready";
     private static final String PREF_WALLPAPER_REFRESH_PENDING = "launcher_wallpaper_refresh_pending";
     private static final String PREF_IMPROVED_ICON_ENABLED = "launcher_improved_icon_enabled";
+    private static final String KEY_SEARCH_PAGE_ENABLED = "launcher_search_page_enabled";
     private static final String KEY_LAUNCHER_ICON_SIZE = "launcher_icon_size";
     private static final String TAG_ICON_SIZE_SUBTITLE = "launcher_icon_size_subtitle";
     private static final String PREF_ICON_SIZE_RUNTIME_DIRTY = "launcher_icon_size_runtime_dirty";
@@ -110,6 +126,8 @@ public final class MaintainedLauncherSettingsHost {
     private static final Map<String, Bitmap> sSmartisanIconCache = new HashMap<String, Bitmap>();
     private static final String THEME_DOWNLOAD_BASE =
             "https://github.com/15255040419/smartisan-launcher/releases/download/themes-v1/";
+    private static final String UPDATE_RELEASE_API =
+            "https://api.github.com/repos/15255040419/Smartisan-original-launcher/releases/latest";
     private static final ThemeEntry[] LOCAL_THEMES = new ThemeEntry[]{
             new ThemeEntry("smartisan_theme_black", "com.smartisanos.home", "经典黑", true),
     };
@@ -160,6 +178,13 @@ public final class MaintainedLauncherSettingsHost {
 
     public static void show(Activity activity) {
         try {
+            Intent intent = activity.getIntent();
+            if (intent != null && intent.getBooleanExtra("launcher_show_search", false)) {
+                intent.removeExtra("launcher_show_search");
+                tuneWindow(activity);
+                showSearchPage(activity);
+                return;
+            }
             migrateBuiltinIconDefaults(activity);
             migrateOldOriginalIconDefaults(activity);
             migrateIconPackDefault(activity);
@@ -360,6 +385,11 @@ public final class MaintainedLauncherSettingsHost {
         if (layoutId == 0) {
             throw new Resources.NotFoundException("layout/" + layoutName);
         }
+        LayoutInflater inflater = settingsInflater(activity, context);
+        return inflater.inflate(layoutId, null);
+    }
+
+    private static LayoutInflater settingsInflater(Activity activity, SettingsResourceContext context) {
         LayoutInflater inflater = LayoutInflater.from(activity).cloneInContext(context);
         inflater.setFactory2(new LayoutInflater.Factory2() {
             public View onCreateView(View parent, String name, Context context, android.util.AttributeSet attrs) {
@@ -378,10 +408,48 @@ public final class MaintainedLauncherSettingsHost {
                 if ("com.smartisanos.home.widget.sys.SelectOptionsView".equals(name)) {
                     return new LinearLayout(context, attrs);
                 }
+                if ("com.smartisan.moreapps.AppsView".equals(name)) {
+                    LinearLayout placeholder = new LinearLayout(context, attrs);
+                    placeholder.setVisibility(View.GONE);
+                    return placeholder;
+                }
+                if ("com.smartisanos.quicksearchbox.container.MainContainerView".equals(name)) {
+                    return new RelativeLayout(context, attrs);
+                }
+                if ("com.smartisanos.quicksearchbox.container.t9keyboard.T9PanelView".equals(name)) {
+                    return new FrameLayout(context, attrs);
+                }
+                if ("com.smartisanos.quicksearchbox.container.t9keyboard.T9KeyBoard".equals(name)) {
+                    LinearLayout keyboard = new LinearLayout(context, attrs);
+                    keyboard.setOrientation(LinearLayout.VERTICAL);
+                    return keyboard;
+                }
+                if ("com.smartisanos.quicksearchbox.container.t9keyboard.DialButtonView".equals(name)) {
+                    TextView key = new TextView(context, attrs);
+                    key.setGravity(Gravity.CENTER);
+                    key.setTextColor(0xff444a5a);
+                    key.setTextSize(18);
+                    return key;
+                }
+                if ("com.smartisanos.quicksearchbox.container.resultbox.resultlist.ResultList".equals(name)) {
+                    return new ListView(context, attrs);
+                }
+                if ("com.smartisanos.quicksearchbox.container.resultbox.resultlist.item.doublesingle.ItemDoubleSingle".equals(name)) {
+                    return new RelativeLayout(context, attrs);
+                }
+                if ("com.smartisanos.quicksearchbox.container.editbox.enginelist.EngineList".equals(name)) {
+                    return new ImageView(context, attrs);
+                }
+                if ("com.smartisanos.quicksearchbox.container.editbox.clearbutton.ClearButton".equals(name)) {
+                    return new ImageView(context, attrs);
+                }
+                if ("com.smartisanos.quicksearchbox.container.editbox.keywordeditor.KeyWordEditor".equals(name)) {
+                    return new EditText(context, attrs);
+                }
                 return null;
             }
         });
-        return inflater.inflate(layoutId, null);
+        return inflater;
     }
 
     private static void bindPage(final Activity activity, Resources resources, View root) {
@@ -392,10 +460,13 @@ public final class MaintainedLauncherSettingsHost {
 
         bindGrid(activity, resources, root);
         bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
+        bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
+        bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
+        bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
         bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
+        bindSwitch(activity, resources, root, "item_id_search_page_enabled", KEY_SEARCH_PAGE_ENABLED, true);
         bindSwitch(activity, resources, root, "multi_block_fast_launch_app", "fast_launch_app_on", true);
 
-        hide(resources, root, "item_id_hide_navigation_bar");
         hide(resources, root, "id_unlock_anim_tips");
         hide(resources, root, "setting_defaultsearchengine");
         hide(resources, root, "searchengine_text");
@@ -407,6 +478,10 @@ public final class MaintainedLauncherSettingsHost {
         bindWallpaperSettingIcon(activity, resources, root);
         bindMainSettingIcon(resources, root, "item_page_flip_anims", "page_flip_animation_default_upper", true);
         bindMainSettingIcon(resources, root, "item_id_icons", "icon_setting_icon");
+        TextView updateVersion = (TextView) byId(root, resources, "more_check_upgradation_text");
+        if (updateVersion != null) {
+            updateVersion.setText(appVersionName(activity));
+        }
 
         click(activity, resources, root, "item_id_themes", new View.OnClickListener() {
             public void onClick(View v) {
@@ -433,12 +508,115 @@ public final class MaintainedLauncherSettingsHost {
                 openDefaultHomeSettings(activity);
             }
         });
-        clickToast(activity, resources, root, "setting_share", "分享功能后续接入");
-        clickToast(activity, resources, root, "more_check_upgradation", "当前已是本地移植版本");
+        hide(resources, root, "setting_share");
+        hide(resources, root, "setting_feedback");
+        hide(resources, root, "setting_user_experience");
+        setBackground(find(resources, root, "more_check_upgradation"), resources, "setting_item_up");
+        setBackground(find(resources, root, "setting_switch_launcher"), resources, "more_item_middle");
+        setBackground(find(resources, root, "setting_about_us"), resources, "setting_item_down");
+        click(activity, resources, root, "more_check_upgradation", new View.OnClickListener() {
+            public void onClick(View v) {
+                checkForUpdates(activity);
+            }
+        });
         clickToast(activity, resources, root, "setting_feedback", "反馈功能后续接入");
         clickToast(activity, resources, root, "setting_user_experience", "用户体验计划后续接入");
-        clickToast(activity, resources, root, "setting_battery_optimization", "请在系统电池设置中调整");
-        clickToast(activity, resources, root, "setting_about_us", "锤子桌面");
+        click(activity, resources, root, "setting_battery_optimization", new View.OnClickListener() {
+            public void onClick(View v) {
+                openBatteryOptimizationSettings(activity);
+            }
+        });
+        click(activity, resources, root, "setting_about_us", new View.OnClickListener() {
+            public void onClick(View v) {
+                showAboutPage(activity);
+            }
+        });
+    }
+
+    public static void applyLauncherNavigationBarSetting(Activity activity) {
+        if (activity == null || activity.getWindow() == null) {
+            return;
+        }
+        try {
+            Window window = activity.getWindow();
+            View decor = window.getDecorView();
+            if (decor == null) {
+                return;
+            }
+            int visibility = decor.getSystemUiVisibility();
+            boolean hideNavigation = LauncherSettingBridge.readBool(
+                    activity, "launcher_hide_navigation_bar", false);
+            if (hideNavigation) {
+                visibility |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+                visibility |= View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+                visibility |= View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+                visibility |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+            } else {
+                visibility &= ~View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
+                visibility &= ~View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            }
+            decor.setSystemUiVisibility(visibility);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public static boolean handleLauncherSearchGesture(Activity activity, MotionEvent event) {
+        if (activity == null || event == null) {
+            return false;
+        }
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            sSearchGestureStartX = event.getX();
+            sSearchGestureStartY = event.getY();
+            sSearchGestureStartTime = android.os.SystemClock.uptimeMillis();
+            sSearchGestureConsumed = false;
+            return false;
+        }
+        if (action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP) {
+            return false;
+        }
+        if (sSearchGestureConsumed) {
+            return true;
+        }
+        float dx = event.getX() - sSearchGestureStartX;
+        float dy = event.getY() - sSearchGestureStartY;
+        long duration = android.os.SystemClock.uptimeMillis() - sSearchGestureStartTime;
+        int height = activity.getResources().getDisplayMetrics().heightPixels;
+        boolean fromDesktop = sSearchGestureStartY > dp(activity, 48)
+                && sSearchGestureStartY < height * 0.88f;
+        boolean downward = dy > dp(activity, 150) && Math.abs(dx) < dy * 0.90f;
+        if (fromDesktop && downward && duration < 2000) {
+            if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, true)) {
+                return false;
+            }
+            sSearchGestureConsumed = true;
+            openLauncherSearch(activity);
+            return true;
+        }
+        return false;
+    }
+
+    private static void openLauncherSearch(Activity activity) {
+        openLauncherSearch((Context) activity);
+    }
+
+    public static void openLauncherSearch(Context context) {
+        if (!readSystemBool(context, KEY_SEARCH_PAGE_ENABLED, true)) {
+            return;
+        }
+        try {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.setClassName(context.getPackageName(),
+                    "com.smartisanos.launcher.theme.ThemeChooserActivity");
+            intent.putExtra("launcher_show_search", true);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            if (!(context instanceof Activity)) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            context.startActivity(intent);
+        } catch (Throwable t) {
+            Toast.makeText(context, "无法打开搜索", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private static void bindMainSettingIcon(Resources resources, View root, String viewName, String drawableName) {
@@ -3021,6 +3199,744 @@ public final class MaintainedLauncherSettingsHost {
         click(context, resources, root, idName, toastClick(context, message));
     }
 
+    private static void checkForUpdates(final Activity activity) {
+        Toast.makeText(activity, "正在检查更新...", Toast.LENGTH_SHORT).show();
+        final Handler handler = new Handler(Looper.getMainLooper());
+        new Thread(new Runnable() {
+            public void run() {
+                HttpURLConnection conn = null;
+                try {
+                    URL url = new URL(UPDATE_RELEASE_API);
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setConnectTimeout(8000);
+                    conn.setReadTimeout(10000);
+                    conn.setRequestProperty("Accept", "application/vnd.github+json");
+                    int code = conn.getResponseCode();
+                    if (code == 404) {
+                        postUpdateInfo(handler, activity, "检查更新",
+                                "当前仓库还没有发布 Release\n当前版本：" + appVersion(activity)
+                                        + "\n\n后续在 GitHub 发布 APK 后，这里会提示下载更新。");
+                        return;
+                    }
+                    if (code < 200 || code >= 300) {
+                        throw new IllegalStateException("HTTP " + code);
+                    }
+                    String json = readText(conn.getInputStream());
+                    JSONObject release = new JSONObject(json);
+                    final String tag = release.optString("tag_name", "");
+                    final String name = release.optString("name", tag);
+                    final String body = release.optString("body", "");
+                    String apkUrl = null;
+                    String apkName = null;
+                    JSONArray assets = release.optJSONArray("assets");
+                    if (assets != null) {
+                        for (int i = 0; i < assets.length(); i++) {
+                            JSONObject asset = assets.optJSONObject(i);
+                            if (asset == null) continue;
+                            String assetName = asset.optString("name", "");
+                            String downloadUrl = asset.optString("browser_download_url", "");
+                            if (assetName.toLowerCase().endsWith(".apk") && downloadUrl.length() > 0) {
+                                apkName = assetName;
+                                apkUrl = downloadUrl;
+                                break;
+                            }
+                        }
+                    }
+                    final String finalApkUrl = apkUrl;
+                    final String finalApkName = apkName == null ? "smartisan-launcher-update.apk" : apkName;
+                    final String finalName = name.length() == 0 ? tag : name;
+                    final String finalBody = body;
+                    handler.post(new Runnable() {
+                        public void run() {
+                            String current = appVersionName(activity);
+                            boolean same = tag.length() > 0 && tag.equalsIgnoreCase(current);
+                            if (finalApkUrl == null) {
+                                showInfoDialog(activity, "检查更新",
+                                        "已找到线上版本：" + finalName
+                                                + "\n但该 Release 没有 APK 安装包\n当前版本：" + appVersion(activity));
+                                return;
+                            }
+                            if (same) {
+                                showInfoDialog(activity, "检查更新",
+                                        "当前已是最新版本\n版本：" + appVersion(activity));
+                                return;
+                            }
+                            String message = "发现线上版本：" + finalName
+                                    + "\n当前版本：" + appVersion(activity);
+                            if (finalBody != null && finalBody.length() > 0) {
+                                String shortBody = finalBody.length() > 120
+                                        ? finalBody.substring(0, 120) + "..."
+                                        : finalBody;
+                                message += "\n\n" + shortBody;
+                            }
+                            showConfirmDialog(activity, "发现新版本", message, "取消", "下载", new View.OnClickListener() {
+                                public void onClick(View v) {
+                                    downloadUpdateApk(activity, finalApkUrl, finalApkName);
+                                }
+                            });
+                        }
+                    });
+                } catch (Throwable t) {
+                    final String error = shortError(t);
+                    postUpdateInfo(handler, activity, "检查更新",
+                            "无法获取线上版本信息\n当前版本：" + appVersion(activity)
+                                    + "\n\n" + error);
+                } finally {
+                    if (conn != null) {
+                        conn.disconnect();
+                    }
+                }
+            }
+        }, "launcher-update-check").start();
+    }
+
+    private static void postUpdateInfo(Handler handler, final Activity activity, final String title, final String message) {
+        handler.post(new Runnable() {
+            public void run() {
+                showInfoDialog(activity, title, message);
+            }
+        });
+    }
+
+    private static String readText(InputStream input) throws Exception {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(input, "UTF-8"));
+        StringBuilder out = new StringBuilder();
+        char[] buf = new char[2048];
+        try {
+            int read;
+            while ((read = reader.read(buf)) != -1) {
+                out.append(buf, 0, read);
+            }
+        } finally {
+            try {
+                reader.close();
+            } catch (Throwable ignored) {
+            }
+        }
+        return out.toString();
+    }
+
+    private static void downloadUpdateApk(Activity activity, String url, String name) {
+        try {
+            if (!ensureDownloadPermission(activity)) {
+                return;
+            }
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+            request.setTitle(name);
+            request.setDescription("锤子桌面更新安装包");
+            request.setMimeType("application/vnd.android.package-archive");
+            if (Build.VERSION.SDK_INT >= 11) {
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            }
+            File out = new File(activity.getExternalFilesDir(null), name);
+            try {
+                if (out.exists()) {
+                    out.delete();
+                }
+                request.setDestinationUri(Uri.fromFile(out));
+            } catch (Throwable ignored) {
+            }
+            DownloadManager manager = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE);
+            if (manager == null) {
+                throw new IllegalStateException("DownloadManager unavailable");
+            }
+            long id = manager.enqueue(request);
+            activity.getSharedPreferences(THEME_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(String.valueOf(id) + ".path", out.getAbsolutePath())
+                    .commit();
+            Toast.makeText(activity, "已开始下载更新包", Toast.LENGTH_SHORT).show();
+            monitorUpdateDownload(activity, id);
+        } catch (Throwable t) {
+            try {
+                activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            } catch (Throwable ignored) {
+                Toast.makeText(activity, "无法下载更新包", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private static void monitorUpdateDownload(final Activity activity, final long downloadId) {
+        final Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(new Runnable() {
+            public void run() {
+                DownloadManager manager = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE);
+                if (manager == null) {
+                    return;
+                }
+                Cursor cursor = null;
+                try {
+                    cursor = manager.query(new DownloadManager.Query().setFilterById(downloadId));
+                    if (cursor == null || !cursor.moveToFirst()) {
+                        handler.postDelayed(this, 800);
+                        return;
+                    }
+                    int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                    if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                        Toast.makeText(activity, "更新包下载完成，正在启动安装...", Toast.LENGTH_LONG).show();
+                        installApk(activity, downloadId);
+                        return;
+                    }
+                    if (status == DownloadManager.STATUS_FAILED) {
+                        Toast.makeText(activity, "更新包下载失败", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                } catch (Throwable ignored) {
+                } finally {
+                    if (cursor != null) {
+                        cursor.close();
+                    }
+                }
+                handler.postDelayed(this, 1200);
+            }
+        });
+    }
+
+    private static void openBatteryOptimizationSettings(Activity activity) {
+        String packageName = activity.getPackageName();
+        Uri packageUri = Uri.parse("package:" + packageName);
+        if (Build.VERSION.SDK_INT >= 23) {
+            try {
+                PowerManager powerManager = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
+                if (powerManager == null || !powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(packageUri);
+                    activity.startActivity(intent);
+                    return;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        try {
+            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            activity.startActivity(intent);
+            return;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(packageUri);
+            activity.startActivity(intent);
+            return;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Intent intent = new Intent(Settings.ACTION_SETTINGS);
+            activity.startActivity(intent);
+        } catch (Throwable t) {
+            Toast.makeText(activity, "无法打开系统电池优化设置：" + shortError(t), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private static void showAboutPage(final Activity activity) {
+        try {
+            final SettingsResourceContext context = createSettingsContext(activity);
+            Resources resources = context.getResources();
+            View root = inflate(activity, context, "setting_about_us");
+            bindBackTitle(activity, resources, root, "view_title",
+                    getString(resources, "setting_about_us", "关于我们"));
+            hide(resources, root, "setting_more_product");
+            tuneScrollBars(root);
+            activity.setContentView(root);
+        } catch (Throwable t) {
+            showInfoDialog(activity, "关于我们",
+                    "锤子桌面 original-port\n版本：" + appVersion(activity)
+                            + "\n包名：" + activity.getPackageName());
+        }
+    }
+
+    private static GradientDrawable cardBg(Context context) {
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xffffffff);
+        bg.setStroke(1, 0xffdddddd);
+        bg.setCornerRadius(dp(context, 5));
+        return bg;
+    }
+
+    private static LinearLayout.LayoutParams sectionTitleLp(Context context) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(context, 46));
+        lp.topMargin = dp(context, 18);
+        return lp;
+    }
+
+    private static TextView sectionTitle(Context context, String value) {
+        TextView title = text(context, value, 18, 0xff7d828d, false);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        title.setPadding(dp(context, 20), 0, 0, 0);
+        return title;
+    }
+
+    private static void addAboutAppRow(final Activity activity, LinearLayout parent, String title, String subtitle, int color) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(activity, 22), 0, dp(activity, 22), 0);
+        TextView icon = text(activity, title.substring(0, 1), 22, 0xffffffff, true);
+        icon.setGravity(Gravity.CENTER);
+        GradientDrawable iconBg = new GradientDrawable();
+        iconBg.setColor(color);
+        iconBg.setCornerRadius(dp(activity, 4));
+        icon.setBackgroundDrawable(iconBg);
+        row.addView(icon, new LinearLayout.LayoutParams(dp(activity, 54), dp(activity, 54)));
+
+        LinearLayout labels = new LinearLayout(activity);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setPadding(dp(activity, 18), 0, dp(activity, 10), 0);
+        TextView tvTitle = text(activity, title, 18, 0xff666b76, false);
+        TextView tvSub = text(activity, subtitle, 13, 0xffb1b4bb, false);
+        tvSub.setSingleLine(true);
+        labels.addView(tvTitle, new LinearLayout.LayoutParams(-1, -2));
+        labels.addView(tvSub, new LinearLayout.LayoutParams(-1, -2));
+        row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1.0f));
+
+        TextView install = text(activity, "安装", 16, 0xff555d6d, false);
+        install.setGravity(Gravity.CENTER);
+        GradientDrawable buttonBg = new GradientDrawable();
+        buttonBg.setColor(0xfffbfbfb);
+        buttonBg.setStroke(1, 0xffd8d8d8);
+        buttonBg.setCornerRadius(dp(activity, 4));
+        install.setBackgroundDrawable(buttonBg);
+        install.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                Toast.makeText(activity, "暂无内置安装源", Toast.LENGTH_SHORT).show();
+            }
+        });
+        row.addView(install, new LinearLayout.LayoutParams(dp(activity, 118), dp(activity, 48)));
+        parent.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 92)));
+    }
+
+    private static void addFollowRow(Context context, LinearLayout parent, String left, String right) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(context, 20), 0, dp(context, 20), 0);
+        TextView title = text(context, left, 20, 0xff555d6d, false);
+        row.addView(title, new LinearLayout.LayoutParams(0, -1, 1.0f));
+        TextView value = text(context, right, 16, 0xff6f91df, false);
+        value.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        row.addView(value, new LinearLayout.LayoutParams(0, -1, 1.0f));
+        parent.addView(row, new LinearLayout.LayoutParams(-1, dp(context, 72)));
+    }
+
+    private static void addDivider(Context context, LinearLayout parent) {
+        View line = new View(context);
+        line.setBackgroundColor(0xffeeeeee);
+        parent.addView(line, new LinearLayout.LayoutParams(-1, 1));
+    }
+
+    private static void showInfoDialog(final Activity activity, String title, String message) {
+        final Dialog dialog = new Dialog(activity);
+        LinearLayout root = new LinearLayout(activity);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(0, 0, 0, 0);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xfffbfbfb);
+        bg.setCornerRadius(dp(activity, 4));
+        root.setBackground(bg);
+
+        TextView titleView = text(activity, title, 18, 0xff333333, true);
+        titleView.setGravity(Gravity.CENTER);
+        root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+
+        View line = new View(activity);
+        line.setBackgroundColor(0xffe5e5e5);
+        root.addView(line, new LinearLayout.LayoutParams(-1, 1));
+
+        TextView messageView = text(activity, message, 14, 0xff666666, false);
+        messageView.setGravity(Gravity.CENTER);
+        messageView.setLineSpacing(dp(activity, 2), 1.0f);
+        messageView.setPadding(dp(activity, 24), dp(activity, 20), dp(activity, 24), dp(activity, 20));
+        root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
+
+        View footerLine = new View(activity);
+        footerLine.setBackgroundColor(0xffe5e5e5);
+        root.addView(footerLine, new LinearLayout.LayoutParams(-1, 1));
+
+        TextView ok = dialogButton(activity, "确定", 0xff5f8fe8);
+        ok.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                dialog.dismiss();
+            }
+        });
+        root.addView(ok, new LinearLayout.LayoutParams(-1, dp(activity, 48)));
+
+        dialog.setContentView(root);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+        }
+        dialog.show();
+        Window shown = dialog.getWindow();
+        if (shown != null) {
+            shown.setLayout(dp(activity, 300), -2);
+        }
+    }
+
+    private static String appVersion(Context context) {
+        try {
+            android.content.pm.PackageInfo info = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0);
+            if (info.versionName != null && info.versionName.length() > 0) {
+                return info.versionName + " (" + info.versionCode + ")";
+            }
+            return String.valueOf(info.versionCode);
+        } catch (Throwable ignored) {
+            return "unknown";
+        }
+    }
+
+    private static String appVersionName(Context context) {
+        try {
+            android.content.pm.PackageInfo info = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0);
+            return info.versionName == null ? "" : info.versionName;
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    public static void showSearchPage(final Activity activity) {
+        if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, true)) {
+            activity.finish();
+            return;
+        }
+        final ArrayList<SearchEntry> all = new ArrayList<SearchEntry>();
+        final ArrayList<SearchEntry> visible = new ArrayList<SearchEntry>();
+        final SettingsResourceContext context;
+        final Resources resources;
+        try {
+            context = createSettingsContext(activity);
+            resources = context.getResources();
+        } catch (Throwable t) {
+            Toast.makeText(activity, "无法打开搜索页：" + shortError(t), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        loadSearchEntries(activity, all);
+
+        final LinearLayout root = new LinearLayout(activity);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(0xffedf3f8);
+        activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+
+        LinearLayout searchArea = new LinearLayout(activity);
+        searchArea.setGravity(Gravity.CENTER_VERTICAL);
+        searchArea.setPadding(dp(activity, 10), dp(activity, 9), dp(activity, 10), dp(activity, 9));
+        searchArea.setBackgroundColor(0xfff7f7f7);
+        root.addView(searchArea, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+
+        RelativeLayout searchBar = new RelativeLayout(activity);
+        searchBar.setBackground(roundedDrawable(0xffffffff, 0xffd8dbe0, dp(activity, 22)));
+        searchArea.addView(searchBar, new LinearLayout.LayoutParams(-1, dp(activity, 38)));
+
+        ImageView searchIcon = new ImageView(activity);
+        int searchIconId = resources.getIdentifier("search_icon", "drawable", SETTINGS_PKG);
+        if (searchIconId != 0) {
+            searchIcon.setImageDrawable(resources.getDrawable(searchIconId));
+        }
+        searchIcon.setAlpha(0.45f);
+        RelativeLayout.LayoutParams searchIconLp = new RelativeLayout.LayoutParams(dp(activity, 23), dp(activity, 23));
+        searchIconLp.leftMargin = dp(activity, 12);
+        searchIconLp.addRule(RelativeLayout.CENTER_VERTICAL);
+        searchBar.addView(searchIcon, searchIconLp);
+
+        final EditText query = new EditText(activity);
+        query.setSingleLine(true);
+        query.setHint("搜索本机和在线内容");
+        query.setTextColor(0xff3f4656);
+        query.setHintTextColor(0xffc6cbd1);
+        query.setTextSize(17);
+        query.setPadding(0, 0, 0, 0);
+        query.setBackgroundColor(Color.TRANSPARENT);
+        query.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        query.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        RelativeLayout.LayoutParams queryLp = new RelativeLayout.LayoutParams(-1, -1);
+        queryLp.leftMargin = dp(activity, 46);
+        queryLp.rightMargin = dp(activity, 45);
+        searchBar.addView(query, queryLp);
+
+        TextView clearButton = new TextView(activity);
+        clearButton.setText("×");
+        clearButton.setGravity(Gravity.CENTER);
+        clearButton.setTextColor(0xff8d939b);
+        clearButton.setTextSize(24);
+        clearButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        RelativeLayout.LayoutParams clearLp = new RelativeLayout.LayoutParams(dp(activity, 42), -1);
+        clearLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+        clearLp.addRule(RelativeLayout.CENTER_VERTICAL);
+        searchBar.addView(clearButton, clearLp);
+
+        final LinearLayout emptyPanel = new LinearLayout(activity);
+        emptyPanel.setOrientation(LinearLayout.VERTICAL);
+        emptyPanel.setPadding(0, dp(activity, 22), 0, 0);
+        root.addView(emptyPanel, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        HorizontalScrollView commonScroll = new HorizontalScrollView(activity);
+        commonScroll.setHorizontalScrollBarEnabled(false);
+        commonScroll.setFillViewport(false);
+        commonScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        LinearLayout commonApps = new LinearLayout(activity);
+        commonApps.setOrientation(LinearLayout.HORIZONTAL);
+        commonApps.setGravity(Gravity.CENTER);
+        commonApps.setPadding(dp(activity, 22), 0, dp(activity, 22), 0);
+        commonScroll.addView(commonApps, new HorizontalScrollView.LayoutParams(-2, -1));
+        emptyPanel.addView(commonScroll, new LinearLayout.LayoutParams(-1, dp(activity, 102)));
+        int appCount = Math.min(20, all.size());
+        for (int i = 0; i < appCount; i++) {
+            LinearLayout.LayoutParams shortcutLp = new LinearLayout.LayoutParams(
+                    dp(activity, 82), -1);
+            shortcutLp.rightMargin = dp(activity, 8);
+            commonApps.addView(searchShortcut(activity, all.get(i)), shortcutLp);
+        }
+
+        RelativeLayout historyTitle = new RelativeLayout(activity);
+        TextView history = new TextView(activity);
+        history.setText("搜索历史");
+        history.setTextSize(16);
+        history.setTextColor(0xffa2a7ae);
+        RelativeLayout.LayoutParams historyLp = new RelativeLayout.LayoutParams(-2, -1);
+        historyLp.leftMargin = dp(activity, 28);
+        historyTitle.addView(history, historyLp);
+        TextView historyClear = new TextView(activity);
+        historyClear.setText("×");
+        historyClear.setGravity(Gravity.CENTER);
+        historyClear.setTextSize(22);
+        historyClear.setTextColor(0xff9da3aa);
+        historyClear.setBackground(roundedDrawable(0xffffffff, 0xffdde2e8, dp(activity, 18)));
+        RelativeLayout.LayoutParams historyClearLp = new RelativeLayout.LayoutParams(dp(activity, 34), dp(activity, 34));
+        historyClearLp.rightMargin = dp(activity, 28);
+        historyClearLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+        historyClearLp.addRule(RelativeLayout.CENTER_VERTICAL);
+        historyTitle.addView(historyClear, historyClearLp);
+        emptyPanel.addView(historyTitle, new LinearLayout.LayoutParams(-1, dp(activity, 50)));
+
+        LinearLayout chipBox = new LinearLayout(activity);
+        chipBox.setOrientation(LinearLayout.VERTICAL);
+        chipBox.setPadding(dp(activity, 20), 0, dp(activity, 20), 0);
+        emptyPanel.addView(chipBox, new LinearLayout.LayoutParams(-1, -2));
+        addSearchHistoryChips(activity, chipBox, all);
+
+        final ListView list = new ListView(activity);
+        list.setDividerHeight(1);
+        list.setDivider(new android.graphics.drawable.ColorDrawable(0xffe3e5e8));
+        list.setCacheColorHint(Color.TRANSPARENT);
+        list.setBackgroundColor(0xffffffff);
+        list.setVisibility(View.GONE);
+        root.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        final SearchAdapter adapter = new SearchAdapter(activity, context, resources, visible);
+        list.setAdapter(adapter);
+
+        clearButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (query.getText() != null && query.getText().length() > 0) {
+                    query.setText("");
+                } else {
+                    activity.finish();
+                }
+            }
+        });
+
+        activity.setContentView(root);
+        query.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String text = s == null ? "" : s.toString();
+                filterSearchEntries(text, all, visible, adapter);
+                boolean searching = text.trim().length() > 0;
+                emptyPanel.setVisibility(searching ? View.GONE : View.VISIBLE);
+                list.setVisibility(searching ? View.VISIBLE : View.GONE);
+                if (searching && visible.size() == 0) {
+                    Toast.makeText(activity, "无搜索结果", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            public void afterTextChanged(Editable s) {
+            }
+        });
+        query.requestFocus();
+        query.postDelayed(new Runnable() {
+            public void run() {
+                Object service = activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (service instanceof InputMethodManager) {
+                    ((InputMethodManager) service).showSoftInput(query, InputMethodManager.SHOW_IMPLICIT);
+                }
+            }
+        }, 250);
+    }
+
+    private static Drawable roundedDrawable(int color, int strokeColor, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radius);
+        drawable.setStroke(1, strokeColor);
+        return drawable;
+    }
+
+    private static View searchShortcut(final Activity activity, final SearchEntry entry) {
+        LinearLayout item = new LinearLayout(activity);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setClickable(true);
+        item.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                launchSearchEntry(activity, entry);
+            }
+        });
+
+        ImageView icon = new ImageView(activity);
+        icon.setImageDrawable(entry.icon);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        item.addView(icon, new LinearLayout.LayoutParams(dp(activity, 46), dp(activity, 46)));
+
+        TextView label = new TextView(activity);
+        label.setText(entry.label);
+        label.setTextSize(12);
+        label.setTextColor(0xff2f3440);
+        label.setGravity(Gravity.CENTER);
+        label.setSingleLine(true);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, dp(activity, 26));
+        labelLp.topMargin = dp(activity, 6);
+        item.addView(label, labelLp);
+        return item;
+    }
+
+    private static void addSearchHistoryChips(final Activity activity, LinearLayout chipBox,
+                                              ArrayList<SearchEntry> entries) {
+        LinearLayout row = null;
+        int count = Math.min(8, entries.size());
+        for (int i = 0; i < count; i++) {
+            if (i % 4 == 0) {
+                row = new LinearLayout(activity);
+                row.setGravity(Gravity.LEFT);
+                chipBox.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 40)));
+            }
+            final SearchEntry entry = entries.get(i);
+            TextView chip = new TextView(activity);
+            chip.setText(entry.label);
+            chip.setSingleLine(true);
+            chip.setEllipsize(TextUtils.TruncateAt.END);
+            chip.setTextSize(14);
+            chip.setTextColor(0xff565d68);
+            chip.setGravity(Gravity.CENTER);
+            chip.setPadding(dp(activity, 12), 0, dp(activity, 12), 0);
+            chip.setBackground(roundedDrawable(0xffffffff, 0xffd8dde4, dp(activity, 8)));
+            chip.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    launchSearchEntry(activity, entry);
+                }
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(activity, 30), 1);
+            lp.leftMargin = dp(activity, 4);
+            lp.rightMargin = dp(activity, 4);
+            if (row != null) {
+                row.addView(chip, lp);
+            }
+        }
+    }
+
+    private static void launchSearchEntry(Activity activity, SearchEntry entry) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setClassName(entry.packageName, entry.className);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            activity.startActivity(intent);
+            activity.finish();
+        } catch (Throwable t) {
+            Toast.makeText(activity, "无法启动应用", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private static void bindMaintainedT9Keyboard(final Activity activity, Resources resources,
+                                                 View root, final EditText query) {
+        String[][] keys = new String[][] {
+                {"one", "1"}, {"two", "2\nABC"}, {"three", "3\nDEF"},
+                {"four", "4\nGHI"}, {"five", "5\nJKL"}, {"six", "6\nMNO"},
+                {"seven", "7\nPQRS"}, {"eight", "8\nTUV"}, {"nine", "9\nWXYZ"},
+                {"down", ""}, {"zero", "0"}, {"delete", "⌫"}
+        };
+        int defaultBg = drawable(resources, "btn_0_classic_normal");
+        for (int i = 0; i < keys.length; i++) {
+            final String id = keys[i][0];
+            final String label = keys[i][1];
+            View view = byId(root, resources, id);
+            if (view instanceof TextView) {
+                TextView key = (TextView) view;
+                key.setText(label);
+                key.setSingleLine(false);
+                key.setGravity(Gravity.CENTER);
+                key.setTextColor(0xff444a5a);
+                key.setTextSize(label.indexOf('\n') >= 0 ? 16 : 19);
+                if (defaultBg != 0 && key.getBackground() == null) {
+                    key.setBackgroundResource(defaultBg);
+                }
+                key.setOnClickListener(new View.OnClickListener() {
+                    public void onClick(View v) {
+                        if ("delete".equals(id)) {
+                            Editable text = query.getText();
+                            if (text != null && text.length() > 0) {
+                                text.delete(text.length() - 1, text.length());
+                            }
+                        } else if ("down".equals(id)) {
+                            activity.finish();
+                        } else {
+                            query.append(label.substring(0, 1));
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    private static void loadSearchEntries(Context context, ArrayList<SearchEntry> out) {
+        out.clear();
+        try {
+            PackageManager pm = context.getPackageManager();
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            List<ResolveInfo> infos = pm.queryIntentActivities(intent, 0);
+            for (ResolveInfo info : infos) {
+                if (info == null || info.activityInfo == null) {
+                    continue;
+                }
+                String pkg = info.activityInfo.packageName;
+                String cls = info.activityInfo.name;
+                if (pkg == null || cls == null) {
+                    continue;
+                }
+                CharSequence label = info.loadLabel(pm);
+                out.add(new SearchEntry(label == null ? pkg : label.toString(), pkg, cls, info.loadIcon(pm)));
+            }
+            Collections.sort(out, new Comparator<SearchEntry>() {
+                public int compare(SearchEntry a, SearchEntry b) {
+                    return a.label.compareToIgnoreCase(b.label);
+                }
+            });
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void filterSearchEntries(String query, ArrayList<SearchEntry> all,
+                                            ArrayList<SearchEntry> visible, BaseAdapter adapter) {
+        visible.clear();
+        String needle = query == null ? "" : query.trim().toLowerCase();
+        boolean t9 = isDigitQuery(needle);
+        for (SearchEntry entry : all) {
+            if (needle.length() == 0
+                    || entry.label.toLowerCase().contains(needle)
+                    || entry.packageName.toLowerCase().contains(needle)
+                    || (t9 && entry.t9Code.indexOf(needle) >= 0)) {
+                visible.add(entry);
+            }
+        }
+        adapter.notifyDataSetChanged();
+    }
+
     private static void click(Context context, Resources resources, View root, String idName, View.OnClickListener listener) {
         View view = find(resources, root, idName);
         if (view != null) {
@@ -3554,8 +4470,24 @@ public final class MaintainedLauncherSettingsHost {
         title.setSingleLine(true);
         title.setText(titleText);
         title.setTextColor(0xff454a5c);
-        title.setTextSize(20);
+        title.setTextSize(18);
         texts.addView(title, new LinearLayout.LayoutParams(-2, -1));
+
+        boolean iconSizeRow = "桌面图标大小".equals(titleText);
+        boolean iconPackRow = "图标包".equals(titleText);
+        if (iconSizeRow || iconPackRow) {
+            ImageView arrow = new ImageView(context);
+            int arrowId = resources.getIdentifier("setting_next", "drawable", SETTINGS_PKG);
+            if (arrowId != 0) {
+                arrow.setImageDrawable(resources.getDrawable(arrowId));
+            }
+            arrow.setScaleType(ImageView.ScaleType.CENTER);
+            RelativeLayout.LayoutParams arrowLp = new RelativeLayout.LayoutParams(dp(context, 42), -1);
+            arrowLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+            arrowLp.addRule(RelativeLayout.CENTER_VERTICAL);
+            arrowLp.rightMargin = dp(context, 8);
+            row.addView(arrow, arrowLp);
+        }
 
         if (subtitleText != null && subtitleText.length() > 0) {
             TextView subtitle = new TextView(context);
@@ -3563,13 +4495,13 @@ public final class MaintainedLauncherSettingsHost {
             subtitle.setSingleLine(true);
             subtitle.setText(subtitleText);
             subtitle.setTextColor(0xff9d9fa6);
-            subtitle.setTextSize(15);
+            subtitle.setTextSize(14);
             RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(-2, -1);
             lp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
             lp.addRule(RelativeLayout.CENTER_VERTICAL);
-            lp.rightMargin = dp(context, 24);
+            lp.rightMargin = (iconSizeRow || iconPackRow) ? dp(context, 58) : dp(context, 24);
             row.addView(subtitle, lp);
-            if ("桌面图标大小".equals(titleText)) {
+            if (iconSizeRow) {
                 subtitle.setTag(TAG_ICON_SIZE_SUBTITLE);
             }
             if (click != null) {
@@ -3647,8 +4579,8 @@ public final class MaintainedLauncherSettingsHost {
         title.setSingleLine(true);
         title.setText("桌面图标大小");
         title.setTextColor(0xff5c5c5c);
-        title.setTextSize(18);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextSize(17);
+        title.setTypeface(null, android.graphics.Typeface.NORMAL);
         root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
@@ -3661,7 +4593,7 @@ public final class MaintainedLauncherSettingsHost {
         final TextView percentText = new TextView(activity);
         percentText.setGravity(Gravity.CENTER);
         percentText.setTextColor(0xff454a5c);
-        percentText.setTextSize(25);
+        percentText.setTextSize(22);
         percentText.setText(current + "%");
         LinearLayout.LayoutParams percentLp = new LinearLayout.LayoutParams(-1, dp(activity, 36));
         content.addView(percentText, percentLp);
@@ -3681,9 +4613,9 @@ public final class MaintainedLauncherSettingsHost {
         LinearLayout preview = new LinearLayout(activity);
         preview.setGravity(Gravity.CENTER);
         preview.setOrientation(LinearLayout.HORIZONTAL);
-        final TextView smallPreview = iconSizePreviewText(activity, "小", 16);
-        final TextView standardPreview = iconSizePreviewText(activity, "中", 24);
-        final TextView largePreview = iconSizePreviewText(activity, "大", 32);
+        final TextView smallPreview = iconSizePreviewText(activity, "小", 15);
+        final TextView standardPreview = iconSizePreviewText(activity, "中", 22);
+        final TextView largePreview = iconSizePreviewText(activity, "大", 29);
         preview.addView(smallPreview, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
         preview.addView(standardPreview, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
         preview.addView(largePreview, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
@@ -3801,7 +4733,7 @@ public final class MaintainedLauncherSettingsHost {
         view.setText(text);
         view.setTextColor(0xff4d5a73);
         view.setTextSize(textSize);
-        view.setTypeface(null, android.graphics.Typeface.BOLD);
+        view.setTypeface(null, android.graphics.Typeface.NORMAL);
         return view;
     }
 
@@ -3817,7 +4749,7 @@ public final class MaintainedLauncherSettingsHost {
         button.setSingleLine(true);
         button.setText(text);
         button.setTextColor(primary ? 0xff5f8fe9 : 0xff5f6268);
-        button.setTextSize(14);
+        button.setTextSize(13);
         button.setTypeface(null, android.graphics.Typeface.NORMAL);
         button.setBackgroundDrawable(smartisanButtonBackground(context, side));
         return button;
@@ -4846,10 +5778,11 @@ public final class MaintainedLauncherSettingsHost {
             long downloadId = activity.getSharedPreferences(THEME_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
                     .getLong(entry.pkg, -1);
             
+            boolean current = entry.id.equals(currentThemeId);
             if (installed) {
                 if (downloading != null) {
-                    downloading.setText("");
-                    downloading.setVisibility(View.GONE);
+                    downloading.setText(current ? "当前" : "");
+                    downloading.setVisibility(current ? View.VISIBLE : View.GONE);
                 }
                 if (progress != null) {
                     progress.setVisibility(View.GONE);
@@ -4907,7 +5840,7 @@ public final class MaintainedLauncherSettingsHost {
             
             ImageView checked = (ImageView) byId(convertView, resources, "checked_image");
             if (checked != null) {
-                checked.setVisibility(entry.id.equals(currentThemeId) ? View.VISIBLE : View.GONE);
+                checked.setVisibility(current ? View.VISIBLE : View.GONE);
             }
             int bg = drawable(resources, gridCellBackground(position, getCount()));
             if (bg != 0) {
@@ -5571,6 +6504,186 @@ public final class MaintainedLauncherSettingsHost {
     private static View byId(View root, Resources resources, String idName) {
         int id = resources.getIdentifier(idName, "id", SETTINGS_PKG);
         return id == 0 ? null : root.findViewById(id);
+    }
+
+    private static final class SearchAdapter extends BaseAdapter {
+        private final Activity activity;
+        private final SettingsResourceContext context;
+        private final Resources resources;
+        private final ArrayList<SearchEntry> entries;
+
+        SearchAdapter(Activity activity, SettingsResourceContext context, Resources resources,
+                      ArrayList<SearchEntry> entries) {
+            this.activity = activity;
+            this.context = context;
+            this.resources = resources;
+            this.entries = entries;
+        }
+
+        public int getCount() {
+            return entries.size();
+        }
+
+        public Object getItem(int position) {
+            return entries.get(position);
+        }
+
+        public long getItemId(int position) {
+            return position;
+        }
+
+        public View getView(int position, View convertView, ViewGroup parent) {
+            final SearchEntry entry = entries.get(position);
+            View row = convertView;
+            if (row == null) {
+                RelativeLayout custom = new RelativeLayout(activity);
+                custom.setLayoutParams(new AbsListView.LayoutParams(-1, dp(activity, 84)));
+                custom.setMinimumHeight(dp(activity, 84));
+                custom.setBackgroundColor(0xffffffff);
+
+                ImageView icon = new ImageView(activity);
+                icon.setId(0x53500101);
+                icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                RelativeLayout.LayoutParams iconLp = new RelativeLayout.LayoutParams(
+                        dp(activity, 52), dp(activity, 52));
+                iconLp.leftMargin = dp(activity, 24);
+                iconLp.addRule(RelativeLayout.CENTER_VERTICAL);
+                custom.addView(icon, iconLp);
+
+                TextView label = new TextView(activity);
+                label.setId(0x53500102);
+                label.setSingleLine(true);
+                label.setIncludeFontPadding(false);
+                label.setGravity(Gravity.CENTER_VERTICAL);
+                label.setTextColor(0xff333743);
+                label.setTextSize(19);
+                label.setEllipsize(TextUtils.TruncateAt.END);
+                RelativeLayout.LayoutParams labelLp = new RelativeLayout.LayoutParams(-1, dp(activity, 84));
+                labelLp.leftMargin = dp(activity, 18);
+                labelLp.rightMargin = dp(activity, 24);
+                labelLp.addRule(RelativeLayout.RIGHT_OF, 0x53500101);
+                labelLp.addRule(RelativeLayout.CENTER_VERTICAL);
+                custom.addView(label, labelLp);
+                row = custom;
+            }
+
+            ImageView icon = (ImageView) row.findViewById(0x53500101);
+            if (icon != null) {
+                icon.setVisibility(View.VISIBLE);
+                icon.setImageDrawable(entry.icon);
+            }
+
+            TextView label = (TextView) row.findViewById(0x53500102);
+            if (label != null) {
+                label.setText(entry.label);
+                label.setSingleLine(true);
+            }
+
+            row.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    launchSearchEntry(activity, entry);
+                }
+            });
+            return row;
+        }
+    }
+
+    private static final class SearchEntry {
+        final String label;
+        final String packageName;
+        final String className;
+        final String t9Code;
+        final Drawable icon;
+
+        SearchEntry(String label, String packageName, String className, Drawable icon) {
+            this.label = label;
+            this.packageName = packageName;
+            this.className = className;
+            this.t9Code = toT9Code(label + " " + packageName);
+            this.icon = icon;
+        }
+    }
+
+    private static boolean isDigitQuery(String text) {
+        if (text == null || text.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String toT9Code(String text) {
+        StringBuilder out = new StringBuilder();
+        if (text == null) {
+            return "";
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char c = Character.toLowerCase(text.charAt(i));
+            if (c >= '0' && c <= '9') {
+                out.append(c);
+                continue;
+            }
+            if (c >= 'a' && c <= 'z') {
+                out.append(letterToT9(c));
+                continue;
+            }
+            char initial = chineseInitial(c);
+            if (initial != 0) {
+                out.append(letterToT9(initial));
+            }
+        }
+        return out.toString();
+    }
+
+    private static char letterToT9(char c) {
+        if (c >= 'a' && c <= 'c') return '2';
+        if (c >= 'd' && c <= 'f') return '3';
+        if (c >= 'g' && c <= 'i') return '4';
+        if (c >= 'j' && c <= 'l') return '5';
+        if (c >= 'm' && c <= 'o') return '6';
+        if (c >= 'p' && c <= 's') return '7';
+        if (c >= 't' && c <= 'v') return '8';
+        return '9';
+    }
+
+    private static char chineseInitial(char c) {
+        switch (c) {
+            case '图': return 't';
+            case '库': return 'k';
+            case '应':
+            case '用':
+            case '游': return 'y';
+            case '分': return 'f';
+            case '身':
+            case '设': return 's';
+            case '文': return 'w';
+            case '件':
+            case '机': return 'j';
+            case '浏': return 'l';
+            case '览': return 'l';
+            case '器': return 'q';
+            case '戏': return 'x';
+            case '中': return 'z';
+            case '心':
+            case '相': return 'x';
+            case '虚': return 'x';
+            case '拟': return 'n';
+            case '份': return 'f';
+            case '管': return 'g';
+            case '理': return 'l';
+            case '桌': return 'z';
+            case '面': return 'm';
+            case '谷': return 'g';
+            case '歌': return 'g';
+            case '安': return 'a';
+            case '装': return 'z';
+            default: return 0;
+        }
     }
 
     private static final class WrapContentGridView extends GridView {
