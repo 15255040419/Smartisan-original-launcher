@@ -1249,10 +1249,12 @@
 .end method
 
 .method public static o(Lcom/smartisanos/launcher/theme/v;)V
-    .locals 10
+    .locals 11
 
     .line 1
     iget-object v0, p0, Lcom/smartisanos/launcher/theme/v;->mResources:Landroid/content/res/Resources;
+
+    move-object v10, p0
 
     .line 2
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/X;->h(Lcom/smartisanos/launcher/theme/v;)Z

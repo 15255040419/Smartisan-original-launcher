@@ -238,7 +238,7 @@
 
 .field public static MAX_TITLE_NAME_LENGTH_MODULUS:F = 0.0f
 
-.field public static final MIST_BACK_MASK:Lcom/smartisanos/smengine/a/k;
+.field public static final GAUSSIAN_BACK_MASK:Lcom/smartisanos/smengine/a/k;
 
 .field private static final MODE_12:I = 0xc
 
@@ -811,7 +811,7 @@
 
     invoke-direct {v4, v2, v2, v2, v5}, Lcom/smartisanos/smengine/a/k;-><init>(FFFF)V
 
-    sput-object v4, Lcom/smartisanos/launcher/data/Constants;->MIST_BACK_MASK:Lcom/smartisanos/smengine/a/k;
+    sput-object v4, Lcom/smartisanos/launcher/data/Constants;->GAUSSIAN_BACK_MASK:Lcom/smartisanos/smengine/a/k;
 
     .line 61
     sput v0, Lcom/smartisanos/launcher/data/Constants;->sPostLayerCount:I

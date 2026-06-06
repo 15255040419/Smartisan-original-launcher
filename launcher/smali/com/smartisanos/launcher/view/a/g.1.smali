@@ -16681,6 +16681,17 @@
     .line 3
     iget-object v2, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
+    iget v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I
+
+    if-lez v2, :cond_codex_normal_icon
+
+    move-object v1, v0
+
+    goto :goto_0
+
+    :cond_codex_normal_icon
+    iget-object v2, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
     iget-object v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
 
     invoke-virtual {v1, v2}, Landroid/content/pm/PackageManager;->getApplicationIcon(Ljava/lang/String;)Landroid/graphics/drawable/Drawable;

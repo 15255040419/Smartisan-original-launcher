@@ -230,7 +230,6 @@
     <string name="smartisan_theme_light_blue_name">Light Blue</string>
     <string name="smartisan_theme_light_gold_name">Light Gold</string>
     <string name="smartisan_theme_light_wood_name">Birch Wood</string>
-    <string name="smartisan_theme_mist_name">Mist</string>
     <string name="smartisan_theme_orange_name">Orange</string>
     <string name="smartisan_theme_purple_name">Purple</string>
     <string name="smartisan_theme_raven_name">Raven</string>
@@ -566,8 +565,6 @@
     <string name="LiteraryWhite_PKG">com.smartisanos.launcher.theme.LiteraryWhite</string>
     <string name="LiteraryYellow">LiteraryYellow</string>
     <string name="LiteraryYellow_PKG">com.smartisanos.launcher.theme.LiteraryYellow</string>
-    <string name="MIST">smartisan_theme_mist</string>
-    <string name="MIST_PKG">com.smartisanos.launcher.theme.mist</string>
     <string name="RAVEN">smartisan_theme_raven</string>
     <string name="RAVEN_PKG">com.smartisanos.launcher.theme.raven</string>
     <string name="STRIP">smartisan_theme_strip</string>
@@ -601,7 +598,7 @@
     <string name="hello_world">Hello world!</string>
     <string name="launcher_color_sort_sub_text">Sort App Icon By Color</string>
     <string name="launcher_color_sort_text">Launcher Color Sort</string>
-    <string name="more_current_version_txt">v1.4.5</string>
+    <string name="more_current_version_txt">v1.4.6</string>
     <string name="os_update_dlg_cancel_btn">稍后更新</string>
     <string name="os_update_dlg_msg">检测到系统版本过低，为保证您个人信息安全，正常使用手机完整功能，请 Smartisan 用户尽快升级到最新系统版本！</string>
     <string name="os_update_dlg_ok_btn">现在更新</string>

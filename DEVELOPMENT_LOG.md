@@ -4,12 +4,12 @@
 
 注意：本文档顶部的“当前状态总览”和“每日修复记录（倒序）”是当前可信记录。后面的“历史归档”保留旧记录原文，其中有些日期和标题不是严格排序，且早期条目里的“暂未实现 / 后续接入 / 当前不可用”只代表当时状态；如果和顶部记录或 `README.md` 冲突，以顶部记录和 `README.md` 为准。
 
-## 当前状态总览（2026-06-04）
+## 当前状态总览（2026-06-06）
 
 ### 已完成
 
 - APK 可通过 `build.bat` 构建、签名并输出 `build\launcher-signed.apk`，最近多次安装到 `emulator-5554` 验证通过。
-- 当前发布版本调整为 `v1.4.5`，Manifest `versionCode=19`，`versionName=v1.4.5`；最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单为准。
+- 当前发布版本调整为 `v1.4.6`，Manifest `versionCode=20`，`versionName=v1.4.6`；最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单为准。
 - 第一轮兼容安装与包体瘦身完成：最终 APK 的 `minSdkVersion` 从 29 降到 23，`targetSdkVersion` 调整为 28；纹理资源统一走 `1080p`，删除冗余 `assets/Textures/720p` 后，`build\launcher-signed.apk` 从约 105.9MB 降到约 63.9MB。
 - 构建签名流程已从 `jarsigner` 旧 v1 签名改为 `zipalign -p` 后用 `apksigner` 输出 v1/v2/v3 签名，修复 Android 12 等新系统上可能因只有 v1/JAR 签名而安装失败的问题。
 - 桌面主入口、桌面内“桌面设置”虚拟入口、12 / 20 宫格、主题页、壁纸页、翻页动画页、应用图标页、三个设置开关均已接入。
@@ -27,18 +27,23 @@
 - 内置搜索页已继续按 Smartisan PRO3 搜索体验方向调整：设置页提供“启用下滑搜索”开关；搜索页不再显示自绘 T9 键盘，点击搜索框调用系统输入法；顶部常用应用列表支持横向滑动；输入关键词后的结果行修正为固定高度，图标和文字垂直居中。
 - 强迫症选项已从设置首页零散开关收纳到二级页；主页入口和二级页标题走资源字符串，英文系统显示 `OCD Settings`，中文系统显示“强迫症选项”。
 - 双开 / 多用户应用显示和启动已补入 LauncherApps 查询与 `startActivityAsUser` 兼容路径，避免双开应用只显示主用户图标或点击后启动错用户。
+- 双开 / 多用户应用继续对照 maintained 调整：搜索页、桌面应用列表和启动链路都尽量使用 LauncherApps 多用户查询；分身应用支持叠加原版风格面具标记。
+- 应用图标识别逻辑已继续向 maintained 对齐，同时保留当前工程已有的图标识别能力，减少“闲鱼 / 酷安”等普通应用被误识别成应用商店图标，以及系统“电话 / 拨号 / 电话本”等名称匹配不稳定的问题。
+- 毛玻璃主题已改为只保留 `smartisan_theme_aero` 作为透明壁纸主题，移除白雾主题入口和资源引用；毛玻璃桌面与编辑页文字已恢复为原版风格白色文字效果。
+- 检查更新的 APK 下载流程已增加前台进度弹窗，下载开始后会显示等待、下载中和百分比，下载完成后自动关闭并拉起安装。
+- 主题详情下载按钮状态已按当前主题项隔离，避免切换到其他主题后仍残留“正在下载”状态。
+- 桌面图标加载链路加入 drawable 归一化兜底，改善 MuMu 等环境 adaptive drawable 或特殊图标不显示的问题。
 - 主题详情页预览图已改为外层居中容器，手机壳和主题截图保持原版层级叠加；从主题详情返回主题列表、从关于我们返回设置首页时会保持原滚动位置，并在首帧绘制前恢复，避免上下晃动。
 - 对照 maintained 的 APK 结构确认：maintained `minSdkVersion=19`、`targetSdkVersion=28`，且只保留 `assets/Textures/1080p`；当前工程第一轮先降到 `minSdkVersion=23`，保留更多运行安全余量，后续如需覆盖 Android 5.x / 4.x 再继续做 API 兼容回归。
 
 ### 已完成但需要继续回归
 
 - 首次主题切换动画：主问题已修复，仍需用更多主题、多次清数据冷启动验证是否还有边缘竞态。
-- 透明主题换壁纸：选择、即时刷新、恢复默认主链路已修复，仍需分别回归毛玻璃 / 白雾主题。
+- 透明主题换壁纸：选择、即时刷新、恢复默认主链路已修复，仍需回归毛玻璃主题。
 - 主设置页缩略图：当前 ImageView 显示上限为 `53dp x 63dp`，三项带框缩略图源 bitmap 为 `180 x 210 px`、四周 `12 px` 内边距；这些尺寸是为修复边框不等宽、图标过大、双层边框后固定下来的基准。
 
 ### 未完成 / 待处理
 
-- 白雾主题显示异常仍未最终确认修复。
 - 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
 - 原生 Smartisan Settings Activity / Fragment 还没有完整迁移，当前仍由 launcher 包内 `ThemeChooserActivity` 承载 maintained 风格兼容页。
 - 对照 `E:\FANG\smartisan\smartisan-launcher-maintained`，当前桌面设置和桌面能力仍需按优先级继续移植；“分享此应用给朋友”和“用户体验改进计划”不再作为移植目标。
@@ -64,6 +69,50 @@
 3. 需要追溯原因时，再读后面的“历史归档”。历史归档保留早期判断，其中部分结论已被后续实现覆盖。
 
 ## 每日修复记录（倒序）
+
+### 2026-06-06：应用分身、图标识别、毛玻璃主题、搜索和更新下载修复
+
+修复内容：
+
+- 版本发布：
+  - 文本 `launcher/AndroidManifest.xml` 调整为 `versionCode=20` / `versionName=v1.4.6`。
+  - 同步修正最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 的真实版本也是 `v1.4.6 (20)`。
+  - 设置页“检查更新”默认版本字符串同步为 `v1.4.6`。
+
+- 应用分身：
+  - 对照 maintained 的多用户查询思路，把桌面应用列表、搜索页和启动链路继续向 `LauncherApps` / 用户句柄查询靠拢。
+  - 修复首次安装后桌面第一次进入只显示一个微信、退出重开才显示两个微信的竞态问题方向：启动和恢复时会触发分身应用 bootstrap，减少多用户列表未及时进入桌面的情况。
+  - 修复分身应用图标叠加面具标记的链路，分身图标会走 `PackageManager.getUserBadgedIcon` 和当前工程的面具绘制兜底。
+  - 继续调整面具标记大小、位置和颜色，使其更接近原版锤子桌面左下角黑色面具效果。
+
+- 图标识别：
+  - 对照 `smartisan-launcher-maintained` 调整当前工程图标识别逻辑，同时保留当前项目已有的图标识别入口和 redirect / appfilter / 自定义图标能力。
+  - 修复部分普通应用被误识别成应用商店图标的情况，例如“闲鱼”“酷安”。
+  - 修复部分系统应用名称识别不稳定的情况，例如“电话”“拨号”“电话本”“电话管家”。
+  - 应用图标页加载速度继续优化，避免每次打开都做不必要的重拉取和整页重建。
+
+- 搜索页和拖动手势：
+  - 搜索页改为能搜索到普通应用和分身应用。
+  - 对照 maintained 收窄下滑搜索触发条件，只在明确快速下滑时打开搜索，减少长按拖动应用时误识别为打开搜索页。
+
+- 毛玻璃主题：
+  - 对比原版毛玻璃主题 `com.smartisanos.launcher.theme.aero.apk` 和 maintained 的显示效果，修复毛玻璃主题桌面文字、编辑页文字仍显示黑色或加载时先黑后白的问题。
+  - 毛玻璃主题文字效果恢复为和其他深色/浅蓝主题一致的白色文字效果。
+  - 删除白雾主题入口、显示顺序、字符串、公有资源项和相关 smali 判断；当前透明壁纸主题只保留毛玻璃。
+
+- 主题下载和模拟器兼容：
+  - 修复在线主题详情页从一个正在下载的主题切换到其他主题时，右上角下载按钮状态没有正确隐藏或刷新。
+  - 桌面图标加载链路加入 drawable 归一化处理，改善 MuMu 模拟器等环境中 adaptive drawable 或特殊 drawable 图标不显示的问题。
+
+- 检查更新：
+  - 修复“检查更新 -> 下载”没有任何进度显示的问题。
+  - 下载更新包后现在会弹出进度窗口；未知大小时显示等待 / 下载中，已知大小时显示百分比，下载完成后自动关闭并启动安装。
+
+- 构建和清理：
+  - 多次执行 `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+  - `aapt2 dump badging build\launcher-signed.apk` 确认最终 APK 为 `versionCode='20'`、`versionName='v1.4.6'`、`sdkVersion:'23'`、`targetSdkVersion:'28'`。
+  - `apksigner verify --verbose --print-certs build\launcher-signed.apk` 确认 v1 / v2 / v3 签名均为 true。
+  - 按当前约定清理 `build` 目录，只保留 `launcher-signed.apk`、`launcher-signed.apk.idsig` 和 `tools`。
 
 ### 2026-06-04：v1.4.5 设置体验、主题详情和英文文案修复
 
@@ -2095,7 +2144,6 @@ SharedPreferences 时使用了未初始化寄存器，Android 直接拒绝加载
 - 在线主题列表：
   - 对齐 maintained main 分支的 release 资产，当前可下载主题来源为 `themes-v1`；
   - 下载基址改为 maintained 文档记录的 `https://gh-proxy.org/https://github.com/15255040419/smartisan-launcher/releases/download/themes-v1/`；
-  - 白雾主题改为真实的 `smartisan_theme_mist` / `com.smartisanos.launcher.theme.mist`，并从 maintained 补入白雾预览资源；
   - 移除 release 中不存在的 `copperred`、`gintama` 下载项，避免点击后 404；
   - 经典蓝使用本地 `smartisan_theme_light_blue` 预览，但下载包对应 release 中存在的 `com.smartisanos.launcher.theme.blue.apk`。
 - 主题下载：
@@ -2117,7 +2165,7 @@ ADB 复测结论：
 
 - `build/settings_after_final.png`：一级菜单“桌面主题”左侧已显示当前主题预览图。
 - `build/theme_list_now.png`：主题列表页显示 maintained 风格的本地主题 / 在线主题网格。
-- `build/theme_detail_now.png`：主题详情页显示 maintained 风格手机预览、底部圆点和下载按钮，白雾圆点有预览。
+- `build/theme_detail_now.png`：主题详情页显示 maintained 风格手机预览、底部圆点和下载按钮。
 - `build/download_after_fix.png`：点击下载后无崩溃，DownloadManager 成功完成下载。
 
 ## 2026-05-26 应用图标自动识别与自定义替换迁移
@@ -2355,7 +2403,7 @@ ADB 复测结论：
 
 ### 2026-05-31 追加：主题切换任务栈、透明主题壁纸与桌面设置缩略图对齐
 
-用户继续反馈三类问题：主题设置页与桌面被系统识别成两个应用导致切换主题后前后台来回闪；毛玻璃/白雾透明主题更换壁纸后仍可能显示旧默认壁纸；桌面设置页中“桌面主题 / 桌面壁纸 / 桌面翻页动画 / 应用图标”四个图标尺寸、边框和对齐与 maintained 项目不一致。
+用户继续反馈三类问题：主题设置页与桌面被系统识别成两个应用导致切换主题后前后台来回闪；毛玻璃透明主题更换壁纸后仍可能显示旧默认壁纸；桌面设置页中“桌面主题 / 桌面壁纸 / 桌面翻页动画 / 应用图标”四个图标尺寸、边框和对齐与 maintained 项目不一致。
 
 本轮修正：
 
@@ -2401,7 +2449,7 @@ ADB 复测结论：
 
 ### 2026-05-31 追加：首次主题动画、设置页闪回、壁纸选择与恢复默认
 
-用户继续确认：即使把锤子桌面设为默认桌面，第一次在主题页点击“设定”后仍可能没有桌面翻页过渡动画；主题设定后会先回桌面，又短暂闪回主题设置页，再回桌面加载动画；毛玻璃 / 白雾透明主题选择壁纸后缩略图已变化但桌面仍不刷新；点击“恢复默认壁纸”也不能回到主题自带背景。
+用户继续确认：即使把锤子桌面设为默认桌面，第一次在主题页点击“设定”后仍可能没有桌面翻页过渡动画；主题设定后会先回桌面，又短暂闪回主题设置页，再回桌面加载动画；毛玻璃透明主题选择壁纸后缩略图已变化但桌面仍不刷新；点击“恢复默认壁纸”也不能回到主题自带背景。
 
 本轮原因定位：
 
@@ -2413,7 +2461,7 @@ ADB 复测结论：
   - 设置页承载在 `ThemeChooserActivity`，之前启动桌面和关闭设置页的时机不稳定；
   - 系统把设置页与桌面当成两个可切换界面处理时，就会出现“桌面 -> 设置页残影 -> 桌面动画”的短暂跳转。
 - 透明主题壁纸不生效来自两个问题叠加：
-  - original-port 中 `Constants.isTransparentTheme` 有时与当前主题 ID 不同步，毛玻璃 / 白雾会被当成普通主题；
+  - original-port 中 `Constants.isTransparentTheme` 有时与当前主题 ID 不同步，毛玻璃会被当成普通主题；
   - `launcher_wallpaper_uri`、私有副本、`gaussian_wallpaper.png` 和旧 Settings 值之间优先级混乱，导致缩略图更新了，桌面仍拿旧图或主题默认图。
 - “恢复默认壁纸”之前只是 UI 占位或只清一部分 key，没有把 launcher 私有壁纸副本、ready 标记和桌面缓存一起清掉，所以桌面没有真正回退到主题资源。
 
@@ -2434,9 +2482,9 @@ ADB 复测结论：
   - `refreshLauncherWallpaperNow(...)` 会立即通知桌面刷新，并延迟二次刷新，解决返回桌面后仍显示旧默认图的问题；
   - `Launcher.onResume()` 追加 `maybeRefreshLauncherWallpaper(...)`，用于从图片选择器返回后补一次刷新。
 - 透明主题识别：
-  - `e/s.smali` 不再只看 `Constants.isTransparentTheme`，同时通过 `MaintainedLauncherSettingsHost.isLauncherWallpaperTheme(context)` 判断当前主题是否为 `smartisan_theme_aero` 或 `smartisan_theme_mist`；
+  - `e/s.smali` 不再只看 `Constants.isTransparentTheme`，同时通过 `MaintainedLauncherSettingsHost.isLauncherWallpaperTheme(context)` 判断当前主题是否为 `smartisan_theme_aero`；
   - 普通不透明主题继续使用主题自己的背景，不再透出用户选择的图片壁纸；
-  - 毛玻璃 / 白雾才读取 launcher 自定义壁纸。
+  - 毛玻璃才读取 launcher 自定义壁纸。
 - 恢复默认壁纸：
   - `restoreDefaultWallpaper(...)` 清理 `launcher_wallpaper_uri`、`desktop_wallpaper_uri`、`lockscreen_background`、缩略图和 ready / pending 标记；
   - 删除 `gaussian_wallpaper.png`、`launcher_wallpaper.jpg`、`launcher_wallpaper_*` 等私有壁纸副本；

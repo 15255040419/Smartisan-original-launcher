@@ -2904,7 +2904,7 @@
 
     iget-object v0, v0, Lcom/smartisanos/launcher/theme/v;->mId:Ljava/lang/String;
 
-    const-string v1, "smartisan_theme_mist"
+    const-string v1, "smartisan_theme_unused"
 
     invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 

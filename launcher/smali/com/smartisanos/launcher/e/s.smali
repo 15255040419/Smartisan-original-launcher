@@ -10083,7 +10083,7 @@
     const/4 p1, 0x0
 
     .line 5
-    invoke-virtual {p0, v0, p1}, Landroid/content/pm/PackageManager;->queryIntentActivities(Landroid/content/Intent;I)Ljava/util/List;
+    invoke-static {p0, v0, p1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->queryLauncherActivitiesWithProfiles(Landroid/content/pm/PackageManager;Landroid/content/Intent;I)Ljava/util/List;
 
     move-result-object p0
 

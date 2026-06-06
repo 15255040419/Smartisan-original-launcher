@@ -53,6 +53,10 @@
 
     invoke-virtual {p1, p0, v0}, Landroid/content/pm/PackageManager;->getUserBadgedIcon(Landroid/graphics/drawable/Drawable;Landroid/os/UserHandle;)Landroid/graphics/drawable/Drawable;
 
+    move-result-object v0
+
+    invoke-static {p0, p1, v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->doppelgangerBadgeDrawable(Landroid/graphics/drawable/Drawable;Landroid/content/pm/PackageManager;Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
+
     move-result-object p0
 
     return-object p0
@@ -62,7 +66,7 @@
     .locals 0
 
     .line 1
-    invoke-static {p0}, Lcom/android/internal/util/DoppelgangerUtils;->getDoppelgangerBitmap(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->doppelgangerBitmap(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
 
     move-result-object p0
 

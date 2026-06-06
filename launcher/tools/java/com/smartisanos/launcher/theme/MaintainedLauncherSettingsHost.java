@@ -62,6 +62,7 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.RadioButton;
 import android.widget.RelativeLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -132,6 +133,11 @@ public final class MaintainedLauncherSettingsHost {
     private static int sThemePageScrollY = -1;
     private static final Map<String, Bitmap> sThemePreviewCache = new HashMap<String, Bitmap>();
     private static final Map<String, Bitmap> sSmartisanIconCache = new HashMap<String, Bitmap>();
+    private static final Map<String, Boolean> sSmartisanIconFetchPending = new HashMap<String, Boolean>();
+    private static boolean sDoppelgangerBootstrapScheduled;
+    private static final String SMARTISAN_ICON_CACHE_PREFS = "smartisan_icon_cache";
+    private static final String SMARTISAN_ICON_CACHE_DIR = "smartisan_icon_cache";
+    private static final long SMARTISAN_ICON_MISS_RETRY_MS = 7L * 24L * 60L * 60L * 1000L;
     private static final String THEME_DOWNLOAD_BASE =
             "https://github.com/15255040419/smartisan-launcher/releases/download/themes-v1/";
     private static final String UPDATE_RELEASE_API =
@@ -143,7 +149,6 @@ public final class MaintainedLauncherSettingsHost {
             new ThemeEntry("smartisan_theme_blue", "com.smartisanos.launcher.theme.blue", "蓝色", false),
             new ThemeEntry("smartisan_theme_light_blue", "com.smartisanos.launcher.theme.lightblue", "经典蓝", false),
             theme("smartisan_theme_aero", "毛玻璃"),
-            theme("smartisan_theme_mist", "白雾"),
             theme("smartisan_theme_grid", "格子"),
             theme("smartisan_theme_leaf", "叶绿"),
             theme("smartisan_theme_dark_wood", "胡桃木"),
@@ -197,10 +202,6 @@ public final class MaintainedLauncherSettingsHost {
                 showSearchPage(activity);
                 return;
             }
-            migrateBuiltinIconDefaults(activity);
-            migrateOldOriginalIconDefaults(activity);
-            migrateIconPackDefault(activity);
-            maybeRefreshLauncherIcons(activity);
             tuneWindow(activity);
             SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
@@ -209,9 +210,29 @@ public final class MaintainedLauncherSettingsHost {
             tuneScrollBars(root);
             activity.setContentView(root);
             restoreScroll(root, restoreScrollY);
+            scheduleInitialSettingsMigrations(activity);
         } catch (Throwable t) {
             showFailure(activity, t);
         }
+    }
+
+    private static void scheduleInitialSettingsMigrations(Context context) {
+        if (context == null) {
+            return;
+        }
+        final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            public void run() {
+                new Thread(new Runnable() {
+                    public void run() {
+                        migrateBuiltinIconDefaults(app);
+                        migrateOldOriginalIconDefaults(app);
+                        migrateIconPackDefault(app);
+                        maybeRefreshLauncherIcons(app);
+                    }
+                }, "MaintainedSettingsInit").start();
+            }
+        }, 350);
     }
 
     private static void migrateBuiltinIconDefaults(Context context) {
@@ -317,6 +338,217 @@ public final class MaintainedLauncherSettingsHost {
                 applyIconChange(app);
             }
         }, 1200);
+    }
+
+    public static void scheduleDoppelgangerBootstrap(Context context) {
+        if (context == null) {
+            return;
+        }
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            if (sDoppelgangerBootstrapScheduled) {
+                return;
+            }
+            sDoppelgangerBootstrapScheduled = true;
+        }
+        final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                bootstrapDoppelgangerPackages(app);
+            }
+        }, 700);
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                bootstrapDoppelgangerPackages(app);
+            }
+        }, 2600);
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                bootstrapDoppelgangerPackages(app);
+            }
+        }, 6200);
+    }
+
+    private static void bootstrapDoppelgangerPackages(final Context context) {
+        if (context == null) {
+            return;
+        }
+        new Thread(new Runnable() {
+            public void run() {
+                HashMap<Integer, HashMap<String, Boolean>> packagesByUser =
+                        new HashMap<Integer, HashMap<String, Boolean>>();
+                try {
+                    LauncherApps launcherApps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+                    if (launcherApps != null) {
+                        ArrayList<Integer> userIds = doppelgangerUserIds(context);
+                        for (int u = 0; u < userIds.size(); u++) {
+                            int userId = userIds.get(u).intValue();
+                            UserHandle user = userHandleForIdentifier(userId);
+                            if (user == null) {
+                                continue;
+                            }
+                            List<LauncherActivityInfo> activities = launcherApps.getActivityList(null, user);
+                            if (activities != null) {
+                                for (int i = 0; i < activities.size(); i++) {
+                                    LauncherActivityInfo info = activities.get(i);
+                                    if (info != null && info.getComponentName() != null) {
+                                        String pkg = info.getComponentName().getPackageName();
+                                        if (pkg != null && pkg.length() > 0) {
+                                            addDoppelgangerPackage(packagesByUser, userId, pkg);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+                if (packagesByUser.isEmpty()) {
+                    try {
+                        Method method = PackageManager.class.getMethod("getInstalledPackagesAsUser",
+                                Integer.TYPE, Integer.TYPE);
+                        ArrayList<Integer> userIds = doppelgangerUserIds(context);
+                        for (int u = 0; u < userIds.size(); u++) {
+                            int userId = userIds.get(u).intValue();
+                            List list = (List) method.invoke(context.getPackageManager(), 0, userId);
+                            if (list != null) {
+                                for (int i = 0; i < list.size(); i++) {
+                                    Object item = list.get(i);
+                                    if (item instanceof android.content.pm.PackageInfo) {
+                                        String pkg = ((android.content.pm.PackageInfo) item).packageName;
+                                        if (pkg != null && pkg.length() > 0) {
+                                            addDoppelgangerPackage(packagesByUser, userId, pkg);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+                for (Integer userId : packagesByUser.keySet()) {
+                    HashMap<String, Boolean> packages = packagesByUser.get(userId);
+                    if (packages == null) {
+                        continue;
+                    }
+                    for (String pkg : packages.keySet()) {
+                        try {
+                            ArrayList params = new ArrayList();
+                            params.add(pkg);
+                            params.add(userId);
+                            postDatabaseUserPackageAdded(params);
+                            postDatabaseUserPackageChanged(params);
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                }
+                if (!packagesByUser.isEmpty()) {
+                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                        public void run() {
+                            postDatabaseRefreshEvent();
+                            applyIconChange(context);
+                        }
+                    }, 900);
+                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                        public void run() {
+                            postDatabaseRefreshEvent();
+                        }
+                    }, 2200);
+                }
+            }
+        }, "DoppelgangerBootstrap").start();
+    }
+
+    private static void addDoppelgangerPackage(HashMap<Integer, HashMap<String, Boolean>> packagesByUser,
+                                               int userId, String pkg) {
+        if (!isDoppelgangerUserId(userId) || pkg == null || pkg.length() == 0) {
+            return;
+        }
+        HashMap<String, Boolean> packages = packagesByUser.get(Integer.valueOf(userId));
+        if (packages == null) {
+            packages = new HashMap<String, Boolean>();
+            packagesByUser.put(Integer.valueOf(userId), packages);
+        }
+        packages.put(pkg, Boolean.TRUE);
+    }
+
+    private static ArrayList<Integer> doppelgangerUserIds(Context context) {
+        ArrayList<Integer> out = new ArrayList<Integer>();
+        try {
+            android.os.UserManager manager =
+                    (android.os.UserManager) context.getSystemService(Context.USER_SERVICE);
+            if (manager != null) {
+                List<UserHandle> profiles = manager.getUserProfiles();
+                if (profiles != null) {
+                    for (int i = 0; i < profiles.size(); i++) {
+                        int id = userIdentifier(profiles.get(i));
+                        if (isDoppelgangerUserId(id) && !out.contains(Integer.valueOf(id))) {
+                            out.add(Integer.valueOf(id));
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        int[] commonCloneUsers = new int[]{10, 999, 888, 100, 95};
+        for (int i = 0; i < commonCloneUsers.length; i++) {
+            Integer value = Integer.valueOf(commonCloneUsers[i]);
+            if (!out.contains(value)) {
+                out.add(value);
+            }
+        }
+        return out;
+    }
+
+    private static int userIdentifier(UserHandle user) {
+        try {
+            Object id = UserHandle.class.getMethod("getIdentifier").invoke(user);
+            return id instanceof Integer ? ((Integer) id).intValue() : -1;
+        } catch (Throwable ignored) {
+            return -1;
+        }
+    }
+
+    private static boolean isDoppelgangerUserId(int userId) {
+        return userId > 0;
+    }
+
+    private static UserHandle userHandleForIdentifier(int id) {
+        try {
+            java.lang.reflect.Constructor<UserHandle> constructor = UserHandle.class.getDeclaredConstructor(Integer.TYPE);
+            constructor.setAccessible(true);
+            return constructor.newInstance(Integer.valueOf(id));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static void postDatabaseUserPackageAdded(ArrayList params) {
+        postDatabaseUserPackageEvent("EVENT_USER_PACKAGE_ADDED", params);
+    }
+
+    private static void postDatabaseUserPackageChanged(ArrayList params) {
+        postDatabaseUserPackageEvent("EVENT_USER_PACKAGE_CHANGED", params);
+    }
+
+    private static void postDatabaseUserPackageEvent(String eventName, ArrayList params) {
+        try {
+            Class actionClass = Class.forName("com.smartisanos.launcher.data.DatabaseUpdater$Action");
+            Object action = java.lang.Enum.valueOf(actionClass, eventName);
+            Class updater = Class.forName("com.smartisanos.launcher.data.F");
+            updater.getMethod("b", actionClass, List.class, ArrayList.class).invoke(null, action, null, params);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void postDatabaseRefreshEvent() {
+        try {
+            Class actionClass = Class.forName("com.smartisanos.launcher.data.DatabaseUpdater$Action");
+            Object action = java.lang.Enum.valueOf(actionClass, "EVENT_REFRESH");
+            Class updater = Class.forName("com.smartisanos.launcher.data.F");
+            updater.getMethod("b", actionClass).invoke(null, action);
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void tuneWindow(Activity activity) {
@@ -628,8 +860,11 @@ public final class MaintainedLauncherSettingsHost {
         int height = activity.getResources().getDisplayMetrics().heightPixels;
         boolean fromDesktop = sSearchGestureStartY > dp(activity, 48)
                 && sSearchGestureStartY < height * 0.88f;
-        boolean downward = dy > dp(activity, 150) && Math.abs(dx) < dy * 0.90f;
-        if (fromDesktop && downward && duration < 2000) {
+        boolean downward = dy > dp(activity, 190) && Math.abs(dx) < dy * 0.45f;
+        if (action != MotionEvent.ACTION_UP) {
+            return false;
+        }
+        if (fromDesktop && downward && duration < 650) {
             if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, true)) {
                 return false;
             }
@@ -706,7 +941,7 @@ public final class MaintainedLauncherSettingsHost {
         }
         if (isOriginalIconForced(info)) {
             try {
-                return info.loadIcon(pm);
+                return normalizeLauncherIcon(info.loadIcon(pm));
             } catch (Throwable ignored) {
                 return null;
             }
@@ -714,15 +949,140 @@ public final class MaintainedLauncherSettingsHost {
         try {
             Drawable override = iconOverrideDrawable(info, pm);
             if (override != null) {
-                return override;
+                return normalizeLauncherIcon(override);
             }
         } catch (Throwable ignored) {
         }
         try {
-            return info.loadIcon(pm);
+            return normalizeLauncherIcon(info.loadIcon(pm));
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    private static Drawable normalizeLauncherIcon(Drawable icon) {
+        if (icon == null) {
+            return null;
+        }
+        try {
+            Bitmap bitmap = drawableToBitmapForBadge(icon);
+            if (bitmap != null) {
+                return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), bitmap);
+            }
+        } catch (Throwable ignored) {
+        }
+        return icon;
+    }
+
+    public static Drawable doppelgangerBadgeDrawable(Drawable original, PackageManager pm, Drawable systemBadged) {
+        try {
+            if (original == null) {
+                return systemBadged;
+            }
+            Bitmap bitmap = drawableToBitmapForBadge(original);
+            if (bitmap == null) {
+                return original;
+            }
+            Bitmap badged = drawDoppelgangerBadge(bitmap);
+            return badged == null ? original : new android.graphics.drawable.BitmapDrawable(null, badged);
+        } catch (Throwable ignored) {
+            return systemBadged == null ? original : systemBadged;
+        }
+    }
+
+    public static Bitmap doppelgangerBitmap(Bitmap bitmap) {
+        try {
+            return bitmap == null ? null : drawDoppelgangerBadge(bitmap);
+        } catch (Throwable ignored) {
+            return bitmap;
+        }
+    }
+
+    public static byte[] doppelgangerIconBytes(byte[] data, int userId) {
+        if (data == null || !isDoppelgangerUserId(userId)) {
+            return data;
+        }
+        ByteArrayOutputStream out = null;
+        try {
+            Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+            Bitmap badged = doppelgangerBitmap(bitmap);
+            if (badged == null || badged == bitmap) {
+                return data;
+            }
+            out = new ByteArrayOutputStream();
+            badged.compress(Bitmap.CompressFormat.PNG, 100, out);
+            return out.toByteArray();
+        } catch (Throwable ignored) {
+            return data;
+        } finally {
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+    }
+
+    private static Bitmap drawableToBitmapForBadge(Drawable drawable) {
+        int width = drawable.getIntrinsicWidth();
+        int height = drawable.getIntrinsicHeight();
+        if (width <= 0) {
+            width = 96;
+        }
+        if (height <= 0) {
+            height = width;
+        }
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Rect oldBounds = new Rect(drawable.getBounds());
+        drawable.setBounds(0, 0, width, height);
+        drawable.draw(canvas);
+        drawable.setBounds(oldBounds);
+        return bitmap;
+    }
+
+    private static Bitmap drawDoppelgangerBadge(Bitmap base) {
+        int width = base.getWidth();
+        int height = base.getHeight();
+        if (width <= 0 || height <= 0) {
+            return base;
+        }
+        Bitmap out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(out);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+        canvas.drawBitmap(base, 0, 0, paint);
+
+        float size = Math.max(14f, Math.min(width, height) * 0.23f);
+        float left = Math.max(1f, width * 0.06f);
+        float top = height - size - Math.max(1f, height * 0.12f);
+        RectF shield = new RectF(left, top, left + size, top + size);
+        float radius = size * 0.20f;
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0x33000000);
+        canvas.drawRoundRect(new RectF(shield.left + 1f, shield.top + 1.5f,
+                shield.right + 1f, shield.bottom + 1.5f), radius, radius, paint);
+        paint.setColor(0xff2b3036);
+        canvas.drawRoundRect(shield, radius, radius, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1.2f, size * 0.08f));
+        paint.setColor(0xffffffff);
+        canvas.drawRoundRect(shield, radius, radius, paint);
+
+        RectF inner = new RectF(shield.left + size * 0.12f, shield.top + size * 0.12f,
+                shield.right - size * 0.12f, shield.bottom - size * 0.12f);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(0xffffffff);
+        canvas.drawCircle(inner.left + size * 0.25f, inner.top + size * 0.35f, size * 0.055f, paint);
+        canvas.drawCircle(inner.left + size * 0.56f, inner.top + size * 0.35f, size * 0.055f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1f, size * 0.055f));
+        RectF smile = new RectF(inner.left + size * 0.23f, inner.top + size * 0.39f,
+                inner.left + size * 0.62f, inner.top + size * 0.72f);
+        canvas.drawArc(smile, 25, 130, false, paint);
+        paint.setStyle(Paint.Style.FILL);
+        return out;
     }
 
     public static boolean onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
@@ -1016,7 +1376,7 @@ public final class MaintainedLauncherSettingsHost {
 
     public static boolean isLauncherWallpaperTheme(Context context) {
         String id = currentTheme(context);
-        return "smartisan_theme_aero".equals(id) || "smartisan_theme_mist".equals(id);
+        return "smartisan_theme_aero".equals(id);
     }
 
     private static Bitmap decodeUriBitmap(Context context, Uri uri, int target) {
@@ -1785,13 +2145,17 @@ public final class MaintainedLauncherSettingsHost {
             }
 
             List<UserHandle> profiles = launcherApps.getProfiles();
-            if (profiles == null || profiles.size() <= 1) {
-                return result;
+            if (profiles == null || profiles.size() == 0) {
+                profiles = new ArrayList<UserHandle>();
+                profiles.add(Process.myUserHandle());
             }
             UserHandle current = Process.myUserHandle();
             String packageFilter = intent == null ? null : intent.getPackage();
             for (UserHandle profile : profiles) {
-                if (profile == null || profile.equals(current)) {
+                if (profile == null) {
+                    continue;
+                }
+                if (profile.equals(current) && !result.isEmpty()) {
                     continue;
                 }
                 List<LauncherActivityInfo> activities = launcherApps.getActivityList(packageFilter, profile);
@@ -2440,6 +2804,9 @@ public final class MaintainedLauncherSettingsHost {
         if (entry == null) {
             return;
         }
+        tagThemeDetailControl(btnOk, entry);
+        tagThemeDetailControl(btnDownload, entry);
+        tagThemeDetailControl(statusIcon, entry);
         if (previewImg != null) {
             Bitmap bitmap = themeLargePreviewBitmap(activity, entry.id);
             if (bitmap != null) {
@@ -2514,6 +2881,8 @@ public final class MaintainedLauncherSettingsHost {
                     public void onClick(View v) {
                         long id = downloadTheme(activity, entry);
                         if (id >= 0) {
+                            tagThemeDetailControl(btnDownload, entry);
+                            tagThemeDetailControl(statusIcon, entry);
                             btnDownload.setVisibility(View.GONE);
                             showMaintainedStatusIcon(resources, statusIcon, "btn_loading", -1, null);
                             monitorThemeDownload(activity, id, entry, btnOk, btnDownload, statusIcon);
@@ -3167,6 +3536,11 @@ public final class MaintainedLauncherSettingsHost {
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.post(new Runnable() {
             public void run() {
+                if (!isThemeDetailControlCurrent(statusIcon, entry)
+                        || !isThemeDetailControlCurrent(btnDownload, entry)
+                        || !isThemeDetailControlCurrent(btnOk, entry)) {
+                    return;
+                }
                 DownloadManager manager = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE);
                 if (manager == null) {
                     return;
@@ -3187,7 +3561,9 @@ public final class MaintainedLauncherSettingsHost {
                         if (btnDownload != null) {
                             btnDownload.setEnabled(true);
                         }
-                        updateThemeDetail(activity, getMaintainedResources(activity), entry, null, btnOk, btnDownload, statusIcon);
+                        if (isThemeDetailControlCurrent(statusIcon, entry)) {
+                            updateThemeDetail(activity, getMaintainedResources(activity), entry, null, btnOk, btnDownload, statusIcon);
+                        }
                         return;
                     }
                     if (status == DownloadManager.STATUS_FAILED) {
@@ -3227,6 +3603,11 @@ public final class MaintainedLauncherSettingsHost {
         }
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             public void run() {
+                if (!isThemeDetailControlCurrent(statusIcon, entry)
+                        || !isThemeDetailControlCurrent(btnDownload, entry)
+                        || !isThemeDetailControlCurrent(btnOk, entry)) {
+                    return;
+                }
                 if (packageInstalled(activity, entry.pkg)) {
                     Toast.makeText(activity, "已安装：" + entry.name, Toast.LENGTH_SHORT).show();
                     clearThemeDownloadRecord(activity, entry);
@@ -3629,7 +4010,7 @@ public final class MaintainedLauncherSettingsHost {
                     .putString(String.valueOf(id) + ".path", out.getAbsolutePath())
                     .commit();
             Toast.makeText(activity, "已开始下载更新包", Toast.LENGTH_SHORT).show();
-            monitorUpdateDownload(activity, id);
+            monitorUpdateDownload(activity, id, showUpdateDownloadProgress(activity));
         } catch (Throwable t) {
             try {
                 activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
@@ -3639,7 +4020,44 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void monitorUpdateDownload(final Activity activity, final long downloadId) {
+    private static UpdateDownloadProgress showUpdateDownloadProgress(Activity activity) {
+        final UpdateDownloadProgress ui = new UpdateDownloadProgress();
+        try {
+            int padding = dp(activity, 22);
+            LinearLayout content = new LinearLayout(activity);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.setPadding(padding, dp(activity, 12), padding, dp(activity, 4));
+
+            TextView message = new TextView(activity);
+            message.setText("正在下载更新包...");
+            message.setTextSize(18);
+            message.setTextColor(Color.rgb(80, 86, 104));
+            message.setGravity(Gravity.CENTER_HORIZONTAL);
+            content.addView(message, new LinearLayout.LayoutParams(-1, -2));
+
+            ProgressBar progress = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
+            progress.setIndeterminate(true);
+            progress.setMax(100);
+            LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(activity, 8));
+            progressLp.topMargin = dp(activity, 18);
+            content.addView(progress, progressLp);
+
+            Dialog dialog = new AlertDialog.Builder(activity)
+                    .setTitle("检查更新")
+                    .setView(content)
+                    .setNegativeButton("后台下载", null)
+                    .create();
+            dialog.show();
+            ui.dialog = dialog;
+            ui.message = message;
+            ui.progress = progress;
+        } catch (Throwable ignored) {
+        }
+        return ui;
+    }
+
+    private static void monitorUpdateDownload(final Activity activity, final long downloadId,
+                                              final UpdateDownloadProgress ui) {
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.post(new Runnable() {
             public void run() {
@@ -3655,12 +4073,17 @@ public final class MaintainedLauncherSettingsHost {
                         return;
                     }
                     int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+                    updateDownloadProgressUi(activity, ui, status,
+                            cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)),
+                            cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)));
                     if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                        dismissUpdateDownloadProgress(ui);
                         Toast.makeText(activity, "更新包下载完成，正在启动安装...", Toast.LENGTH_LONG).show();
                         installApk(activity, downloadId);
                         return;
                     }
                     if (status == DownloadManager.STATUS_FAILED) {
+                        dismissUpdateDownloadProgress(ui);
                         Toast.makeText(activity, "更新包下载失败", Toast.LENGTH_SHORT).show();
                         return;
                     }
@@ -3673,6 +4096,46 @@ public final class MaintainedLauncherSettingsHost {
                 handler.postDelayed(this, 1200);
             }
         });
+    }
+
+    private static void updateDownloadProgressUi(Activity activity, UpdateDownloadProgress ui,
+                                                 int status, int downloaded, int total) {
+        if (ui == null || ui.message == null || ui.progress == null) {
+            return;
+        }
+        try {
+            if (total > 0 && downloaded >= 0) {
+                int percent = (int) Math.min(100, Math.max(0, (downloaded * 100L) / total));
+                ui.progress.setIndeterminate(false);
+                ui.progress.setProgress(percent);
+                ui.message.setText("正在下载更新包... " + percent + "%");
+            } else {
+                ui.progress.setIndeterminate(status == DownloadManager.STATUS_RUNNING
+                        || status == DownloadManager.STATUS_PENDING);
+                ui.message.setText(status == DownloadManager.STATUS_PENDING
+                        ? "等待开始下载..."
+                        : "正在下载更新包...");
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void dismissUpdateDownloadProgress(UpdateDownloadProgress ui) {
+        if (ui == null || ui.dialog == null) {
+            return;
+        }
+        try {
+            if (ui.dialog.isShowing()) {
+                ui.dialog.dismiss();
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static final class UpdateDownloadProgress {
+        Dialog dialog;
+        TextView message;
+        ProgressBar progress;
     }
 
     private static void openBatteryOptimizationSettings(Activity activity) {
@@ -4149,7 +4612,11 @@ public final class MaintainedLauncherSettingsHost {
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             intent.setClassName(entry.packageName, entry.className);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-            activity.startActivity(intent);
+            if (isDoppelgangerUserId(entry.userId)) {
+                startActivityForUser(activity, intent, null, entry.userId);
+            } else {
+                activity.startActivity(intent);
+            }
             activity.finish();
         } catch (Throwable t) {
             Toast.makeText(activity, "无法启动应用", Toast.LENGTH_SHORT).show();
@@ -4203,7 +4670,7 @@ public final class MaintainedLauncherSettingsHost {
             PackageManager pm = context.getPackageManager();
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
-            List<ResolveInfo> infos = pm.queryIntentActivities(intent, 0);
+            List<ResolveInfo> infos = queryLauncherActivitiesWithProfiles(pm, intent, 0);
             for (ResolveInfo info : infos) {
                 if (info == null || info.activityInfo == null) {
                     continue;
@@ -4214,11 +4681,20 @@ public final class MaintainedLauncherSettingsHost {
                     continue;
                 }
                 CharSequence label = info.loadLabel(pm);
-                out.add(new SearchEntry(label == null ? pkg : label.toString(), pkg, cls, info.loadIcon(pm)));
+                int userId = userIdForResolveInfo(info);
+                Drawable icon = info.loadIcon(pm);
+                if (isDoppelgangerUserId(userId)) {
+                    icon = doppelgangerBadgeDrawable(icon, pm, null);
+                }
+                out.add(new SearchEntry(label == null ? pkg : label.toString(), pkg, cls, userId, icon));
             }
             Collections.sort(out, new Comparator<SearchEntry>() {
                 public int compare(SearchEntry a, SearchEntry b) {
-                    return a.label.compareToIgnoreCase(b.label);
+                    int byLabel = a.label.compareToIgnoreCase(b.label);
+                    if (byLabel != 0) {
+                        return byLabel;
+                    }
+                    return a.userId - b.userId;
                 }
             });
         } catch (Throwable ignored) {
@@ -4885,33 +5361,33 @@ public final class MaintainedLauncherSettingsHost {
         title.setTextColor(0xff5c5c5c);
         title.setTextSize(17);
         title.setTypeface(null, android.graphics.Typeface.NORMAL);
-        root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 60)));
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
         LinearLayout content = new LinearLayout(activity);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER_HORIZONTAL);
         content.setBackgroundColor(0xfffafafa);
-        content.setPadding(dp(activity, 16), dp(activity, 16), dp(activity, 16), dp(activity, 18));
+        content.setPadding(dp(activity, 22), dp(activity, 20), dp(activity, 22), dp(activity, 24));
 
         final TextView percentText = new TextView(activity);
         percentText.setGravity(Gravity.CENTER);
         percentText.setTextColor(0xff454a5c);
-        percentText.setTextSize(22);
+        percentText.setTextSize(24);
         percentText.setText(current + "%");
-        LinearLayout.LayoutParams percentLp = new LinearLayout.LayoutParams(-1, dp(activity, 36));
+        LinearLayout.LayoutParams percentLp = new LinearLayout.LayoutParams(-1, dp(activity, 44));
         content.addView(percentText, percentLp);
 
         LinearLayout previewPanel = new LinearLayout(activity);
         previewPanel.setOrientation(LinearLayout.VERTICAL);
-        previewPanel.setPadding(dp(activity, 10), dp(activity, 10), dp(activity, 10), dp(activity, 8));
+        previewPanel.setPadding(dp(activity, 14), dp(activity, 16), dp(activity, 14), dp(activity, 12));
         GradientDrawable previewBg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{0xffffffff, 0xfff3f3f3});
         previewBg.setCornerRadius(dp(activity, 4));
         previewBg.setStroke(1, 0xffdddddd);
         previewPanel.setBackgroundDrawable(previewBg);
         LinearLayout.LayoutParams previewPanelLp = new LinearLayout.LayoutParams(-1, -2);
-        previewPanelLp.topMargin = dp(activity, 10);
+        previewPanelLp.topMargin = dp(activity, 14);
         content.addView(previewPanel, previewPanelLp);
 
         LinearLayout preview = new LinearLayout(activity);
@@ -4920,19 +5396,19 @@ public final class MaintainedLauncherSettingsHost {
         final TextView smallPreview = iconSizePreviewText(activity, "小", 15);
         final TextView standardPreview = iconSizePreviewText(activity, "中", 22);
         final TextView largePreview = iconSizePreviewText(activity, "大", 29);
-        preview.addView(smallPreview, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
-        preview.addView(standardPreview, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
-        preview.addView(largePreview, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
-        previewPanel.addView(preview, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+        preview.addView(smallPreview, new LinearLayout.LayoutParams(0, dp(activity, 72), 1));
+        preview.addView(standardPreview, new LinearLayout.LayoutParams(0, dp(activity, 72), 1));
+        preview.addView(largePreview, new LinearLayout.LayoutParams(0, dp(activity, 72), 1));
+        previewPanel.addView(preview, new LinearLayout.LayoutParams(-1, dp(activity, 72)));
 
         final SeekBar seekBar = new SeekBar(activity);
         seekBar.setMax(100);
         seekBar.setProgress(current - 50);
         seekBar.setProgressDrawable(iconSizeSeekBarProgress(activity));
         seekBar.setThumb(iconSizeSeekBarThumb(activity));
-        LinearLayout.LayoutParams seekLp = new LinearLayout.LayoutParams(-1, dp(activity, 34));
-        seekLp.leftMargin = dp(activity, 4);
-        seekLp.rightMargin = dp(activity, 4);
+        LinearLayout.LayoutParams seekLp = new LinearLayout.LayoutParams(-1, dp(activity, 42));
+        seekLp.leftMargin = dp(activity, 8);
+        seekLp.rightMargin = dp(activity, 8);
         previewPanel.addView(seekBar, seekLp);
 
         LinearLayout labels = new LinearLayout(activity);
@@ -4942,10 +5418,10 @@ public final class MaintainedLauncherSettingsHost {
         TextView standard = iconSizeLabel(activity, "100%");
         TextView large = iconSizeLabel(activity, "150%");
         labels.setPadding(dp(activity, 2), 0, dp(activity, 2), 0);
-        labels.addView(small, new LinearLayout.LayoutParams(0, dp(activity, 23), 1));
-        labels.addView(standard, new LinearLayout.LayoutParams(0, dp(activity, 23), 1));
-        labels.addView(large, new LinearLayout.LayoutParams(0, dp(activity, 23), 1));
-        previewPanel.addView(labels, new LinearLayout.LayoutParams(-1, dp(activity, 24)));
+        labels.addView(small, new LinearLayout.LayoutParams(0, dp(activity, 30), 1));
+        labels.addView(standard, new LinearLayout.LayoutParams(0, dp(activity, 30), 1));
+        labels.addView(large, new LinearLayout.LayoutParams(0, dp(activity, 30), 1));
+        previewPanel.addView(labels, new LinearLayout.LayoutParams(-1, dp(activity, 31)));
         root.addView(content, new LinearLayout.LayoutParams(-1, -2));
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
@@ -4954,10 +5430,10 @@ public final class MaintainedLauncherSettingsHost {
         buttons.setOrientation(LinearLayout.HORIZONTAL);
         TextView cancel = smartisanDialogActionButton(activity, "取消", false, -1);
         TextView ok = smartisanDialogActionButton(activity, "确定", true, 1);
-        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 47), 1));
-        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 47)));
-        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 47), 1));
-        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 56)));
+        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
+        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
@@ -5014,7 +5490,7 @@ public final class MaintainedLauncherSettingsHost {
         if (window != null) {
             WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
             lp.copyFrom(window.getAttributes());
-            lp.width = activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 116);
+            lp.width = activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 64);
             lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
             window.setAttributes(lp);
         }
@@ -6283,16 +6759,34 @@ public final class MaintainedLauncherSettingsHost {
                         result.add(info);
                     }
                 }
+                final HashMap<String, String> labels = new HashMap<String, String>();
                 Collections.sort(result, new Comparator<RedirectIconInfo>() {
                     public int compare(RedirectIconInfo a, RedirectIconInfo b) {
-                        String la = a == null ? "" : iconManager.getLableForPackage(a.packageName, a.componentName);
-                        String lb = b == null ? "" : iconManager.getLableForPackage(b.packageName, b.componentName);
+                        String la = cachedLabel(labels, iconManager, a);
+                        String lb = cachedLabel(labels, iconManager, b);
                         return la.compareToIgnoreCase(lb);
                     }
                 });
             } catch (Throwable ignored) {
             }
             return result;
+        }
+
+        private static String cachedLabel(HashMap<String, String> labels, IconManager iconManager,
+                                          RedirectIconInfo info) {
+            if (info == null) {
+                return "";
+            }
+            String key = info.packageName + ";" + info.componentName;
+            String label = labels.get(key);
+            if (label == null) {
+                label = iconManager.getLableForPackage(info.packageName, info.componentName);
+                if (label == null) {
+                    label = "";
+                }
+                labels.put(key, label);
+            }
+            return label;
         }
 
         public int getCount() {
@@ -6551,15 +7045,15 @@ public final class MaintainedLauncherSettingsHost {
                 return custom;
             }
         }
+        Drawable packed = packedIcon(context, info);
+        if (packed != null) {
+            return packed;
+        }
         if (redirect != null && redirect.useImprovedAppIcon && RedirectIconDB.MODE_AUTO.equals(mode)) {
             Drawable smartisan = smartisanIconDrawable(context, info, resources);
             if (smartisan != null) {
                 return smartisan;
             }
-        }
-        Drawable packed = packedIcon(context, info);
-        if (packed != null) {
-            return packed;
         }
         if (redirect == null && isImprovedIconEnabled(context)) {
             Drawable smartisan = smartisanIconDrawable(context, info, resources);
@@ -6593,7 +7087,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static Drawable smartisanIconDrawable(Context context, ResolveInfo info, Resources resources) {
-        Drawable local = safeDrawable(resources, drawable(resources, smartisanIconNameFor(context, info)));
+        Drawable local = maintainedResourceIcon(context, resources, smartisanIconNameFor(context, info));
         if (local != null) {
             return local;
         }
@@ -6614,8 +7108,50 @@ public final class MaintainedLauncherSettingsHost {
             label = loaded == null ? "" : loaded.toString();
         } catch (Throwable ignored) {
         }
+        if ("com.smartisanos.weather".equals(pkg) || "com.android.weather".equals(pkg)
+                || (isSystemApp(ai) && (key.contains("weather") || "天气".equals(label)))) {
+            return "app_icon_weather";
+        }
+        if ("com.smartisanos.appstore".equals(pkg) || "com.android.vending".equals(pkg)
+                || "com.sec.android.app.samsungapps".equals(pkg)
+                || key.contains("appstore")
+                || "应用商店".equals(label) || "应用市场".equals(label)) {
+            return "app_icon_app_store";
+        }
+        if ("com.smartisanos.reader".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("reader"))
+                || "阅读".equals(label)) {
+            return "app_icon_reader";
+        }
+        if ("com.google.android.googlequicksearchbox".equals(pkg)
+                || (isSystemApp(ai) && key.contains("googlequicksearchbox"))
+                || "搜索".equals(label)) {
+            return "app_icon_search";
+        }
+        if ("com.smartisanos.notes".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("note"))
+                || "便签".equals(label)
+                || "笔记".equals(label)) {
+            return "app_icon_notes";
+        }
+        if ("com.smartisanos.gamecenter".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("gamecenter"))
+                || "游戏中心".equals(label)) {
+            return "app_icon_game_center";
+        }
+        if ("com.smartisanos.cloudsync".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("cloudsync"))
+                || "欢喜云".equals(label)) {
+            return "app_icon_smile_cloud";
+        }
+        if ("com.smartisanos.bbs".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("bbs"))
+                || "锤子论坛".equals(label)) {
+            return "app_icon_bbs";
+        }
+
+        if (!isSystemApp(ai)) {
+            return null;
+        }
         if ("com.android.dialer".equals(pkg) || "com.android.phone".equals(pkg)
-                || "com.google.android.dialer".equals(pkg) || "电话".equals(label)) {
+                || "com.google.android.dialer".equals(pkg) || "com.smartisanos.phone".equals(pkg)
+                || key.contains("dialer")
+                || "电话".equals(label) || "拨号".equals(label)) {
             return "app_icon_phone";
         }
         if ("com.android.mms".equals(pkg) || "com.google.android.apps.messaging".equals(pkg)
@@ -6623,34 +7159,10 @@ public final class MaintainedLauncherSettingsHost {
                 || "短信".equals(label) || "信息".equals(label)) {
             return "app_icon_mms";
         }
-        if ("com.smartisanos.weather".equals(pkg) || "com.android.weather".equals(pkg)
-                || key.contains("weather") || "天气".equals(label)) {
-            return "app_icon_weather";
-        }
-        if ("com.smartisanos.appstore".equals(pkg) || key.contains("appstore")
-                || key.contains("market") || "应用商店".equals(label)) {
-            return "app_icon_app_store";
-        }
-        if ("com.smartisanos.reader".equals(pkg) || key.contains("reader") || "阅读".equals(label)) {
-            return "app_icon_reader";
-        }
-        if ("com.google.android.googlequicksearchbox".equals(pkg)
-                || key.contains("googlequicksearchbox")
-                || "搜索".equals(label)) {
-            return "app_icon_search";
-        }
-        if ("com.smartisanos.notes".equals(pkg) || key.contains("note") || "便签".equals(label)
-                || "笔记".equals(label)) {
-            return "app_icon_notes";
-        }
-        if ("com.smartisanos.gamecenter".equals(pkg) || key.contains("gamecenter") || "游戏中心".equals(label)) {
-            return "app_icon_game_center";
-        }
-        if ("com.smartisanos.cloudsync".equals(pkg) || key.contains("cloudsync") || "欢喜云".equals(label)) {
-            return "app_icon_smile_cloud";
-        }
-        if ("com.smartisanos.bbs".equals(pkg) || key.contains("bbs") || "锤子论坛".equals(label)) {
-            return "app_icon_bbs";
+        if ("com.android.contacts".equals(pkg) || "com.google.android.contacts".equals(pkg)
+                || "com.smartisanos.contacts".equals(pkg) || key.contains("contacts")
+                || "联系人".equals(label) || "通讯录".equals(label) || "电话本".equals(label)) {
+            return "source_contactcommon_icon";
         }
         if ("com.android.calendar".equals(pkg) || "com.google.android.calendar".equals(pkg)
                 || "com.smartisanos.calendar".equals(pkg) || key.contains("calendar") || "日历".equals(label)) {
@@ -6667,16 +7179,56 @@ public final class MaintainedLauncherSettingsHost {
         return null;
     }
 
+    private static boolean isSmartisanPackage(String pkg) {
+        return pkg != null && pkg.startsWith("com.smartisanos.");
+    }
+
+    private static boolean isSystemApp(ActivityInfo ai) {
+        try {
+            ApplicationInfo app = ai == null ? null : ai.applicationInfo;
+            return app != null && (app.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static void tagThemeDetailControl(View view, ThemeEntry entry) {
+        if (view != null && entry != null) {
+            view.setTag(entry.pkg);
+        }
+    }
+
+    private static boolean isThemeDetailControlCurrent(View view, ThemeEntry entry) {
+        if (view == null || entry == null) {
+            return true;
+        }
+        Object tag = view.getTag();
+        return tag == null || entry.pkg.equals(tag);
+    }
+
+    private static Drawable maintainedResourceIcon(Context context, Resources resources, String name) {
+        Drawable icon = safeDrawable(resources, drawable(resources, name));
+        if (icon != null || context == null || name == null) {
+            return icon;
+        }
+        try {
+            Resources appResources = context.getResources();
+            return safeDrawable(appResources, appResources.getIdentifier(name, "drawable", context.getPackageName()));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     private static Drawable smartisanNetworkIconDrawable(Context context, ResolveInfo info) {
         ActivityInfo ai = info == null ? null : info.activityInfo;
         if (context == null || ai == null || ai.packageName == null || ai.packageName.length() == 0) {
             return null;
         }
-        Bitmap bitmap = smartisanNetworkIconBitmap(ai.packageName);
+        Bitmap bitmap = smartisanNetworkIconBitmap(context, ai.packageName);
         return bitmap == null ? null : new android.graphics.drawable.BitmapDrawable(context.getResources(), bitmap);
     }
 
-    private static Bitmap smartisanNetworkIconBitmap(String packageName) {
+    private static Bitmap smartisanNetworkIconBitmap(Context context, String packageName) {
         if (packageName == null || packageName.length() == 0) {
             return null;
         }
@@ -6684,6 +7236,20 @@ public final class MaintainedLauncherSettingsHost {
             if (sSmartisanIconCache.containsKey(packageName)) {
                 return sSmartisanIconCache.get(packageName);
             }
+        }
+        Bitmap cached = readCachedSmartisanIcon(context, packageName);
+        if (cached != null) {
+            synchronized (sSmartisanIconCache) {
+                sSmartisanIconCache.put(packageName, cached);
+            }
+            return cached;
+        }
+        if (shouldSkipSmartisanIconFetch(context, packageName)) {
+            return null;
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            scheduleSmartisanIconFetch(context, packageName);
+            return null;
         }
         Bitmap bitmap = null;
         InputStream in = null;
@@ -6700,6 +7266,7 @@ public final class MaintainedLauncherSettingsHost {
                 in = conn.getInputStream();
                 byte[] data = readAllBytes(in, 64 * 1024);
                 bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+                writeCachedSmartisanIcon(context, packageName, bitmap);
             }
         } catch (Throwable ignored) {
         } finally {
@@ -6719,7 +7286,105 @@ public final class MaintainedLauncherSettingsHost {
         synchronized (sSmartisanIconCache) {
             sSmartisanIconCache.put(packageName, bitmap);
         }
+        if (bitmap == null) {
+            markSmartisanIconMiss(context, packageName);
+        }
         return bitmap;
+    }
+
+    private static void scheduleSmartisanIconFetch(final Context context, final String packageName) {
+        if (context == null || packageName == null) {
+            return;
+        }
+        synchronized (sSmartisanIconFetchPending) {
+            if (sSmartisanIconFetchPending.containsKey(packageName)) {
+                return;
+            }
+            sSmartisanIconFetchPending.put(packageName, Boolean.TRUE);
+        }
+        final Context appContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    smartisanNetworkIconBitmap(appContext, packageName);
+                } finally {
+                    synchronized (sSmartisanIconFetchPending) {
+                        sSmartisanIconFetchPending.remove(packageName);
+                    }
+                }
+            }
+        }, "SmartisanIconFetch").start();
+    }
+
+    private static Bitmap readCachedSmartisanIcon(Context context, String packageName) {
+        try {
+            File file = smartisanIconCacheFile(context, packageName);
+            if (file == null || !file.exists()) {
+                return null;
+            }
+            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+            if (bitmap == null) {
+                file.delete();
+            }
+            return bitmap;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static void writeCachedSmartisanIcon(Context context, String packageName, Bitmap bitmap) {
+        if (bitmap == null) {
+            return;
+        }
+        FileOutputStream out = null;
+        try {
+            File file = smartisanIconCacheFile(context, packageName);
+            if (file == null) {
+                return;
+            }
+            File dir = file.getParentFile();
+            if (dir != null && !dir.exists()) {
+                dir.mkdirs();
+            }
+            out = new FileOutputStream(file);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            context.getSharedPreferences(SMARTISAN_ICON_CACHE_PREFS, Context.MODE_PRIVATE).edit()
+                    .remove("miss." + packageName).apply();
+        } catch (Throwable ignored) {
+        } finally {
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+    }
+
+    private static boolean shouldSkipSmartisanIconFetch(Context context, String packageName) {
+        try {
+            long lastMiss = context.getSharedPreferences(SMARTISAN_ICON_CACHE_PREFS, Context.MODE_PRIVATE)
+                    .getLong("miss." + packageName, 0L);
+            return lastMiss > 0L && System.currentTimeMillis() - lastMiss < SMARTISAN_ICON_MISS_RETRY_MS;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static void markSmartisanIconMiss(Context context, String packageName) {
+        try {
+            context.getSharedPreferences(SMARTISAN_ICON_CACHE_PREFS, Context.MODE_PRIVATE).edit()
+                    .putLong("miss." + packageName, System.currentTimeMillis()).apply();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static File smartisanIconCacheFile(Context context, String packageName) {
+        if (context == null || packageName == null) {
+            return null;
+        }
+        return new File(new File(context.getCacheDir(), SMARTISAN_ICON_CACHE_DIR),
+                Integer.toHexString(packageName.hashCode()) + ".png");
     }
 
     private static byte[] readAllBytes(InputStream in, int maxBytes) throws java.io.IOException {
@@ -6911,13 +7576,15 @@ public final class MaintainedLauncherSettingsHost {
         final String label;
         final String packageName;
         final String className;
+        final int userId;
         final String t9Code;
         final Drawable icon;
 
-        SearchEntry(String label, String packageName, String className, Drawable icon) {
+        SearchEntry(String label, String packageName, String className, int userId, Drawable icon) {
             this.label = label;
             this.packageName = packageName;
             this.className = className;
+            this.userId = userId;
             this.t9Code = toT9Code(label + " " + packageName);
             this.icon = icon;
         }

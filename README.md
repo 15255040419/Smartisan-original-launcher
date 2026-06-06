@@ -5,7 +5,7 @@
 <h1 align="center">Smartisan Launcher Original Port</h1>
 
 <p align="center">
-  原版锤子桌面移植工程，目标是在普通 Android 设备上独立安装、启动和使用，同时保留 12 / 20 宫格、主题、壁纸、翻页动画和应用图标体验。
+  原版锤子桌面移植工程，目标是在普通 Android 设备上独立安装、启动和使用，同时尽量保留 Smartisan OS 桌面的宫格、主题、图标、壁纸、搜索和设置体验。
 </p>
 
 <p align="center">
@@ -18,9 +18,9 @@
 
 ## 项目概览
 
-本项目基于从锤子手机提取的原版桌面 `com.smartisanos.launcher-3.apk`，把原版 Smartisan Launcher 移植为可在普通 Android 环境中运行的独立 APK。
+本项目基于从锤子手机提取的原版桌面 `com.smartisanos.launcher-3.apk`，将原版 Smartisan Launcher 移植为可在普通 Android 环境中运行的独立 APK。
 
-`E:\FANG\smartisan\smartisan-launcher-maintained` 是主要参考项目，用于对照普通 Android 兼容逻辑、maintained 风格设置页、图标替换链路、主题下载、开关控件和设置项交互。本工程不会直接替换为 maintained，也不会把 12 / 20 宫格退回 maintained 的 9 / 16 宫格。
+`E:\FANG\smartisan\smartisan-launcher-maintained` 是主要参考项目，用来对照普通 Android 兼容逻辑、设置页结构、搜索页、主题下载、图标识别、图标替换、多用户应用查询和常见交互细节。本工程保留原版桌面的 12 / 20 宫格方向，不直接替换成 maintained 的桌面主体。
 
 ## 参考来源
 
@@ -31,89 +31,64 @@
 | 原版桌面 APK | `com.smartisanos.launcher-3.apk` |
 | 原生设置 APK | `com.android.settings-100.apk` |
 | 原生桌面 / 壁纸相关 APK | `com.smartisanos.desktop-3.apk`、`com.smartisanos.wallpaperprovider-100.apk` |
+| 毛玻璃主题 APK | `com.smartisanos.launcher.theme.aero.apk` |
 
-## 当前状态
+## 当前进度
 
-当前 APK 可以构建、签名、安装和启动，并已多次通过 ADB 安装到在线 Android 虚拟机验证。
-
-```bat
-build.bat
-adb install -r build\launcher-signed.apk
-```
-
-最近使用的输出 APK：
+当前 APK 可以构建、签名、安装和启动，输出文件为：
 
 ```text
 build\launcher-signed.apk
 ```
-
-桌面主体、桌面设置入口、12 / 20 宫格、主题页、壁纸入口、翻页动画页、应用图标页、桌面图标大小滑块和三个设置开关都已经接入。设置页当前由 `com.smartisanos.launcher.theme.ThemeChooserActivity` 承载，内部加载 maintained 风格资源和当前工程的兼容逻辑。
-
-最近状态：2026-06-01 重点修复应用图标页，顶部开关复用首页同款 `SettingItemSwitch` / `SwitchEx`，图标包行和开关行组成同一组，单应用图标选择与相册返回改为当前行刷新并保持滚动位置；2026-06-02 新增桌面图标大小滑块，并补齐隐藏虚拟键、角标开关、下滑 / 上滑搜索、检查更新、关闭电池优化和原版风格“关于我们”页面；2026-06-03 发布 `v1.4.1` 搜索页修正版后，继续整理兼容安装、签名和包体瘦身，随后提升到 `v1.4.2`；2026-06-04 继续修复刘海屏编辑态状态栏、双开应用显示与启动、主题详情预览居中、设置页返回保持滚动位置、强迫症选项收纳和英文文案，并准备发布 `v1.4.5`。详细过程见 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) 顶部“每日修复记录（倒序）”。
 
 当前兼容安装基线：
 
 ```text
 minSdkVersion: 23
 targetSdkVersion: 28
-APK size: about 64 MB after first resource slimming pass
+APK size: about 64 MB
 ```
 
-## 功能进度
+桌面主体、桌面设置入口、12 / 20 宫格、主题页、壁纸入口、翻页动画页、应用图标页、桌面图标大小、搜索页、检查更新、关于我们、强迫症选项和多个设置开关已经接入。设置页当前由 `com.smartisanos.launcher.theme.ThemeChooserActivity` 承载，内部加载 maintained 风格资源和当前工程的兼容逻辑。
+
+详细开发过程、每天修复了哪些问题、验证记录和历史原因见 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md)。README 只记录当前项目状态，不记录每日流水账。
+
+## 已实现
 
 | 模块 | 状态 | 说明 |
 | --- | --- | --- |
-| 桌面主体 | 已接入 | 独立 APK、应用名、桌面虚拟设置入口、12 / 20 宫格、Dock 和部分坐标适配已完成。 |
-| 桌面设置 | 已接入，继续微调 | 主入口迁移为 maintained 风格结构，包含桌面主题、桌面壁纸、桌面翻页动画、应用图标。 |
-| 主题 | 已接入，继续回归 | 本地 / 在线主题、详情页、下载按钮、设定流程、经典黑资源修复已接入；首次切换主题的翻页过渡动画已通过冷启动队列和桌面就绪触发修复，仍建议多主题回归。 |
-| 壁纸 | 已接入，继续回归 | 系统图片选择、`launcher_wallpaper_uri`、私有壁纸副本、缩略图、gaussian 兜底和恢复默认已接入；毛玻璃 / 白雾使用自定义壁纸，普通主题不透出用户壁纸。 |
-| 翻页动画 | 已接入 | 支持默认、立体翻转、百叶窗、切牌等 maintained 常见动画值，并保存兼容配置。 |
+| 桌面主体 | 已接入 | 支持独立 APK 启动、桌面虚拟设置入口、12 / 20 宫格、Dock、基础坐标和多分辨率适配。 |
+| 桌面设置 | 已接入 | 主入口迁移为 maintained 风格结构，包含桌面主题、桌面壁纸、桌面翻页动画、应用图标、强迫症选项、检查更新、关于我们等入口。 |
+| 主题 | 已接入 | 支持本地主题、在线主题、主题详情、主题下载、主题设定、主题切换动画和毛玻璃主题壁纸链路。 |
+| 壁纸 | 已接入 | 支持系统图片选择、私有壁纸副本、缩略图、毛玻璃主题壁纸应用和恢复默认壁纸。 |
+| 翻页动画 | 已接入 | 支持默认、立体翻转、百叶窗、切牌等常见动画值，并保存兼容配置。 |
 | 应用图标 | 已接入 | 支持系统原图、图标包 appfilter、redirect、自定义图片、桌面图标大小调节和桌面主图标加载链路。 |
-| 设置开关 | 已接入 | 隐藏图标名称、解锁动画、多板块视图快速启用应用已接入读取、写入和即时刷新；应用图标页的改进版图标开关已复用同款控件。 |
-| 内置搜索 | 已接入，继续微调 | 支持设置页开关启用 / 禁用下滑搜索，搜索页使用系统输入法；顶部常用应用支持横向滑动，搜索结果行图标和文字已修正为垂直居中。 |
+| 图标识别 | 已接入，继续回归 | 已对照 maintained 调整图标识别逻辑，减少普通应用被识别成应用商店等错误图标的概率，并保留当前项目已有的图标识别能力。 |
+| 应用分身 | 已接入，继续回归 | 已接入多用户 / 双开应用查询、显示和启动路径，支持为分身应用叠加原版风格面具标记。 |
+| 内置搜索 | 已接入，继续微调 | 支持搜索普通应用和分身应用；下滑搜索手势已收窄，减少长按拖动应用时误打开搜索页。 |
+| 检查更新 | 已接入 | 支持 GitHub Release 版本检查、更新包下载、下载进度显示和下载完成后启动安装。 |
+| 设置开关 | 已接入 | 已接入隐藏虚拟键、隐藏图标名称、解锁动画、角标隐藏、横扫清除角标、下滑搜索等开关。 |
+| 毛玻璃主题 | 已接入 | 已接入原版毛玻璃主题包资源，桌面文字和编辑页文字按白色文字效果显示。 |
+| 构建签名 | 已接入 | `build.bat` 会完成资源编译、APK 构建、zipalign 和 apksigner 签名。 |
 
-## 重点修复记录
+## 待实现
 
-- 修正桌面主图标加载入口，图标不只在设置页预览里变化，也会进入桌面图标加载链路。
-- 应用图标页顶部全局项已对齐 maintained 样式：改进版图标使用首页同款开关，图标包默认显示“不使用图标包”，点击可选择自动选择、不使用或已安装图标包。
-- 应用图标页新增“桌面图标大小”行，位于改进版图标和图标包之间；支持 50% - 150% 滑块调节，弹窗内“小 / 中 / 大”可快速跳转三档，保存后回桌面并重启 Launcher，确保 12 / 20 宫格所有图标统一应用新尺寸。
-- 应用图标页单应用图标选择改为行级刷新：点击左侧默认图标、右侧推荐/加号图标、自定义相册图标后保持当前位置，不再整页刷新回顶部。
-- 内置搜索页去掉自绘 T9 键盘，点击搜索框调用系统输入法；顶部常用应用横向滑动展示，输入关键词后的搜索结果行固定高度并保持图标、文字垂直居中。
-- 对照 maintained 的安装兼容和资源结构，已把最终二进制 Manifest 的 `minSdkVersion` 从 29 降到 23、`targetSdkVersion` 调整为 28；`pb.getResolution()` 统一返回 `1080p`，删除 `assets/Textures/720p` 后 APK 从约 106MB 降到约 64MB。
-- 构建签名流程已从 `jarsigner` 旧 v1 签名改为 `zipalign -p` 后使用 `apksigner` 输出 v1/v2/v3 签名；这能改善 Android 12 等新系统通过文件管理器安装时直接报“安装失败”的问题。
-- 检查更新依赖 GitHub Release 的最新 tag 与当前安装版本对比；如果本机已经安装版本不低于 GitHub 最新 release，就会提示“当前已经是最新版本”。后续功能或兼容修复必须同时提升文本 Manifest、`launcher/original/AndroidManifest.xml` 二进制 Manifest、设置页默认版本字符串，并发布新 GitHub Release / APK 资产，例如 `v1.4.5`。
-- 强迫症选项已从主设置页零散开关收纳为二级页面，英文系统显示 `OCD Settings`，中文系统显示“强迫症选项”；不要再在 Java 中硬编码中文标题或入口文字。
-- 主题详情页预览图使用“外层填满标题栏到底部主题标签之间区域，内层原版手机预览居中”的结构，避免再用运行时平移导致手机壳和截图错位。
-- 设置页返回位置恢复必须在首帧绘制前执行，避免从“关于我们”或主题详情返回时先跳到顶部再滚回当前位置造成上下晃动。
-- 刘海屏 / 长屏状态栏链路已按 maintained 思路修正：Launcher 主窗口始终保留 `LAYOUT_STABLE | LAYOUT_FULLSCREEN`，Android 9 及以上设置刘海短边延伸，避免长按图标或进入桌面编辑模式时系统状态栏露出并把桌面整体向下顶。
-- 主设置页入口缩略图继续对齐 maintained 风格：桌面主题 / 桌面壁纸 / 桌面翻页动画使用统一竖向预览图，应用图标不再额外加白色外框。
-- 12 / 20 宫格预览图已替换为当前工程专用资源，不再沿用 maintained 的旧 9 / 16 宫格含义。
-- 主题切换流程已加入切换动画、主题快照和冷启动队列处理，修复第一次切换主题不显示翻页过渡动画的问题；主题设定后由桌面直接承接动画，避免设置页短暂闪回。
-- 经典黑主题顶底色彩对齐：已恢复官方底包 `com.smartisanos.launcher-3.apk` 中 12 / 20 宫格经典黑拟物皮质网格资源，修复顶部网格与底部 Dock 的色差问题。
-- 普通不透明主题切换时不再把用户壁纸作为桌面背景传入，避免所有主题都透出系统壁纸。
-- 毛玻璃、白雾等透明主题的壁纸读取路径已接到当前 launcher 壁纸；恢复默认壁纸会清掉自定义副本并回到当前主题内置背景。
+- 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议优先拉起系统或已安装天气应用。
+- 日历：当前保留日历权限和动态图标资源线索，但桌面日期刷新、点击入口和系统日历兼容还未完整回归。
+- 通知角标通用化：当前桌面已有旧 Smartisan 未读数广播入口和角标绘制逻辑，但普通 Android 上不能保证微信等应用有通知就自动显示角标；后续需要通知监听或厂商 badge 兼容桥。
+- 原生 Smartisan Settings：当前设置页仍由 launcher 包内 `ThemeChooserActivity` 承载 maintained 风格兼容页，还不是完整移植的原生 Smartisan Settings Activity / Fragment。
+- 在线主题安装：普通应用不能静默安装主题 APK，下载完成后仍需要用户手动确认安装。
+- 包体继续压缩：`theme_preview`、`assets/Textures/1080p`、`settings_maintained/maintained-settings-res.apk` 仍占用较多空间，后续需要逐项替代或合并资源，不能直接删除。
 
-## 当前待回归 / 待修复
+## 已知 BUG / 待回归
 
-- 首次主题切换动画：当前已修复主链路，仍建议继续用多主题、多次清数据冷启动做回归。
-- 透明主题换壁纸：当前已修复选择壁纸、即时刷新和恢复默认主链路，仍建议继续对毛玻璃 / 白雾分别回归。
-- 白雾主题显示异常还没有最终确认修复。
-- 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
-- 设置页宿主仍复用 `ThemeChooserActivity`，还不是完整移植的原生 Smartisan `Settings` Activity。
-- 包体仍有继续压缩空间：`theme_preview` 约 16MB，`assets/Textures/1080p` 约 28MB，内嵌 `settings_maintained/maintained-settings-res.apk` 约 6.6MB；后续需要逐项替代或合并资源，不能直接删除。
-- 对照 `smartisan-launcher-maintained`，桌面设置和桌面能力仍需按下面优先级继续移植；“分享此应用给朋友”和“用户体验改进计划”不再作为移植目标。
-  - [x] 桌面隐藏虚拟键：优先级最高，key 为 `launcher_hide_navigation_bar`，已接入首页开关并限制只由 Launcher 主界面应用系统 UI flags。
-  - [x] 检查更新：已接入当前项目 GitHub Release 检测；存在 APK 资产时提示下载，普通应用更新仍需系统安装确认。
-  - [x] 关闭电池优化：优先请求当前包名 `com.smartisanos.launcher` 的电池优化弹窗，系统不允许时回退当前应用详情页。
-  - [x] 关于我们：已从信息弹窗改为完整 maintained / 原版锤子风格页面。
-  - [x] 紧贴屏幕横扫清除角标：key 为 `launcher_badge_swipe_clean`，已接入 maintained 风格设置页开关。
-  - [x] 隐藏图标上的角标：key 为 `launcher_hide_badge`，已接入 maintained 风格设置页开关。
-  - [x] 下滑 / 上滑搜索：已修正旧逻辑只认上滑、前三次只提示、依赖缺失 QuickSearch provider 的问题，统一打开本项目内置应用搜索页。
-  - [ ] 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议按 maintained 的方向优先拉起系统 / 已安装天气应用。
-  - [ ] 日历：当前保留日历权限和动态图标资源线索，但桌面日期刷新、点击入口和系统日历兼容还未单独回归。
-- 提醒角标底层存在 `launcher_hide_badge`、`launcher_badge_swipe_clean` 和 badge 读取 / 刷新痕迹，若应用或系统提供旧 Smartisan / 厂商未读数广播则有机会显示；普通 Android 通知角标仍需要额外通知监听或 badge 兼容桥，当前不能保证所有应用通知都会显示桌面角标。
-- 在线主题 APK 通过系统 `DownloadManager` 下载，普通应用不能静默安装，下载完成后仍需要用户手动安装主题包。
-- 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画在更多分辨率和真机上仍需要继续回归。
+- 应用分身在不同品牌手机上的包名、用户 ID 和启动行为可能不同，需要继续用 OPPO、vivo、小米、荣耀、模拟器等环境回归。
+- 微信分身面具标记已经接入，但面具大小、位置和不同图标尺寸下的观感仍需要继续对照原版微调。
+- MuMu 模拟器存在桌面图标不显示的兼容风险，当前已对 adaptive drawable 和图标归一化做兼容，但仍需要继续实机 / 模拟器回归。
+- 图标识别仍可能遇到同名、别名、厂商魔改包名或系统应用名称不一致的问题，需要继续按实际截图补规则。
+- 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画仍需要更多分辨率和真机回归。
+- 透明主题下 Dock 区域、毛玻璃背景、状态栏颜色在部分系统上仍需要继续截图对比。
+- 检查更新依赖 GitHub Release 和 APK 资产，后续每次发布新版本都需要同步提升 Manifest 版本和发布资产。
 
 ## 构建与安装
 
@@ -130,6 +105,14 @@ adb shell am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity
 adb shell dumpsys activity activities
 ```
 
+构建后如果需要清理 `build` 目录，当前只需要保留：
+
+```text
+build\launcher-signed.apk
+build\launcher-signed.apk.idsig
+build\tools
+```
+
 ## 主要文件
 
 | 功能 | 文件 / 目录 |
@@ -144,9 +127,3 @@ adb shell dumpsys activity activities
 | redirect 图标数据层 | `launcher/tools/java/com/smartisanos/launcher/data/redirectIcon/` |
 | 开关控件 | `launcher/tools/java/smartisanos/widget/SwitchEx.java` |
 | 构建入口 | `build.bat` |
-
-## 开发记录
-
-详细修复过程、每天修复的 BUG 和功能、验证记录、历史路线说明已经移到 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md)。
-
-`DEVELOPMENT_LOG.md` 顶部维护当前状态和按日期倒序的每日修复记录；后面的历史归档保留旧记录原文，日期和标题不作为最新日志顺序。当前状态以本 README 和日志顶部总览为准。

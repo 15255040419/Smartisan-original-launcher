@@ -2302,7 +2302,7 @@
     :cond_0
     check-cast p0, Lcom/smartisanos/smengine/mymaterial/s;
 
-    sget-object v0, Lcom/smartisanos/launcher/data/Constants;->MIST_BACK_MASK:Lcom/smartisanos/smengine/a/k;
+    sget-object v0, Lcom/smartisanos/launcher/data/Constants;->GAUSSIAN_BACK_MASK:Lcom/smartisanos/smengine/a/k;
 
     iget v1, v0, Lcom/smartisanos/smengine/a/k;->x:F
 

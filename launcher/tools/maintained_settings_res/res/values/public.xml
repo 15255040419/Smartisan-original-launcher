@@ -1499,7 +1499,6 @@
     <public type="string" name="smartisan_theme_leather_name" id="0x7f0800d5" />
     <public type="string" name="smartisan_theme_light_blue_name" id="0x7f0800d6" />
     <public type="string" name="smartisan_theme_light_wood_name" id="0x7f0800d7" />
-    <public type="string" name="smartisan_theme_mist_name" id="0x7f0800d8" />
     <public type="string" name="smartisan_theme_orange_name" id="0x7f0800d9" />
     <public type="string" name="smartisan_theme_purple_name" id="0x7f0800da" />
     <public type="string" name="smartisan_theme_red_name" id="0x7f0800db" />
@@ -1818,8 +1817,6 @@
     <public type="string" name="LiteraryWhite_PKG" id="0x7f080226" />
     <public type="string" name="LiteraryYellow" id="0x7f080227" />
     <public type="string" name="LiteraryYellow_PKG" id="0x7f080228" />
-    <public type="string" name="MIST" id="0x7f080229" />
-    <public type="string" name="MIST_PKG" id="0x7f08022a" />
     <public type="string" name="STRIP" id="0x7f08022b" />
     <public type="string" name="STRIP_PKG" id="0x7f08022c" />
     <public type="string" name="abc_font_family_body_1_material" id="0x7f08022d" />

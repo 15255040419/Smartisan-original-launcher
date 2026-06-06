@@ -1,9 +1,0 @@
-﻿<resources>
-    <string name="app_name">桌面</string>
-    <style name="Theme" parent="android:style/Theme.DeviceDefault" />
-    <style name="LauncherThemeStyle" parent="android:style/Theme.DeviceDefault.NoActionBar" />
-    <style name="ConfirmPasswordStyle" parent="android:style/Theme.DeviceDefault.NoActionBar" />
-    <style name="LauncherActivityTheme" parent="android:style/Theme.DeviceDefault.Wallpaper.NoTitleBar">
-        <item name="android:windowDisablePreview">true</item>
-    </style>
-</resources>

@@ -1276,7 +1276,13 @@
 
     .line 12
     :cond_1
+    iget v0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I
+
     iget-object p0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->iconData:[B
+
+    invoke-static {p0, v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->doppelgangerIconBytes([BI)[B
+
+    move-result-object p0
 
     return-object p0
 .end method

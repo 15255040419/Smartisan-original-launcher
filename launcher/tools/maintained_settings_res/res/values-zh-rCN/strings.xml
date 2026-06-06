@@ -132,7 +132,7 @@
     <string name="launcher_theme_sub_text">设置桌面的背景主题</string>
     <string name="launcher_theme_text">桌面主题</string>
     <string name="launcher_unlock_anim">解锁时桌面的动画效果</string>
-    <string name="launcher_wallpaper_setting_sub_text">仅对毛玻璃、白雾主题生效</string>
+    <string name="launcher_wallpaper_setting_sub_text">仅对毛玻璃主题生效</string>
     <string name="launcher_wallpaper_setting_text">桌面壁纸</string>
     <string name="launcher_wallpaper_pick_failed_text">当前无法设置桌面壁纸</string>
     <string name="launcher_wallpaper_pick_text">选择图片</string>
@@ -234,7 +234,6 @@
     <string name="smartisan_theme_light_blue_name">经典蓝</string>
     <string name="smartisan_theme_light_gold_name">浅金</string>
     <string name="smartisan_theme_light_wood_name">桦木</string>
-    <string name="smartisan_theme_mist_name">白雾</string>
     <string name="smartisan_theme_orange_name">橙色</string>
     <string name="smartisan_theme_purple_name">紫色</string>
     <string name="smartisan_theme_raven_name">鸦青</string>
