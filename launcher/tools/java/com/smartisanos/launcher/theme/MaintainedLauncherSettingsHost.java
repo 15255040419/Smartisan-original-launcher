@@ -5,6 +5,9 @@ import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.DownloadManager;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.WallpaperManager;
 import android.content.Context;
@@ -139,9 +142,13 @@ public final class MaintainedLauncherSettingsHost {
     private static final String SMARTISAN_ICON_CACHE_DIR = "smartisan_icon_cache";
     private static final long SMARTISAN_ICON_MISS_RETRY_MS = 7L * 24L * 60L * 60L * 1000L;
     private static final String THEME_DOWNLOAD_BASE =
-            "https://github.com/15255040419/smartisan-launcher/releases/download/themes-v1/";
+            "https://gitee.com/RANH-F/Smartisan-original-launcher/releases/download/themes-v1/";
     private static final String UPDATE_RELEASE_API =
-            "https://api.github.com/repos/15255040419/Smartisan-original-launcher/releases/latest";
+            "https://api.github.com/repos/RANH-F/Smartisan-original-launcher/releases/latest";
+    private static final String UPDATE_RELEASE_GITEE_MIRROR =
+            "https://gitee.com/RANH-F/Smartisan-original-launcher/releases/download/";
+    private static final String UPDATE_NOTIFICATION_CHANNEL = "launcher_update_download";
+    private static final int UPDATE_NOTIFICATION_ID = 53046;
     private static final ThemeEntry[] LOCAL_THEMES = new ThemeEntry[]{
             new ThemeEntry("smartisan_theme_black", "com.smartisanos.home", "经典黑", true),
     };
@@ -3935,7 +3942,7 @@ public final class MaintainedLauncherSettingsHost {
                             }
                             showConfirmDialog(activity, "发现新版本", message, "取消", "下载", new View.OnClickListener() {
                                 public void onClick(View v) {
-                                    downloadUpdateApk(activity, finalApkUrl, finalApkName);
+                                    downloadUpdateApk(activity, finalApkUrl, finalApkName, tag);
                                 }
                             });
                         }
@@ -3980,37 +3987,29 @@ public final class MaintainedLauncherSettingsHost {
         return out.toString();
     }
 
-    private static void downloadUpdateApk(Activity activity, String url, String name) {
+    private static void downloadUpdateApk(Activity activity, String url, String name, String tag) {
         try {
             if (!ensureDownloadPermission(activity)) {
                 return;
             }
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            request.setTitle(name);
-            request.setDescription("锤子桌面更新安装包");
-            request.setMimeType("application/vnd.android.package-archive");
-            if (Build.VERSION.SDK_INT >= 11) {
-                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            File dir = activity.getExternalFilesDir(null);
+            if (dir == null) {
+                dir = activity.getFilesDir();
             }
-            File out = new File(activity.getExternalFilesDir(null), name);
+            File out = new File(dir, name);
             try {
+                File parent = out.getParentFile();
+                if (parent != null && !parent.exists()) {
+                    parent.mkdirs();
+                }
                 if (out.exists()) {
                     out.delete();
                 }
-                request.setDestinationUri(Uri.fromFile(out));
             } catch (Throwable ignored) {
             }
-            DownloadManager manager = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE);
-            if (manager == null) {
-                throw new IllegalStateException("DownloadManager unavailable");
-            }
-            long id = manager.enqueue(request);
-            activity.getSharedPreferences(THEME_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(String.valueOf(id) + ".path", out.getAbsolutePath())
-                    .commit();
             Toast.makeText(activity, "已开始下载更新包", Toast.LENGTH_SHORT).show();
-            monitorUpdateDownload(activity, id, showUpdateDownloadProgress(activity));
+            downloadUpdateApkDirect(activity, updateDownloadCandidates(tag, name, url), out,
+                    showUpdateDownloadProgress(activity));
         } catch (Throwable t) {
             try {
                 activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
@@ -4018,6 +4017,158 @@ public final class MaintainedLauncherSettingsHost {
                 Toast.makeText(activity, "无法下载更新包", Toast.LENGTH_SHORT).show();
             }
         }
+    }
+
+    private static String[] updateDownloadCandidates(String tag, String name, String githubUrl) {
+        ArrayList<String> urls = new ArrayList<String>();
+        if (tag != null && tag.length() > 0 && name != null && name.length() > 0) {
+            urls.add(UPDATE_RELEASE_GITEE_MIRROR + Uri.encode(tag) + "/" + Uri.encode(name));
+        }
+        if (githubUrl != null && githubUrl.length() > 0 && !urls.contains(githubUrl)) {
+            urls.add(githubUrl);
+        }
+        return urls.toArray(new String[urls.size()]);
+    }
+
+    private static void downloadUpdateApkDirect(final Activity activity, final String[] urls,
+                                                final File out, final UpdateDownloadProgress ui) {
+        final Handler handler = new Handler(Looper.getMainLooper());
+        updateUpdateProgressUi(activity, ui, "正在连接下载...", -1);
+        notifyUpdateDownload(activity, "正在连接下载...", -1, false);
+        new Thread(new Runnable() {
+            public void run() {
+                HttpURLConnection conn = null;
+                InputStream input = null;
+                FileOutputStream output = null;
+                try {
+                    Throwable lastError = null;
+                    for (int i = 0; i < urls.length; i++) {
+                        final boolean mirror = i == 0 && urls[i].startsWith(UPDATE_RELEASE_GITEE_MIRROR);
+                        try {
+                            handler.post(new Runnable() {
+                                public void run() {
+                                    updateUpdateProgressUi(activity, ui,
+                                            mirror ? "正在连接国内镜像..." : "正在连接下载...", -1);
+                                    notifyUpdateDownload(activity,
+                                            mirror ? "正在连接国内镜像..." : "正在连接下载...", -1, false);
+                                }
+                            });
+                            conn = openDownloadConnection(urls[i]);
+                            int code = conn.getResponseCode();
+                            if (code >= 200 && code < 300) {
+                                break;
+                            }
+                            lastError = new IllegalStateException("HTTP " + code);
+                            conn.disconnect();
+                            conn = null;
+                        } catch (Throwable t) {
+                            lastError = t;
+                            if (conn != null) {
+                                try {
+                                    conn.disconnect();
+                                } catch (Throwable ignored) {
+                                }
+                                conn = null;
+                            }
+                        }
+                    }
+                    if (conn == null) {
+                        throw lastError == null ? new IllegalStateException("No download url") : lastError;
+                    }
+                    long total = conn.getContentLength();
+                    input = conn.getInputStream();
+                    output = new FileOutputStream(out);
+                    byte[] buffer = new byte[32768];
+                    long downloaded = 0;
+                    long lastUpdate = 0;
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, read);
+                        downloaded += read;
+                        long now = System.currentTimeMillis();
+                        if (now - lastUpdate > 300) {
+                            lastUpdate = now;
+                            final int percent = total > 0
+                                    ? (int) Math.min(100, Math.max(0, (downloaded * 100L) / total))
+                                    : -1;
+                            handler.post(new Runnable() {
+                                public void run() {
+                                    updateUpdateProgressUi(activity, ui, percent >= 0
+                                            ? "正在下载更新包... " + percent + "%"
+                                            : "正在下载更新包...", percent);
+                                    notifyUpdateDownload(activity, percent >= 0
+                                            ? "正在下载更新包... " + percent + "%"
+                                            : "正在下载更新包...", percent, false);
+                                }
+                            });
+                        }
+                    }
+                    output.flush();
+                    handler.post(new Runnable() {
+                        public void run() {
+                            dismissUpdateDownloadProgress(ui);
+                            notifyUpdateDownload(activity, "下载完成，正在启动安装...", 100, true);
+                            Toast.makeText(activity, "更新包下载完成，正在启动安装...", Toast.LENGTH_LONG).show();
+                            installApkFile(activity, out);
+                        }
+                    });
+                } catch (final Throwable t) {
+                    try {
+                        if (out.exists()) {
+                            out.delete();
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                    handler.post(new Runnable() {
+                        public void run() {
+                            dismissUpdateDownloadProgress(ui);
+                            cancelUpdateNotification(activity);
+                            Toast.makeText(activity, "更新包下载失败: " + shortError(t), Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } finally {
+                    try {
+                        if (output != null) output.close();
+                    } catch (Throwable ignored) {
+                    }
+                    try {
+                        if (input != null) input.close();
+                    } catch (Throwable ignored) {
+                    }
+                    if (conn != null) {
+                        conn.disconnect();
+                    }
+                }
+            }
+        }, "launcher-update-direct-download").start();
+    }
+
+    private static HttpURLConnection openDownloadConnection(String url) throws Exception {
+        String current = url;
+        for (int i = 0; i < 5; i++) {
+            HttpURLConnection conn = (HttpURLConnection) new URL(current).openConnection();
+            conn.setInstanceFollowRedirects(false);
+            conn.setConnectTimeout(12000);
+            conn.setReadTimeout(20000);
+            conn.setRequestProperty("User-Agent", "SmartisanLauncherUpdate/1.0");
+            conn.setRequestProperty("Accept", "application/octet-stream");
+            int code = conn.getResponseCode();
+            if (code == HttpURLConnection.HTTP_MOVED_PERM
+                    || code == HttpURLConnection.HTTP_MOVED_TEMP
+                    || code == HttpURLConnection.HTTP_SEE_OTHER
+                    || code == 307
+                    || code == 308) {
+                String next = conn.getHeaderField("Location");
+                conn.disconnect();
+                if (next == null || next.length() == 0) {
+                    throw new IllegalStateException("Redirect without Location");
+                }
+                current = next;
+                continue;
+            }
+            return conn;
+        }
+        throw new IllegalStateException("Too many redirects");
     }
 
     private static UpdateDownloadProgress showUpdateDownloadProgress(Activity activity) {
@@ -4098,6 +4249,23 @@ public final class MaintainedLauncherSettingsHost {
         });
     }
 
+    private static void updateUpdateProgressUi(Activity activity, UpdateDownloadProgress ui,
+                                               String message, int percent) {
+        if (ui == null || ui.message == null || ui.progress == null) {
+            return;
+        }
+        try {
+            ui.message.setText(message);
+            if (percent >= 0) {
+                ui.progress.setIndeterminate(false);
+                ui.progress.setProgress(percent);
+            } else {
+                ui.progress.setIndeterminate(true);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static void updateDownloadProgressUi(Activity activity, UpdateDownloadProgress ui,
                                                  int status, int downloaded, int total) {
         if (ui == null || ui.message == null || ui.progress == null) {
@@ -4136,6 +4304,68 @@ public final class MaintainedLauncherSettingsHost {
         Dialog dialog;
         TextView message;
         ProgressBar progress;
+    }
+
+    private static void installApkFile(Activity activity, File file) {
+        if (file == null || !file.exists()) {
+            Toast.makeText(activity, "未找到下载的安装包，请重新下载", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        disableFileUriDeath();
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(Uri.fromFile(file), "application/vnd.android.package-archive");
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            activity.startActivity(intent);
+        } catch (Throwable t) {
+            Toast.makeText(activity, "无法拉起安装程序: " + t.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private static void notifyUpdateDownload(Context context, String message, int percent, boolean complete) {
+        try {
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager == null) {
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= 26) {
+                NotificationChannel channel = new NotificationChannel(UPDATE_NOTIFICATION_CHANNEL,
+                        "桌面更新下载", NotificationManager.IMPORTANCE_LOW);
+                manager.createNotificationChannel(channel);
+            }
+            Notification.Builder builder = Build.VERSION.SDK_INT >= 26
+                    ? new Notification.Builder(context, UPDATE_NOTIFICATION_CHANNEL)
+                    : new Notification.Builder(context);
+            int icon = context.getApplicationInfo().icon;
+            if (icon == 0) {
+                icon = android.R.drawable.stat_sys_download;
+            }
+            builder.setSmallIcon(icon)
+                    .setContentTitle("锤子桌面更新")
+                    .setContentText(message)
+                    .setOngoing(!complete)
+                    .setAutoCancel(complete)
+                    .setWhen(System.currentTimeMillis())
+                    .setShowWhen(true);
+            if (!complete) {
+                builder.setProgress(100, Math.max(0, percent), percent < 0);
+            } else {
+                builder.setProgress(0, 0, false);
+            }
+            manager.notify(UPDATE_NOTIFICATION_ID, builder.build());
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void cancelUpdateNotification(Context context) {
+        try {
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                manager.cancel(UPDATE_NOTIFICATION_ID);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void openBatteryOptimizationSettings(Activity activity) {

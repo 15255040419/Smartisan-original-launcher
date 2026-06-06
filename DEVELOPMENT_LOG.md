@@ -70,6 +70,25 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-06-06：v1.4.7 更新下载与 Gitee 镜像测试版
+
+修复内容：
+
+- 版本发布：
+  - 文本 `launcher/AndroidManifest.xml` 调整为 `versionCode=21` / `versionName=v1.4.7`。
+  - 同步修正最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 的真实版本也是 `v1.4.7 (21)`。
+  - 设置页“检查更新”默认版本字符串同步为 `v1.4.7`。
+
+- 下载镜像：
+  - 检查更新仍从 GitHub Release API 获取最新版本信息，但 APK 下载会优先尝试 Gitee Release 镜像，失败后自动回退 GitHub。
+  - 主题下载基地址切换到 Gitee Release `themes-v1`，用于测试国内镜像下载链路。
+  - 当前 Gitee `themes-v1` 已上传部分主题附件，已验证公开附件 URL 会跳转到 `attach_files` 下载地址；剩余主题因 Gitee 仓库附件配额提示超过 1GB，待网页端释放容量或扩容后补齐。
+
+- 验证：
+  - `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+  - `aapt2 dump badging build\launcher-signed.apk` 确认最终 APK 为 `versionCode='21'`、`versionName='v1.4.7'`、`sdkVersion:'23'`、`targetSdkVersion:'28'`。
+  - `apksigner verify --verbose --print-certs build\launcher-signed.apk` 确认 v1 / v2 / v3 签名均为 true。
+
 ### 2026-06-06：应用分身、图标识别、毛玻璃主题、搜索和更新下载修复
 
 修复内容：
