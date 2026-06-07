@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen android:title="@string/search_sources" android:key="search_corpora" android:summary="@string/search_sources_summary"
+  xmlns:android="http://schemas.android.com/apk/res/android" />

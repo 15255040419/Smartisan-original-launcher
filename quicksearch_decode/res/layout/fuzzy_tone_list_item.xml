@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.android.quicksearchbox.ui.CheckableItemLayout android:gravity="center_vertical" android:descendantFocusability="blocksDescendants" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:smartisan="http://schemas.android.com/apk/res-auto">
+    <smartisan.widget.ListContentItemText android:id="@id/fuzzy_tone_container" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="11.0dp" android:layout_marginRight="11.0dp" smartisan:show_arrow="false">
+        <TextView android:textSize="18.0sp" android:textColor="@drawable/setting_item_text_colorlist" android:ellipsize="end" android:layout_gravity="center_vertical" android:id="@id/fuzzy_tone_rule" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="26.0dp" android:singleLine="true" android:layout_weight="1.0" android:layout_centerVertical="true" />
+        <CheckBox android:id="@id/item_checkbox" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="18.0dp" android:button="@drawable/selector_check_box_red" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+    </smartisan.widget.ListContentItemText>
+    <View android:id="@id/empty_view" android:layout_width="match_parent" android:layout_height="12.0dp" android:layout_below="@id/fuzzy_tone_container" />
+</com.android.quicksearchbox.ui.CheckableItemLayout>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@drawable/setting_background" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:smartisanos="http://schemas.android.com/apk/res-auto">
+    <smartisan.widget.TitleBar android:id="@id/view_title_bar" android:layout_width="match_parent" android:layout_height="wrap_content" smartisanos:title_bar_center_text="@string/search_settings" />
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/view_title_bar" android:overScrollMode="always">
+        <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent">
+            <smartisan.widget.TipsView android:textSize="13.5sp" android:textStyle="bold" android:textColor="@color/search_setting_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16.0dp" android:layout_marginBottom="6.0dp" android:text="@string/search_suggestions" />
+            <smartisan.widget.ListContentItemSwitch android:id="@id/switch_apps_suggestions" android:layout_width="match_parent" android:layout_height="wrap_content" smartisanos:smtTitle="@string/application_suggestions" style="@style/ListContentItemStyle.Top" />
+            <smartisan.widget.ListContentItemSwitch android:id="@id/switch_trending_news" android:layout_width="match_parent" android:layout_height="wrap_content" smartisanos:smtTitle="@string/trending_news" style="@style/ListContentItemStyle.Mid" />
+            <smartisan.widget.ListContentItemSwitch android:id="@id/switch_search_history" android:layout_width="match_parent" android:layout_height="wrap_content" smartisanos:smtTitle="@string/search_history" style="@style/ListContentItemStyle.Bottom" />
+            <smartisan.widget.ListContentItemText android:id="@id/tv_search_project" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16.0dp" style="@style/ListContentItemStyle.Top" />
+            <smartisan.widget.ListContentItemText android:id="@id/tv_pinyin_fuzzy" android:layout_width="match_parent" android:layout_height="wrap_content" android:onClick="handleClick" style="@style/ListContentItemStyle.Bottom" />
+            <smartisanos.widget.TipsView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/set_search_fuzzy_token" style="@style/GroupListTipsViewStyle" />
+            <smartisan.widget.ListContentItemSwitch android:id="@id/switch_enable_pull" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16.0dp" smartisanos:smtTitle="@string/pull_down_to_launcher" style="@style/ListContentItemStyle.Single" />
+            <smartisanos.widget.TipsView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/close_pull_down_launcher" android:layout_above="@id/bar_only_icon" style="@style/GroupListTipsViewStyle" />
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>

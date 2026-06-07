@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView android:enabled="false" android:textSize="15.0dp" android:textColor="#26000000" android:gravity="center" android:id="@id/footer_tips_view" android:paddingLeft="33.0dp" android:paddingTop="20.0dp" android:paddingRight="33.0dp" android:paddingBottom="20.0dp" android:focusable="true" android:clickable="false" android:layout_width="match_parent" android:layout_height="wrap_content" android:lineSpacingMultiplier="1.1"
+  xmlns:android="http://schemas.android.com/apk/res/android" />

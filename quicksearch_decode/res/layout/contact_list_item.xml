@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="13.5sp" android:textStyle="bold" android:textColor="@color/top_text_color" android:gravity="center_vertical" android:id="@id/title" android:background="@drawable/list_result_item_top" android:paddingLeft="@dimen/list_item_padding_left" android:focusable="false" android:focusableInTouchMode="false" android:clickable="false" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/contacts" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/item_layout" android:background="@drawable/list_result_item_general" android:paddingLeft="@dimen/list_item_content_padding_left" android:paddingRight="@dimen/list_item_padding_right" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <LinearLayout android:orientation="vertical" android:paddingTop="10.0dp" android:paddingBottom="10.0dp" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_weight="1.0">
+            <TextView android:textSize="16.0sp" android:textColor="@color/result_item_text_color" android:id="@id/name" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" />
+            <TextView android:textSize="12.0sp" android:textColor="@color/result_item_contact_number_text_color" android:id="@id/number" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2.0dp" android:singleLine="true" />
+            <LinearLayout android:orientation="horizontal" android:layout_width="wrap_content" android:layout_height="wrap_content">
+                <TextView android:textSize="12.0sp" android:textColor="#4d000000" android:id="@id/label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4.0dp" android:layout_marginRight="10.0dp" />
+                <TextView android:textSize="12.0sp" android:textColor="#4d000000" android:id="@id/type" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4.0dp" />
+            </LinearLayout>
+        </LinearLayout>
+        <Button android:id="@id/btn_mimeType" android:background="@drawable/btn_weixin_bg" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="11.0dp" android:minWidth="1.0dp" />
+        <Button android:id="@id/btn_call" android:background="@drawable/btn_call_bg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="11.0dp" android:minWidth="1.0dp" android:contentDescription="@string/make_call" />
+        <Button android:id="@id/btn_sms" android:background="@drawable/btn_sms_bg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="1.0dp" android:contentDescription="@string/send_sms" />
+    </LinearLayout>
+</LinearLayout>

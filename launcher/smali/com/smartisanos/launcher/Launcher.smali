@@ -131,6 +131,8 @@
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->scheduleDoppelgangerBootstrap(Landroid/content/Context;)V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->stabilizeLauncherResume(Landroid/app/Activity;)V
+
     return-void
 .end method
 

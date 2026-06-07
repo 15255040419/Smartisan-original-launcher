@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.android.quicksearchbox.tnt.view.TNTSearchContentView android:id="@id/tnt_search_content" android:background="@android:color/transparent" android:layout_width="@dimen/tnt_search_bar_width" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <com.android.quicksearchbox.tnt.view.SnapRecyclerView android:scrollbarThumbVertical="@drawable/tnt_list_view_scrollbar" android:id="@id/suggestions_view" android:background="@android:color/transparent" android:scrollbars="vertical" android:descendantFocusability="blocksDescendants" android:layout_width="match_parent" android:layout_height="wrap_content" android:choiceMode="singleChoice" android:overScrollMode="never" app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior" app:snapEnabled="false" app:snapMaxFlingSizeFraction="2.0" app:snapScrollMsPerInch="50.0" />
+</com.android.quicksearchbox.tnt.view.TNTSearchContentView>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <com.android.quicksearchbox.preferences.OkCancelPreference android:persistent="false" android:title="@string/clear_shortcuts" android:key="clear_shortcuts" android:summary="@string/clear_shortcuts_summary" android:dialogTitle="@string/clear_shortcuts" android:dialogMessage="@string/clear_shortcuts_prompt" android:positiveButtonText="@string/clear_shortcuts_agree" android:negativeButtonText="@string/clear_shortcuts_disagree" />
+</PreferenceScreen>

@@ -190,6 +190,12 @@
     <string name="search_hint_title">搜索</string>
     <string name="search_keywordeditor_hint">搜索</string>
     <string name="search_page_enabled_title">启用下滑搜索</string>
+    <string name="quick_search_install_title">内置搜索</string>
+    <string name="quick_search_install_subtitle">锤子手机原版搜索软件</string>
+    <string name="quick_search_install_button">安装</string>
+    <string name="quick_search_installed_button">已安装</string>
+    <string name="quick_search_reinstall_button">重装</string>
+    <string name="setting_default_search_engine_tips">安装内置搜索APP后，在桌面上打开搜索APP或下滑呼出搜索，即可快速搜索应用</string>
     <string name="search_searchapp_toast">当前应用</string>
     <string name="search_text">"可搜索应用程序 
  邮件，短信"</string>
@@ -197,7 +203,6 @@
     <string name="selected_app_tail">]个应用程序</string>
     <string name="selected_back">拖放至这里放回原处</string>
     <string name="setting_about_us">关于我们</string>
-    <string name="setting_default_search_engine_tips">通过内置的搜索 app 或在桌面上滑呼出搜索，即可快速搜索应用、联系人和网页内容</string>
     <string name="setting_engine_set">默认搜索引擎</string>
     <string name="setting_feedback_txt">问题反馈</string>
     <string name="setting_follow_title">关注我们</string>

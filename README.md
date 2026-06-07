@@ -46,10 +46,10 @@ build\launcher-signed.apk
 ```text
 minSdkVersion: 23
 targetSdkVersion: 28
-APK size: about 64 MB
+APK size: about 65.7 MB
 ```
 
-桌面主体、桌面设置入口、12 / 20 宫格、主题页、壁纸入口、翻页动画页、应用图标页、桌面图标大小、搜索页、检查更新、关于我们、强迫症选项和多个设置开关已经接入。设置页当前由 `com.smartisanos.launcher.theme.ThemeChooserActivity` 承载，内部加载 maintained 风格资源和当前工程的兼容逻辑。
+当前发布版本为 `v1.4.8 (24)`。桌面主体、桌面设置入口、12 / 20 宫格、主题页、壁纸入口、翻页动画页、应用图标页、桌面图标大小、独立内置搜索、检查更新、关于我们、强迫症选项和多个设置开关已经接入。设置页当前由 `com.smartisanos.launcher.theme.ThemeChooserActivity` 承载，内部加载 maintained 风格资源和当前工程的兼容逻辑。
 
 详细开发过程、每天修复了哪些问题、验证记录和历史原因见 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md)。README 只记录当前项目状态，不记录每日流水账。
 
@@ -65,8 +65,8 @@ APK size: about 64 MB
 | 应用图标 | 已接入 | 支持系统原图、图标包 appfilter、redirect、自定义图片、桌面图标大小调节和桌面主图标加载链路。 |
 | 图标识别 | 已接入，继续回归 | 已对照 maintained 调整图标识别逻辑，减少普通应用被识别成应用商店等错误图标的概率，并保留当前项目已有的图标识别能力。 |
 | 应用分身 | 已接入，继续回归 | 已接入多用户 / 双开应用查询、显示和启动路径，支持为分身应用叠加原版风格面具标记。 |
-| 内置搜索 | 已接入，继续微调 | 支持搜索普通应用和分身应用；下滑搜索手势已收窄，减少长按拖动应用时误打开搜索页。 |
-| 检查更新 | 已接入 | 支持 GitHub Release 版本检查、更新包下载、下载进度显示和下载完成后启动安装。 |
+| 内置搜索 | 已接入，继续微调 | 搜索 APK 已独立发布为 `SmartisanQuickSearch.apk`，不再打进桌面主包；未安装时“启用下滑搜索”开关会在页面绑定和点击开启时回落关闭并引导从 Gitee 下载，安装后支持桌面图标打开或下滑呼出搜索。 |
+| 检查更新 | 已接入 | 支持 Gitee Release 版本检查，只识别 `launcher-` 软件标签，更新包下载有弹窗和状态栏进度，下载完成后启动安装。 |
 | 设置开关 | 已接入 | 已接入隐藏虚拟键、隐藏图标名称、解锁动画、角标隐藏、横扫清除角标、下滑搜索等开关。 |
 | 毛玻璃主题 | 已接入 | 已接入原版毛玻璃主题包资源，桌面文字和编辑页文字按白色文字效果显示。 |
 | 构建签名 | 已接入 | `build.bat` 会完成资源编译、APK 构建、zipalign 和 apksigner 签名。 |
@@ -78,17 +78,18 @@ APK size: about 64 MB
 - 通知角标通用化：当前桌面已有旧 Smartisan 未读数广播入口和角标绘制逻辑，但普通 Android 上不能保证微信等应用有通知就自动显示角标；后续需要通知监听或厂商 badge 兼容桥。
 - 原生 Smartisan Settings：当前设置页仍由 launcher 包内 `ThemeChooserActivity` 承载 maintained 风格兼容页，还不是完整移植的原生 Smartisan Settings Activity / Fragment。
 - 在线主题安装：普通应用不能静默安装主题 APK，下载完成后仍需要用户手动确认安装。
-- 包体继续压缩：`theme_preview`、`assets/Textures/1080p`、`settings_maintained/maintained-settings-res.apk` 仍占用较多空间，后续需要逐项替代或合并资源，不能直接删除。
+- 包体继续压缩：`theme_preview`、`assets/Textures/1080p`、`settings_maintained/maintained-settings-res.apk` 仍占用较多空间，后续需要逐项替代或合并资源，不能直接删除。内置搜索 APK 已拆分为独立下载资产。
 
 ## 已知 BUG / 待回归
 
 - 应用分身在不同品牌手机上的包名、用户 ID 和启动行为可能不同，需要继续用 OPPO、vivo、小米、荣耀、模拟器等环境回归。
 - 微信分身面具标记已经接入，但面具大小、位置和不同图标尺寸下的观感仍需要继续对照原版微调。
-- MuMu 模拟器存在桌面图标不显示的兼容风险，当前已对 adaptive drawable 和图标归一化做兼容，但仍需要继续实机 / 模拟器回归。
+- MuMu 模拟器存在桌面图标不显示的兼容风险，当前已对 adaptive drawable、图标归一化和跨用户查询 fallback 做兼容，已验证可避免原版分身查询权限异常导致的桌面空白，但仍需要继续实机 / 模拟器回归。
 - 图标识别仍可能遇到同名、别名、厂商魔改包名或系统应用名称不一致的问题，需要继续按实际截图补规则。
 - 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画仍需要更多分辨率和真机回归。
 - 透明主题下 Dock 区域、毛玻璃背景、状态栏颜色在部分系统上仍需要继续截图对比。
-- 检查更新依赖 GitHub Release 和 APK 资产，后续每次发布新版本都需要同步提升 Manifest 版本和发布资产。
+- 检查更新依赖 Gitee 下载仓库 Release 和 APK 资产，后续每次发布新版本都需要同步提升文本 Manifest、二进制 Manifest 版本，并发布 `launcher-` 标签资产。
+- 独立内置搜索当前补入了普通 Android 兼容的 `HanziToPinyin` 兜底类，可避免缺少锤子系统类时启动崩溃；完整拼音转换效果仍可继续增强。
 
 ## 构建与安装
 

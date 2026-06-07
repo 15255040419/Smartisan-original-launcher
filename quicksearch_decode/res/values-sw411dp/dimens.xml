@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="arrow_translation_x">4.0dp</dimen>
+    <dimen name="choose_lock_pwd_pin_entry_margin_top">227.0dp</dimen>
+    <dimen name="choose_lock_pwd_pin_tip_margin_top">108.0dp</dimen>
+    <dimen name="letters_bar_dot_x_offset">4.0px</dimen>
+    <dimen name="letters_bar_highlight_icon_x">40.0px</dimen>
+    <dimen name="letters_bar_highlight_icon_y">18.0px</dimen>
+    <dimen name="letters_bar_letter_font_x_offset">68.0px</dimen>
+    <dimen name="quickbar_ex_grid_cell_height">60.5dp</dimen>
+    <dimen name="recent_call_padding">50.0dp</dimen>
+    <dimen name="recent_call_padding_left">80.0dp</dimen>
+    <dimen name="search_popup_height">628.0dp</dimen>
+    <dimen name="search_popup_width">408.0dp</dimen>
+    <dimen name="setting_item_title_max_width_def">256.59375dp</dimen>
+    <dimen name="surname_arrow_offset_x">4.3299866dp</dimen>
+    <dimen name="time_picker_width">1440.0px</dimen>
+    <dimen name="tips_max_width">351.39844dp</dimen>
+</resources>

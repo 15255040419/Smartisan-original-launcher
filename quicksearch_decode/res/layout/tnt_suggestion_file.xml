@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.android.quicksearchbox.tnt.suggestion.TNTSuggestionFileView style="@style/tnt_suggestion"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <include layout="@layout/tnt_suggestion_base" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/ll_file_operation_layout" android:layout_width="wrap_content" android:layout_height="match_parent" app:layout_constraintEnd_toEndOf="parent">
+        <ImageView android:id="@id/iv_copy_file" android:background="@drawable/tnt_selector_copy_file_operation" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <ImageView android:id="@id/iv_open_file" android:background="@drawable/tnt_selector_open_file_operation" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="6.0dp" />
+    </LinearLayout>
+</com.android.quicksearchbox.tnt.suggestion.TNTSuggestionFileView>

@@ -8,11 +8,11 @@
     <dimen name="password_button_h">74.0dp</dimen>
     <dimen name="password_button_w">120.0dp</dimen>
     <dimen name="phone_detail_preview_marginTop">39.0dp</dimen>
-    <dimen name="theme_preview_detail_phone_black_h">493.29688dp</dimen>
-    <dimen name="theme_preview_detail_phone_black_w">238.0dp</dimen>
-    <dimen name="theme_preview_img_large_h">330.0dp</dimen>
-    <dimen name="theme_preview_img_large_marginTop">82.0dp</dimen>
-    <dimen name="theme_preview_img_large_w">186.0dp</dimen>
+    <dimen name="theme_preview_detail_phone_black_h">620.0dp</dimen>
+    <dimen name="theme_preview_detail_phone_black_w">276.0dp</dimen>
+    <dimen name="theme_preview_img_large_h">620.0dp</dimen>
+    <dimen name="theme_preview_img_large_marginTop">0.0dp</dimen>
+    <dimen name="theme_preview_img_large_w">276.0dp</dimen>
     <dimen name="theme_thumbnail_setting_h">68.0dp</dimen>
     <dimen name="theme_thumbnail_setting_w">53.0dp</dimen>
 </resources>

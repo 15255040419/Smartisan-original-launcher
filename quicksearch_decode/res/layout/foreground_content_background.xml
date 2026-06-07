@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:smartisan="http://schemas.android.com/apk/res-auto">
+    <RelativeLayout android:orientation="vertical" android:id="@id/content_layout" android:layout_width="match_parent" android:layout_height="match_parent">
+        <LinearLayout android:orientation="vertical" android:paddingLeft="@dimen/suggestion_layout_padding" android:paddingRight="@dimen/suggestion_layout_padding" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <LinearLayout android:orientation="horizontal" android:id="@id/recommend_apps_layout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24.0dp">
+                <TextView android:layout_marginRight="@dimen/recommend_component_space" style="@style/recommend_application" />
+                <TextView android:layout_marginRight="@dimen/recommend_component_space" style="@style/recommend_application" />
+                <TextView android:layout_marginRight="@dimen/recommend_component_space" style="@style/recommend_application" />
+                <TextView android:layout_marginRight="@dimen/recommend_component_space" style="@style/recommend_application" />
+                <TextView style="@style/recommend_application" />
+            </LinearLayout>
+            <TextView android:id="@id/tv_trending_news_title" android:visibility="gone" android:layout_marginBottom="@dimen/suggestion_layout_margin_top" android:text="@string/trending_news" style="@style/recommend_component_title" />
+            <com.android.quicksearchbox.ui.FlowLayoutEx android:id="@id/recommend_word_layout" android:layout_width="match_parent" android:layout_height="wrap_content" smartisan:flChildSpacing="@dimen/flow_layout_child_spacing" smartisan:flMaxRows="2" smartisan:flRowSpacing="@dimen/flow_layout_row_spacing" />
+            <RelativeLayout android:id="@id/history_title" android:visibility="gone" android:layout_width="match_parent" android:layout_height="30.0dp" android:layout_marginTop="@dimen/history_title_margin_top">
+                <TextView android:id="@id/tv_search_history" android:layout_marginTop="0.0dp" android:text="@string/search_history" android:layout_alignParentLeft="true" android:layout_centerVertical="true" style="@style/recommend_component_title" />
+                <ImageView android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/clear_history_btn" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+            </RelativeLayout>
+            <com.android.quicksearchbox.ui.FlowLayoutEx android:id="@id/history_layout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/history_layout_margin_top" smartisan:flChildSpacing="@dimen/flow_layout_child_spacing" smartisan:flMaxRows="2" smartisan:flRowSpacing="@dimen/flow_layout_row_spacing" />
+        </LinearLayout>
+        <View android:layout_gravity="center_horizontal" android:id="@id/btn_action_option" android:background="@drawable/blank_option_btn_selector" android:clickable="true" android:layout_width="60.0dp" android:layout_height="60.0dp" android:layout_marginBottom="42.0dp" android:layout_alignParentBottom="true" android:layout_centerHorizontal="true" />
+    </RelativeLayout>
+    <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/blank_layout" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="@dimen/empty_notes_margin_top">
+        <smartisan.widget.SmartisanBlankView android:id="@id/black_view" android:layout_width="wrap_content" android:layout_height="wrap_content" smartisan:blankStyle="withAction" />
+    </LinearLayout>
+</RelativeLayout>

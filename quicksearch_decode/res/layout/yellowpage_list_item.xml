@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="13.5sp" android:textStyle="bold" android:textColor="@color/top_text_color" android:gravity="center_vertical" android:id="@id/yellow_title" android:background="@drawable/list_result_item_top" android:paddingLeft="@dimen/list_item_padding_left" android:focusable="false" android:focusableInTouchMode="false" android:clickable="false" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/public_number" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/item_layout" android:background="@drawable/list_result_item_general" android:paddingLeft="@dimen/list_item_content_padding_left" android:paddingRight="@dimen/list_item_padding_right" android:layout_width="match_parent" android:layout_height="60.0dp">
+        <LinearLayout android:orientation="vertical" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_weight="1.0">
+            <TextView android:textSize="16.0sp" android:textColor="@color/result_item_text_color" android:id="@id/yellow_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" />
+            <TextView android:textSize="12.0sp" android:textColor="@color/result_item_contact_number_text_color" android:id="@id/yellow_number" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2.0dp" android:singleLine="true" />
+        </LinearLayout>
+        <Button android:id="@id/yellow_call" android:background="@drawable/btn_call_bg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="1.0dp" android:contentDescription="@string/make_call" />
+    </LinearLayout>
+</LinearLayout>

@@ -5917,7 +5917,7 @@
     const/4 v1, 0x0
 
     .line 5
-    invoke-virtual {p0, v0, v1, p2}, Landroid/content/pm/PackageManager;->queryIntentActivitiesAsUser(Landroid/content/Intent;II)Ljava/util/List;
+    invoke-static {p0, v0, v1, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->safeQueryIntentActivitiesForUser(Landroid/content/pm/PackageManager;Landroid/content/Intent;II)Ljava/util/List;
 
     move-result-object v2
 
@@ -6077,7 +6077,7 @@
     invoke-virtual {v2, v4}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     .line 15
-    invoke-virtual {p0, v0, v1, p2}, Landroid/content/pm/PackageManager;->queryIntentActivitiesAsUser(Landroid/content/Intent;II)Ljava/util/List;
+    invoke-static {p0, v0, v1, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->safeQueryIntentActivitiesForUser(Landroid/content/pm/PackageManager;Landroid/content/Intent;II)Ljava/util/List;
 
     move-result-object v2
 
@@ -12341,7 +12341,7 @@
 .end method
 
 .method public static qg()Ljava/util/List;
-    .locals 5
+    .locals 1
 
     .line 1
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
@@ -12352,66 +12352,10 @@
 
     move-result-object v0
 
-    invoke-virtual {v0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->safeInstalledPackagesForDoppelganger(Landroid/content/Context;)Ljava/util/List;
 
     move-result-object v0
 
-    const/4 v1, 0x0
-
-    const/16 v2, 0xa
-
-    .line 2
-    invoke-virtual {v0, v1, v2}, Landroid/content/pm/PackageManager;->getInstalledPackagesAsUser(II)Ljava/util/List;
-
-    move-result-object v0
-
-    if-eqz v0, :cond_1
-
-    .line 3
-    :goto_0
-    invoke-interface {v0}, Ljava/util/List;->size()I
-
-    move-result v2
-
-    if-ge v1, v2, :cond_1
-
-    .line 4
-    sget-boolean v2, Lcom/smartisanos/launcher/va;->DBG:Z
-
-    if-eqz v2, :cond_0
-
-    sget-object v2, Lcom/smartisanos/launcher/e/s;->log:Lcom/smartisanos/launcher/va;
-
-    new-instance v3, Ljava/lang/StringBuilder;
-
-    invoke-direct {v3}, Ljava/lang/StringBuilder;-><init>()V
-
-    const-string v4, "getAllDoppelganger() "
-
-    invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    invoke-interface {v0, v1}, Ljava/util/List;->get(I)Ljava/lang/Object;
-
-    move-result-object v4
-
-    check-cast v4, Landroid/content/pm/PackageInfo;
-
-    iget-object v4, v4, Landroid/content/pm/PackageInfo;->packageName:Ljava/lang/String;
-
-    invoke-virtual {v3, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
-
-    invoke-virtual {v3}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
-
-    move-result-object v3
-
-    invoke-virtual {v2, v3}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
-
-    :cond_0
-    add-int/lit8 v1, v1, 0x1
-
-    goto :goto_0
-
-    :cond_1
     return-object v0
 .end method
 

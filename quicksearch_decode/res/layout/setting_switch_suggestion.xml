@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<view android:layout_height="wrap_content" class="com.android.quicksearchbox.ui.SettingSwitchSuggestionView" style="@style/Suggestion"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <RelativeLayout android:id="@id/icon_container" android:layout_width="@dimen/suggestion_view_height" android:layout_height="@dimen/suggestion_view_height">
+        <ImageView android:id="@id/icon1" style="@style/SuggestionIcon1" />
+    </RelativeLayout>
+    <ImageView android:id="@id/icon2" android:visibility="gone" android:scaleType="centerInside" android:layout_alignParentTop="true" android:layout_alignParentRight="true" android:layout_alignParentBottom="true" style="@style/SuggestionIcon2" />
+    <com.android.quicksearchbox.settings.search.RealSwitchEx android:gravity="right" android:id="@id/checkbox" android:visibility="gone" android:clickable="true" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginRight="@dimen/setting_switch_padding_right" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+    <LinearLayout android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_toLeftOf="@id/checkbox" android:layout_toRightOf="@id/icon_container" android:layout_centerVertical="true">
+        <TextView android:id="@id/text1" style="@style/SuggestionText1" />
+        <TextView android:id="@id/summay1" style="@style/SuggestionText2" />
+        <TextView android:id="@id/summay2" style="@style/SuggestionText2" />
+    </LinearLayout>
+</view>

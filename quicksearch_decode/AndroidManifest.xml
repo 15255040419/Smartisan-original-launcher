@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:compileSdkVersion="28" android:compileSdkVersionCodename="9" package="com.smartisanos.quicksearch" platformBuildVersionCode="28" platformBuildVersionName="9">
+    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28"/>
+    <permission android:name="android.permission.READ_FUZZY_TONES"/>
+    <uses-permission android:name="android.permission.GLOBAL_SEARCH"/>
+    <uses-permission android:name="android.permission.READ_SMS"/>
+    <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_CALL_LOG"/>
+    <uses-permission android:name="android.permission.WRITE_CALL_LOG"/>
+    <uses-permission android:name="android.permission.CALL_PRIVILEGED"/>
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>
+    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS"/>
+    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.NETWORK_STACK"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.SET_ORIENTATION"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_KEYGUARD_SECURE_STORAGE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_ALL_DOWNLOADS"/>
+    <uses-permission android:name="android.permission.STOP_APP_SWITCHES"/>
+    <uses-permission android:name="android.permission.INTERNAL_SYSTEM_WINDOW"/>
+    <uses-permission android:name="com.android.email.permission.ACCESS_PROVIDER"/>
+    <uses-permission android:name="android.permission.WRITE_MEDIA_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.UPDATE_APP_OPS_STATS"/>
+    <uses-permission android:name="android.permission.START_ANY_ACTIVITY"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.MANAGE_NETWORK_POLICY"/>
+    <uses-permission android:name="android.permission.MODIFY_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.FORCE_STOP_PACKAGES"/>
+    <uses-permission android:name="com.android.browser.permission.READ_HISTORY_BOOKMARKS"/>
+    <uses-permission android:name="android.permission.appstore.INSTALL_APPS"/>
+    <uses-permission android:name="com.smartisanos.music.permission"/>
+    <uses-permission android:name="com.smartisanos.launcher.READ_DATABASE"/>
+    <uses-permission android:name="com.smartisanos.permission.LAUNCH_OPTIONS_ACTIVITY"/>
+    <uses-permission android:name="android.permission.SIDEBAR_SERVICE"/>
+    <uses-permission android:name="com.android.permission.PC_MANAGER_API"/>
+    <uses-permission android:name="com.smartisanos.permission.READ_SETTINGS_API"/>
+    <uses-permission android:name="smartisan.permission.READ_NOTES"/>
+    <uses-permission android:name="com.smartisan.permission.ACCOUNT_CENTER"/>
+    <application android:allowBackup="false" android:appComponentFactory="androidx.core.app.CoreComponentFactory" android:backupAgent="com.android.quicksearchbox.SearchBackupAgent" android:hardwareAccelerated="true" android:icon="@mipmap/search_app_icon" android:label="@string/app_name" android:name="com.android.quicksearchbox.QsbApplicationWrapper" android:theme="@style/Theme.QuickSearchBox" android:usesCleartextTraffic="true">
+        <meta-data android:name="smartisan_tracker_appid" android:value="17"/>
+        <activity android:launchMode="singleTask" android:name="com.android.quicksearchbox.tnt.TNTSearchActivity" android:theme="@style/DialogActivity">
+            <intent-filter>
+                <action android:name="android.search.action.GLOBAL_SEARCH"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.search.action.GLOBAL_SEARCH"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:scheme="qsb.corpus"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+            <meta-data android:name="android.app.searchable" android:resource="@xml/access_suggestion_searchable"/>
+        </activity>
+        <activity android:label="@string/app_name" android:launchMode="singleTask" android:name="com.android.quicksearchbox.SearchActivity" android:screenOrientation="portrait" android:theme="@style/Theme.QuickSearchBox.Search">
+            <intent-filter>
+                <action android:name="android.intent.action.launchSpeech"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.search.action.GLOBAL_SEARCH"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.search.action.GLOBAL_SEARCH"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:scheme="qsb.corpus"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+            <meta-data android:name="android.app.searchable" android:resource="@xml/application_searchable"/>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts"/>
+        </activity>
+        <provider android:authorities="com.android.quicksearchbox.shortcuts" android:exported="true" android:name="com.android.quicksearchbox.ShortcutsProvider"/>
+        <activity android:label="@string/search_settings" android:launchMode="singleTop" android:name="com.android.quicksearchbox.preferences.SearchSettingsActivity" android:screenOrientation="portrait" android:theme="@style/SettingTheme"/>
+        <activity android:label="@string/search_settings" android:launchMode="singleTop" android:name="com.android.quicksearchbox.preferences.SearchSmartisanSettingsActivity" android:screenOrientation="portrait" android:taskAffinity="com.android.settings" android:theme="@style/SettingTheme">
+            <meta-data android:name="smartisanos.PACKAGELOCK_PACKAGENAME" android:value="com.android.settings"/>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+            </intent-filter>
+        </activity>
+        <activity android:label="@string/pinyin_fuzzy_tone_title" android:name="com.android.quicksearchbox.preferences.FuzzyToneSettingsActivity" android:screenOrientation="portrait" android:taskAffinity="com.android.settings" android:theme="@style/SettingTheme">
+            <meta-data android:name="smartisanos.PACKAGELOCK_PACKAGENAME" android:value="com.android.settings"/>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+            </intent-filter>
+        </activity>
+        <provider android:authorities="applications" android:exported="true" android:multiprocess="false" android:name="com.android.quicksearchbox.application.ApplicationsProvider" android:syncable="false"/>
+        <provider android:authorities="com.android.quicksearchbox.fuzzytone" android:exported="true" android:name="com.android.quicksearchbox.FuzzyToneProvider">
+            <path-permission android:path="/fuzzy_tones" android:readPermission="android.permission.READ_FUZZY_TONES"/>
+        </provider>
+        <provider android:authorities="com.android.quicksearchbox.qsb" android:exported="true" android:name="com.android.quicksearchbox.data.QsbProvider"/>
+        <provider android:authorities="com.smartisanos.quicksearch.provider.extra" android:exported="true" android:name="com.android.quicksearchbox.animation.LauncherCallProvider"/>
+        <receiver android:enabled="true" android:exported="true" android:name="com.android.quicksearchbox.animation.BootReceiver">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

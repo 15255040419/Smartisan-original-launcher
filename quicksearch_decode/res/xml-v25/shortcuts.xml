@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:icon="@drawable/forcetouch_search_t9" android:enabled="true" android:shortcutId="quick_search" android:shortcutShortLabel="@string/quick_search" android:shortcutLongLabel="@string/quick_search">
+        <intent android:targetPackage="com.smartisanos.quicksearch" android:action="com.android.quicksearchbox.action.QUICK_SEARCH" android:targetClass="com.android.quicksearchbox.SearchActivity" />
+    </shortcut>
+    <shortcut android:icon="@drawable/forcetouch_search_keyboard" android:enabled="true" android:shortcutId="global_search" android:shortcutShortLabel="@string/global_search" android:shortcutLongLabel="@string/global_search">
+        <intent android:targetPackage="com.smartisanos.quicksearch" android:action="com.android.quicksearchbox.action.GLOBAL_SEARCH" android:targetClass="com.android.quicksearchbox.SearchActivity" />
+    </shortcut>
+</shortcuts>

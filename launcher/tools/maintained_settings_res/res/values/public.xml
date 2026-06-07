@@ -1141,7 +1141,6 @@
     <public type="layout" name="abc_search_view" id="0x7f040018" />
     <public type="layout" name="abc_select_dialog_material" id="0x7f040019" />
     <public type="layout" name="activity_experience_content" id="0x7f04001a" />
-    <public type="layout" name="activity_search_main" id="0x7f04001b" />
     <public type="layout" name="activity_theme_item" id="0x7f04001c" />
     <public type="layout" name="activity_user_agreement" id="0x7f04001d" />
     <public type="layout" name="app_icon_settings_item_layout" id="0x7f04001e" />
@@ -1152,7 +1151,6 @@
     <public type="layout" name="custom_dialog_button" id="0x7f040023" />
     <public type="layout" name="dialog_partical_config" id="0x7f040024" />
     <public type="layout" name="dlg_context_download_theme_google" id="0x7f040025" />
-    <public type="layout" name="editbox_fragment" id="0x7f040026" />
     <public type="layout" name="feedback_activity" id="0x7f040027" />
     <public type="layout" name="feedback_item_bottom_shadow_layout" id="0x7f040028" />
     <public type="layout" name="feedback_title_bar_shadow" id="0x7f040029" />
@@ -1170,10 +1168,8 @@
     <public type="layout" name="launcher_single_block_options" id="0x7f040035" />
     <public type="layout" name="launcher_view" id="0x7f040036" />
     <public type="layout" name="layout_main_frame" id="0x7f040037" />
-    <public type="layout" name="layout_search_window" id="0x7f040038" />
     <public type="layout" name="lock_screen_mode_item_layout" id="0x7f040039" />
     <public type="layout" name="main" id="0x7f04003a" />
-    <public type="layout" name="main_background_hint" id="0x7f04003b" />
     <public type="layout" name="main_layout" id="0x7f04003c" />
     <public type="layout" name="menu_dialog" id="0x7f04003d" />
     <public type="layout" name="menu_dialog_cancel_button" id="0x7f04003e" />
@@ -1202,12 +1198,6 @@
     <public type="layout" name="pull_up_no_more" id="0x7f040055" />
     <public type="layout" name="pull_up_to_refresh_base_view" id="0x7f040056" />
     <public type="layout" name="quickbar_ex" id="0x7f040057" />
-    <public type="layout" name="resultbox_fragment" id="0x7f040058" />
-    <public type="layout" name="resultlist_item_doublesingle" id="0x7f040059" />
-    <public type="layout" name="resultlist_item_doublesingle_app" id="0x7f04005a" />
-    <public type="layout" name="resultlist_item_grouptitle" id="0x7f04005b" />
-    <public type="layout" name="search_t9" id="0x7f04005c" />
-    <public type="layout" name="search_t9keyboard" id="0x7f04005d" />
     <public type="layout" name="select_dialog_item_material" id="0x7f04005e" />
     <public type="layout" name="select_dialog_multichoice_material" id="0x7f04005f" />
     <public type="layout" name="select_dialog_singlechoice_material" id="0x7f040060" />
@@ -1229,7 +1219,6 @@
     <public type="layout" name="surname_popup_item_ex" id="0x7f040070" />
     <public type="layout" name="surname_second_popup" id="0x7f040071" />
     <public type="layout" name="surname_second_popup_ex" id="0x7f040072" />
-    <public type="layout" name="switch_input_tab_bar" id="0x7f040073" />
     <public type="layout" name="theme_color_dot_item" id="0x7f040074" />
     <public type="layout" name="theme_preview_block" id="0x7f040075" />
     <public type="layout" name="theme_preview_gridview" id="0x7f040076" />
@@ -3639,7 +3628,6 @@
     <public type="id" name="search_switchinput_tabbar" id="0x7f0f005b" />
     <public type="id" name="search_resultbox_container" id="0x7f0f005c" />
     <public type="id" name="search_editbox_shadow" id="0x7f0f005d" />
-    <public type="id" name="search_t9_panel" id="0x7f0f005e" />
     <public type="id" name="btn_back" id="0x7f0f005f" />
     <public type="id" name="btn_ok" id="0x7f0f0060" />
     <public type="id" name="btn_download" id="0x7f0f0061" />
@@ -3828,9 +3816,7 @@
     <public type="id" name="resultlist_doublesingle_item" id="0x7f0f0118" />
     <public type="id" name="resultlist_singleicon" id="0x7f0f0119" />
     <public type="id" name="resultlist_singletext" id="0x7f0f011a" />
-    <public type="id" name="resultlist_item_grouptitle" id="0x7f0f011b" />
     <public type="id" name="t9_keyboard" id="0x7f0f011c" />
-    <public type="id" name="search_t9_mainkeybord" id="0x7f0f011d" />
     <public type="id" name="row_1" id="0x7f0f011e" />
     <public type="id" name="one" id="0x7f0f011f" />
     <public type="id" name="two" id="0x7f0f0120" />

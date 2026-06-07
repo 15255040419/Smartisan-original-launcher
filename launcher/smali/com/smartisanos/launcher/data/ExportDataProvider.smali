@@ -484,6 +484,25 @@
     return-object p0
 
     :cond_2
+    const-string v0, "get_launcher_icon_method"
+
+    invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_launcher_icon_next
+
+    invoke-virtual {p0}, Landroid/content/ContentProvider;->getContext()Landroid/content/Context;
+
+    move-result-object p0
+
+    invoke-static {p0, p3}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->launcherIconBundle(Landroid/content/Context;Landroid/os/Bundle;)Landroid/os/Bundle;
+
+    move-result-object p0
+
+    return-object p0
+
+    :cond_launcher_icon_next
     const-string v0, "CALL_METHOD_GET_THEME_PREVIEW_RES"
 
     .line 5

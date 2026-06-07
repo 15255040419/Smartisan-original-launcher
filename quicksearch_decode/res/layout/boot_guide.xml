@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout android:orientation="vertical" android:background="@color/boot_background" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="14.0sp" android:textStyle="bold" android:textColor="@color/white" android:gravity="center" android:layout_gravity="center|bottom" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="194.0dp" android:text="@string/first_boot_tips" android:lineSpacingExtra="20.0px" />
+    <TextView android:textSize="13.5sp" android:textStyle="bold" android:textColor="@color/white" android:gravity="center" android:layout_gravity="center|bottom" android:background="@drawable/btn_got_it" android:paddingLeft="12.0dp" android:paddingTop="5.25dp" android:paddingRight="12.0dp" android:paddingBottom="5.25dp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="147.0dp" android:text="@string/got_it" />
+    <ImageView android:layout_gravity="right|bottom" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="6.0dp" android:layout_marginBottom="12.0dp" android:src="@drawable/first_boot_guide" />
+</FrameLayout>

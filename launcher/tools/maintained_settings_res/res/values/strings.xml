@@ -186,6 +186,12 @@
     <string name="search_hint_title">Search</string>
     <string name="search_keywordeditor_hint">Search</string>
     <string name="search_page_enabled_title">Enable Slide Search</string>
+    <string name="quick_search_install_title">Built-in Search</string>
+    <string name="quick_search_install_subtitle">Original Smartisan phone search app</string>
+    <string name="quick_search_install_button">Install</string>
+    <string name="quick_search_installed_button">Installed</string>
+    <string name="quick_search_reinstall_button">Reinstall</string>
+    <string name="setting_default_search_engine_tips">Install the built-in search app, then open the Search app on the desktop or swipe down to quickly search apps.</string>
     <string name="search_searchapp_toast">current app</string>
     <string name="search_text">"search 
  mail message"</string>
@@ -193,7 +199,6 @@
     <string name="selected_app_tail">]</string>
     <string name="selected_back">Drag Here to Put Back</string>
     <string name="setting_about_us">About</string>
-    <string name="setting_default_search_engine_tips">You can use the built-in Search app or the slide out search function on the Launcher to quickly find apps, contacts, and content on webpages.</string>
     <string name="setting_engine_set">Default Search</string>
     <string name="setting_feedback_txt">Feedback</string>
     <string name="setting_follow_title">Follow Us</string>
@@ -598,7 +603,7 @@
     <string name="hello_world">Hello world!</string>
     <string name="launcher_color_sort_sub_text">Sort App Icon By Color</string>
     <string name="launcher_color_sort_text">Launcher Color Sort</string>
-    <string name="more_current_version_txt">v1.4.7</string>
+    <string name="more_current_version_txt">1.4.8</string>
     <string name="os_update_dlg_cancel_btn">稍后更新</string>
     <string name="os_update_dlg_msg">检测到系统版本过低，为保证您个人信息安全，正常使用手机完整功能，请 Smartisan 用户尽快升级到最新系统版本！</string>
     <string name="os_update_dlg_ok_btn">现在更新</string>

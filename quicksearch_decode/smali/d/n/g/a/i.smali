@@ -1,0 +1,86 @@
+.class public abstract Ld/n/g/a/i;
+.super Ld/n/g/a/h;
+.source "ContinuationImpl.kt"
+
+# interfaces
+.implements Lkotlin/jvm/internal/FunctionBase;
+.implements Lkotlin/coroutines/jvm/internal/SuspendFunction;
+
+
+# annotations
+.annotation system Ldalvik/annotation/Signature;
+    value = {
+        "Ld/n/g/a/h;",
+        "Lkotlin/jvm/internal/FunctionBase<",
+        "Ljava/lang/Object;",
+        ">;",
+        "Lkotlin/coroutines/jvm/internal/SuspendFunction;"
+    }
+.end annotation
+
+
+# instance fields
+.field public final b:I
+
+
+# direct methods
+.method public constructor <init>(ILkotlin/coroutines/Continuation;)V
+    .locals 0
+    .annotation system Ldalvik/annotation/Signature;
+        value = {
+            "(I",
+            "Lkotlin/coroutines/Continuation<",
+            "Ljava/lang/Object;",
+            ">;)V"
+        }
+    .end annotation
+
+    .line 1
+    invoke-direct {p0, p2}, Ld/n/g/a/h;-><init>(Lkotlin/coroutines/Continuation;)V
+
+    iput p1, p0, Ld/n/g/a/i;->b:I
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public getArity()I
+    .locals 1
+
+    .line 1
+    iget v0, p0, Ld/n/g/a/i;->b:I
+
+    return v0
+.end method
+
+.method public toString()Ljava/lang/String;
+    .locals 2
+
+    .line 1
+    invoke-virtual {p0}, Ld/n/g/a/a;->a()Lkotlin/coroutines/Continuation;
+
+    move-result-object v0
+
+    if-nez v0, :cond_0
+
+    .line 2
+    invoke-static {p0}, Ld/q/c/h;->a(Lkotlin/jvm/internal/FunctionBase;)Ljava/lang/String;
+
+    move-result-object v0
+
+    const-string v1, "Reflection.renderLambdaToString(this)"
+
+    invoke-static {v0, v1}, Ld/q/c/d;->a(Ljava/lang/Object;Ljava/lang/String;)V
+
+    goto :goto_0
+
+    .line 3
+    :cond_0
+    invoke-super {p0}, Ld/n/g/a/a;->toString()Ljava/lang/String;
+
+    move-result-object v0
+
+    :goto_0
+    return-object v0
+.end method

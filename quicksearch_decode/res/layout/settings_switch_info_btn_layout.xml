@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ImageView android:id="@id/item_info_btn" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/popup_info_btn" android:contentDescription="@string/description"
+  xmlns:android="http://schemas.android.com/apk/res/android" />

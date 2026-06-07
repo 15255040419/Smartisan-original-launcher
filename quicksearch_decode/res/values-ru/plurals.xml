@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="music_artist">
+        <item quantity="one">%2$s, %1$d  композиция</item>
+        <item quantity="few">Композиций: %2$s, %1$d</item>
+        <item quantity="many">Композиций: %2$s, %1$d</item>
+    </plurals>
+    <plurals name="music_total">
+        <item quantity="one"> 1 композиция</item>
+        <item quantity="few"> Композиций: %d</item>
+        <item quantity="many"> Композиций: %d</item>
+    </plurals>
+</resources>

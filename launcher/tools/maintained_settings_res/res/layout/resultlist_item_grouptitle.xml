@@ -1,3 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<TextView android:textSize="@dimen/resultlist_grouptitle_textsize" android:textStyle="bold" android:textColor="#80000000" android:gravity="left|center" android:id="@id/resultlist_item_grouptitle" android:background="@null" android:paddingLeft="22.0dp" android:layout_width="match_parent" android:layout_height="@dimen/resultlist_grouptitle_height"
-  xmlns:android="http://schemas.android.com/apk/res/android" />

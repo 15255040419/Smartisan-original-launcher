@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.android.quicksearchbox.tnt.suggestion.TNTSuggestionSettingView style="@style/tnt_suggestion"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <include layout="@layout/tnt_suggestion_base" />
+    <ViewStub android:id="@id/checkbox" android:visibility="gone" android:layout="@layout/tnt_suggestion_setting_switch" android:inflatedId="@id/checkbox" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="6.0dp" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toStartOf="@id/text_cmd" app:layout_constraintTop_toTopOf="parent" />
+    <ViewStub android:id="@id/summary" android:visibility="gone" android:layout="@layout/tnt_suggestion_text2" android:inflatedId="@id/summary" android:layout_width="wrap_content" android:layout_height="wrap_content" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintHorizontal_bias="0.0" app:layout_constraintStart_toEndOf="@id/left_icon_guideline" app:layout_constraintTop_toBottomOf="@id/text2" />
+</com.android.quicksearchbox.tnt.suggestion.TNTSuggestionSettingView>

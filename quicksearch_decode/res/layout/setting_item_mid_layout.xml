@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:gravity="left|center" android:orientation="horizontal" android:duplicateParentState="true" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_centerVertical="true"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:layout_gravity="center_vertical" android:orientation="vertical" android:paddingTop="@dimen/mid_container_top_bottom_padding" android:paddingBottom="@dimen/mid_container_top_bottom_padding" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content">
+        <TextView android:textSize="@dimen/primary_text_size" android:id="@id/item_title" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" style="@style/ListContentItemPrimaryText" />
+        <TextView android:textSize="@dimen/tertiary_text_size" android:id="@id/item_summary" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/mid_container_summary_margin" style="@style/ListContentItemSecondaryText" />
+    </LinearLayout>
+    <ViewStub android:id="@id/info_btn_viewstub" android:layout="@layout/settings_switch_info_btn_layout" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="3.0dp" android:layout_marginTop="1.0px" />
+</LinearLayout>

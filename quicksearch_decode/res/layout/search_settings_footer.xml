@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView android:textSize="@dimen/instruction_text_size" android:textColor="@color/instruction_text_color" android:ellipsize="end" android:gravity="center_horizontal" android:padding="20.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/search_settings_instruction"
+  xmlns:android="http://schemas.android.com/apk/res/android" />

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animation-list android:oneshot="true"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:duration="0" android:drawable="@drawable/search_frame0060" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0001" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0004" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0011" />
+    <item android:duration="32" android:drawable="@drawable/search_frame0013" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0016" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0019" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0022" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0024" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0027" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0029" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0032" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0034" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0036" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0038" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0040" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0042" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0044" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0045" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0047" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0048" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0050" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0051" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0052" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0053" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0054" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0055" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0056" />
+    <item android:duration="16" android:drawable="@drawable/search_frame0057" />
+    <item android:duration="32" android:drawable="@drawable/search_frame0058" />
+    <item android:duration="32" android:drawable="@drawable/search_frame0059" />
+    <item android:duration="80" android:drawable="@drawable/search_frame0060" />
+</animation-list>

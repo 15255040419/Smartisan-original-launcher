@@ -94,7 +94,6 @@
     <id name="search_switchinput_tabbar" />
     <id name="search_resultbox_container" />
     <id name="search_editbox_shadow" />
-    <id name="search_t9_panel" />
     <id name="btn_back" />
     <id name="btn_ok" />
     <id name="btn_download" />
@@ -284,9 +283,7 @@
     <id name="resultlist_doublesingle_item" />
     <id name="resultlist_singleicon" />
     <id name="resultlist_singletext" />
-    <id name="resultlist_item_grouptitle" />
     <id name="t9_keyboard" />
-    <id name="search_t9_mainkeybord" />
     <id name="row_1" />
     <id name="one" />
     <id name="two" />

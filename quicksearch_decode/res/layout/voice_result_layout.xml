@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <FrameLayout android:layout_gravity="center" android:id="@id/result" android:visibility="gone" android:layout_width="match_parent" android:layout_height="@dimen/voice_result_height" android:layout_marginLeft="5.0dp" android:layout_marginRight="5.0dp">
+        <com.android.quicksearchbox.panels.widget.RoundedRectLinearLayout android:orientation="vertical" android:background="@drawable/list_mesk" android:clickable="true" android:layout_width="match_parent" android:layout_height="match_parent" app:radius_marginBottom="31.0dp" app:radius_marginLeft="21.0dp" app:radius_marginRight="21.0dp" app:round_radius="6.3299866dp">
+            <LinearLayout android:gravity="center" android:layout_gravity="center" android:orientation="horizontal" android:layout_width="wrap_content" android:layout_height="61.0dp">
+                <ImageView android:id="@id/header_contact" android:background="@drawable/title_contact_bg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:importantForAccessibility="no" />
+                <ImageView android:id="@id/header_app" android:background="@drawable/title_app_bg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:importantForAccessibility="no" />
+                <ImageView android:id="@id/header_music" android:background="@drawable/title_music_bg" android:layout_width="wrap_content" android:layout_height="wrap_content" android:importantForAccessibility="no" />
+            </LinearLayout>
+            <ListView android:id="@id/list" android:paddingBottom="31.0dp" android:scrollbars="none" android:fadingEdge="none" android:fadingEdgeLength="0.0dp" android:layout_width="match_parent" android:layout_height="0.0dp" android:divider="#14000000" android:dividerHeight="0.6700001dp" android:layout_weight="1.0" android:overScrollMode="always" />
+        </com.android.quicksearchbox.panels.widget.RoundedRectLinearLayout>
+        <View android:layout_gravity="bottom" android:background="@drawable/list_mesk_gradient" android:layout_width="match_parent" android:layout_height="62.0dp" />
+        <View android:background="@drawable/list_mesk_shadow" android:layout_width="match_parent" android:layout_height="2.0dp" android:layout_marginLeft="21.0dp" android:layout_marginTop="71.66998dp" android:layout_marginRight="21.0dp" />
+    </FrameLayout>
+    <LinearLayout android:gravity="center" android:layout_gravity="center" android:orientation="vertical" android:id="@id/empty" android:background="@drawable/search_empty_all" android:visibility="gone" android:clickable="true" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginLeft="20.0dp" android:layout_marginRight="20.0dp">
+        <ImageView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="32.0dp" android:layout_marginBottom="26.0dp" android:src="@drawable/search" />
+        <TextView android:textSize="18.0sp" android:textColor="#858585" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginBottom="39.0dp" android:text="@string/no_result_title" />
+    </LinearLayout>
+</merge>

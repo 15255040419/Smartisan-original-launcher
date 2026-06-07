@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:orientation="vertical" android:background="@drawable/setting_background" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:smartisan="http://schemas.android.com/apk/res-auto" xmlns:dslv="http://schemas.android.com/apk/res-auto">
+    <smartisan.widget.TitleBar android:id="@id/title" android:layout_width="match_parent" android:layout_height="wrap_content" dslv:title_bar_center_text="@string/pinyin_fuzzy_tone_title" />
+    <com.android.quicksearchbox.dslv.SlideListView android:id="@id/fuzzy_tone_list" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/title" android:headerDividersEnabled="false" android:footerDividersEnabled="false" dslv:slider_checkbox_id="@id/item_checkbox" style="@style/ListViewGeneralStyle" />
+</RelativeLayout>

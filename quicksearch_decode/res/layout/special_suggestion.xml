@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<view android:layout_height="@dimen/bottom_suggestion_view_height" android:layout_alignWithParentIfMissing="true" class="com.android.quicksearchbox.ui.SpecialSuggestionView" style="@style/Suggestion"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/icon1" android:visibility="gone" style="@style/SuggestionIcon1" />
+    <TextView android:id="@id/text1" android:layout_toRightOf="@id/icon1" android:layout_centerVertical="true" style="@style/SuggestionText1" />
+</view>

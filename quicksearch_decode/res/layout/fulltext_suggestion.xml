@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<view class="com.android.quicksearchbox.ui.FullTextSuggestionView" style="@style/Suggestion"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <RelativeLayout android:id="@id/icon_container" android:layout_width="@dimen/suggestion_view_height" android:layout_height="@dimen/suggestion_view_height">
+        <ImageView android:id="@id/icon1" style="@style/SuggestionIcon1" />
+        <com.android.quicksearchbox.panels.widget.OtherIconView android:id="@id/other_icon" android:visibility="gone" style="@style/SuggestionIcon1" />
+    </RelativeLayout>
+    <ImageView android:id="@id/icon2" android:visibility="gone" android:scaleType="centerInside" android:layout_alignParentTop="true" android:layout_alignParentRight="true" android:layout_alignParentBottom="true" style="@style/SuggestionIcon2" />
+    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_toLeftOf="@id/icon2" android:layout_toRightOf="@id/icon_container" android:layout_centerVertical="true">
+        <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+            <TextView android:textSize="13.5sp" android:id="@id/date" android:layout_alignParentRight="true" style="@style/SuggestionText2" />
+            <TextView android:id="@id/text1" android:layout_toLeftOf="@id/date" android:layout_alignParentLeft="true" android:layout_alignWithParentIfMissing="true" style="@style/SuggestionText1" />
+        </RelativeLayout>
+        <TextView android:id="@id/text2" style="@style/SuggestionText2" />
+    </LinearLayout>
+</view>

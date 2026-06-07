@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:orientation="vertical" android:id="@id/header_content" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:id="@id/tv_automated_1" style="@style/tv_suggestion_header" />
+        <TextView android:id="@id/tv_automated_2" style="@style/tv_suggestion_header" />
+        <TextView android:id="@id/tv_automated_3" style="@style/tv_suggestion_header" />
+    </LinearLayout>
+    <RelativeLayout android:id="@id/v_appstore_search" android:background="@drawable/list_item_nophoto_bg" android:visibility="gone" android:layout_width="match_parent" android:layout_height="44.0dp">
+        <ImageView style="@style/top_suggestion_arrow_style" />
+        <TextView android:textSize="14.0sp" android:textColor="@color/list_text1_color" android:paddingLeft="16.0dp" android:text="@string/top_suggestion_appstore" android:drawableLeft="@drawable/icon_suggestion_header_appstore" android:drawablePadding="16.0dp" style="@style/top_suggestion_button_style" />
+    </RelativeLayout>
+</LinearLayout>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge android:layout_width="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <TextView android:gravity="center" android:id="@id/text_cmd" android:background="@drawable/tnt_selector_list_shortcut" android:layout_width="36.0dp" android:layout_height="24.0dp" android:text="cmd" android:lineHeight="14.0sp" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toStartOf="@id/tnt_suggestion_keyboard_shortcut_num" app:layout_constraintHorizontal_bias="1.0" app:layout_constraintHorizontal_chainStyle="packed" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent" style="@style/suggestion_shortcut" />
+    <TextView android:id="@id/tnt_suggestion_keyboard_shortcut_num" android:background="@drawable/tnt_selector_list_shortcut" android:layout_width="24.0dp" android:layout_height="24.0dp" android:layout_marginLeft="4.0dp" android:layout_marginRight="12.0dp" android:text="1" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toEndOf="@id/text_cmd" app:layout_constraintTop_toTopOf="parent" style="@style/suggestion_shortcut" />
+</merge>
