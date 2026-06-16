@@ -140,6 +140,8 @@
 
     move-result-object v0
 
+    if-eqz v0, :cond_3
+
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/b/fa;->vm()Z
 
     move-result v0
@@ -155,6 +157,8 @@
 
     move-result-object v0
 
+    if-eqz v0, :cond_3
+
     const/4 v2, 0x0
 
     invoke-virtual {v0, v2, v1}, Lcom/smartisanos/launcher/view/b/fa;->a(Lcom/smartisanos/launcher/view/b/M;I)Z
@@ -167,6 +171,8 @@
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/Eb;->Ih()Lcom/smartisanos/launcher/view/b/fa;
 
     move-result-object v0
+
+    if-eqz v0, :cond_3
 
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/b/fa;->pr()Lcom/smartisanos/launcher/animations/Qa;
 

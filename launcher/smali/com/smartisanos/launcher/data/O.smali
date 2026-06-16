@@ -1107,38 +1107,15 @@
 
     const/4 p0, 0x0
 
-    .line 1
-    :try_start_0
-    invoke-virtual {p1}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
+    invoke-static {p1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readTransparentMode(Landroid/content/Context;)Z
 
-    move-result-object p1
+    move-result v0
 
-    .line 2
-    sget-object v0, Lcom/smartisanos/launcher/data/M;->hr:Ljava/lang/String;
+    if-eqz v0, :cond_0
 
-    invoke-static {p1, v0, p0}, Landroid/provider/Settings$Global;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I
-
-    move-result p1
-    :try_end_0
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
-
-    const/4 v0, 0x1
-
-    if-ne v0, p1, :cond_0
-
-    move p0, v0
+    const/4 p0, 0x1
 
     :cond_0
-    return p0
-
-    .line 3
-    :catch_0
-    sget-object p1, Lcom/smartisanos/launcher/data/O;->log:Lcom/smartisanos/launcher/va;
-
-    const-string v0, "load transparent mode error"
-
-    invoke-virtual {p1, v0}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
-
     return p0
 .end method
 

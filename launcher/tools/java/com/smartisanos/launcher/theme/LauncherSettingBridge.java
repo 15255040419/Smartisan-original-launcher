@@ -2,6 +2,8 @@ package com.smartisanos.launcher.theme;
 
 import android.content.Context;
 import android.provider.Settings;
+import java.util.List;
+import java.util.Map;
 
 public final class LauncherSettingBridge {
     private static final String PREFS = "com.smartisanos.launcher_prefs";
@@ -48,6 +50,46 @@ public final class LauncherSettingBridge {
         return defValue;
     }
 
+    public static boolean readTransparentMode(Context context) {
+        if (context == null) {
+            return false;
+        }
+        final String key = "launcher_grid_theme";
+        try {
+            android.content.SharedPreferences prefs =
+                    context.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE);
+            if (prefs.contains(key)) {
+                try {
+                    return prefs.getInt(key, 0) == 1;
+                } catch (Throwable ignored) {
+                    return prefs.getBoolean(key, false);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            android.content.SharedPreferences prefs =
+                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            if (prefs.contains(key)) {
+                try {
+                    return prefs.getInt(key, 0) == 1;
+                } catch (Throwable ignored) {
+                    return prefs.getBoolean(key, false);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            return Settings.Global.getInt(context.getContentResolver(), key, 0) == 1;
+        } catch (Throwable ignored) {
+        }
+        try {
+            return Settings.System.getInt(context.getContentResolver(), key, 0) == 1;
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
     public static String readString(Context context, String key, String defValue) {
         if (context == null || key == null) {
             return defValue;
@@ -92,7 +134,64 @@ public final class LauncherSettingBridge {
     }
 
     public static int readIconSizePercent(Context context) {
-        return normalizeIconSizePercent(readInt(context, KEY_ICON_SIZE, 100));
+        return effectiveIconSizePercent(normalizeIconSizePercent(readInt(context, KEY_ICON_SIZE, 100)));
+    }
+
+    public static void ensureTransparentThemeRegistered(Context context) {
+        transparentTheme(context);
+    }
+
+    public static Object transparentTheme(Context context) {
+        if (context == null || !packageInstalled(context, "com.smartisanos.launcher.theme.trans")) {
+            return null;
+        }
+        Object theme = null;
+        try {
+            Class<?> themeClass = Class.forName("com.smartisanos.launcher.theme.v");
+            theme = themeClass.getConstructor(String.class).newInstance("smartisan_theme_trans");
+            themeClass.getField("mPackage").set(theme, "com.smartisanos.launcher.theme.trans");
+            themeClass.getField("mName").set(theme, "透明");
+            themeClass.getField("mResources").set(theme,
+                    context.getPackageManager().getResourcesForApplication("com.smartisanos.launcher.theme.trans"));
+
+            Class<?> manager = Class.forName("com.smartisanos.launcher.theme.X");
+            java.lang.reflect.Field themeMapField = manager.getDeclaredField("gu");
+            themeMapField.setAccessible(true);
+            Object themeMapValue = themeMapField.get(null);
+            if (themeMapValue instanceof Map) {
+                ((Map) themeMapValue).put("smartisan_theme_trans", theme);
+            }
+            java.lang.reflect.Field themeListField = manager.getDeclaredField("fu");
+            themeListField.setAccessible(true);
+            Object themeListValue = themeListField.get(null);
+            if (themeListValue instanceof List && !((List) themeListValue).contains("smartisan_theme_trans")) {
+                ((List) themeListValue).add("smartisan_theme_trans");
+            }
+            try {
+                java.lang.reflect.Field packageMapField = manager.getDeclaredField("hu");
+                packageMapField.setAccessible(true);
+                Object packageMapValue = packageMapField.get(null);
+                if (packageMapValue instanceof Map) {
+                    ((Map) packageMapValue).put("com.smartisanos.launcher.theme.trans", "smartisan_theme_trans");
+                }
+            } catch (Throwable ignored) {
+            }
+        } catch (Throwable ignored) {
+        }
+        if (theme != null) {
+            return theme;
+        }
+        try {
+            Class<?> manager = Class.forName("com.smartisanos.launcher.theme.X");
+            java.lang.reflect.Field themeMapField = manager.getDeclaredField("gu");
+            themeMapField.setAccessible(true);
+            Object themeMapValue = themeMapField.get(null);
+            if (themeMapValue instanceof Map) {
+                return ((Map) themeMapValue).get("smartisan_theme_trans");
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     private static int readInt(Context context, String key, int defValue) {
@@ -126,6 +225,15 @@ public final class LauncherSettingBridge {
         return defValue;
     }
 
+    private static boolean packageInstalled(Context context, String pkg) {
+        try {
+            context.getPackageManager().getPackageInfo(pkg, 0);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     private static int normalizeIconSizePercent(int percent) {
         if (percent == 0) {
             return 100;
@@ -143,5 +251,16 @@ public final class LauncherSettingBridge {
             return 150;
         }
         return percent;
+    }
+
+    private static int effectiveIconSizePercent(int percent) {
+        int scaled = Math.round(percent * 1.12f);
+        if (scaled < 50) {
+            return 50;
+        }
+        if (scaled > 168) {
+            return 168;
+        }
+        return scaled;
     }
 }

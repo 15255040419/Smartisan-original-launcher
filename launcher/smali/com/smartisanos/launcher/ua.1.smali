@@ -1094,12 +1094,22 @@
     :try_end_1
     .catch Ljava/lang/Throwable; {:try_start_1 .. :try_end_1} :catch_1
 
+    if-nez p0, :cond_wallpaper_fallback_return
+
+    invoke-static {v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->transparentWallpaperDrawableFallback(Landroid/content/Context;)Landroid/graphics/drawable/Drawable;
+
+    move-result-object p0
+
+    :cond_wallpaper_fallback_return
+
     return-object p0
 
     :catch_1
     move-exception p0
 
-    const/4 p0, 0x0
+    invoke-static {v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->transparentWallpaperDrawableFallback(Landroid/content/Context;)Landroid/graphics/drawable/Drawable;
+
+    move-result-object p0
 
     return-object p0
 .end method
@@ -1954,27 +1964,15 @@
     .locals 2
 
     .line 1
-    invoke-virtual {p0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
+    const-string v0, "original_launcher_wallpaper_blur_on"
 
-    move-result-object p0
+    const/4 v1, 0x0
 
-    const/4 v0, 0x1
-
-    const-string v1, "original_launcher_wallpaper_blur_on"
-
-    invoke-static {p0, v1, v0}, Landroid/provider/Settings$Global;->getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I
+    invoke-static {p0, v0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
 
     move-result p0
 
-    if-ne p0, v0, :cond_0
-
-    goto :goto_0
-
-    :cond_0
-    const/4 v0, 0x0
-
-    :goto_0
-    return v0
+    return p0
 .end method
 
 .method public static ic()Z

@@ -50,6 +50,18 @@
     return-void
 .end method
 
+.method protected onNewIntent(Landroid/content/Intent;)V
+    .locals 0
+
+    invoke-super {p0, p1}, Landroid/app/Activity;->onNewIntent(Landroid/content/Intent;)V
+
+    invoke-virtual {p0, p1}, Landroid/app/Activity;->setIntent(Landroid/content/Intent;)V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->show(Landroid/app/Activity;)V
+
+    return-void
+.end method
+
 .method protected onDestroy()V
     .locals 1
 

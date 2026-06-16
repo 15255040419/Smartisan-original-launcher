@@ -1062,18 +1062,18 @@
 
     sput-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
 
+    sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
+
+    if-eqz p0, :cond_trans_theme_register_done
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->ensureTransparentThemeRegistered(Landroid/content/Context;)V
+
+    :cond_trans_theme_register_done
+
     .line 2
     invoke-static {p1}, Lcom/smartisanos/launcher/ua;->i(Landroid/content/Context;)Z
 
     move-result p0
-
-    sput-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransWallpaperBlur:Z
-
-    sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
-
-    if-eqz p0, :cond_trans_wallpaper_blur_done
-
-    const/4 p0, 0x1
 
     sput-boolean p0, Lcom/smartisanos/launcher/data/Constants;->isTransWallpaperBlur:Z
 

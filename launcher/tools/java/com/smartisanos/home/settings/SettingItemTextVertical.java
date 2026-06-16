@@ -15,6 +15,7 @@ public class SettingItemTextVertical extends RelativeLayout {
     private final ImageView icon;
     private final ImageView iconFrame;
     private final ImageView arrow;
+    private TextView subTitle;
 
     public SettingItemTextVertical(Context context) {
         this(context, null);
@@ -104,6 +105,7 @@ public class SettingItemTextVertical extends RelativeLayout {
         sub.setTextColor(0xff888888);
         int subRes = attrRes(attrs, "setting_item_text_vertical_subTitle");
         if (subRes != 0) sub.setText(getResources().getText(subRes));
+        subTitle = sub;
         texts.addView(sub, new LinearLayout.LayoutParams(-1, -2));
         addView(texts, textLp);
     }
@@ -155,6 +157,12 @@ public class SettingItemTextVertical extends RelativeLayout {
 
     public void setImageResource(int resId) {
         setIconResource(resId);
+    }
+
+    public void setSubTitle(CharSequence text) {
+        if (subTitle != null) {
+            subTitle.setText(text == null ? "" : text);
+        }
     }
 
     private int attrRes(AttributeSet attrs, String name) {

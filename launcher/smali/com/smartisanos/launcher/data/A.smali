@@ -2126,6 +2126,21 @@
 .method public static Je()V
     .locals 14
 
+    sget v0, Landroid/os/Build$VERSION;->SDK_INT:I
+
+    const/16 v1, 0x1d
+
+    if-lt v0, v1, :cond_modern_doppelganger_check_ok
+
+    sget-object v0, Lcom/smartisanos/launcher/data/A;->log:Lcom/smartisanos/launcher/va;
+
+    const-string v1, "skip legacy doppelganger package scan on modern Android"
+
+    invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
+
+    return-void
+
+    :cond_modern_doppelganger_check_ok
     .line 1
     invoke-static {}, Lcom/smartisanos/launcher/e/s;->qg()Ljava/util/List;
 
@@ -2435,7 +2450,7 @@
 
     invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V
 
-    const-string v3, "user = 10 OR user = 0"
+    const-string v3, "(user = 10 OR user = 0) AND pageIndex != -2"
 
     .line 7
     invoke-static {v3}, Lcom/smartisanos/launcher/data/a/l;->V(Ljava/lang/String;)Ljava/util/List;
@@ -2534,14 +2549,14 @@
 
     invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V
 
-    const-string v1, "user = 0 AND itemType=0"
+    const-string v1, "user = 0 AND itemType=0 AND pageIndex != -2 AND 1 = 0"
 
     .line 16
     invoke-static {v1}, Lcom/smartisanos/launcher/data/a/l;->V(Ljava/lang/String;)Ljava/util/List;
 
     move-result-object v1
 
-    const-string v2, "user = 10 AND itemType=0"
+    const-string v2, "user = 10 AND itemType=0 AND pageIndex != -2 AND 1 = 0"
 
     .line 17
     invoke-static {v2}, Lcom/smartisanos/launcher/data/a/l;->V(Ljava/lang/String;)Ljava/util/List;

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <ImageView android:id="@id/left_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentLeft="true" android:layout_centerVertical="true" />
-    <ImageView android:id="@id/right_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
-    <smartisan.widget.SmoothSeekBar android:id="@id/seek_bar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_toLeftOf="@id/right_icon" android:layout_toRightOf="@id/left_icon" android:layout_centerVertical="true" style="@style/SeekBarStyle.Thin.LargeThumb.Actived" />
-</RelativeLayout>

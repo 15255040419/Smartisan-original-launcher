@@ -191,7 +191,7 @@
     <string name="quick_search_install_button">Install</string>
     <string name="quick_search_installed_button">Installed</string>
     <string name="quick_search_reinstall_button">Reinstall</string>
-    <string name="setting_default_search_engine_tips">Install the built-in search app, then open the Search app on the desktop or swipe down to quickly search apps.</string>
+    <string name="setting_default_search_engine_tips">Swipe down on the desktop to quickly search apps.</string>
     <string name="search_searchapp_toast">current app</string>
     <string name="search_text">"search 
  mail message"</string>
@@ -603,7 +603,7 @@
     <string name="hello_world">Hello world!</string>
     <string name="launcher_color_sort_sub_text">Sort App Icon By Color</string>
     <string name="launcher_color_sort_text">Launcher Color Sort</string>
-    <string name="more_current_version_txt">1.4.8</string>
+    <string name="more_current_version_txt">1.5.0</string>
     <string name="os_update_dlg_cancel_btn">稍后更新</string>
     <string name="os_update_dlg_msg">检测到系统版本过低，为保证您个人信息安全，正常使用手机完整功能，请 Smartisan 用户尽快升级到最新系统版本！</string>
     <string name="os_update_dlg_ok_btn">现在更新</string>
@@ -648,4 +648,5 @@
     <string name="update_available_title">更新提示</string>
     <string name="unlock_animation_title">Unlock Animation</string>
     <string name="unlock_animation_tips">Play scale animation after unlock</string>
+    <string name="transparent_theme_title">Transparent Theme</string>
 </resources>

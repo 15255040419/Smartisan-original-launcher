@@ -21,6 +21,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageInstaller;
 import android.content.pm.ResolveInfo;
 import android.content.res.AssetManager;
@@ -33,6 +34,9 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Point;
+import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -47,6 +51,8 @@ import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -61,6 +67,7 @@ import android.widget.AbsListView;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridView;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -103,23 +110,27 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class MaintainedLauncherSettingsHost {
+    private static final String LOG_TAG = "MaintainedSettings";
     private static android.os.Handler sThemePageHandler;
     private static Runnable sThemePageRunnable;
     private static Resources sSettingsResources;
     private static File sSettingsApk;
     private static Bitmap sPendingThemeScreenshot;
+    private static Dialog sLauncherReloadDialog;
     private static final String SETTINGS_ASSET = "settings_maintained/maintained-settings-res.apk";
     private static float sSearchGestureStartX;
     private static float sSearchGestureStartY;
     private static long sSearchGestureStartTime;
     private static boolean sSearchGestureConsumed;
+    private static boolean sSearchGestureInvalid;
+    private static long sSearchGestureLastOpenTime;
     private static final String SETTINGS_PKG = "com.smartisanos.home";
     private static final String QUICK_SEARCH_PKG = "com.smartisanos.quicksearch";
-    private static final String QUICK_SEARCH_ACTIVITY = "com.android.quicksearchbox.SearchActivity";
-    private static final String QUICK_SEARCH_GLOBAL_ACTION = "android.search.action.GLOBAL_SEARCH";
     private static final String QUICK_SEARCH_DOWNLOAD_URL =
             "https://gitee.com/RANH-F/Smartisan-original-launcher-download/releases/download/launcher-1.4.8/SmartisanQuickSearch.apk";
     private static final String QUICK_SEARCH_INSTALL_ACTION = "com.smartisanos.launcher.action.QUICK_SEARCH_INSTALL_STATUS";
+    private static final String SEARCH_PREFS = "launcher_search_prefs";
+    private static final String SEARCH_HISTORY_KEY = "search_history_entries";
     private static final String THEME_DOWNLOAD_PREFS = "theme_download_prefs";
     private static final String ICON_OVERRIDE_PREFS = "icon_override_prefs";
     private static final String WALLPAPER_PREFS = "launcher_settings";
@@ -127,8 +138,13 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_WALLPAPER_THUMB = "launcher_wallpaper_thumb";
     private static final String PREF_WALLPAPER_READY = "launcher_wallpaper_ready";
     private static final String PREF_WALLPAPER_REFRESH_PENDING = "launcher_wallpaper_refresh_pending";
+    private static final String PREF_THEME_RELOAD_LOADING_PENDING = "launcher_theme_reload_loading_pending";
+    private static final String PREF_THEME_RELOAD_LOADING_MESSAGE = "launcher_theme_reload_loading_message";
     private static final String PREF_IMPROVED_ICON_ENABLED = "launcher_improved_icon_enabled";
     private static final String KEY_SEARCH_PAGE_ENABLED = "launcher_search_page_enabled";
+    private static final String KEY_TRANSPARENT_THEME_ENABLED = "launcher_grid_theme";
+    private static final String KEY_TRANSPARENT_WALLPAPER_BLUR = "original_launcher_wallpaper_blur_on";
+    private static final String PREF_TRANSPARENT_PREVIOUS_THEME = "transparent_previous_theme";
     private static final String KEY_LAUNCHER_ICON_SIZE = "launcher_icon_size";
     private static final String TAG_ICON_SIZE_SUBTITLE = "launcher_icon_size_subtitle";
     private static final String PREF_ICON_SIZE_RUNTIME_DIRTY = "launcher_icon_size_runtime_dirty";
@@ -210,6 +226,13 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void show(Activity activity, int restoreScrollY) {
         try {
+            Intent intent = activity.getIntent();
+            if (intent != null && intent.getBooleanExtra("launcher_show_search", false)) {
+                intent.removeExtra("launcher_show_search");
+                tuneWindow(activity);
+                showSearchPage(activity);
+                return;
+            }
             tuneWindow(activity);
             SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
@@ -364,17 +387,17 @@ public final class MaintainedLauncherSettingsHost {
             public void run() {
                 bootstrapDoppelgangerPackages(app);
             }
-        }, 700);
+        }, 12000);
         handler.postDelayed(new Runnable() {
             public void run() {
                 bootstrapDoppelgangerPackages(app);
             }
-        }, 2600);
+        }, 30000);
         handler.postDelayed(new Runnable() {
             public void run() {
                 bootstrapDoppelgangerPackages(app);
             }
-        }, 6200);
+        }, 60000);
     }
 
     private static void bootstrapDoppelgangerPackages(final Context context) {
@@ -481,18 +504,69 @@ public final class MaintainedLauncherSettingsHost {
                     Integer.TYPE, Integer.TYPE);
             Object list = method.invoke(pm, 0, 10);
             if (list instanceof List) {
-                return (List) list;
+                addPackageInfos(out, (List) list);
             }
         } catch (Throwable ignored) {
         }
         try {
             List list = pm.getInstalledPackages(0);
             if (list != null) {
-                out.addAll(list);
+                addPackageInfos(out, list);
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
+            launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+            List activities = pm.queryIntentActivities(launcherIntent, 0);
+            if (activities != null) {
+                for (int i = 0; i < activities.size(); i++) {
+                    Object item = activities.get(i);
+                    if (!(item instanceof ResolveInfo)) {
+                        continue;
+                    }
+                    ResolveInfo info = (ResolveInfo) item;
+                    if (info.activityInfo == null || info.activityInfo.packageName == null) {
+                        continue;
+                    }
+                    try {
+                        PackageInfo packageInfo = pm.getPackageInfo(info.activityInfo.packageName, 0);
+                        addPackageInfo(out, packageInfo);
+                    } catch (Throwable ignored) {
+                    }
+                }
             }
         } catch (Throwable ignored) {
         }
         return out;
+    }
+
+    private static void addPackageInfos(ArrayList out, List packages) {
+        if (out == null || packages == null) {
+            return;
+        }
+        for (int i = 0; i < packages.size(); i++) {
+            Object item = packages.get(i);
+            if (item instanceof PackageInfo) {
+                addPackageInfo(out, (PackageInfo) item);
+            }
+        }
+    }
+
+    private static void addPackageInfo(ArrayList out, PackageInfo packageInfo) {
+        if (out == null || packageInfo == null || packageInfo.packageName == null) {
+            return;
+        }
+        for (int i = 0; i < out.size(); i++) {
+            Object item = out.get(i);
+            if (item instanceof PackageInfo) {
+                PackageInfo existing = (PackageInfo) item;
+                if (packageInfo.packageName.equals(existing.packageName)) {
+                    return;
+                }
+            }
+        }
+        out.add(packageInfo);
     }
 
     public static List safeQueryIntentActivitiesForUser(PackageManager pm, Intent intent, int flags, int userId) {
@@ -734,9 +808,9 @@ public final class MaintainedLauncherSettingsHost {
         bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
         bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
         bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
-        bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
-        bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
+        bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
         bindSwitch(activity, resources, root, "multi_block_fast_launch_app", "fast_launch_app_on", true);
+        bindTransparentThemeSwitch(activity, resources, root);
 
         hide(resources, root, "id_unlock_anim_tips");
         hide(resources, root, "setting_defaultsearchengine");
@@ -748,12 +822,18 @@ public final class MaintainedLauncherSettingsHost {
         hide(resources, root, "item_id_hide_lable");
         hide(resources, root, "item_id_hide_navigation_bar");
         hide(resources, root, "item_id_hide_badge");
-        hide(resources, root, "item_id_badge_swipe_clean");
         hide(resources, root, "item_id_unlock_anim");
         setFirstChildText(resources, root, "setting_ocd_options",
                 getString(resources, "ocd_setting", "OCD Settings"));
         bindCurrentThemePreviewIcon(activity, resources, root, "item_id_themes");
         bindWallpaperSettingIcon(activity, resources, root);
+        if (isTransparentThemeEnabled(activity)) {
+            forceDefaultPageAnimation(activity);
+            hide(resources, root, "item_id_themes");
+            hide(resources, root, "item_page_flip_anims");
+            setBackground(find(resources, root, "item_id_launcher_wallpaper"), resources, "selector_setting_sub_item_bg_top");
+            setBackground(find(resources, root, "item_id_icons"), resources, "selector_setting_sub_item_bg_bottom");
+        }
         bindMainSettingIcon(resources, root, "item_page_flip_anims", "page_flip_animation_default_upper", true);
         bindMainSettingIcon(resources, root, "item_id_icons", "icon_setting_icon");
         TextView updateVersion = (TextView) byId(root, resources, "more_check_upgradation_text");
@@ -872,29 +952,52 @@ public final class MaintainedLauncherSettingsHost {
             sSearchGestureStartY = event.getY();
             sSearchGestureStartTime = android.os.SystemClock.uptimeMillis();
             sSearchGestureConsumed = false;
+            sSearchGestureInvalid = false;
+            return false;
+        }
+        if (action == MotionEvent.ACTION_CANCEL
+                || action == MotionEvent.ACTION_POINTER_DOWN
+                || action == MotionEvent.ACTION_POINTER_UP) {
+            sSearchGestureInvalid = true;
+            return false;
+        }
+        if (event.getPointerCount() != 1) {
+            sSearchGestureInvalid = true;
             return false;
         }
         if (action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP) {
             return false;
         }
         if (sSearchGestureConsumed) {
-            return true;
+            return action == MotionEvent.ACTION_UP;
         }
         float dx = event.getX() - sSearchGestureStartX;
         float dy = event.getY() - sSearchGestureStartY;
-        long duration = android.os.SystemClock.uptimeMillis() - sSearchGestureStartTime;
-        int height = activity.getResources().getDisplayMetrics().heightPixels;
-        boolean fromDesktop = sSearchGestureStartY > dp(activity, 48)
-                && sSearchGestureStartY < height * 0.88f;
-        boolean downward = dy > dp(activity, 190) && Math.abs(dx) < dy * 0.45f;
+        float absDx = Math.abs(dx);
+        if (dy < -dp(activity, 24)
+                || absDx > Math.max(dp(activity, 96), Math.max(dy, 1f) * 0.55f)) {
+            sSearchGestureInvalid = true;
+        }
         if (action != MotionEvent.ACTION_UP) {
             return false;
         }
-        if (fromDesktop && downward && duration < 650) {
-            if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, false)) {
+        long now = android.os.SystemClock.uptimeMillis();
+        long duration = now - sSearchGestureStartTime;
+        if (sSearchGestureInvalid || now - sSearchGestureLastOpenTime < 1000) {
+            return false;
+        }
+        int height = activity.getResources().getDisplayMetrics().heightPixels;
+        boolean fromDesktop = sSearchGestureStartY > dp(activity, 96)
+                && sSearchGestureStartY < height - dp(activity, 280);
+        float minDistance = Math.max(dp(activity, 180), height * 0.14f);
+        boolean downward = dy > minDistance && absDx < dy * 0.28f;
+        boolean deliberate = duration >= 120 && duration <= 900;
+        if (fromDesktop && downward && deliberate) {
+            if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, true)) {
                 return false;
             }
             sSearchGestureConsumed = true;
+            sSearchGestureLastOpenTime = now;
             openLauncherSearch(activity);
             return true;
         }
@@ -906,85 +1009,488 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static void openLauncherSearch(Context context) {
-        if (!readSystemBool(context, KEY_SEARCH_PAGE_ENABLED, false)) {
+        if (!readSystemBool(context, KEY_SEARCH_PAGE_ENABLED, true)) {
             return;
         }
-        if (openOriginalQuickSearch(context)) {
-            return;
-        }
-        Toast.makeText(context, "请先安装原版搜索", Toast.LENGTH_SHORT).show();
-    }
-
-    private static boolean openOriginalQuickSearch(Context context) {
-        if (context == null) {
-            return false;
-        }
-        PackageManager pm = context.getPackageManager();
-        if (pm == null || !isPackageInstalled(pm, QUICK_SEARCH_PKG)) {
-            return promptBundledQuickSearchInstall(context, false);
-        }
-        Intent explicit = new Intent(Intent.ACTION_SEARCH);
-        explicit.setClassName(QUICK_SEARCH_PKG, QUICK_SEARCH_ACTIVITY);
-        explicit.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-        if (!(context instanceof Activity)) {
-            explicit.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
-        if (startQuickSearchIntent(context, explicit)) {
-            return true;
-        }
-        Intent global = new Intent(QUICK_SEARCH_GLOBAL_ACTION);
-        global.setPackage(QUICK_SEARCH_PKG);
-        global.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-        if (!(context instanceof Activity)) {
-            global.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
-        if (startQuickSearchIntent(context, global)) {
-            return true;
-        }
-        Intent main = pm.getLaunchIntentForPackage(QUICK_SEARCH_PKG);
-        if (main != null) {
-            main.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        try {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.setClassName(context.getPackageName(),
+                    "com.smartisanos.launcher.theme.ThemeChooserActivity");
+            intent.putExtra("launcher_show_search", true);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             if (!(context instanceof Activity)) {
-                main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             }
-            if (startQuickSearchIntent(context, main)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean startQuickSearchIntent(Context context, Intent intent) {
-        try {
             context.startActivity(intent);
-            if (context instanceof Activity) {
-                ((Activity) context).overridePendingTransition(0, 0);
-            }
-            return true;
-        } catch (Throwable ignored) {
-            return false;
+        } catch (Throwable t) {
+            Toast.makeText(context, "无法打开搜索", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private static boolean promptBundledQuickSearchInstall(Context context, boolean markPrompted) {
-        if (context == null) {
-            return false;
+    public static void showSearchPage(final Activity activity) {
+        if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, true)) {
+            activity.finish();
+            return;
         }
-        PackageManager pm = context.getPackageManager();
-        if (pm != null && isPackageInstalled(pm, QUICK_SEARCH_PKG)) {
-            return false;
+        final ArrayList<SearchEntry> all = new ArrayList<SearchEntry>();
+        final ArrayList<SearchEntry> visible = new ArrayList<SearchEntry>();
+        final SettingsResourceContext context;
+        final Resources resources;
+        try {
+            context = createSettingsContext(activity);
+            resources = context.getResources();
+        } catch (Throwable t) {
+            Toast.makeText(activity, "无法打开搜索页：" + shortError(t), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        loadSearchEntries(activity, all);
+
+        final LinearLayout root = new LinearLayout(activity);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(0xffedf3f8);
+        activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+
+        LinearLayout searchArea = new LinearLayout(activity);
+        searchArea.setGravity(Gravity.CENTER_VERTICAL);
+        searchArea.setPadding(dp(activity, 10), dp(activity, 9), dp(activity, 10), dp(activity, 9));
+        searchArea.setBackgroundColor(0xfff7f7f7);
+        root.addView(searchArea, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+
+        RelativeLayout searchBar = new RelativeLayout(activity);
+        searchBar.setBackground(roundedDrawable(0xffffffff, 0xffd8dbe0, dp(activity, 22)));
+        searchArea.addView(searchBar, new LinearLayout.LayoutParams(-1, dp(activity, 38)));
+
+        ImageView searchIcon = new ImageView(activity);
+        int searchIconId = resources.getIdentifier("search_icon", "drawable", SETTINGS_PKG);
+        if (searchIconId != 0) {
+            searchIcon.setImageDrawable(resources.getDrawable(searchIconId));
+        }
+        searchIcon.setAlpha(0.45f);
+        RelativeLayout.LayoutParams searchIconLp = new RelativeLayout.LayoutParams(dp(activity, 23), dp(activity, 23));
+        searchIconLp.leftMargin = dp(activity, 12);
+        searchIconLp.addRule(RelativeLayout.CENTER_VERTICAL);
+        searchBar.addView(searchIcon, searchIconLp);
+
+        final EditText query = new EditText(activity);
+        query.setSingleLine(true);
+        query.setHint("搜索本机和在线内容");
+        query.setTextColor(0xff3f4656);
+        query.setHintTextColor(0xffc6cbd1);
+        query.setTextSize(17);
+        query.setIncludeFontPadding(false);
+        query.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+        query.setPadding(dp(activity, 2), 0, dp(activity, 2), dp(activity, 1));
+        query.setBackgroundColor(Color.TRANSPARENT);
+        query.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        query.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        RelativeLayout.LayoutParams queryLp = new RelativeLayout.LayoutParams(-1, -1);
+        queryLp.leftMargin = dp(activity, 46);
+        queryLp.rightMargin = dp(activity, 45);
+        searchBar.addView(query, queryLp);
+
+        TextView clearButton = new TextView(activity);
+        clearButton.setText("×");
+        clearButton.setGravity(Gravity.CENTER);
+        clearButton.setTextColor(0xff8d939b);
+        clearButton.setTextSize(24);
+        clearButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        RelativeLayout.LayoutParams clearLp = new RelativeLayout.LayoutParams(dp(activity, 42), -1);
+        clearLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+        clearLp.addRule(RelativeLayout.CENTER_VERTICAL);
+        searchBar.addView(clearButton, clearLp);
+
+        final LinearLayout emptyPanel = new LinearLayout(activity);
+        emptyPanel.setOrientation(LinearLayout.VERTICAL);
+        emptyPanel.setPadding(0, dp(activity, 22), 0, 0);
+        root.addView(emptyPanel, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        final HorizontalScrollView commonScroll = new HorizontalScrollView(activity);
+        commonScroll.setHorizontalScrollBarEnabled(false);
+        commonScroll.setFillViewport(true);
+        commonScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        LinearLayout commonApps = new LinearLayout(activity);
+        commonApps.setOrientation(LinearLayout.HORIZONTAL);
+        commonApps.setGravity(Gravity.CENTER);
+        commonScroll.addView(commonApps, new HorizontalScrollView.LayoutParams(-2, -1));
+        emptyPanel.addView(commonScroll, new LinearLayout.LayoutParams(-1, dp(activity, 96)));
+        int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+        final int commonItemWidth = Math.max(dp(activity, 68), screenWidth / 4);
+        int appCount = Math.min(20, all.size());
+        for (int i = 0; i < appCount; i++) {
+            LinearLayout.LayoutParams shortcutLp = new LinearLayout.LayoutParams(commonItemWidth, -1);
+            commonApps.addView(searchShortcut(activity, all.get(i), commonItemWidth), shortcutLp);
+        }
+        commonScroll.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent event) {
+                int action = event.getActionMasked();
+                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                    commonScroll.postDelayed(new Runnable() {
+                        public void run() {
+                            int target = Math.round(commonScroll.getScrollX() / (float) commonItemWidth)
+                                    * commonItemWidth;
+                            commonScroll.smoothScrollTo(target, 0);
+                        }
+                    }, 80);
+                }
+                return false;
+            }
+        });
+
+        RelativeLayout historyTitle = new RelativeLayout(activity);
+        TextView history = new TextView(activity);
+        history.setText("搜索历史");
+        history.setTextSize(16);
+        history.setTextColor(0xffa2a7ae);
+        history.setGravity(Gravity.CENTER_VERTICAL);
+        RelativeLayout.LayoutParams historyLp = new RelativeLayout.LayoutParams(-2, dp(activity, 28));
+        historyLp.leftMargin = dp(activity, 28);
+        historyLp.addRule(RelativeLayout.CENTER_VERTICAL);
+        historyTitle.addView(history, historyLp);
+        TextView historyClear = new TextView(activity);
+        historyClear.setText("×");
+        historyClear.setGravity(Gravity.CENTER);
+        historyClear.setTextSize(14);
+        historyClear.setTypeface(Typeface.DEFAULT_BOLD);
+        historyClear.setTextColor(0xff9da3aa);
+        historyClear.setBackground(roundedDrawable(0xffffffff, 0xffdde2e8, dp(activity, 11)));
+        RelativeLayout.LayoutParams historyClearLp = new RelativeLayout.LayoutParams(dp(activity, 22), dp(activity, 22));
+        historyClearLp.rightMargin = dp(activity, 28);
+        historyClearLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+        historyClearLp.addRule(RelativeLayout.CENTER_VERTICAL);
+        historyTitle.addView(historyClear, historyClearLp);
+        emptyPanel.addView(historyTitle, new LinearLayout.LayoutParams(-1, dp(activity, 50)));
+
+        final LinearLayout chipBox = new LinearLayout(activity);
+        chipBox.setOrientation(LinearLayout.VERTICAL);
+        chipBox.setPadding(dp(activity, 20), 0, dp(activity, 20), 0);
+        emptyPanel.addView(chipBox, new LinearLayout.LayoutParams(-1, -2));
+        addSearchHistoryChips(activity, chipBox, all);
+        historyClear.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                clearSearchHistory(activity);
+                for (SearchEntry entry : all) {
+                    entry.historyRank = -1;
+                }
+                chipBox.removeAllViews();
+            }
+        });
+
+        final LinearLayout resultPanel = new LinearLayout(activity);
+        resultPanel.setOrientation(LinearLayout.VERTICAL);
+        resultPanel.setVisibility(View.GONE);
+        root.addView(resultPanel, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        TextView appGroupTitle = new TextView(activity);
+        appGroupTitle.setText("应用程序");
+        appGroupTitle.setTextColor(0xffa4a9b0);
+        appGroupTitle.setTextSize(15);
+        appGroupTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        appGroupTitle.setGravity(Gravity.CENTER_VERTICAL);
+        appGroupTitle.setPadding(dp(activity, 22), 0, 0, 0);
+        appGroupTitle.setBackgroundColor(0xfff3f4f5);
+        resultPanel.addView(appGroupTitle, new LinearLayout.LayoutParams(-1, dp(activity, 40)));
+
+        final ListView list = new ListView(activity);
+        list.setDividerHeight(1);
+        list.setDivider(new android.graphics.drawable.ColorDrawable(0xffececef));
+        list.setCacheColorHint(Color.TRANSPARENT);
+        list.setBackgroundColor(0xffffffff);
+        list.setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        resultPanel.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        final SearchAdapter adapter = new SearchAdapter(activity, context, resources, visible);
+        list.setAdapter(adapter);
+
+        clearButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (query.getText() != null && query.getText().length() > 0) {
+                    query.setText("");
+                } else {
+                    activity.finish();
+                }
+            }
+        });
+
+        activity.setContentView(root);
+        query.addTextChangedListener(new TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String text = s == null ? "" : s.toString();
+                filterSearchEntries(text, all, visible, adapter);
+                boolean searching = text.trim().length() > 0;
+                emptyPanel.setVisibility(searching ? View.GONE : View.VISIBLE);
+                resultPanel.setVisibility(searching ? View.VISIBLE : View.GONE);
+            }
+
+            public void afterTextChanged(Editable s) {
+            }
+        });
+        query.requestFocus();
+        query.postDelayed(new Runnable() {
+            public void run() {
+                Object service = activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (service instanceof InputMethodManager) {
+                    ((InputMethodManager) service).showSoftInput(query, InputMethodManager.SHOW_IMPLICIT);
+                }
+            }
+        }, 250);
+    }
+
+    private static Drawable roundedDrawable(int color, int strokeColor, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radius);
+        drawable.setStroke(1, strokeColor);
+        return drawable;
+    }
+
+    private static View searchShortcut(final Activity activity, final SearchEntry entry, int itemWidth) {
+        LinearLayout item = new LinearLayout(activity);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setClickable(true);
+        item.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                launchSearchEntry(activity, entry);
+            }
+        });
+
+        ImageView icon = new ImageView(activity);
+        icon.setImageDrawable(entry.icon);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        item.addView(icon, new LinearLayout.LayoutParams(dp(activity, 42), dp(activity, 42)));
+
+        TextView label = new TextView(activity);
+        label.setText(entry.label);
+        label.setTextSize(11);
+        label.setTextColor(0xff2f3440);
+        label.setGravity(Gravity.CENTER);
+        label.setSingleLine(true);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        int labelWidth = Math.max(dp(activity, 58), Math.min(itemWidth - dp(activity, 8), dp(activity, 78)));
+        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(labelWidth, dp(activity, 24));
+        labelLp.topMargin = dp(activity, 5);
+        item.addView(label, labelLp);
+        return item;
+    }
+
+    private static void addSearchHistoryChips(final Activity activity, LinearLayout chipBox,
+                                              ArrayList<SearchEntry> entries) {
+        LinearLayout row = null;
+        int added = 0;
+        for (int i = 0; i < entries.size() && added < 8; i++) {
+            final SearchEntry entry = entries.get(i);
+            if (entry.historyRank < 0) {
+                continue;
+            }
+            if (added % 4 == 0) {
+                row = new LinearLayout(activity);
+                row.setGravity(Gravity.LEFT);
+                chipBox.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 40)));
+            }
+            LinearLayout chip = new LinearLayout(activity);
+            chip.setOrientation(LinearLayout.HORIZONTAL);
+            chip.setGravity(Gravity.CENTER);
+            chip.setPadding(dp(activity, 10), 0, dp(activity, 12), 0);
+            chip.setBackground(roundedDrawable(0xffffffff, 0xffd8dde4, dp(activity, 8)));
+            ImageView icon = new ImageView(activity);
+            icon.setImageDrawable(entry.icon);
+            icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(activity, 20), dp(activity, 20));
+            iconLp.rightMargin = dp(activity, 7);
+            chip.addView(icon, iconLp);
+
+            TextView text = new TextView(activity);
+            text.setText(entry.label);
+            text.setSingleLine(true);
+            text.setEllipsize(TextUtils.TruncateAt.END);
+            text.setTextSize(14);
+            text.setTextColor(0xff565d68);
+            text.setGravity(Gravity.CENTER_VERTICAL);
+            chip.addView(text, new LinearLayout.LayoutParams(-2, -1));
+            chip.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    launchSearchEntry(activity, entry);
+                }
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(activity, 30));
+            lp.leftMargin = dp(activity, 4);
+            lp.rightMargin = dp(activity, 4);
+            if (row != null) {
+                row.addView(chip, lp);
+            }
+            added++;
+        }
+    }
+
+    private static void launchSearchEntry(Activity activity, SearchEntry entry) {
+        try {
+            recordSearchHistory(activity, entry);
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setClassName(entry.packageName, entry.className);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            if (isDoppelgangerUserId(entry.userId)) {
+                startActivityForUser(activity, intent, null, entry.userId);
+            } else {
+                activity.startActivity(intent);
+            }
+            activity.finish();
+        } catch (Throwable t) {
+            Toast.makeText(activity, "无法启动应用", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private static void loadSearchEntries(Context context, ArrayList<SearchEntry> out) {
+        out.clear();
+        try {
+            PackageManager pm = context.getPackageManager();
+            final ArrayList<String> history = readSearchHistory(context);
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            List<ResolveInfo> infos = queryLauncherActivitiesWithProfiles(pm, intent, 0);
+            for (ResolveInfo info : infos) {
+                if (info == null || info.activityInfo == null) {
+                    continue;
+                }
+                String pkg = info.activityInfo.packageName;
+                String cls = info.activityInfo.name;
+                if (pkg == null || cls == null) {
+                    continue;
+                }
+                CharSequence label = info.loadLabel(pm);
+                int userId = userIdForResolveInfo(info);
+                Drawable icon = loadIcon(info, pm);
+                if (icon == null) {
+                    icon = info.loadIcon(pm);
+                }
+                if (isDoppelgangerUserId(userId)) {
+                    icon = doppelgangerBadgeDrawable(icon, pm, null);
+                }
+                String title = label == null ? pkg : label.toString();
+                SearchEntry entry = new SearchEntry(title, pkg, cls, userId, icon);
+                entry.historyRank = history.indexOf(entry.key);
+                out.add(entry);
+            }
+            Collections.sort(out, new Comparator<SearchEntry>() {
+                public int compare(SearchEntry a, SearchEntry b) {
+                    if (a.historyRank != b.historyRank) {
+                        if (a.historyRank < 0) return 1;
+                        if (b.historyRank < 0) return -1;
+                        return a.historyRank - b.historyRank;
+                    }
+                    int byLabel = a.label.compareToIgnoreCase(b.label);
+                    if (byLabel != 0) {
+                        return byLabel;
+                    }
+                    return a.userId - b.userId;
+                }
+            });
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void filterSearchEntries(String query, ArrayList<SearchEntry> all,
+                                            ArrayList<SearchEntry> visible, SearchAdapter adapter) {
+        visible.clear();
+        String needle = query == null ? "" : query.trim().toLowerCase();
+        adapter.setQuery(needle);
+        for (SearchEntry entry : all) {
+            int score = scoreSearchEntry(needle, entry);
+            if (score >= 0) {
+                entry.lastScore = score;
+                visible.add(entry);
+            }
+        }
+        Collections.sort(visible, new Comparator<SearchEntry>() {
+            public int compare(SearchEntry a, SearchEntry b) {
+                if (a.lastScore != b.lastScore) {
+                    return a.lastScore - b.lastScore;
+                }
+                if (a.historyRank != b.historyRank) {
+                    if (a.historyRank < 0) return 1;
+                    if (b.historyRank < 0) return -1;
+                    return a.historyRank - b.historyRank;
+                }
+                return a.label.compareToIgnoreCase(b.label);
+            }
+        });
+        adapter.notifyDataSetChanged();
+    }
+
+    private static int scoreSearchEntry(String needle, SearchEntry entry) {
+        if (needle == null || needle.length() == 0) {
+            return 0;
+        }
+        boolean t9 = isDigitQuery(needle);
+        if (entry.labelLower.equals(needle)) return 0;
+        if (entry.labelLower.startsWith(needle)) return 10;
+        if (entry.pinyinCompact.startsWith(needle)) return 15;
+        if (entry.initials.startsWith(needle)) return 16;
+        if (entry.packageName.toLowerCase().contains(needle)) return 28;
+        if (entry.labelLower.contains(needle)) return 32;
+        if (entry.pinyinCompact.contains(needle)) return 36;
+        if (entry.pinyinSpaced.contains(needle)) return 38;
+        if (entry.initials.contains(needle)) return 40;
+        if (t9 && entry.t9Code.indexOf(needle) >= 0) return 45;
+        return -1;
+    }
+
+    private static ArrayList<String> readSearchHistory(Context context) {
+        ArrayList<String> out = new ArrayList<String>();
+        try {
+            String raw = context.getSharedPreferences(SEARCH_PREFS, Context.MODE_PRIVATE)
+                    .getString(SEARCH_HISTORY_KEY, "");
+            if (raw == null || raw.length() == 0) {
+                return out;
+            }
+            String[] parts = raw.split("\\|");
+            for (String part : parts) {
+                if (part != null && part.length() > 0 && !out.contains(part)) {
+                    out.add(part);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
+    private static void recordSearchHistory(Context context, SearchEntry entry) {
+        if (context == null || entry == null) {
+            return;
         }
         try {
-            downloadQuickSearchApk(context);
-            return true;
-        } catch (Throwable t) {
-            if (!markPrompted) {
-                Toast.makeText(context, "无法下载内置搜索：" + shortError(t), Toast.LENGTH_SHORT).show();
+            ArrayList<String> history = readSearchHistory(context);
+            history.remove(entry.key);
+            history.add(0, entry.key);
+            while (history.size() > 16) {
+                history.remove(history.size() - 1);
             }
-            return false;
+            StringBuilder raw = new StringBuilder();
+            for (int i = 0; i < history.size(); i++) {
+                if (i > 0) {
+                    raw.append('|');
+                }
+                raw.append(history.get(i));
+            }
+            context.getSharedPreferences(SEARCH_PREFS, Context.MODE_PRIVATE).edit()
+                    .putString(SEARCH_HISTORY_KEY, raw.toString()).apply();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void clearSearchHistory(Context context) {
+        if (context == null) {
+            return;
+        }
+        try {
+            context.getSharedPreferences(SEARCH_PREFS, Context.MODE_PRIVATE).edit()
+                    .remove(SEARCH_HISTORY_KEY).apply();
+        } catch (Throwable ignored) {
         }
     }
 
@@ -1665,13 +2171,84 @@ public final class MaintainedLauncherSettingsHost {
         return decodeUriBitmap(context, Uri.parse(uri), 1440);
     }
 
+    public static Drawable transparentWallpaperDrawableFallback(Context context) {
+        try {
+            WallpaperManager manager = WallpaperManager.getInstance(context);
+            if (manager != null) {
+                try {
+                    Drawable drawable = manager.peekDrawable();
+                    if (drawable != null) {
+                        return drawable;
+                    }
+                } catch (Throwable ignored) {
+                }
+                try {
+                    Drawable drawable = manager.getFastDrawable();
+                    if (drawable != null) {
+                        return drawable;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            Bitmap bitmap = decodeLauncherWallpaperBitmap(context, currentLauncherWallpaperUri(context));
+            if (bitmap == null) {
+                return null;
+            }
+            Bitmap cropped = centerCropToScreen(context, bitmap);
+            return new BitmapDrawable(context.getResources(), cropped == null ? bitmap : cropped);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Bitmap centerCropToScreen(Context context, Bitmap source) {
+        if (context == null || source == null || source.isRecycled()) {
+            return source;
+        }
+        int width = 0;
+        int height = 0;
+        try {
+            Point point = new Point();
+            WindowManager manager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+            if (manager != null && manager.getDefaultDisplay() != null) {
+                manager.getDefaultDisplay().getRealSize(point);
+                width = point.x;
+                height = point.y;
+            }
+        } catch (Throwable ignored) {
+        }
+        if (width <= 0 || height <= 0) {
+            try {
+                width = context.getResources().getDisplayMetrics().widthPixels;
+                height = context.getResources().getDisplayMetrics().heightPixels;
+            } catch (Throwable ignored) {
+            }
+        }
+        if (width <= 0 || height <= 0 || source.getWidth() <= 0 || source.getHeight() <= 0) {
+            return source;
+        }
+        float scale = Math.max(width / (float) source.getWidth(), height / (float) source.getHeight());
+        int scaledWidth = Math.round(source.getWidth() * scale);
+        int scaledHeight = Math.round(source.getHeight() * scale);
+        Rect src = new Rect(0, 0, source.getWidth(), source.getHeight());
+        RectF dst = new RectF((width - scaledWidth) / 2f, (height - scaledHeight) / 2f,
+                (width + scaledWidth) / 2f, (height + scaledHeight) / 2f);
+        Bitmap result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+        canvas.drawBitmap(source, src, dst, paint);
+        return result;
+    }
+
     public static String currentLauncherWallpaperUri(Context context) {
         return selectedWallpaperUri(context);
     }
 
     public static boolean isLauncherWallpaperTheme(Context context) {
         String id = currentTheme(context);
-        return "smartisan_theme_aero".equals(id);
+        return "smartisan_theme_aero".equals(id)
+                || "smartisan_theme_trans".equals(id)
+                || isTransparentThemeEnabled(context);
     }
 
     private static Bitmap decodeUriBitmap(Context context, Uri uri, int target) {
@@ -1738,6 +2315,7 @@ public final class MaintainedLauncherSettingsHost {
             SettingItemTextVertical settingItem = (SettingItemTextVertical) item;
             bindIconFrame(resources, settingItem);
             settingItem.setIconFrameVisible(false);
+            settingItem.setSubTitle("仅对毛玻璃 / 透明主题生效");
             Bitmap selected = selectedWallpaperThumbnail(context);
             if (selected != null) {
                 settingItem.setPreviewIconBitmap(thumbnailFramedPreviewBitmap(resources, selected));
@@ -1988,7 +2566,7 @@ public final class MaintainedLauncherSettingsHost {
                                 "从系统图片选择器选择桌面壁纸",
                                 "恢复锤子桌面内置背景"
                         });
-                replaceSimpleListWithScroll(activity, context, resources, list, adapter,
+                View wallpaperScroll = replaceSimpleListWithScroll(activity, context, resources, list, adapter,
                         new View.OnClickListener[]{
                                 new View.OnClickListener() {
                                     public void onClick(View v) {
@@ -2001,11 +2579,56 @@ public final class MaintainedLauncherSettingsHost {
                                     }
                                 }
                         });
+                if (isTransparentThemeEnabled(activity)) {
+                    addWallpaperBlurSwitch(activity, context, resources, wallpaperScroll);
+                }
             }
             tuneScrollBars(root);
             activity.setContentView(root);
         } catch (Throwable t) {
             showFailure(activity, t);
+        }
+    }
+
+    private static void addWallpaperBlurSwitch(final Activity activity, SettingsResourceContext context,
+                                               Resources resources, View replacedList) {
+        if (!(replacedList instanceof ViewGroup)) {
+            return;
+        }
+        ViewGroup scroll = (ViewGroup) replacedList;
+        if (scroll.getChildCount() == 0 || !(scroll.getChildAt(0) instanceof LinearLayout)) {
+            return;
+        }
+        LinearLayout content = (LinearLayout) scroll.getChildAt(0);
+        final SettingItemSwitch item = new SettingItemSwitch(context);
+        item.setTitle("桌面壁纸模糊效果");
+        item.setChecked(readSystemBool(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false));
+        setBackground(item, resources, "selector_setting_sub_item_bg_single");
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(context, 72));
+        lp.topMargin = dp(context, 12);
+        content.addView(item, lp);
+        View.OnClickListener listener = new View.OnClickListener() {
+            public void onClick(View v) {
+                boolean next = !item.isChecked();
+                item.setCheckedAnimated(next);
+                writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, next);
+                applyTransparentWallpaperBlur(activity);
+            }
+        };
+        item.setOnClickListener(listener);
+        if (item.getSwitch() != null) {
+            item.getSwitch().setClickable(true);
+            item.getSwitch().setOnTouchListener(new View.OnTouchListener() {
+                public boolean onTouch(View v, MotionEvent event) {
+                    if (event.getAction() == MotionEvent.ACTION_UP) {
+                        boolean next = !item.isChecked();
+                        item.setCheckedAnimated(next);
+                        writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, next);
+                        applyTransparentWallpaperBlur(activity);
+                    }
+                    return true;
+                }
+            });
         }
     }
 
@@ -2070,12 +2693,12 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void replaceSimpleListWithScroll(Activity activity, SettingsResourceContext context,
+    private static ScrollView replaceSimpleListWithScroll(Activity activity, SettingsResourceContext context,
                                                     Resources resources, ListView list, SimpleTextAdapter adapter,
                                                     View.OnClickListener[] listeners) {
         ViewGroup parent = (ViewGroup) list.getParent();
         if (parent == null) {
-            return;
+            return null;
         }
         int index = parent.indexOfChild(list);
         ViewGroup.LayoutParams listLp = list.getLayoutParams();
@@ -2108,6 +2731,7 @@ public final class MaintainedLauncherSettingsHost {
                 }
             });
         }
+        return scroll;
     }
 
     private static void replaceIconListWithScroll(Activity activity, SettingsResourceContext context,
@@ -2386,16 +3010,7 @@ public final class MaintainedLauncherSettingsHost {
             return;
         }
         final SettingItemSwitch item = (SettingItemSwitch) view;
-        boolean checked = readSystemBool(context, key, def);
-        if (KEY_SEARCH_PAGE_ENABLED.equals(key) && checked) {
-            PackageManager pm = context.getPackageManager();
-            if (pm == null || !isPackageInstalled(pm, QUICK_SEARCH_PKG)) {
-                checked = false;
-                writeBoolSetting(context, key, false);
-                applyLauncherSettingChange(context, key);
-            }
-        }
-        item.setChecked(checked);
+        item.setChecked(readSystemBool(context, key, def));
         item.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 toggleBoundSwitch(context, item, key);
@@ -2414,68 +3029,322 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void toggleBoundSwitch(Context context, SettingItemSwitch item, String key) {
-        boolean next = !item.isChecked();
-        if (KEY_SEARCH_PAGE_ENABLED.equals(key) && next) {
-            PackageManager pm = context.getPackageManager();
-            if (pm == null || !isPackageInstalled(pm, QUICK_SEARCH_PKG)) {
-                item.setCheckedAnimated(false);
-                writeBoolSetting(context, key, false);
-                applyLauncherSettingChange(context, key);
-                Toast.makeText(context, "请先安装内置搜索", Toast.LENGTH_SHORT).show();
-                promptBundledQuickSearchInstall(context, false);
-                return;
-            }
-        }
-        item.setCheckedAnimated(next);
-        writeBoolSetting(context, key, next);
-        applyLauncherSettingChange(context, key);
-    }
-
-    private static void bindQuickSearchInstallRow(final Activity activity, final Resources resources, View root) {
-        final View row = find(resources, root, "item_id_quick_search_install");
-        final View button = find(resources, root, "quick_search_install_button");
-        if (row == null) {
+    private static void bindTransparentThemeSwitch(final Activity activity, Resources resources, View root) {
+        View view = find(resources, root, "item_id_transparent_theme");
+        if (!(view instanceof SettingItemSwitch)) {
             return;
         }
-        updateQuickSearchInstallRow(activity, resources, button);
-        row.setOnClickListener(new View.OnClickListener() {
+        final SettingItemSwitch item = (SettingItemSwitch) view;
+        item.setChecked(isTransparentThemeEnabled(activity));
+        View.OnClickListener listener = new View.OnClickListener() {
             public void onClick(View v) {
-                PackageManager pm = activity.getPackageManager();
-                if (pm != null && isPackageInstalled(pm, QUICK_SEARCH_PKG)) {
-                    Toast.makeText(activity, "内置搜索已安装", Toast.LENGTH_SHORT).show();
-                    updateQuickSearchInstallRow(activity, resources, button);
-                    return;
-                }
-                if (promptBundledQuickSearchInstall(activity, false)) {
-                    updateQuickSearchInstallRow(activity, resources, button);
-                }
+                toggleTransparentTheme(activity, item);
             }
-        });
-        if (button != null) {
-            button.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    row.performClick();
+        };
+        item.setOnClickListener(listener);
+        if (item.getSwitch() != null) {
+            item.getSwitch().setClickable(true);
+            item.getSwitch().setOnTouchListener(new View.OnTouchListener() {
+                public boolean onTouch(View v, MotionEvent event) {
+                    if (event.getAction() == MotionEvent.ACTION_UP) {
+                        toggleTransparentTheme(activity, item);
+                    }
+                    return true;
                 }
             });
         }
     }
 
-    private static void updateQuickSearchInstallRow(Context context, Resources resources, View button) {
-        if (!(button instanceof TextView)) {
+    private static void toggleTransparentTheme(Activity activity, SettingItemSwitch item) {
+        boolean next = !readTransparentModeSetting(activity);
+        if (next && !packageInstalled(activity, "com.smartisanos.launcher.theme.trans")) {
+            item.setChecked(false);
+            Toast.makeText(activity, "透明主题包未安装", Toast.LENGTH_SHORT).show();
             return;
         }
-        boolean installed = false;
+        item.setCheckedAnimated(next);
+        applyTransparentThemeSetting(activity, next, true);
+    }
+
+    private static boolean isTransparentThemeEnabled(Context context) {
+        return readTransparentModeSetting(context);
+    }
+
+    private static void applyTransparentThemeSetting(Context context) {
+        applyTransparentThemeRuntimeFlags(context);
+    }
+
+    private static void applyTransparentThemeSetting(Activity activity, boolean transparent, boolean animate) {
+        String targetTheme;
+        if (transparent) {
+            ensureTransparentThemeRegistered(activity);
+            forceDefaultPageAnimation(activity);
+            String current = currentTheme(activity);
+            if (!"smartisan_theme_trans".equals(current)) {
+                saveTransparentPreviousTheme(activity, current);
+            }
+            targetTheme = current;
+            if (targetTheme == null || targetTheme.length() == 0 || "smartisan_theme_trans".equals(targetTheme)) {
+                targetTheme = readTransparentPreviousTheme(activity);
+            }
+            if (targetTheme == null || targetTheme.length() == 0 || "smartisan_theme_trans".equals(targetTheme)) {
+                targetTheme = "smartisan_theme_black";
+            }
+        } else {
+            writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false);
+            targetTheme = readTransparentPreviousTheme(activity);
+            if (targetTheme == null || targetTheme.length() == 0 || "smartisan_theme_trans".equals(targetTheme)) {
+                targetTheme = "smartisan_theme_black";
+            }
+        }
+        writeTransparentModeSetting(activity, transparent);
+        if (!transparent) {
+            storeThemeSelection(activity, targetTheme);
+        }
+        if (transparent) {
+            ensureTransparentThemeRegistered(activity);
+        }
+        applyTransparentThemeRuntimeFlags(activity, transparent);
+        Toast.makeText(activity, transparent ? "正在应用透明主题" : "正在恢复桌面主题", Toast.LENGTH_SHORT).show();
+        if (animate) {
+            restartLauncher(activity);
+        } else {
+            reloadOriginalSettings(activity);
+            rebuildLauncherLayoutForIconSize();
+            applyIconChange(activity);
+        }
+    }
+
+    private static void applyTransparentThemeRuntimeFlags(Context context) {
+        applyTransparentThemeRuntimeFlags(context, isTransparentThemeEnabled(context));
+    }
+
+    private static void applyTransparentThemeRuntimeFlags(Context context, boolean transparent) {
+        boolean blur = transparent && readSystemBool(context, KEY_TRANSPARENT_WALLPAPER_BLUR, false);
+        if (transparent) {
+            ensureTransparentThemeRegistered(context);
+        }
         try {
-            PackageManager pm = context.getPackageManager();
-            installed = pm != null && isPackageInstalled(pm, QUICK_SEARCH_PKG);
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            constants.getField("isTransparentTheme").setBoolean(null, transparent);
+            constants.getField("isTransWallpaperBlur").setBoolean(null, blur);
         } catch (Throwable ignored) {
         }
-        TextView text = (TextView) button;
-        text.setText(installed
-                ? getString(resources, "quick_search_installed_button", "Installed")
-                : getString(resources, "quick_search_install_button", "Install"));
-        text.setAlpha(installed ? 0.55f : 1.0f);
+        notifyOriginalConfigChanged(KEY_TRANSPARENT_THEME_ENABLED);
+        notifyOriginalConfigChanged(KEY_TRANSPARENT_WALLPAPER_BLUR);
+        reloadOriginalSettings(context);
+        rebuildLauncherLayoutForIconSize();
+        applyIconChange(context);
+    }
+
+    private static void applyTransparentWallpaperBlur(Context context) {
+        boolean transparent = isTransparentThemeEnabled(context);
+        boolean blur = transparent && readSystemBool(context, KEY_TRANSPARENT_WALLPAPER_BLUR, false);
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            constants.getField("isTransWallpaperBlur").setBoolean(null, blur);
+        } catch (Throwable ignored) {
+        }
+        notifyOriginalConfigChanged(KEY_TRANSPARENT_WALLPAPER_BLUR);
+        try {
+            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
+                    .getMethod("getInstance").invoke(null);
+            if (mainView != null) {
+                mainView.getClass().getMethod("lh").invoke(mainView);
+            }
+        } catch (Throwable ignored) {
+        }
+        refreshLauncherWallpaperSurface();
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                refreshLauncherWallpaperSurface();
+            }
+        }, 160);
+    }
+
+    private static boolean applyThemeViaOriginalLoading(final Activity activity, boolean transparent) {
+        try {
+            ensureTransparentThemeRegistered(activity);
+            try {
+                Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+                constants.getField("isTransparentTheme").setBoolean(null, transparent);
+                constants.getField("isTransWallpaperBlur").setBoolean(null,
+                        transparent && readSystemBool(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false));
+            } catch (Throwable ignored) {
+            }
+            reloadOriginalSettings(activity);
+            try {
+                Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+                constants.getField("isTransparentTheme").setBoolean(null, transparent);
+                constants.getField("isTransWallpaperBlur").setBoolean(null,
+                        transparent && readSystemBool(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false));
+            } catch (Throwable ignored) {
+            }
+            Class<?> manager = Class.forName("com.smartisanos.launcher.theme.X");
+            Method currentThemeMethod = manager.getDeclaredMethod("va", Context.class);
+            currentThemeMethod.setAccessible(true);
+            Object theme = currentThemeMethod.invoke(null, activity);
+            if (theme == null) {
+                theme = manager.getMethod("eg").invoke(null);
+            }
+            if (theme == null) {
+                Log.w(LOG_TAG, "Original theme loading skipped: current theme is null");
+                return false;
+            }
+            Log.i(LOG_TAG, "Original theme loading target: " + describeTheme(theme)
+                    + ", transparent=" + transparent);
+            Object launcher = Class.forName("com.smartisanos.launcher.J")
+                    .getMethod("getInstance").invoke(null);
+            if (launcher == null) {
+                Log.w(LOG_TAG, "Original theme loading skipped: launcher instance is null");
+                return false;
+            }
+            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
+                    .getMethod("getInstance").invoke(null);
+            if (mainView == null) {
+                Log.w(LOG_TAG, "Original theme loading skipped: launcher view is null");
+                return false;
+            }
+            String message = getString(activity.getResources(), "theme_changing", "Loading");
+            Class<?> themeClass = Class.forName("com.smartisanos.launcher.theme.v");
+            launcher.getClass()
+                    .getMethod("a", themeClass, String.class)
+                    .invoke(launcher, theme, message);
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                public void run() {
+                    try {
+                        activity.finish();
+                        activity.overridePendingTransition(0, 0);
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }, 120);
+            return true;
+        } catch (Throwable t) {
+            Log.w(LOG_TAG, "Original theme loading failed", t);
+            return false;
+        }
+    }
+
+    private static String describeTheme(Object theme) {
+        if (theme == null) {
+            return "null";
+        }
+        try {
+            Class<?> cls = theme.getClass();
+            Object id = cls.getField("mId").get(theme);
+            Object pkg = cls.getField("mPackage").get(theme);
+            Object res = cls.getField("mResources").get(theme);
+            return String.valueOf(id) + "/" + String.valueOf(pkg) + "/res=" + (res != null);
+        } catch (Throwable ignored) {
+            return String.valueOf(theme);
+        }
+    }
+
+    private static void saveTransparentPreviousTheme(Context context, String theme) {
+        if (theme == null || theme.length() == 0 || "smartisan_theme_trans".equals(theme)) {
+            return;
+        }
+        try {
+            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(PREF_TRANSPARENT_PREVIOUS_THEME, theme)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        try {
+            Settings.Global.putString(context.getContentResolver(), PREF_TRANSPARENT_PREVIOUS_THEME, theme);
+        } catch (Throwable ignored) {
+        }
+        try {
+            Settings.System.putString(context.getContentResolver(), PREF_TRANSPARENT_PREVIOUS_THEME, theme);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void ensureTransparentThemeRegistered(Context context) {
+        if (!packageInstalled(context, "com.smartisanos.launcher.theme.trans")) {
+            return;
+        }
+        try {
+            Class<?> themeClass = Class.forName("com.smartisanos.launcher.theme.v");
+            Object theme = themeClass.getConstructor(String.class).newInstance("smartisan_theme_trans");
+            themeClass.getField("mPackage").set(theme, "com.smartisanos.launcher.theme.trans");
+            themeClass.getField("mName").set(theme, "透明");
+            themeClass.getField("mResources").set(theme,
+                    context.getPackageManager().getResourcesForApplication("com.smartisanos.launcher.theme.trans"));
+
+            Class<?> manager = Class.forName("com.smartisanos.launcher.theme.X");
+            java.lang.reflect.Field themeMapField = manager.getDeclaredField("gu");
+            themeMapField.setAccessible(true);
+            Object themeMapValue = themeMapField.get(null);
+            if (themeMapValue instanceof Map) {
+                ((Map) themeMapValue).put("smartisan_theme_trans", theme);
+            }
+            java.lang.reflect.Field themeListField = manager.getDeclaredField("fu");
+            themeListField.setAccessible(true);
+            Object themeListValue = themeListField.get(null);
+            if (themeListValue instanceof List && !((List) themeListValue).contains("smartisan_theme_trans")) {
+                ((List) themeListValue).add("smartisan_theme_trans");
+            }
+            try {
+                java.lang.reflect.Field packageMapField = manager.getDeclaredField("hu");
+                packageMapField.setAccessible(true);
+                Object packageMapValue = packageMapField.get(null);
+                if (packageMapValue instanceof Map) {
+                    ((Map) packageMapValue).put("com.smartisanos.launcher.theme.trans", "smartisan_theme_trans");
+                }
+            } catch (Throwable ignored) {
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static String readTransparentPreviousTheme(Context context) {
+        try {
+            String value = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .getString(PREF_TRANSPARENT_PREVIOUS_THEME, "");
+            if (value != null && value.length() > 0 && !"smartisan_theme_trans".equals(value)) {
+                return value;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            String value = context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                    .getString(PREF_TRANSPARENT_PREVIOUS_THEME, "");
+            if (value != null && value.length() > 0 && !"smartisan_theme_trans".equals(value)) {
+                return value;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            String value = Settings.Global.getString(context.getContentResolver(), PREF_TRANSPARENT_PREVIOUS_THEME);
+            if (value != null && value.length() > 0 && !"smartisan_theme_trans".equals(value)) {
+                return value;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            String value = Settings.System.getString(context.getContentResolver(), PREF_TRANSPARENT_PREVIOUS_THEME);
+            if (value != null && value.length() > 0 && !"smartisan_theme_trans".equals(value)) {
+                return value;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            return context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .getString(PREF_TRANSPARENT_PREVIOUS_THEME, "smartisan_theme_black");
+        } catch (Throwable ignored) {
+            return "smartisan_theme_black";
+        }
+    }
+
+    private static void toggleBoundSwitch(Context context, SettingItemSwitch item, String key) {
+        boolean next = !item.isChecked();
+        item.setCheckedAnimated(next);
+        writeBoolSetting(context, key, next);
+        applyLauncherSettingChange(context, key);
     }
 
     private static void writeBoolSetting(Context context, String key, boolean value) {
@@ -2503,6 +3372,103 @@ public final class MaintainedLauncherSettingsHost {
                     .commit();
         } catch (Throwable ignored) {
         }
+    }
+
+    private static void writeOriginalBoolIntSetting(Context context, String key, boolean value) {
+        int intValue = value ? 1 : 0;
+        try {
+            Settings.Global.putInt(context.getContentResolver(), key, intValue);
+        } catch (Throwable ignored) {
+        }
+        try {
+            if (Build.VERSION.SDK_INT < 23 || Settings.System.canWrite(context)) {
+                Settings.System.putInt(context.getContentResolver(), key, intValue);
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(key, value)
+                    .putInt(key + "_int", intValue)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        try {
+            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(key, value)
+                    .putInt(key + "_int", intValue)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void writeTransparentModeSetting(Context context, boolean enabled) {
+        int value = enabled ? 1 : 0;
+        try {
+            Settings.Global.putInt(context.getContentResolver(), KEY_TRANSPARENT_THEME_ENABLED, value);
+        } catch (Throwable ignored) {
+        }
+        try {
+            if (Build.VERSION.SDK_INT < 23 || Settings.System.canWrite(context)) {
+                Settings.System.putInt(context.getContentResolver(), KEY_TRANSPARENT_THEME_ENABLED, value);
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_TRANSPARENT_THEME_ENABLED, enabled)
+                    .putInt(KEY_TRANSPARENT_THEME_ENABLED, value)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        try {
+            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_TRANSPARENT_THEME_ENABLED, enabled)
+                    .putInt(KEY_TRANSPARENT_THEME_ENABLED, value)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static boolean readTransparentModeSetting(Context context) {
+        if (context == null) {
+            return false;
+        }
+        try {
+            SharedPreferences prefs = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE);
+            if (prefs.contains(KEY_TRANSPARENT_THEME_ENABLED)) {
+                try {
+                    return prefs.getInt(KEY_TRANSPARENT_THEME_ENABLED, 0) == 1;
+                } catch (Throwable ignored) {
+                    return prefs.getBoolean(KEY_TRANSPARENT_THEME_ENABLED, false);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            SharedPreferences prefs = context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE);
+            if (prefs.contains(KEY_TRANSPARENT_THEME_ENABLED)) {
+                try {
+                    return prefs.getInt(KEY_TRANSPARENT_THEME_ENABLED, 0) == 1;
+                } catch (Throwable ignored) {
+                    return prefs.getBoolean(KEY_TRANSPARENT_THEME_ENABLED, false);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            return Settings.Global.getInt(context.getContentResolver(), KEY_TRANSPARENT_THEME_ENABLED, 0) == 1;
+        } catch (Throwable ignored) {
+        }
+        try {
+            return Settings.System.getInt(context.getContentResolver(), KEY_TRANSPARENT_THEME_ENABLED, 0) == 1;
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     private static void applyLauncherSettingChange(Context context, String key) {
@@ -2869,6 +3835,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void restartLauncher(final Context context) {
+        markThemeReloadLoadingPending(context, "正在加载桌面...");
         if (context instanceof Activity) {
             showRestartLoading((Activity) context);
         }
@@ -2886,6 +3853,112 @@ public final class MaintainedLauncherSettingsHost {
                 }
             }
         }, 420);
+    }
+
+    private static void restartLauncherByRecreate(final Activity activity) {
+        markThemeReloadLoadingPending(activity, "正在加载桌面...");
+        showRestartLoading(activity);
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                try {
+                    Intent intent = launcherActivityIntent(activity);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                    activity.startActivity(intent);
+                    try {
+                        activity.overridePendingTransition(0, 0);
+                    } catch (Throwable ignored) {
+                    }
+                    activity.finish();
+                    try {
+                        activity.overridePendingTransition(0, 0);
+                    } catch (Throwable ignored) {
+                    }
+                } catch (Throwable ignored) {
+                    restartLauncher(activity);
+                }
+            }
+        }, 420);
+    }
+
+    private static void markThemeReloadLoadingPending(Context context, String message) {
+        if (context == null) {
+            return;
+        }
+        if (message == null || message.length() == 0) {
+            message = "正在加载桌面...";
+        }
+        try {
+            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_THEME_RELOAD_LOADING_PENDING, true)
+                    .putString(PREF_THEME_RELOAD_LOADING_MESSAGE, message)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        try {
+            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_THEME_RELOAD_LOADING_PENDING, true)
+                    .putString(PREF_THEME_RELOAD_LOADING_MESSAGE, message)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static boolean consumeThemeReloadLoadingPending(Context context) {
+        boolean pending = false;
+        try {
+            pending = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .getBoolean(PREF_THEME_RELOAD_LOADING_PENDING, false);
+        } catch (Throwable ignored) {
+        }
+        if (!pending) {
+            try {
+                pending = context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                        .getBoolean(PREF_THEME_RELOAD_LOADING_PENDING, false);
+            } catch (Throwable ignored) {
+            }
+        }
+        return pending;
+    }
+
+    private static String themeReloadLoadingMessage(Context context) {
+        String message = "";
+        try {
+            message = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .getString(PREF_THEME_RELOAD_LOADING_MESSAGE, "");
+        } catch (Throwable ignored) {
+        }
+        if (message == null || message.length() == 0) {
+            try {
+                message = context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                        .getString(PREF_THEME_RELOAD_LOADING_MESSAGE, "");
+            } catch (Throwable ignored) {
+            }
+        }
+        return message == null || message.length() == 0 ? "正在加载桌面..." : message;
+    }
+
+    private static void clearThemeReloadLoadingPending(Context context) {
+        try {
+            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_THEME_RELOAD_LOADING_PENDING, false)
+                    .remove(PREF_THEME_RELOAD_LOADING_MESSAGE)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        try {
+            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_THEME_RELOAD_LOADING_PENDING, false)
+                    .remove(PREF_THEME_RELOAD_LOADING_MESSAGE)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void reloadOriginalSettings(Context context) {
@@ -3300,6 +4373,10 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showRestartLoading(Activity activity) {
+        showRestartLoading(activity, "正在重启桌面...", false);
+    }
+
+    private static void showRestartLoading(Activity activity, String message, boolean keepReference) {
         try {
             Class<?> dialogClass = Class.forName("smartisanos.app.SmartisanProgressDialog");
             Object dialog = dialogClass.getConstructor(Context.class).newInstance(activity);
@@ -3310,8 +4387,11 @@ public final class MaintainedLauncherSettingsHost {
             }
             dialogClass.getMethod("setCancelable", boolean.class).invoke(dialog, false);
             dialogClass.getMethod("setCanceledOnTouchOutside", boolean.class).invoke(dialog, false);
-            dialogClass.getMethod("setMessage", String.class).invoke(dialog, "正在重启桌面...");
+            dialogClass.getMethod("setMessage", String.class).invoke(dialog, message);
             dialogClass.getMethod("show").invoke(dialog);
+            if (keepReference && dialog instanceof Dialog) {
+                sLauncherReloadDialog = (Dialog) dialog;
+            }
         } catch (Throwable t) {
             try {
                 tuneWindowForLoading(activity);
@@ -3468,17 +4548,29 @@ public final class MaintainedLauncherSettingsHost {
     private static void cycleAnimation(Context context) {
         int current = readPageAnimation(context);
         int next = current == 0 ? 3 : (current == 3 ? 4 : (current == 4 ? 6 : 0));
+        if (isTransparentThemeEnabled(context)) {
+            next = 0;
+        }
         writePageAnimation(context, next);
         Toast.makeText(context, "桌面翻页动画：" + animName(next), Toast.LENGTH_SHORT).show();
     }
 
     private static void savePageAnimation(Activity activity, int value) {
-        writePageAnimation(activity, value);
-        refreshPageAnimation(value);
-        Toast.makeText(activity, "桌面翻页动画：" + animName(value), Toast.LENGTH_SHORT).show();
+        int target = isTransparentThemeEnabled(activity) ? 0 : value;
+        writePageAnimation(activity, target);
+        refreshPageAnimation(target);
+        Toast.makeText(activity, "桌面翻页动画：" + animName(target), Toast.LENGTH_SHORT).show();
+    }
+
+    private static void forceDefaultPageAnimation(Context context) {
+        writePageAnimation(context, 0);
+        refreshPageAnimation(0);
     }
 
     private static int readPageAnimation(Context context) {
+        if (isTransparentThemeEnabled(context)) {
+            return 0;
+        }
         try {
             return context.getSharedPreferences("com.smartisanos.launcher_prefs", 0)
                     .getInt("launcher_page_animation", readGlobal(context, "launcher_page_animation", 0));
@@ -3488,6 +4580,9 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void writePageAnimation(Context context, int value) {
+        if (isTransparentThemeEnabled(context)) {
+            value = 0;
+        }
         try {
             context.getSharedPreferences("com.smartisanos.launcher_prefs", 0)
                     .edit()
@@ -3552,6 +4647,26 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void applyTheme(Activity activity, String id, String pkg, String name) {
         pkg = normalizeThemePackage(activity, id, pkg);
+        if ("smartisan_theme_trans".equals(id)) {
+            ensureTransparentThemeRegistered(activity);
+            String current = currentTheme(activity);
+            if (current != null && current.length() > 0 && !"smartisan_theme_trans".equals(current)) {
+                saveTransparentPreviousTheme(activity, current);
+            }
+            writeTransparentModeSetting(activity, true);
+            applyTransparentThemeRuntimeFlags(activity);
+            Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                public void run() {
+                    restartLauncher(activity);
+                }
+            }, 120);
+            return;
+        } else {
+            writeTransparentModeSetting(activity, false);
+            writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false);
+            applyTransparentThemeRuntimeFlags(activity);
+        }
         boolean queued = queueThemeChangeForLauncher(id);
         if (queued) {
             Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
@@ -3564,22 +4679,7 @@ public final class MaintainedLauncherSettingsHost {
             return;
         }
         boolean stored = applyThemeViaOriginalStack(activity, id, pkg);
-        try {
-            SharedPreferences.Editor editor = activity.getSharedPreferences("com.smartisanos.launcher_prefs", 0).edit();
-            editor.putString("launcher_theme", id);
-            editor.putString("launcher_grid_theme", id);
-            editor.remove("launcher_theme_preview_res");
-            editor.commit();
-        } catch (Throwable ignored) {
-        }
-        try {
-            if (Build.VERSION.SDK_INT < 23 || Settings.System.canWrite(activity)) {
-                Settings.System.putString(activity.getContentResolver(), "launcher_theme", id);
-                Settings.System.putString(activity.getContentResolver(), "launcher_grid_theme", id);
-                Settings.System.putString(activity.getContentResolver(), "launcher_theme_preview_res", null);
-            }
-        } catch (Throwable ignored) {
-        }
+        storeThemeSelection(activity, id);
         Toast.makeText(activity, (stored ? "正在应用：" : "已记录：") + name, Toast.LENGTH_SHORT).show();
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             public void run() {
@@ -3698,6 +4798,35 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         return ok;
+    }
+
+    private static void storeThemeSelection(Context context, String id) {
+        try {
+            SharedPreferences.Editor editor = context.getSharedPreferences("com.smartisanos.launcher_prefs", 0).edit();
+            editor.putString("launcher_theme", id);
+            editor.remove("launcher_theme_preview_res");
+            editor.commit();
+        } catch (Throwable ignored) {
+        }
+        try {
+            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("launcher_theme", id)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        try {
+            if (Build.VERSION.SDK_INT < 23 || Settings.System.canWrite(context)) {
+                Settings.System.putString(context.getContentResolver(), "launcher_theme", id);
+                Settings.System.putString(context.getContentResolver(), "launcher_theme_preview_res", null);
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            Settings.Global.putString(context.getContentResolver(), "launcher_theme", id);
+            Settings.Global.putString(context.getContentResolver(), "launcher_theme_preview_res", null);
+        } catch (Throwable ignored) {
+        }
     }
 
     private static String normalizeThemePackage(Context context, String id, String pkg) {
@@ -4305,16 +5434,29 @@ public final class MaintainedLauncherSettingsHost {
                     String apkName = null;
                     JSONArray assets = release.optJSONArray("assets");
                     if (assets != null) {
+                        String fallbackApkUrl = null;
+                        String fallbackApkName = null;
                         for (int i = 0; i < assets.length(); i++) {
                             JSONObject asset = assets.optJSONObject(i);
                             if (asset == null) continue;
                             String assetName = asset.optString("name", "");
                             String downloadUrl = asset.optString("browser_download_url", "");
-                            if (assetName.toLowerCase().endsWith(".apk") && downloadUrl.length() > 0) {
+                            if (!isApkAssetName(assetName) || downloadUrl.length() == 0) {
+                                continue;
+                            }
+                            if (isLauncherUpdateApkName(assetName)) {
                                 apkName = assetName;
                                 apkUrl = downloadUrl;
                                 break;
                             }
+                            if (fallbackApkUrl == null && !isNonLauncherUpdateApkName(assetName)) {
+                                fallbackApkName = assetName;
+                                fallbackApkUrl = downloadUrl;
+                            }
+                        }
+                        if (apkUrl == null) {
+                            apkName = fallbackApkName;
+                            apkUrl = fallbackApkUrl;
                         }
                     }
                     final String finalApkUrl = apkUrl;
@@ -4328,7 +5470,7 @@ public final class MaintainedLauncherSettingsHost {
                             if (finalApkUrl == null) {
                                 showInfoDialog(activity, "检查更新",
                                         "已找到线上版本：" + finalName
-                                                + "\n但该 Release 没有 APK 安装包\n当前版本：" + appVersion(activity));
+                                                + "\n但该 Release 没有桌面主 APK 安装包\n当前版本：" + appVersion(activity));
                                 return;
                             }
                             if (same) {
@@ -4395,6 +5537,7 @@ public final class MaintainedLauncherSettingsHost {
         String text = json == null ? "" : json.trim();
         if (text.startsWith("[")) {
             JSONArray releases = new JSONArray(text);
+            JSONObject best = null;
             for (int i = 0; i < releases.length(); i++) {
                 JSONObject item = releases.optJSONObject(i);
                 if (item == null) {
@@ -4402,12 +5545,62 @@ public final class MaintainedLauncherSettingsHost {
                 }
                 String tag = item.optString("tag_name", "");
                 if (tag.startsWith("launcher-") || tag.startsWith("Launcher-")) {
-                    return item;
+                    if (best == null || compareVersionTag(tag, best.optString("tag_name", "")) > 0) {
+                        best = item;
+                    }
                 }
             }
-            return null;
+            return best;
         }
         return new JSONObject(text);
+    }
+
+    private static boolean isApkAssetName(String name) {
+        return name != null && name.toLowerCase().endsWith(".apk");
+    }
+
+    private static boolean isLauncherUpdateApkName(String name) {
+        if (!isApkAssetName(name) || isNonLauncherUpdateApkName(name)) {
+            return false;
+        }
+        String lower = name.toLowerCase();
+        return lower.contains("launcher") || lower.contains("smartisan");
+    }
+
+    private static boolean isNonLauncherUpdateApkName(String name) {
+        if (name == null) {
+            return true;
+        }
+        String lower = name.toLowerCase();
+        return lower.contains("quicksearch")
+                || lower.contains("quick_search")
+                || lower.contains("theme")
+                || lower.contains("trans");
+    }
+
+    private static int compareVersionTag(String left, String right) {
+        String[] a = normalizeVersionTag(left).split("[^0-9]+");
+        String[] b = normalizeVersionTag(right).split("[^0-9]+");
+        int count = Math.max(a.length, b.length);
+        for (int i = 0; i < count; i++) {
+            int ai = i < a.length ? parseVersionPart(a[i]) : 0;
+            int bi = i < b.length ? parseVersionPart(b[i]) : 0;
+            if (ai != bi) {
+                return ai > bi ? 1 : -1;
+            }
+        }
+        return normalizeVersionTag(left).compareToIgnoreCase(normalizeVersionTag(right));
+    }
+
+    private static int parseVersionPart(String part) {
+        if (part == null || part.length() == 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(part);
+        } catch (Throwable ignored) {
+            return 0;
+        }
     }
 
     private static boolean sameVersionTag(String online, String current) {
@@ -4565,8 +5758,9 @@ public final class MaintainedLauncherSettingsHost {
                     handler.post(new Runnable() {
                         public void run() {
                             dismissUpdateDownloadProgress(ui);
-                            cancelUpdateNotification(activity);
-                            Toast.makeText(activity, "更新包下载失败: " + shortError(t), Toast.LENGTH_LONG).show();
+                            String error = "下载失败: " + shortError(t);
+                            notifyUpdateDownload(activity, error, 0, true);
+                            Toast.makeText(activity, "更新包" + error, Toast.LENGTH_LONG).show();
                         }
                     });
                 } finally {
@@ -4730,6 +5924,52 @@ public final class MaintainedLauncherSettingsHost {
                 requestLauncherFrame(activity);
             }
         }, 260);
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                requestLauncherFrame(activity);
+                dismissPendingLauncherReloadLoading();
+            }
+        }, 1200);
+    }
+
+    public static void showPendingLauncherReloadLoading(final Activity activity) {
+        if (activity == null || !consumeThemeReloadLoadingPending(activity)) {
+            return;
+        }
+        String message = themeReloadLoadingMessage(activity);
+        clearThemeReloadLoadingPending(activity);
+        showRestartLoading(activity, message, true);
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                requestLauncherFrame(activity);
+            }
+        }, 320);
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                requestLauncherFrame(activity);
+            }
+        }, 760);
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                requestLauncherFrame(activity);
+                dismissPendingLauncherReloadLoading();
+            }
+        }, 1600);
+    }
+
+    private static void dismissPendingLauncherReloadLoading() {
+        Dialog dialog = sLauncherReloadDialog;
+        sLauncherReloadDialog = null;
+        if (dialog == null) {
+            return;
+        }
+        try {
+            if (dialog.isShowing()) {
+                dialog.dismiss();
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void requestLauncherFrame(Activity activity) {
@@ -5118,10 +6358,8 @@ public final class MaintainedLauncherSettingsHost {
             bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
             bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
             bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
-            bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
-            bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
-            bindSwitch(activity, resources, root, "item_id_search_page_enabled", KEY_SEARCH_PAGE_ENABLED, false);
-            bindQuickSearchInstallRow(activity, resources, root);
+            bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
+            bindSwitch(activity, resources, root, "item_id_search_page_enabled", KEY_SEARCH_PAGE_ENABLED, true);
             tuneScrollBars(root);
             activity.setContentView(root);
         } catch (Throwable t) {
@@ -5685,7 +6923,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static boolean isTransparentThemeWithWallpaper(Context context, boolean originalTransparentVal) {
-        return originalTransparentVal;
+        return originalTransparentVal || isTransparentThemeEnabled(context);
     }
 
     private static String currentTheme(Context context) {
@@ -5694,30 +6932,30 @@ public final class MaintainedLauncherSettingsHost {
             Object value = cls.getMethod("j", android.content.ContentResolver.class)
                     .invoke(null, context.getContentResolver());
             if (value instanceof String && ((String) value).length() > 0) {
-                return (String) value;
+                String theme = (String) value;
+                if (!"smartisan_theme_trans".equals(theme)) {
+                    return theme;
+                }
             }
         } catch (Throwable ignored) {
         }
         try {
-            String value = Settings.Global.getString(context.getContentResolver(), "launcher_grid_theme");
-            if (value != null && value.length() > 0) {
+            String value = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .getString("launcher_theme", "");
+            if (value != null && value.length() > 0 && !"smartisan_theme_trans".equals(value)) {
                 return value;
             }
         } catch (Throwable ignored) {
         }
         try {
-            String value = Settings.System.getString(context.getContentResolver(), "launcher_grid_theme");
-            if (value != null && value.length() > 0) {
+            String value = context.getSharedPreferences("com.smartisanos.launcher_prefs", 0)
+                    .getString("launcher_theme", "smartisan_theme_black");
+            if (value != null && value.length() > 0 && !"smartisan_theme_trans".equals(value)) {
                 return value;
             }
         } catch (Throwable ignored) {
         }
-        try {
-            return context.getSharedPreferences("com.smartisanos.launcher_prefs", 0)
-                    .getString("launcher_grid_theme", "smartisan_theme_black");
-        } catch (Throwable ignored) {
-            return "smartisan_theme_black";
-        }
+        return "smartisan_theme_black";
     }
 
     private static View iconPageHeader(final Activity activity, SettingsResourceContext context, Resources resources) {
@@ -6270,6 +7508,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void restartLauncherForIconSizeChange(Activity activity) {
+        markThemeReloadLoadingPending(activity, "正在加载桌面...");
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_HOME);
@@ -8034,6 +9273,274 @@ public final class MaintainedLauncherSettingsHost {
     private static View byId(View root, Resources resources, String idName) {
         int id = resources.getIdentifier(idName, "id", SETTINGS_PKG);
         return id == 0 ? null : root.findViewById(id);
+    }
+
+    private static final class SearchAdapter extends BaseAdapter {
+        private final Activity activity;
+        private final SettingsResourceContext context;
+        private final Resources resources;
+        private final ArrayList<SearchEntry> entries;
+        private String query = "";
+
+        SearchAdapter(Activity activity, SettingsResourceContext context, Resources resources,
+                      ArrayList<SearchEntry> entries) {
+            this.activity = activity;
+            this.context = context;
+            this.resources = resources;
+            this.entries = entries;
+        }
+
+        public int getCount() {
+            return entries.size();
+        }
+
+        public Object getItem(int position) {
+            return entries.get(position);
+        }
+
+        public long getItemId(int position) {
+            return position;
+        }
+
+        void setQuery(String query) {
+            this.query = query == null ? "" : query.trim().toLowerCase();
+        }
+
+        public View getView(int position, View convertView, ViewGroup parent) {
+            final SearchEntry entry = entries.get(position);
+            View row = convertView == null ? createSearchResultRow(activity) : convertView;
+
+            ImageView icon = (ImageView) row.findViewById(0x53500101);
+            if (icon != null) {
+                icon.setVisibility(View.VISIBLE);
+                icon.setImageDrawable(entry.icon);
+            }
+
+            TextView label = (TextView) row.findViewById(0x53500102);
+            if (label != null) {
+                label.setText(highlightMatch(entry.label, query));
+                label.setSingleLine(true);
+            }
+
+            row.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    launchSearchEntry(activity, entry);
+                }
+            });
+            return row;
+        }
+    }
+
+    private static View createSearchResultRow(Activity activity) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(activity, 27), 0, dp(activity, 24), 0);
+        row.setMinimumHeight(dp(activity, 56));
+        row.setLayoutParams(new AbsListView.LayoutParams(-1, dp(activity, 56)));
+        row.setBackground(searchRowBackground());
+
+        ImageView icon = new ImageView(activity);
+        icon.setId(0x53500101);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(activity, 42), dp(activity, 42));
+        row.addView(icon, iconLp);
+
+        TextView label = new TextView(activity);
+        label.setId(0x53500102);
+        label.setSingleLine(true);
+        label.setIncludeFontPadding(false);
+        label.setTextColor(0xff333743);
+        label.setTextSize(15);
+        label.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(0, -1, 1);
+        labelLp.leftMargin = dp(activity, 17);
+        row.addView(label, labelLp);
+        return row;
+    }
+
+    private static Drawable searchRowBackground() {
+        android.graphics.drawable.StateListDrawable states = new android.graphics.drawable.StateListDrawable();
+        GradientDrawable pressed = new GradientDrawable();
+        pressed.setColor(0xfff1f2f3);
+        pressed.setStroke(1, 0xffe6e8eb);
+        GradientDrawable normal = new GradientDrawable();
+        normal.setColor(0xffffffff);
+        normal.setStroke(1, 0xffececef);
+        states.addState(new int[]{android.R.attr.state_pressed}, pressed);
+        states.addState(new int[]{}, normal);
+        return states;
+    }
+
+    private static CharSequence highlightMatch(String label, String query) {
+        if (label == null || query == null || query.length() == 0) {
+            return label;
+        }
+        String lower = label.toLowerCase();
+        int index = lower.indexOf(query.toLowerCase());
+        if (index < 0) {
+            return label;
+        }
+        android.text.SpannableString span = new android.text.SpannableString(label);
+        span.setSpan(new android.text.style.ForegroundColorSpan(0xffd94b45),
+                index, Math.min(label.length(), index + query.length()),
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return span;
+    }
+
+    private static final class SearchEntry {
+        final String label;
+        final String labelLower;
+        final String packageName;
+        final String className;
+        final int userId;
+        final String key;
+        final String pinyinSpaced;
+        final String pinyinCompact;
+        final String initials;
+        final String t9Code;
+        final Drawable icon;
+        int historyRank = -1;
+        int lastScore;
+
+        SearchEntry(String label, String packageName, String className, int userId, Drawable icon) {
+            this.label = label;
+            this.labelLower = label == null ? "" : label.toLowerCase();
+            this.packageName = packageName;
+            this.className = className;
+            this.userId = userId;
+            this.key = packageName + "\t" + className + "\t" + userId;
+            this.pinyinSpaced = toLatinPinyin(label);
+            this.pinyinCompact = compactLetters(this.pinyinSpaced);
+            this.initials = pinyinInitials(this.pinyinSpaced);
+            this.t9Code = toT9Code(label + " " + packageName + " " + pinyinCompact + " " + initials);
+            this.icon = icon;
+        }
+    }
+
+    private static String toLatinPinyin(String text) {
+        if (text == null || text.length() == 0) {
+            return "";
+        }
+        try {
+            Class<?> cls = Class.forName("android.icu.text.Transliterator");
+            Object instance = cls.getMethod("getInstance", String.class)
+                    .invoke(null, "Han-Latin/Names; Latin-ASCII; Lower()");
+            Object value = cls.getMethod("transliterate", String.class).invoke(instance, text);
+            return value == null ? "" : value.toString().toLowerCase();
+        } catch (Throwable ignored) {
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < text.length(); i++) {
+                char c = Character.toLowerCase(text.charAt(i));
+                char initial = chineseInitial(c);
+                out.append(initial == 0 ? c : initial).append(' ');
+            }
+            return out.toString().trim();
+        }
+    }
+
+    private static String compactLetters(String text) {
+        StringBuilder out = new StringBuilder();
+        if (text == null) {
+            return "";
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char c = Character.toLowerCase(text.charAt(i));
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    private static String pinyinInitials(String text) {
+        StringBuilder out = new StringBuilder();
+        if (text == null) {
+            return "";
+        }
+        boolean atWordStart = true;
+        for (int i = 0; i < text.length(); i++) {
+            char c = Character.toLowerCase(text.charAt(i));
+            if (c >= 'a' && c <= 'z') {
+                if (atWordStart) {
+                    out.append(c);
+                    atWordStart = false;
+                }
+            } else {
+                atWordStart = true;
+            }
+        }
+        return out.toString();
+    }
+
+    private static boolean isDigitQuery(String text) {
+        if (text == null || text.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String toT9Code(String text) {
+        StringBuilder out = new StringBuilder();
+        if (text == null) {
+            return "";
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char c = Character.toLowerCase(text.charAt(i));
+            if (c >= '0' && c <= '9') {
+                out.append(c);
+                continue;
+            }
+            if (c >= 'a' && c <= 'z') {
+                out.append(letterToT9(c));
+                continue;
+            }
+            char initial = chineseInitial(c);
+            if (initial != 0) {
+                out.append(letterToT9(initial));
+            }
+        }
+        return out.toString();
+    }
+
+    private static char letterToT9(char c) {
+        if (c >= 'a' && c <= 'c') return '2';
+        if (c >= 'd' && c <= 'f') return '3';
+        if (c >= 'g' && c <= 'i') return '4';
+        if (c >= 'j' && c <= 'l') return '5';
+        if (c >= 'm' && c <= 'o') return '6';
+        if (c >= 'p' && c <= 's') return '7';
+        if (c >= 't' && c <= 'v') return '8';
+        if (c >= 'w' && c <= 'z') return '9';
+        return '0';
+    }
+
+    private static char chineseInitial(char c) {
+        String table = "的一是在不了有和人这中大为上个国我以要他"
+                + "时来用们生到作地于出就分对成会可主发年动"
+                + "同工也能下过子说产种面而方后多定行学法所"
+                + "民得经十三之进着等部度家电力里如水化高自"
+                + "二理起小物现实加量都两体制机当使点从业本"
+                + "去把性好应开它合还因由其些然前外天政四日";
+        int index = table.indexOf(c);
+        if (index < 0) {
+            return 0;
+        }
+        char[] initials = new char[]{
+                'd','y','s','z','b','l','y','h','r','z','z','d','w','s','g','g','w','y','y','t',
+                's','l','y','m','s','d','z','d','y','c','j','f','d','c','h','k','z','f','n','d',
+                't','g','y','n','x','g','z','s','c','z','m','e','f','h','d','x','x','f','s','m',
+                'd','j','s','s','z','j','z','d','b','d','j','d','z','t','b','q','x','w','x','j',
+                'l','d','l','t','l','t','z','j','d','s','d','c','y','b','q','b','q','h','y','q',
+                'x','r','q','w','t','z','s','r'
+        };
+        return index < initials.length ? initials[index] : 0;
     }
 
     private static final class WrapContentGridView extends GridView {

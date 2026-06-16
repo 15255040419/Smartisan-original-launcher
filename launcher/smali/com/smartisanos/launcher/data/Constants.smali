@@ -4991,10 +4991,6 @@
 
     if-eqz v1, :cond_2
 
-    const-string v4, ""
-
-    sput-object v4, Lcom/smartisanos/launcher/data/Constants;->sGaussianResSuffix:Ljava/lang/String;
-
     sget-object v1, Lcom/smartisanos/launcher/data/Constants;->sGaussianResSuffix:Ljava/lang/String;
 
     .line 41

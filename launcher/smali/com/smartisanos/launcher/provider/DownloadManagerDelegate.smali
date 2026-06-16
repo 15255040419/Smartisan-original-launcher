@@ -1495,6 +1495,16 @@
 
     invoke-direct {v0}, Ljava/util/ArrayList;-><init>()V
 
+    sget v1, Landroid/os/Build$VERSION;->SDK_INT:I
+
+    const/16 v2, 0x1d
+
+    if-lt v1, v2, :cond_modern_download_ok
+
+    return-object v0
+
+    :cond_modern_download_ok
+
     .line 2
     new-instance v1, Landroid/app/DownloadManager$Query;
 

@@ -43,6 +43,16 @@
     .locals 3
 
     .line 1
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v0
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->ensureTransparentThemeRegistered(Landroid/content/Context;)V
+
     invoke-static {}, Lcom/smartisanos/launcher/theme/X;->gg()Ljava/util/List;
 
     move-result-object v0
@@ -82,6 +92,31 @@
     goto :goto_0
 
     :cond_1
+    const-string v1, "smartisan_theme_trans"
+
+    invoke-virtual {v1, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v2
+
+    if-eqz v2, :cond_trans_fallback_done
+
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v1
+
+    invoke-virtual {v1}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v1
+
+    invoke-static {v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->transparentTheme(Landroid/content/Context;)Ljava/lang/Object;
+
+    move-result-object v1
+
+    check-cast v1, Lcom/smartisanos/launcher/theme/v;
+
+    goto :goto_0
+
+    :cond_trans_fallback_done
     const/4 v1, 0x0
 
     :goto_0
@@ -230,9 +265,11 @@
 
     move-result-object p0
 
-    invoke-direct {v0, p0}, Ljava/lang/IllegalArgumentException;-><init>(Ljava/lang/String;)V
+    sget-object v0, Lcom/smartisanos/launcher/a/r;->log:Lcom/smartisanos/launcher/va;
 
-    throw v0
+    invoke-virtual {v0, p0}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
+
+    return-void
 .end method
 
 .method public static a(Landroid/os/Message;)V

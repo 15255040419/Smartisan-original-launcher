@@ -1575,7 +1575,7 @@
     :cond_1
     sget-boolean p1, Lcom/smartisanos/launcher/data/Constants;->isTransparentTheme:Z
 
-    if-nez p1, :cond_port_wallpaper_theme
+    if-nez p1, :cond_port_wallpaper_fallback
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isLauncherWallpaperTheme(Landroid/content/Context;)Z
 
@@ -4213,7 +4213,7 @@
     goto :goto_0
 
     :cond_2
-    const/4 p0, 0x3
+    const/16 p0, 0x8
 
     .line 114
     invoke-static {p0}, Ljava/util/concurrent/Executors;->newFixedThreadPool(I)Ljava/util/concurrent/ExecutorService;
@@ -10835,7 +10835,15 @@
 
     const/4 v1, 0x0
 
-    if-nez v0, :cond_port_transparent_wallpaper_theme
+    if-eqz v0, :cond_port_transparent_check_wallpaper_theme
+
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/e/s;->a(Landroid/content/Context;Lcom/smartisanos/launcher/theme/v;)Landroid/graphics/Bitmap;
+
+    move-result-object p0
+
+    return-object p0
+
+    :cond_port_transparent_check_wallpaper_theme
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isLauncherWallpaperTheme(Landroid/content/Context;)Z
 

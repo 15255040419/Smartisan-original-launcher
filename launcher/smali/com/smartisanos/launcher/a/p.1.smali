@@ -55,6 +55,8 @@
 
     move-result-object v1
 
+    if-eqz v1, :cond_theme_page_missing
+
     invoke-virtual {v1}, Lcom/smartisanos/launcher/view/b/fa;->vm()Z
 
     move-result v1
@@ -71,6 +73,11 @@
     invoke-virtual {p0, v1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     .line 8
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/theme/t;->Tf()V
+
+    return-void
+
+    :cond_theme_page_missing
     invoke-virtual {v0}, Lcom/smartisanos/launcher/theme/t;->Tf()V
 
     return-void

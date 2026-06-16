@@ -2151,6 +2151,8 @@
     .locals 4
 
     .line 1
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->ensureTransparentThemeRegistered(Landroid/content/Context;)V
+
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/X;->va(Landroid/content/Context;)Lcom/smartisanos/launcher/theme/v;
 
     move-result-object v0

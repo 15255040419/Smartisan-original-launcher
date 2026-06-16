@@ -2951,6 +2951,8 @@
 
     move-result-object v0
 
+    if-eqz v0, :cond_y_page_missing
+
     invoke-virtual {v0, p1}, Lcom/smartisanos/launcher/view/b/fa;->o(Lcom/smartisanos/launcher/view/b/M;)I
 
     move-result v0
@@ -3028,6 +3030,7 @@
     .line 7
     invoke-static {}, Lcom/smartisanos/launcher/e/s;->Jg()V
 
+    :cond_y_page_missing
     return-void
 .end method
 
@@ -8706,6 +8709,8 @@
 
     move-result-object v0
 
+    if-eqz v0, :cond_theme_page_missing
+
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/b/fa;->Sq()Lcom/smartisanos/launcher/animations/r;
 
     move-result-object v0
@@ -8717,6 +8722,8 @@
 
     move-result-object v0
 
+    if-eqz v0, :cond_theme_page_missing
+
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/b/fa;->vm()Z
 
     move-result v0
@@ -8726,6 +8733,13 @@
     const/4 v2, 0x0
 
     const/4 v3, 0x1
+
+    goto :goto_theme_page_ready
+
+    :cond_theme_page_missing
+    return-void
+
+    :goto_theme_page_ready
 
     if-eqz v0, :cond_4
 

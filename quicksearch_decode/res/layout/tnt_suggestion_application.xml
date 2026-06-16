@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<com.android.quicksearchbox.tnt.suggestion.TNTSuggestionApplicationView style="@style/tnt_suggestion">
-    <include layout="@layout/tnt_suggestion_base" />
-</com.android.quicksearchbox.tnt.suggestion.TNTSuggestionApplicationView>

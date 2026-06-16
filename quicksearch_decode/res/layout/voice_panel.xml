@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<merge android:layout_width="match_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <ImageButton android:layout_gravity="center" android:id="@id/fade_voice" android:background="@drawable/fade_voice_selector" android:layout_width="wrap_content" android:layout_height="wrap_content" android:contentDescription="@string/voice" />
-</merge>

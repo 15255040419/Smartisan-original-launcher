@@ -122,14 +122,12 @@
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyLauncherNavigationBarSetting(Landroid/app/Activity;)V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->showPendingLauncherReloadLoading(Landroid/app/Activity;)V
+
     .line 3
     invoke-static {p0}, Lcom/smartisanos/launcher/J;->b(Landroid/app/Activity;)V
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyLauncherNavigationBarSetting(Landroid/app/Activity;)V
-
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->maybeRefreshLauncherIcons(Landroid/content/Context;)V
-
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->scheduleDoppelgangerBootstrap(Landroid/content/Context;)V
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->stabilizeLauncherResume(Landroid/app/Activity;)V
 
@@ -268,8 +266,6 @@
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyLauncherNavigationBarSetting(Landroid/app/Activity;)V
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->maybeRefreshLauncherWallpaper(Landroid/content/Context;)V
-
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->scheduleDoppelgangerBootstrap(Landroid/content/Context;)V
 
     return-void
 .end method

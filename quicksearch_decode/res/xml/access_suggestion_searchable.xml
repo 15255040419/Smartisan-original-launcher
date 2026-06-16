@@ -1,3 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<searchable android:label="@string/searchable_label_access_suggestion" android:searchSuggestAuthority="com.android.quicksearchbox.qsb" android:searchSuggestIntentAction="android.intent.action.MAIN" android:includeInGlobalSearch="true" android:queryAfterZeroResults="true" android:searchSettingsDescription="@string/settings_description"
-  xmlns:android="http://schemas.android.com/apk/res/android" />

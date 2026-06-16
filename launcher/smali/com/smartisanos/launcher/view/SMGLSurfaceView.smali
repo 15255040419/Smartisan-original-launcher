@@ -71,27 +71,6 @@
     .locals 3
 
     .line 1
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/SMGLSurfaceView;->getContext()Landroid/content/Context;
-
-    move-result-object v0
-
-    instance-of v1, v0, Landroid/app/Activity;
-
-    if-eqz v1, :cond_0
-
-    check-cast v0, Landroid/app/Activity;
-
-    invoke-static {v0, p1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->handleLauncherSearchGesture(Landroid/app/Activity;Landroid/view/MotionEvent;)Z
-
-    move-result v0
-
-    if-eqz v0, :cond_0
-
-    const/4 v0, 0x1
-
-    return v0
-
-    :cond_0
     invoke-super {p0, p1}, Landroid/opengl/GLSurfaceView;->dispatchTouchEvent(Landroid/view/MotionEvent;)Z
 
     move-result p0

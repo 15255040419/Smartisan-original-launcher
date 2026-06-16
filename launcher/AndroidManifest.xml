@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="24" android:versionName="1.4.8" package="com.smartisanos.launcher">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="25" android:versionName="1.5.0" package="com.smartisanos.launcher">
   <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
   <uses-feature android:glEsVersion="0x00020000" />
   <permission android:name="com.smartisanos.launcher.READ_DATABASE" android:protectionLevel="signature" />
@@ -87,7 +87,7 @@
   <uses-permission android:name="com.smartisanos.smartisanbrain.ACCESS_CALL_METHOD" />
   <uses-permission android:name="com.smartisanos.permission.facerecognition" />
   <uses-permission android:name="com.smartisan.permission.ACCOUNT_CENTER" />
-  <application android:theme="@0x7f0c015d" android:label="@0x7f0b0043" android:icon="@0x7f020184" android:name="com.smartisanos.launcher.LauncherApplication" android:configChanges="0x400027FF" android:allowBackup="false" android:hardwareAccelerated="true" android:largeHeap="true" android:extractNativeLibs="false" android:usesCleartextTraffic="true" android:appComponentFactory="android.support.v4.app.CoreComponentFactory">
+  <application android:theme="@0x7f0c015d" android:label="@0x7f0b0043" android:icon="@0x7f020184" android:name="com.smartisanos.launcher.LauncherApplication" android:configChanges="0x400027FF" android:allowBackup="false" android:hardwareAccelerated="true" android:largeHeap="true" android:extractNativeLibs="true" android:usesCleartextTraffic="true" android:appComponentFactory="android.support.v4.app.CoreComponentFactory">
     <activity android:theme="@0x7f0c0163" android:name="com.smartisanos.launcher.Launcher" android:taskAffinity="smartisanos.task.launcher" android:clearTaskOnLaunch="true" android:stateNotNeeded="true" android:excludeFromRecents="true" android:launchMode="2" android:screenOrientation="1" android:configChanges="0x410027FF" android:windowSoftInputMode="0x00000020" android:resumeWhilePausing="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />

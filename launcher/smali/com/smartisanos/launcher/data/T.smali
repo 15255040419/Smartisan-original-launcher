@@ -1536,7 +1536,9 @@
 .end method
 
 .method public static g(Ljava/lang/String;Ljava/lang/String;)Z
-    .locals 1
+    .locals 2
+
+    move-object v1, p0
 
     const-string v0, "com.smartisan.folder"
 
@@ -1553,6 +1555,25 @@
 
     .line 2
     :cond_0
+    const-string p0, "com.smartisanos.launcher"
+
+    invoke-virtual {p0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result p0
+
+    if-eqz p0, :cond_launcher_settings
+
+    const-string p0, "com.smartisanos.launcher.theme.ThemeChooserActivity"
+
+    invoke-virtual {p0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result p0
+
+    if-eqz p0, :cond_launcher_settings
+
+    return v0
+
+    :cond_launcher_settings
     sget-object p0, Lcom/smartisanos/launcher/data/T;->Ir:Lcom/smartisanos/launcher/data/S;
 
     iget-object p0, p0, Lcom/smartisanos/launcher/data/S;->Fr:Ljava/lang/String;
@@ -2797,5 +2818,47 @@
     sput-object p0, Lcom/smartisanos/launcher/data/T;->Nr:[Lcom/smartisanos/launcher/data/S;
 
     :cond_3
+    const/4 p0, 0x3
+
+    new-array p0, p0, [Lcom/smartisanos/launcher/data/S;
+
+    const/4 v0, 0x0
+
+    new-instance v1, Lcom/smartisanos/launcher/data/S;
+
+    const-string v2, "com.android.dialer"
+
+    const-string v3, "com.android.dialer.main.impl.MainActivity"
+
+    invoke-direct {v1, v2, v3}, Lcom/smartisanos/launcher/data/S;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+
+    aput-object v1, p0, v0
+
+    const/4 v0, 0x1
+
+    new-instance v1, Lcom/smartisanos/launcher/data/S;
+
+    const-string v2, "com.smartisanos.launcher"
+
+    const-string v3, "com.smartisanos.launcher.theme.ThemeChooserActivity"
+
+    invoke-direct {v1, v2, v3}, Lcom/smartisanos/launcher/data/S;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+
+    aput-object v1, p0, v0
+
+    const/4 v0, 0x2
+
+    new-instance v1, Lcom/smartisanos/launcher/data/S;
+
+    const-string v2, "com.android.messaging"
+
+    const-string v3, "com.android.messaging.ui.conversationlist.ConversationListActivity"
+
+    invoke-direct {v1, v2, v3}, Lcom/smartisanos/launcher/data/S;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+
+    aput-object v1, p0, v0
+
+    sput-object p0, Lcom/smartisanos/launcher/data/T;->Nr:[Lcom/smartisanos/launcher/data/S;
+
     return-void
 .end method

@@ -4,13 +4,14 @@
 
 注意：本文档只保留当前可信记录和倒序每日修复记录。旧归档中已经被后续修复覆盖或推翻的内容已删除；如果本文档和 `README.md` 冲突，以本文档顶部“当前状态总览”为准。
 
-## 当前状态总览（2026-06-07）
+## 当前状态总览（2026-06-16）
 
 ### 已完成
 
 - APK 可通过 `build.bat` 构建、签名并输出 `build\launcher-signed.apk`，最近多次安装验证通过。
-- 当前发布版本调整为 `v1.4.8`，Manifest `versionCode=24`，`versionName=v1.4.8`；最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单为准，文本 Manifest 和二进制 Manifest 需要同步维护。
-- 第一轮兼容安装与包体瘦身完成：最终 APK 的 `minSdkVersion` 从 29 降到 23，`targetSdkVersion` 调整为 28；纹理资源统一走 `1080p`，删除冗余 `assets/Textures/720p` 后，`build\launcher-signed.apk` 从约 105.9MB 降到约 63.9MB。
+- 当前发布版本调整为 `v1.5.0`，Manifest `versionCode=25`，`versionName=v1.5.0`；最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单为准，文本 Manifest 和二进制 Manifest 需要同步维护。
+- 当前桌面主 APK 为 `minSdkVersion=23`、`targetSdkVersion=28`，理论安装基线是 Android 6.0+（API 23+），已按 Android 15 安装方向保留 target 28。
+- 兼容安装与包体瘦身已持续推进：最终 APK 的 `minSdkVersion` 从 29 降到 23，`targetSdkVersion` 调整为 28；纹理资源统一走 `1080p`，删除冗余资源和不再使用的独立搜索产物后，当前 `build\launcher-signed.apk` 约 50.2MB。
 - 构建签名流程已从 `jarsigner` 旧 v1 签名改为 `zipalign -p` 后用 `apksigner` 输出 v1/v2/v3 签名，修复 Android 12 等新系统上可能因只有 v1/JAR 签名而安装失败的问题。
 - 桌面主入口、桌面内“桌面设置”虚拟入口、12 / 20 宫格、主题页、壁纸页、翻页动画页、应用图标页、三个设置开关均已接入。
 - 经典黑主题 12 / 20 宫格顶部网格和底部 Dock 资源已从原版 `com.smartisanos.launcher-3.apk` 重新抽取覆盖，顶底色差问题已修复。
@@ -24,13 +25,36 @@
 - 应用图标页新增“桌面图标大小”滑块，位置在“改进版图标”和“图标包”之间；支持 50% - 150% 连续调节，并可点击“小 / 中 / 大”快速跳到 50% / 100% / 150%；保存后回到桌面并完整重启 Launcher，让 12 / 20 宫格里的所有普通应用和桌面设置虚拟入口统一应用新尺寸。
 - 应用图标页单应用切换已改为行级刷新：选择左侧默认图标、右侧推荐图标或相册自定义图标后，当前页面和滚动位置保持不变；只有找不到当前行时才兜底重建并恢复滚动位置。
 - 应用图标页点击范围已收窄：只有左侧默认图标块和右侧推荐/加号图标块响应选择，右侧应用名称/说明文字区域不再弹出选择框。
-- 内置搜索已拆成独立 APK，不再打进桌面主包；强迫症选项页提供“启用下滑搜索”和“内置搜索”安装行，未安装 `com.smartisanos.quicksearch` 时开关会在页面绑定时强制回落为关闭并引导下载。该检测只在设置页绑定时执行轻量包名查询，不进入桌面主界面热路径。搜索 APK 下载走 Gitee Release `launcher-1.4.8/SmartisanQuickSearch.apk`，下载过程有弹窗和状态栏进度。
+- 当前搜索页使用 launcher 内 `ThemeChooserActivity` / `MaintainedLauncherSettingsHost.showSearchPage()` 自绘页面，不再依赖、下载或构建锤子独立搜索 APK；桌面下滑只作为进入自绘搜索页的手势入口。
 - 强迫症选项已从设置首页零散开关收纳到二级页；主页入口和二级页标题走资源字符串，英文系统显示 `OCD Settings`，中文系统显示“强迫症选项”。
 - 双开 / 多用户应用显示和启动已补入 LauncherApps 查询与 `startActivityAsUser` 兼容路径，避免双开应用只显示主用户图标或点击后启动错用户。
 - 双开 / 多用户应用继续对照 maintained 调整：搜索页、桌面应用列表和启动链路都尽量使用 LauncherApps 多用户查询；分身应用支持叠加原版风格面具标记。
 - 应用图标识别逻辑已继续向 maintained 对齐，同时保留当前工程已有的图标识别能力，减少“闲鱼 / 酷安”等普通应用被误识别成应用商店图标，以及系统“电话 / 拨号 / 电话本”等名称匹配不稳定的问题。
 - 毛玻璃主题已改为只保留 `smartisan_theme_aero` 作为透明壁纸主题，移除白雾主题入口和资源引用；毛玻璃桌面与编辑页文字已恢复为原版风格白色文字效果。
-- 检查更新改为读取 Gitee 下载仓库 Release 列表，只识别 `launcher-` 前缀的软件发布标签，跳过 `themes-v1` 等主题发布；APK 下载流程有前台进度弹窗和状态栏通知，下载完成后自动拉起安装。
+- 透明主题切换已从自定义运行时旁路改回原版方向：透明模式写入 `launcher_grid_theme` 的 0/1，普通主题 ID 只写入 `launcher_theme`；透明主题包只用于资源注册，不再把 `smartisan_theme_trans` 当普通主题写入或送入普通主题切换队列，避免关闭透明主题后无法恢复上一主题。
+- 透明主题安装包使用 `build\theme-trans-signed.apk`，安装后包名为 `com.smartisanos.launcher.theme.trans`，`minSdkVersion=23`、`targetSdkVersion=28`，用于普通 Android / Android 15 安装；`original_apks\com.smartisanos.launcher.theme.trans.apk` 是原始参考包，`targetSdkVersion=17`，不要作为 Android 15 安装包。
+- 透明主题开启后只能使用默认翻页动画：主设置页隐藏“桌面翻页动画”入口，翻页动画读写被钳制为 `0`，避免透明主题资源链路和非默认翻页动画混用。
+- 透明主题开关状态读取改为私有 prefs 优先、系统 Settings 兜底，解决普通 Android 上系统 Settings 旧值覆盖设置页开关，导致返回设置页仍显示关闭的问题。
+- 修复透明主题开启后仍排队 `MESSAGE_CHANGE_THEME smartisan_theme_black` 的问题；开启透明主题只写透明覆盖状态并重启 / 刷新桌面，关闭透明主题时才恢复上一普通主题。
+- 修复原版主题管理器 `X.ca()` 清空主题表后 `smartisan_theme_trans` 丢失的问题：在 `X.da()` 选择当前主题前重新注册透明主题包，避免透明状态回落到黑主题导致黑底、黑宫格或 Dock 混用。
+- 透明主题开关和主题列表透明主题入口统一改为写入透明状态后重新触发桌面初始化，让 `O.V()`、`Constants.isTransparentTheme` 和 `X.va()` 重新选择资源，避免设置页开关状态正确但桌面仍停留在上一套主题资源。
+- 透明主题开关确认必须完整重启 Launcher 才能稳定生效：普通 `J.a(theme, theme_changing)` 能拿到 `smartisan_theme_trans`，但不会完整重建透明桌面的壁纸 / 网格层；当前改为显示加载动画后重启桌面，避免仅退出设置页导致黑主题资源残留。
+- 透明主题重启链路新增跨进程 loading pending 标记：设置页写入标记后杀进程重启，新 Launcher 进程在 `onCreate`、`J.b()` 初始化前显示加载层，等桌面渲染帧稳定后再关闭，避免切换时裸露黑屏 / 壁纸中间态。
+- 透明主题壁纸取图改回原版优先系统壁纸 drawable；当 `WallpaperManagerSmt` / `WallpaperManager.getDrawable()` 在普通 Android 返回 null 时，再依次尝试 `peekDrawable()`、`getFastDrawable()`，最后才使用本地壁纸副本按屏幕比例中心裁剪，避免整图拉伸导致壁纸看起来被压缩。
+- “桌面壁纸模糊效果”改回原版刷新方式：写入 `original_launcher_wallpaper_blur_on` 的 0/1，更新 `Constants.isTransWallpaperBlur` 后调用 `Eb.lh()` 重建 `t_blur_background`，不再走完整透明主题重载，修复打开模糊开关后背景变黑的问题。
+- `ua.i(context)` 已加入普通 Android 兼容读取，优先从 launcher 私有 prefs 读取 `original_launcher_wallpaper_blur_on`，避免无 `WRITE_SECURE_SETTINGS` 时原版只读 `Settings.Global` 导致状态丢失。
+- 对照原版确认：毛玻璃 / 透明壁纸主题下应用文字颜色由壁纸明暗决定，原版通过 `Constants.initGaussianDarkLight()` 在普通资源和 `_light` 后缀资源之间切换，不是按时间变化。
+- 透明主题 / 毛玻璃主题下，状态栏文字和桌面应用文字已恢复为按壁纸明暗自动切换：
+  - 根因一：`Constants.initByTheme()` 调用 `initGaussianDarkLight()` 后已经根据壁纸算出 `sGaussianResSuffix="_light"`，但后续又把 `sGaussianResSuffix` 清空为 `""`，导致浅色壁纸无法继续加载原版 `_light` 应用文字资源，应用名仍显示白字。
+  - 根因二：状态栏颜色虽然已经通过原版 `status_bar_icon_color(_light)` 资源传给 `ua.setSystemUiDecoration()`，但普通 Android / Android 6+ 还需要同步 `View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR`，否则系统状态栏文字可能仍按旧颜色显示。
+  - 修复方式：保留 `initGaussianDarkLight()` 算出的 `sGaussianResSuffix`，让 `Mc.o(theme)` / `Constants.initGaussianTheme()` 正常进入 `_light` 资源分支；同时在 `launcher/smali/com/smartisanos/launcher/e/g.smali` 中根据最终解析出的 `status_bar_icon_color` 设置或清除 `LIGHT_STATUS_BAR`。
+  - 回归注意：只允许透明主题 `smartisan_theme_trans`、毛玻璃主题 `smartisan_theme_aero` 这类高斯 / 壁纸主题跟随壁纸明暗；普通不透明主题应继续使用主题自身文字资源和状态栏资源，不要改成跟随壁纸。
+- 壁纸显示 / 模糊链路当前保持原版方向，不要再次改成手动模糊 bitmap 或把 `background.png` / `t_blur_background` 互相替换：
+  - 透明主题壁纸显示正常的关键是 `s.n(context, uri)` / `decodeLauncherWallpaperSurfaceBitmap()` 按屏幕中心裁剪取壁纸，`background.png` 作为桌面背景纹理。
+  - “桌面壁纸模糊效果”正常的关键是写入 `original_launcher_wallpaper_blur_on`，更新 `Constants.isTransWallpaperBlur` 后调用 `Eb.lh()`，由原版 SMEngine 重建 `t_blur_background`。
+  - 不要在 Java 层自行 StackBlur 主壁纸，也不要把 `t_blur_background` 覆盖回 `background.png`；这样会造成主桌面、Dock 或局部区域显示不一致。
+- 检查更新改为读取 Gitee 下载仓库 Release 列表，只识别 `launcher-` 前缀的软件发布标签，并按版本号选择最高版本；APK 资产只选择桌面主 APK，跳过 `SmartisanQuickSearch.apk`、主题包和 `theme-trans-signed.apk`；APK 下载流程有前台进度弹窗和状态栏通知，点击“后台下载”后状态栏继续显示进度，下载成功或失败都会留下结果通知，下载成功后自动拉起系统安装确认。
+- 后续发布 GitHub / Gitee Release 时，推荐同时上传 `build\launcher-signed.apk` 和 `build\theme-trans-signed.apk`；前者是桌面主 APK，后者是透明主题 Android 15 兼容安装包。不要把 `original_apks\com.smartisanos.launcher.theme.trans.apk` 当用户安装资产发布。
 - 主题详情下载按钮状态已按当前主题项隔离，避免切换到其他主题后仍残留“正在下载”状态。
 - 桌面图标加载链路加入 drawable 归一化兜底，改善 MuMu 等环境 adaptive drawable 或特殊图标不显示的问题；MuMu 多用户 / 分身查询缺少 `INTERACT_ACROSS_USERS` 时，`getInstalledPackagesAsUser` 和 `queryIntentActivitiesAsUser` 会退回当前用户查询，避免初始化循环清库导致桌面空白。
 - 主题详情页预览图已改为外层居中容器，手机壳和主题截图保持原版层级叠加，并会按标题栏和底部主题色栏之间的可用空间自适应缩小，避免小屏手机底部被颜色栏遮住；从主题详情返回主题列表、从关于我们返回设置首页时会保持原滚动位置，并在首帧绘制前恢复，避免上下晃动。
@@ -44,16 +68,16 @@
 
 ### 未完成 / 待处理
 
-- 透明主题下 Dock 区域是否还有旧层残留、偏移或未清理干净，需要继续截图对比 maintained。
+- 透明主题下 Dock 区域仍需继续对照原版 `com.smartisanos.launcher.theme.trans` 和 `clean_launcher/` 回归，重点看 Dock 半透明层、虚拟导航栏高度和壁纸裁切是否完全一致。
 - 原生 Smartisan Settings Activity / Fragment 还没有完整迁移，当前仍由 launcher 包内 `ThemeChooserActivity` 承载 maintained 风格兼容页。
 - 对照 `E:\FANG\smartisan\smartisan-launcher-maintained`，当前桌面设置和桌面能力仍需按优先级继续移植；“分享此应用给朋友”和“用户体验改进计划”不再作为移植目标。
   - [x] 桌面隐藏虚拟键：优先级最高，key 为 `launcher_hide_navigation_bar`，已接入首页开关并限制只由 Launcher 主界面应用系统 UI flags。
-  - [x] 检查更新：已接入 Gitee 下载仓库 Release 检测；只识别 `launcher-` 软件标签，存在 APK 资产时提示下载，普通应用更新仍需系统安装确认。
+  - [x] 检查更新：已接入 Gitee 下载仓库 Release 检测；只识别 `launcher-` 软件标签中的最高版本，只下载桌面主 APK，普通应用更新仍需系统安装确认。
   - [x] 关闭电池优化：优先请求当前包名 `com.smartisanos.launcher` 的电池优化弹窗，系统不允许时回退当前应用详情页。
   - [x] 关于我们：已从信息弹窗改为完整 maintained / 原版锤子风格页面。
   - [x] 紧贴屏幕横扫清除角标：key 为 `launcher_badge_swipe_clean`，已接入 maintained 风格设置页开关。
   - [x] 隐藏图标上的角标：key 为 `launcher_hide_badge`，已接入 maintained 风格设置页开关。
-  - [x] 下滑 / 上滑搜索：已改为调用独立内置搜索 APK；未安装时不能打开开关，会先引导下载并安装 `SmartisanQuickSearch.apk`。
+  - [x] 下滑 / 上滑搜索：已改为进入 launcher 内 `ThemeChooserActivity` 承载的自绘搜索页；当前不再依赖锤子独立搜索 APK。
   - [ ] 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议按 maintained 的方向优先拉起系统 / 已安装天气应用。
   - [ ] 日历：当前保留日历权限和动态图标资源线索，但桌面日期刷新、点击入口和系统日历兼容还未单独回归。
 - 提醒角标可以作为后续功能实现目标，但不能简单等同于“应用有通知就一定显示”。当前 old Smartisan / 厂商未读数广播或系统 badge 数据能接入时才有机会显示；普通 Android 通知角标需要额外接入通知监听或 badge 兼容桥。
@@ -69,6 +93,83 @@
 3. 需要追溯原因时，按每日记录由近到远阅读；已被后续修复覆盖的旧结论不再保留。
 
 ## 每日修复记录（倒序）
+
+### 2026-06-16：检查更新下载、通知进度和安装链路复查
+
+复查结论：
+
+- 点击“检查更新”后会请求 Gitee 下载仓库 Release 列表；发现新版本后点击“下载”，代码会启动 `launcher-update-direct-download` 后台线程下载 APK，界面弹出下载进度窗口。
+- 下载弹窗的“后台下载”按钮会关闭弹窗，但下载线程继续运行，状态栏通知继续显示下载进度；这属于应用进程内后台下载，不是系统 `DownloadManager` 的持久下载，若进程被系统杀掉不能保证继续。
+- 下载过程中会通过 `NotificationManager` 创建 `launcher_update_download` / “桌面更新下载”通知渠道，并持续刷新状态栏通知进度；Android 13+ 如果用户关闭通知权限，状态栏进度可能不会显示。
+- 下载完成后优先走 `PackageInstaller` 提交安装会话，状态为 `STATUS_PENDING_USER_ACTION` 时拉起系统安装确认；失败时回退 `ACTION_INSTALL_PACKAGE` / `ACTION_VIEW`。普通 Android 不能静默安装，覆盖安装要求新 APK 包名相同、签名一致，并且用户允许当前应用安装未知来源应用。
+
+修复内容：
+
+- 修复后台下载失败没有状态栏结果的问题。旧代码下载失败会直接 `cancelUpdateNotification()`，用户点“后台下载”后只能看到 Toast，状态栏没有失败结果；现在失败时调用 `notifyUpdateDownload(..., complete=true)` 留下“下载失败: ...”结果通知，成功时继续保留“下载完成，正在启动安装...”结果通知。
+- 修复线上 Release 选择不稳定的问题。Gitee API 当前可能先返回 `themes-v1`、`launcher-1.4.8`，再返回 `launcher-1.4.9`；旧逻辑遇到第一个 `launcher-` 就返回，导致安装 `v1.4.8` 时可能误判“当前已是最新版本”。现在会遍历全部 `launcher-` 发布并按版本号选择最高版本。
+- 修复 APK 资产选错的问题。旧逻辑选择 Release 中第一个 `.apk`，当 `launcher-1.4.8` 的资产顺序为 `SmartisanQuickSearch.apk`、`SmartisanLauncher-1.4.8.apk` 时，会把独立搜索包当桌面更新包；后续 Release 同时上传 `theme-trans-signed.apk` 时也有同类风险。现在只优先选择桌面主 APK，跳过 `SmartisanQuickSearch.apk`、主题 APK、透明主题包。
+- 文档同步说明：检查更新只负责桌面主 APK 升级；`build\theme-trans-signed.apk` 作为透明主题 Android 15 兼容包随 Release 发布，但需要单独安装，不由桌面内更新自动替换。
+- 版本发布：文本 `launcher/AndroidManifest.xml`、最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest、设置页当前版本字符串均同步调整为 `v1.5.0 (25)`。
+
+验证结果：
+
+- `.\build.bat` 编译成功，输出 `build\launcher-signed.apk`。
+- `aapt2 dump badging build\launcher-signed.apk` 确认包名 `com.smartisanos.launcher`、`versionCode=25`、`versionName=v1.5.0`、`minSdkVersion=23`、`targetSdkVersion=28`，且仍声明 `REQUEST_INSTALL_PACKAGES`。
+- `apksigner verify --verbose --print-certs build\launcher-signed.apk` 确认 v1 / v2 / v3 签名均为 true。
+- 当前 PowerShell 环境没有可直接调用的 `adb.exe`，本轮未完成真机 / 模拟器安装验证；覆盖安装行为仍需在有 ADB 的环境执行 `adb install -r -d build\launcher-signed.apk` 或通过桌面内检查更新实机确认。
+
+### 2026-06-16：自绘搜索页下滑误触与历史清除按钮修复
+
+修复内容：
+
+- 调整主设置页透明主题位置和翻页动画联动。
+  - 需求原因：透明主题下桌面背景、文字和高斯壁纸链路都走特殊资源分支，继续暴露“桌面翻页动画”容易让用户选到与透明主题不匹配的动画效果。
+  - 修复方式：在 `setting_main.xml` 中把“透明主题”开关移动到“强迫症选项”下面；透明主题开启时，`MaintainedLauncherSettingsHost.bindPage()` 隐藏 `item_page_flip_anims`，`applyTransparentThemeSetting()` 立即强制写回默认翻页动画。
+  - 回归注意：透明主题开启期间，`readPageAnimation()` 和 `writePageAnimation()` 都会把动画值钳制为 `0`，确保其他入口也只能使用“默认动画”；关闭透明主题后主设置页会重新显示“桌面翻页动画”选项。
+
+- 修复桌面自绘搜索页容易误触发的问题。
+  - 问题根因：此前搜索手势在 `Launcher.smali`、`RootView.smali`、`SMGLSurfaceView.smali` 三层都接入了 `MaintainedLauncherSettingsHost.handleLauncherSearchGesture()`，同一次下滑会被多处重复处理；同时 Java 侧在 `ACTION_MOVE` 阶段就会打开搜索页，距离和角度阈值偏松，没有多指 / 取消手势失效和冷却限制，所以短滑、拖动或图标附近滑动容易误触。
+  - 修复方式：只保留 `Launcher.smali` 顶层搜索触发入口，删除 `RootView.smali` 和 `SMGLSurfaceView.smali` 的重复搜索钩子；`handleLauncherSearchGesture()` 改为松手 `ACTION_UP` 时才确认打开，并限制单指、起始区域、下滑距离、纵向角度、手势时长和 1 秒冷却。
+
+- 修复自绘搜索页“搜索历史”右侧清除按钮偏大、和标题不水平对齐的问题。
+  - 修复方式：在 `MaintainedLauncherSettingsHost.showSearchPage()` 中让“搜索历史”标题使用垂直居中布局；右侧清除按钮从 `30dp / 18sp` 调整为 `22dp / 14sp`，圆角同步缩小，并保持 `CENTER_VERTICAL`，让按钮中心线和标题文字对齐。
+
+验证结果：
+
+- `.\build.bat` 编译成功，输出 `build\launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 在 Smartisan Launcher 桌面右侧空白区域短距离下滑，前台仍保持 `com.smartisanos.launcher/.Launcher`，未打开搜索页。
+- 在同一区域明确长距离下滑，前台进入 `com.smartisanos.launcher/.theme.ThemeChooserActivity` 自绘搜索页。
+- 截图 `build\search_page_after_fix.png` 确认“搜索历史”右侧 X 已缩小并与标题水平对齐。
+
+### 2026-06-16：透明 / 毛玻璃主题文字随壁纸明暗修复与壁纸链路说明
+
+修复内容：
+
+- 修复透明主题、毛玻璃主题下浅色壁纸仍显示白色应用文字的问题。
+  - 问题根因：`Constants.initByTheme()` 先调用 `initGaussianDarkLight(context)` 根据当前壁纸计算明暗，并会把浅色壁纸结果写为 `sGaussianResSuffix="_light"`；但紧接着旧代码又执行 `sGaussianResSuffix=""`，把 `_light` 后缀清掉，导致 `Constants.initGaussianTheme()` 和 `Mc.o(theme)` 无法进入原版浅色资源分支。
+  - 修复方式：删除这次错误清空 `sGaussianResSuffix` 的逻辑，保留 `initGaussianDarkLight()` 的计算结果；浅色壁纸继续加载 `def_apps_text_color_light`、`def_apps_shadow_color_light`、`page_title_text_color_light` 等原版资源，深色壁纸继续走默认资源。
+
+- 修复透明主题、毛玻璃主题下系统状态栏文字不随壁纸明暗稳定切换的问题。
+  - 问题根因：原版会解析 `status_bar_icon_color` / `status_bar_icon_color_light` 并传给 `ua.setSystemUiDecoration()`，但普通 Android 上状态栏深浅文字还受 `SYSTEM_UI_FLAG_LIGHT_STATUS_BAR` 控制，只写旧的装饰颜色不够。
+  - 修复方式：在 `launcher/smali/com/smartisanos/launcher/e/g.smali` 中，解析出最终 `status_bar_icon_color` 后按颜色亮度设置系统 UI flag：深色图标颜色时设置 `LIGHT_STATUS_BAR`，浅色 / 白色图标颜色时清除该 flag。
+
+- 验证结果：
+  - 浅色壁纸下，状态栏文字变深；应用文字应随 `_light` 资源变深，不再白字贴浅色壁纸。
+  - 深色壁纸下，状态栏和应用文字保持浅色，仍可读。
+  - 本轮只修文字明暗链路，没有改壁纸模糊和背景纹理链路。
+
+后续注意：
+
+- 透明主题和毛玻璃主题属于“壁纸主题 / 高斯主题”，文字明暗跟随壁纸；普通不透明主题不应跟随壁纸，必须继续使用当前主题自己的文字和状态栏资源。
+- 壁纸显示正常依赖原版链路：
+  - 自定义壁纸保存为 launcher 私有副本，并同步 `launcher_wallpaper_uri` / `desktop_wallpaper_uri` / `lockscreen_background`。
+  - 透明 / 毛玻璃主题加载壁纸时由原版路径按屏幕比例中心裁剪，不应拉伸整图。
+  - 模糊开关只写 `original_launcher_wallpaper_blur_on` 并刷新 `Constants.isTransWallpaperBlur`，再调用 `Eb.lh()` 让引擎重建 `t_blur_background`。
+- 不要再做以下改动：
+  - 不要在 `decodeLauncherWallpaperSurfaceBitmap()` 或 Java 辅助代码里主动 StackBlur 主壁纸 bitmap。
+  - 不要把 `t_blur_background` 覆盖回 `background.png`。
+  - 不要为了修 Dock 或模糊，替换原版 `background.png` 与 `t_blur_background` 的职责；这会导致主桌面、Dock、动画层使用不同来源的壁纸，出现局部清晰 / 局部模糊 / 底部错图。
 
 ### 2026-06-07：v1.4.8 独立内置搜索、Gitee 软件更新和主题详情小屏适配
 

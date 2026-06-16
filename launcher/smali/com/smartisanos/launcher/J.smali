@@ -5077,7 +5077,7 @@
 
     if-lt v2, v3, :cond_9
 
-    const-wide/16 v2, 0x974
+    const-wide/16 v2, 0x320
 
     goto :goto_0
 

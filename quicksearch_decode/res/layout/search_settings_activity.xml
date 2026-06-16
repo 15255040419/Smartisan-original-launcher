@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout android:orientation="vertical" android:background="@drawable/setting_background" android:layout_width="match_parent" android:layout_height="match_parent"
-  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:dslv="http://schemas.android.com/apk/res-auto" xmlns:smartisan="http://schemas.android.com/apk/res-auto">
-    <smartisan.widget.TitleBar android:id="@id/title" android:layout_width="match_parent" android:layout_height="wrap_content" smartisan:title_bar_center_text="@string/allowed_search_project" />
-    <com.android.quicksearchbox.dslv.DragSortListView android:id="@id/list" android:layout_width="match_parent" android:layout_height="match_parent" android:listSelector="@android:color/transparent" android:divider="@null" android:choiceMode="multipleChoice" android:layout_below="@id/title" android:overScrollMode="always" smartisan:drag_enabled="true" smartisan:drag_handle_id="@id/drag_handle" smartisan:drag_start_mode="onDown" smartisan:slide_shuffle_speed="0.3" smartisan:slider_checkbox_id="@id/item_check" />
-</RelativeLayout>

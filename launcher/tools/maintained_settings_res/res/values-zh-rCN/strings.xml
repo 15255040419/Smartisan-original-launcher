@@ -195,7 +195,7 @@
     <string name="quick_search_install_button">安装</string>
     <string name="quick_search_installed_button">已安装</string>
     <string name="quick_search_reinstall_button">重装</string>
-    <string name="setting_default_search_engine_tips">安装内置搜索APP后，在桌面上打开搜索APP或下滑呼出搜索，即可快速搜索应用</string>
+    <string name="setting_default_search_engine_tips">在桌面上下滑呼出搜索，即可快速搜索应用</string>
     <string name="search_searchapp_toast">当前应用</string>
     <string name="search_text">"可搜索应用程序 
  邮件，短信"</string>
@@ -505,4 +505,5 @@
     <string name="icon_setting_footer_text">你可以选择一个普适性图标来替换未被重绘的应用程序的图标，在该应用的图标被重绘后，图标将被替换</string>
     <string name="unlock_animation_title">解锁动画</string>
     <string name="unlock_animation_tips">允许桌面解锁后播放缩放动画</string>
+    <string name="transparent_theme_title">透明主题</string>
 </resources>

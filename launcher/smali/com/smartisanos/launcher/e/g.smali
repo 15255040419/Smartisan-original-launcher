@@ -29,7 +29,7 @@
 
 # virtual methods
 .method public run()V
-    .locals 12
+    .locals 15
 
     const-string v0, "status_bar_number_color"
 
@@ -247,6 +247,36 @@
     invoke-static/range {v5 .. v10}, Lcom/smartisanos/launcher/ua;->setSystemUiDecoration(Landroid/view/WindowManager$LayoutParams;Ljava/lang/String;IIII)Landroid/view/WindowManager$LayoutParams;
 
     move-result-object v11
+
+    invoke-virtual {v4}, Landroid/view/Window;->getDecorView()Landroid/view/View;
+
+    move-result-object v12
+
+    invoke-virtual {v12}, Landroid/view/View;->getSystemUiVisibility()I
+
+    move-result v13
+
+    const/16 v14, 0x2000
+
+    const v0, 0xffffff
+
+    and-int/2addr v0, v1
+
+    const v5, 0x808080
+
+    if-ge v0, v5, :cond_port_clear_light_status_bar
+
+    or-int/2addr v13, v14
+
+    goto :goto_port_apply_light_status_bar
+
+    :cond_port_clear_light_status_bar
+    not-int v14, v14
+
+    and-int/2addr v13, v14
+
+    :goto_port_apply_light_status_bar
+    invoke-virtual {v12, v13}, Landroid/view/View;->setSystemUiVisibility(I)V
     :try_end_0
     .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
 

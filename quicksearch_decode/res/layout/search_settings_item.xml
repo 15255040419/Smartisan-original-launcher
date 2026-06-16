@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout android:background="@drawable/list_item_nophoto_bg" android:descendantFocusability="blocksDescendants" android:layout_width="match_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <CheckBox android:id="@id/item_check" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="12.0dp" android:button="@drawable/selector_check_box_red" android:layout_centerVertical="true" />
-    <ImageView android:id="@id/drag_handle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="6.0dp" android:src="@drawable/selector_small_icon_btn_drag_handle" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
-    <TextView android:textSize="17.0sp" android:textColor="@drawable/setting_item_text_colorlist" android:ellipsize="end" android:id="@id/item_label" android:duplicateParentState="true" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/search_setting_item_text_margin_left" android:maxLines="1" android:layout_toLeftOf="@id/drag_handle" android:layout_toRightOf="@id/item_check" android:layout_centerVertical="true" />
-</RelativeLayout>

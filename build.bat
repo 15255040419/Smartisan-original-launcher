@@ -38,6 +38,7 @@ set "ZIPALIGN=%BUILD_TOOLS%\zipalign.exe"
 set "D8=%BUILD_TOOLS%\d8.bat"
 set "AAPT2=%BUILD_TOOLS%\aapt2.exe"
 set "APKSIGNER=%BUILD_TOOLS%\apksigner.bat"
+set "MANIFEST_BIN=%ROOT%launcher\original\AndroidManifest.xml"
 
 rem Dynamically detect the latest version of android.jar
 set "ANDROID_JAR="
@@ -64,8 +65,6 @@ if not exist "%ANDROID_JAR%" (
   echo Please make sure Android SDK platform is installed.
   exit /b 1
 )
-
-set "MANIFEST_BIN=%ROOT%launcher\original\AndroidManifest.xml"
 
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 
@@ -140,7 +139,11 @@ if exist "%OUT_DIR%\launcher-signed.apk" del /f /q "%OUT_DIR%\launcher-signed.ap
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Milliseconds 500"
 
 if exist "%ZIPALIGN%" (
-  "%ZIPALIGN%" -p -f 4 "%OUT_DIR%\launcher-unsigned.apk" "%OUT_DIR%\launcher-aligned.apk"
+  "%ZIPALIGN%" -P 16 -f 4 "%OUT_DIR%\launcher-unsigned.apk" "%OUT_DIR%\launcher-aligned.apk"
+  if errorlevel 1 (
+    echo WARN: 16KB page zipalign failed, retrying standard alignment.
+    "%ZIPALIGN%" -p -f 4 "%OUT_DIR%\launcher-unsigned.apk" "%OUT_DIR%\launcher-aligned.apk"
+  )
   if errorlevel 1 (
     echo FAIL: zipalign failed.
     exit /b 1

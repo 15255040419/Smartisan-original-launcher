@@ -114,7 +114,7 @@
   <integer name="page_view_margin_top_trans">18</integer>
   <integer name="page_width_trans">1044</integer>
   <integer name="setting_button">100</integer>
-  <integer name="text_font_size">26</integer>
+  <integer name="text_font_size">30</integer>
   <integer name="title_page_spacing">2</integer>
   <integer name="trash_display_height">102</integer>
   <integer name="trash_float_up_height">60</integer>

@@ -5,98 +5,152 @@
 <h1 align="center">Smartisan Launcher Original Port</h1>
 
 <p align="center">
-  原版锤子桌面移植工程，目标是在普通 Android 设备上独立安装、启动和使用，同时尽量保留 Smartisan OS 桌面的宫格、主题、图标、壁纸、搜索和设置体验。
-</p>
-
-<p align="center">
-  <strong>当前工程：</strong>smartisan-launcher-original-port
-  ·
-  <strong>主要参考：</strong>smartisan-launcher-maintained
+  原版锤子桌面移植工程，用于在普通 Android 设备上独立安装和使用，同时尽量保留 Smartisan OS 桌面的宫格、主题、图标、壁纸、搜索和设置体验。
 </p>
 
 ---
 
-## 项目概览
+## 当前状态
 
-本项目基于从锤子手机提取的原版桌面 `com.smartisanos.launcher-3.apk`，将原版 Smartisan Launcher 移植为可在普通 Android 环境中运行的独立 APK。
-
-`E:\FANG\smartisan\smartisan-launcher-maintained` 是主要参考项目，用来对照普通 Android 兼容逻辑、设置页结构、搜索页、主题下载、图标识别、图标替换、多用户应用查询和常见交互细节。本工程保留原版桌面的 12 / 20 宫格方向，不直接替换成 maintained 的桌面主体。
-
-## 参考来源
-
-| 类型 | 路径 / 文件 |
-| --- | --- |
-| 当前工程 | `E:\FANG\smartisan\smartisan-launcher-original-port` |
-| maintained 参考工程 | `E:\FANG\smartisan\smartisan-launcher-maintained` |
-| 原版桌面 APK | `com.smartisanos.launcher-3.apk` |
-| 原生设置 APK | `com.android.settings-100.apk` |
-| 原生桌面 / 壁纸相关 APK | `com.smartisanos.desktop-3.apk`、`com.smartisanos.wallpaperprovider-100.apk` |
-| 毛玻璃主题 APK | `com.smartisanos.launcher.theme.aero.apk` |
-
-## 当前进度
-
-当前 APK 可以构建、签名、安装和启动，输出文件为：
+当前桌面主 APK：
 
 ```text
 build\launcher-signed.apk
 ```
 
-当前兼容安装基线：
+当前透明主题兼容包：
 
 ```text
-minSdkVersion: 23
-targetSdkVersion: 28
-APK size: about 65.7 MB
+build\theme-trans-signed.apk
 ```
 
-当前发布版本为 `v1.4.8 (24)`。桌面主体、桌面设置入口、12 / 20 宫格、主题页、壁纸入口、翻页动画页、应用图标页、桌面图标大小、独立内置搜索、检查更新、关于我们、强迫症选项和多个设置开关已经接入。设置页当前由 `com.smartisanos.launcher.theme.ThemeChooserActivity` 承载，内部加载 maintained 风格资源和当前工程的兼容逻辑。
+当前版本和兼容基线：
 
-详细开发过程、每天修复了哪些问题、验证记录和历史原因见 [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md)。README 只记录当前项目状态，不记录每日流水账。
+```text
+versionName: v1.4.8
+versionCode: 24
+minSdkVersion: 23
+targetSdkVersion: 28
+Android compatibility: Android 6.0+ (API 23+), including Android 15
+launcher APK size: about 50.2 MB
+```
+
+当前工程保留原版桌面的 `12 / 20 宫格` 方向，不再退回 maintained 的 `9 / 16 宫格` 语义。
+
+## 安装
+
+先安装桌面主 APK：
+
+```bat
+adb install -r -d build\launcher-signed.apk
+adb shell am start -n com.smartisanos.launcher/.Launcher
+```
+
+透明主题是独立主题包，不打进桌面主 APK。需要透明主题时，再安装兼容重签包：
+
+```bat
+adb install -r -d build\theme-trans-signed.apk
+adb shell pm list packages | findstr com.smartisanos.launcher.theme.trans
+```
+
+安装后包名应为：
+
+```text
+com.smartisanos.launcher.theme.trans
+```
+
+不要给 Android 15 用户安装 `original_apks\com.smartisanos.launcher.theme.trans.apk`。它是原始参考包，`targetSdkVersion=17`，新系统可能拦截旧 target SDK 应用安装；`build\theme-trans-signed.apk` 已调整为 `minSdkVersion=23`、`targetSdkVersion=28`，用于普通 Android 和 Android 15。
 
 ## 已实现
 
-| 模块 | 状态 | 说明 |
-| --- | --- | --- |
-| 桌面主体 | 已接入 | 支持独立 APK 启动、桌面虚拟设置入口、12 / 20 宫格、Dock、基础坐标和多分辨率适配。 |
-| 桌面设置 | 已接入 | 主入口迁移为 maintained 风格结构，包含桌面主题、桌面壁纸、桌面翻页动画、应用图标、强迫症选项、检查更新、关于我们等入口。 |
-| 主题 | 已接入 | 支持本地主题、在线主题、主题详情、主题下载、主题设定、主题切换动画和毛玻璃主题壁纸链路。 |
-| 壁纸 | 已接入 | 支持系统图片选择、私有壁纸副本、缩略图、毛玻璃主题壁纸应用和恢复默认壁纸。 |
-| 翻页动画 | 已接入 | 支持默认、立体翻转、百叶窗、切牌等常见动画值，并保存兼容配置。 |
-| 应用图标 | 已接入 | 支持系统原图、图标包 appfilter、redirect、自定义图片、桌面图标大小调节和桌面主图标加载链路。 |
-| 图标识别 | 已接入，继续回归 | 已对照 maintained 调整图标识别逻辑，减少普通应用被识别成应用商店等错误图标的概率，并保留当前项目已有的图标识别能力。 |
-| 应用分身 | 已接入，继续回归 | 已接入多用户 / 双开应用查询、显示和启动路径，支持为分身应用叠加原版风格面具标记。 |
-| 内置搜索 | 已接入，继续微调 | 搜索 APK 已独立发布为 `SmartisanQuickSearch.apk`，不再打进桌面主包；未安装时“启用下滑搜索”开关会在页面绑定和点击开启时回落关闭并引导从 Gitee 下载，安装后支持桌面图标打开或下滑呼出搜索。 |
-| 检查更新 | 已接入 | 支持 Gitee Release 版本检查，只识别 `launcher-` 软件标签，更新包下载有弹窗和状态栏进度，下载完成后启动安装。 |
-| 设置开关 | 已接入 | 已接入隐藏虚拟键、隐藏图标名称、解锁动画、角标隐藏、横扫清除角标、下滑搜索等开关。 |
-| 毛玻璃主题 | 已接入 | 已接入原版毛玻璃主题包资源，桌面文字和编辑页文字按白色文字效果显示。 |
-| 构建签名 | 已接入 | `build.bat` 会完成资源编译、APK 构建、zipalign 和 apksigner 签名。 |
+| 模块 | 当前状态 |
+| --- | --- |
+| 桌面主体 | 支持独立 APK 启动、桌面虚拟设置入口、12 / 20 宫格、Dock、基础坐标和多分辨率适配。 |
+| 桌面设置 | 由 `com.smartisanos.launcher.theme.ThemeChooserActivity` 承载，使用 maintained 风格资源和当前工程兼容逻辑。 |
+| 主题 | 支持本地主题、在线主题、主题详情、主题下载、主题设定、主题切换动画、毛玻璃主题和透明主题覆盖状态。 |
+| 壁纸 | 支持系统图片选择、私有壁纸副本、缩略图、毛玻璃 / 透明主题壁纸应用和恢复默认壁纸。 |
+| 翻页动画 | 支持默认、立体翻转、百叶窗、切牌等动画值；透明主题开启后强制使用默认动画。 |
+| 应用图标 | 支持系统原图、图标包 appfilter、redirect、自定义图片、桌面图标大小调节和桌面主图标加载链路。 |
+| 应用分身 | 已接入多用户 / 双开应用查询、显示和启动路径，支持为分身应用叠加原版风格面具标记。 |
+| 自绘搜索页 | 搜索页由 launcher 内 `ThemeChooserActivity` / `MaintainedLauncherSettingsHost.showSearchPage()` 自绘，不再依赖、下载或构建锤子独立搜索 APK。 |
+| 检查更新 | 支持 Gitee Release 版本检查，只识别 `launcher-` 软件标签，下载有弹窗和状态栏进度，完成后启动安装。 |
+| 毛玻璃主题 | 已接入原版毛玻璃主题资源，状态栏文字和桌面应用文字按壁纸明暗在默认 / `_light` 资源之间切换。 |
+| 透明主题 | 安装 `build\theme-trans-signed.apk` 后可用；透明状态写入 `launcher_grid_theme=1/0`，普通主题仍走 `launcher_theme`。 |
 
-## 待实现
+## 最近修复
 
-- 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议优先拉起系统或已安装天气应用。
-- 日历：当前保留日历权限和动态图标资源线索，但桌面日期刷新、点击入口和系统日历兼容还未完整回归。
-- 通知角标通用化：当前桌面已有旧 Smartisan 未读数广播入口和角标绘制逻辑，但普通 Android 上不能保证微信等应用有通知就自动显示角标；后续需要通知监听或厂商 badge 兼容桥。
-- 原生 Smartisan Settings：当前设置页仍由 launcher 包内 `ThemeChooserActivity` 承载 maintained 风格兼容页，还不是完整移植的原生 Smartisan Settings Activity / Fragment。
-- 在线主题安装：普通应用不能静默安装主题 APK，下载完成后仍需要用户手动确认安装。
-- 包体继续压缩：`theme_preview`、`assets/Textures/1080p`、`settings_maintained/maintained-settings-res.apk` 仍占用较多空间，后续需要逐项替代或合并资源，不能直接删除。内置搜索 APK 已拆分为独立下载资产。
+- 自绘搜索页误触：只保留 `Launcher.smali` 顶层搜索手势入口，移除 `RootView.smali` / `SMGLSurfaceView.smali` 重复触发；搜索手势改为松手确认，并限制单指、起始区域、下滑距离、纵向角度、时长和冷却。
+- 搜索页样式：右侧“搜索历史”清除按钮缩小并和标题水平对齐。
+- 透明主题位置：主设置页中“透明主题”移动到“强迫症选项”下面。
+- 透明主题动画限制：开启透明主题后隐藏“桌面翻页动画”入口，读写翻页动画时钳制为默认动画 `0`。
+- 透明 / 毛玻璃主题文字：状态栏文字和桌面应用文字按壁纸明暗切换；浅色壁纸走 `_light` 资源，普通不透明主题仍使用主题自身文字资源。
+- 壁纸模糊链路：桌面壁纸模糊开关走原版 `original_launcher_wallpaper_blur_on` 和 `Eb.lh()` 重建 `t_blur_background`，不再手动替换主壁纸 bitmap。
+- 文档同步：当前桌面主 APK 约 `50.2MB`；透明主题 Android 15 安装包明确为 `build\theme-trans-signed.apk`。
 
-## 已知 BUG / 待回归
+## 发布资产
 
-- 应用分身在不同品牌手机上的包名、用户 ID 和启动行为可能不同，需要继续用 OPPO、vivo、小米、荣耀、模拟器等环境回归。
-- 微信分身面具标记已经接入，但面具大小、位置和不同图标尺寸下的观感仍需要继续对照原版微调。
-- MuMu 模拟器存在桌面图标不显示的兼容风险，当前已对 adaptive drawable、图标归一化和跨用户查询 fallback 做兼容，已验证可避免原版分身查询权限异常导致的桌面空白，但仍需要继续实机 / 模拟器回归。
-- 图标识别仍可能遇到同名、别名、厂商魔改包名或系统应用名称不一致的问题，需要继续按实际截图补规则。
-- 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画仍需要更多分辨率和真机回归。
-- 透明主题下 Dock 区域、毛玻璃背景、状态栏颜色在部分系统上仍需要继续截图对比。
-- 检查更新依赖 Gitee 下载仓库 Release 和 APK 资产，后续每次发布新版本都需要同步提升文本 Manifest、二进制 Manifest 版本，并发布 `launcher-` 标签资产。
-- 独立内置搜索当前补入了普通 Android 兼容的 `HanziToPinyin` 兜底类，可避免缺少锤子系统类时启动崩溃；完整拼音转换效果仍可继续增强。
+发布到 GitHub Release 和 Gitee Release 时，当前推荐同时上传这些资产：
 
-## 构建与安装
+| 资产 | 用途 |
+| --- | --- |
+| `build\launcher-signed.apk` | 桌面主 APK。 |
+| `build\theme-trans-signed.apk` | 透明主题 Android 15 兼容包，用户需要使用“透明主题”时安装。 |
+
+不要上传 `original_apks\com.smartisanos.launcher.theme.trans.apk` 作为用户安装包；它只作为原始资源参考。
+
+## 透明主题规则
+
+透明主题不是普通主题 ID，也不是毛玻璃主题包。
+
+```text
+runtime id:      smartisan_theme_trans
+theme package:   com.smartisanos.launcher.theme.trans
+install apk:     build\theme-trans-signed.apk
+state key:       launcher_grid_theme
+normal theme key: launcher_theme
+```
+
+注意事项：
+
+- 开启透明主题只写 `launcher_grid_theme=1`，不要把 `smartisan_theme_trans` 写入普通 `launcher_theme`。
+- 关闭透明主题写回 `launcher_grid_theme=0`，并恢复之前保存的普通主题。
+- 未安装 `com.smartisanos.launcher.theme.trans` 时，设置页不允许开启“透明主题”。
+- 透明主题开启后只能使用默认翻页动画，设置页会隐藏“桌面翻页动画”。
+- 透明主题壁纸和模糊必须保持原版链路：`background.png` 是主背景纹理，`t_blur_background` 是模糊纹理，不要互相覆盖。
+
+## 待处理
+
+- 透明主题 Dock 区域、毛玻璃背景仍需要继续截图对比，重点看 Dock 半透明层、虚拟导航栏高度和壁纸裁切。
+- 应用分身在不同品牌手机上的包名、用户 ID 和启动行为可能不同，还需要 OPPO、vivo、小米、荣耀、模拟器等环境回归。
+- 微信分身面具标记已经接入，但面具大小、位置和不同图标尺寸下的观感仍需继续对照原版微调。
+- 天气和日历保留了旧 Smartisan 资源与权限线索，但入口、刷新和普通 Android 兼容还没有完整回归。
+- 普通 Android 通知角标不能简单等同于“应用有通知就一定显示”，后续需要通知监听或厂商 badge 兼容桥。
+- 在线主题 APK 下载后仍依赖用户手动确认安装，普通应用没有静默安装能力。
+
+## 文档分工
+
+| 文档 | 用途 |
+| --- | --- |
+| `README.md` | 当前版本能做什么、怎么构建安装、当前注意事项。 |
+| `DEVELOPMENT_LOG.md` | 每天修了什么、为什么这么修、历史验证和回归注意。 |
+| `APK_INVENTORY.md` | 原始 APK、反编译缓存、透明主题包和参考资源清单；不合并进 README。 |
+
+## 构建
 
 ```bat
 build.bat
-adb install -r -d build\launcher-signed.apk
-adb shell am start -n com.smartisanos.launcher/.Launcher
+```
+
+构建脚本输出桌面主 APK：
+
+```text
+build\launcher-signed.apk
+```
+
+透明主题兼容包当前保留为：
+
+```text
+build\theme-trans-signed.apk
 ```
 
 常用验证入口：
@@ -104,14 +158,6 @@ adb shell am start -n com.smartisanos.launcher/.Launcher
 ```bat
 adb shell am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity
 adb shell dumpsys activity activities
-```
-
-构建后如果需要清理 `build` 目录，当前只需要保留：
-
-```text
-build\launcher-signed.apk
-build\launcher-signed.apk.idsig
-build\tools
 ```
 
 ## 主要文件

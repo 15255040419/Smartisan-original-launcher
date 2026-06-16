@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:smartisan="http://schemas.android.com/apk/res-auto">
-    <TextView android:id="@id/sortkey" android:layout_width="match_parent" android:layout_height="wrap_content" style="@style/StickyListHeaderStyle" />
-    <ImageView android:id="@id/clear_history" android:paddingLeft="9.0dp" android:paddingRight="9.0dp" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="30.0dp" android:src="@drawable/history_clear_btn" android:scaleType="centerInside" android:layout_alignParentRight="true" android:layout_centerVertical="true" android:contentDescription="@string/accessibility_clear_history_text" />
-</RelativeLayout>

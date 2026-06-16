@@ -2390,7 +2390,7 @@
 
     const/4 p1, 0x0
 
-    const-wide/16 v0, 0xbb8
+    const-wide/16 v0, 0x3e8
 
     invoke-virtual {p0, p1, v0, v1}, Landroid/os/Handler;->sendEmptyMessageDelayed(IJ)Z
 
