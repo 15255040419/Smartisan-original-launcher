@@ -1,8 +1,21 @@
 # 原始 APK 清单
 
-本文档记录 `original_apks/` 目录下每个 APK 的用途、当前项目里的反编译目录，以及使用时需要注意的坑。后续查原版实现时先看这里，避免重复反编译。
+## 本文档职责
 
-本文档不合并进 `README.md`：README 只写当前工程状态、构建和安装方法；本文件保留原始 APK、反编译缓存和主题包细节，避免 README 变回长流水账。
+本文档负责记录 `original_apks/` 目录下每个 APK 的用途、当前项目里的反编译目录、主题包身份、当前构建产物和 Release 资产筛选规则。后续查原版实现、透明主题包、毛玻璃主题包、哪些 APK 该上传 Release 时先看这里。
+
+本文档和其他文档的边界：
+
+- README 只写用户当前该安装哪个 APK、当前兼容哪些 Android 版本；不要把本文件的反编译目录和原始 APK 细节合并进 README。
+- `DEVELOPMENT_LOG.md` 记录为什么修、怎么验证；本文件只保留资产身份和长期规则。
+- `BUILD_AND_VERSION_NOTES.md` 记录构建工具、签名、版本号和二进制 Manifest 修改；本文件不写版本号修改脚本。
+
+必须同步更新本文档的情况：
+
+- 新增、删除或替换 `original_apks/` 里的 APK。
+- 新增、删除或重建反编译目录。
+- 透明主题 / 毛玻璃主题包身份、包名、`theme_id` 或安装包路径变化。
+- GitHub / Gitee Release 上传资产规则变化，尤其是桌面内“检查更新”应该选择或跳过哪些 APK。
 
 项目根目录：
 
@@ -19,16 +32,16 @@ E:\FANG\smartisan\smartisan-launcher-original-port
 | `original_apks/com.android.settings-100.apk` | 原版 Smartisan 设置 APK。用于对照桌面设置页、预览组件、壁纸 UI 和系统设置 key。 | `build/decompiled_theme_check/com.android.settings-100/` | 临时参考缓存 | 可以查看 smali / resources，但因为缺少 Smartisan framework 资源，这个缓存没有完整 `apktool.yml`。只当只读参考。 |
 | `original_apks/com.smartisanos.launcher.theme.aero.apk` | 毛玻璃 / 半透明桌面主题包。 | `build/decompiled_theme_check/com.smartisanos.launcher.theme.aero/` | 完整参考反编译目录 | 包名是 `com.smartisanos.launcher.theme.aero`，内部 `theme_id` 是 `smartisan_theme_aero`。 |
 | `original_apks/com.smartisanos.launcher.theme.glime.apk` | Glime 桌面主题包。用于对照同一类主题包如何共享相同 `theme_id`。 | `build/decompiled_theme_check/com.smartisanos.launcher.theme.glime/` | 完整参考反编译目录 | 包名是 `com.smartisanos.launcher.theme.glime`，内部 `theme_id` 也是 `smartisan_theme_aero`，所以应用这类主题时包名很重要。 |
-| `original_apks/com.smartisanos.launcher.theme.trans.apk` | 原始透明主题包。它是原版透明主题资源参考，不等于毛玻璃主题。 | `build/decompiled_theme_check/com.smartisanos.launcher.theme.trans/` | 完整参考反编译目录 | 包名是 `com.smartisanos.launcher.theme.trans`，内部 `theme_id` 是 `smartisan_theme_aero`；原始包 `targetSdkVersion=17`，Android 15 不建议直接安装。 |
+| `original_apks/com.smartisanos.launcher.theme.trans.apk` | 原始透明主题包。它是原版透明主题资源参考，不等于毛玻璃主题。 | `build/decompiled_theme_check/com.smartisanos.launcher.theme.trans/` | 完整参考反编译目录 | 包名是 `com.smartisanos.launcher.theme.trans`，内部 `theme_id` 是 `smartisan_theme_aero`；原始包 `targetSdkVersion=17`，Android 15 / Android 16 不建议直接安装。 |
 | `original_apks/com.smartisanos.wallpaperprovider-100.apk` | 原版 Smartisan 壁纸提供器。用于对照内置壁纸、壁纸选择流程和 provider UI / 资源。 | `build/decompiled_theme_check/com.smartisanos.wallpaperprovider-100/` | 部分参考缓存 | Apktool 解出了 `smali/` 和 `res/`，但因为缺少 Smartisan framework 资源，manifest / yml 没有完整生成。只当只读参考。 |
 
 ## 当前构建产物
 
 | 文件 | 当前用途 | 备注 |
 | --- | --- | --- |
-| `build/launcher-signed.apk` | 当前桌面主 APK。 | 最近构建大小约 `50.2MB`，`minSdkVersion=23`、`targetSdkVersion=28`，可安装基线为 Android 6.0+，包含 Android 15；不包含独立 QuickSearch APK；发布 GitHub / Gitee Release 时需要上传。 |
-| `build/theme-trans-signed.apk` | 当前透明主题安装包。 | 安装后包名为 `com.smartisanos.launcher.theme.trans`；`minSdkVersion=23`、`targetSdkVersion=28`，Android 15 使用这个包；发布 GitHub / Gitee Release 时建议随主 APK 一起上传。 |
-| `original_apks/com.smartisanos.launcher.theme.trans.apk` | 原始透明主题参考包。 | `minSdkVersion=29`、`targetSdkVersion=17`；只作资源参考，不作为 Android 15 安装包。 |
+| `build/launcher-signed.apk` | 当前桌面主 APK。 | 最近构建大小约 `50.2MB`，`compileSdkVersion=36`、`minSdkVersion=23`、`targetSdkVersion=28`，可安装基线为 Android 6.0+，包含 Android 15 / Android 16；不包含独立 QuickSearch APK；发布 GitHub / Gitee Release 时需要上传。 |
+| `build/theme-trans-signed.apk` | 当前透明主题安装包。 | 安装后包名为 `com.smartisanos.launcher.theme.trans`；`compileSdkVersion=36`、`minSdkVersion=23`、`targetSdkVersion=28`，Android 15 / Android 16 使用这个包；发布 GitHub / Gitee Release 时建议随主 APK 一起上传。 |
+| `original_apks/com.smartisanos.launcher.theme.trans.apk` | 原始透明主题参考包。 | `minSdkVersion=29`、`targetSdkVersion=17`；只作资源参考，不作为 Android 15 / Android 16 安装包。 |
 | `original_apks/com.smartisanos.launcher.theme.aero.apk` | 毛玻璃主题安装包 / 原版参考。 | 包名为 `com.smartisanos.launcher.theme.aero`，不能当透明主题包使用。 |
 
 ## 已删除的 APK / 目录
@@ -77,7 +90,7 @@ install apk:       build/theme-trans-signed.apk
 
 - 不能把透明主题简单等同于 `com.smartisanos.launcher.theme.aero`，那是毛玻璃主题包。
 - `com.smartisanos.launcher.theme.trans.apk` 的内部 `theme_id` 虽然也是 `smartisan_theme_aero`，但包名不同，资源效果不同。
-- Android 新版本可能会拦截旧版透明主题 APK，因此当前移植版安装透明主题时使用 `build\theme-trans-signed.apk`，不要直接安装 `original_apks\com.smartisanos.launcher.theme.trans.apk`。
+- Android 新版本可能会拦截旧版透明主题 APK，因此当前移植版安装透明主题时使用 `build\theme-trans-signed.apk`，不要直接安装 `original_apks\com.smartisanos.launcher.theme.trans.apk`。当前构建包已用 Android 16 SDK 元数据重新打包，仍保留 `targetSdkVersion=28` 以兼容旧桌面逻辑。
 - 当前做法改回原版方向：桌面设置里的“透明主题”开关只写入原版透明模式键 `launcher_grid_theme`，开启为 `1`、关闭为 `0`；普通主题 ID 只写入 `launcher_theme`。
 - 透明主题包用于补齐原版透明资源注册，但不要把 `smartisan_theme_trans` 当普通主题 ID 写进 `launcher_theme`，也不要把它送进普通主题切换队列；否则关闭透明主题后容易回不到之前主题，甚至出现毛玻璃 / 透明资源混用。
 - 原版主题管理器 `X.ca()` 会清空主题表，之后 `X.va()` 会按当前透明状态查 `smartisan_theme_trans`；移植版必须在 `X.da()` 调 `X.va()` 前重新注册 `com.smartisanos.launcher.theme.trans`，否则透明状态会回落到黑主题资源，表现为黑底 / 黑宫格 / Dock 混用。
@@ -96,3 +109,5 @@ install apk:       build/theme-trans-signed.apk
 - 桌面内“检查更新”只升级桌面主 APK，Release 资产应优先命名为 `SmartisanLauncher-版本.apk` 或 `launcher-signed.apk`。
 - 同一个 `launcher-` Release 可以同时上传 `build/theme-trans-signed.apk`，但更新逻辑会跳过透明主题包；透明主题包仍按安装说明单独安装。
 - 更新逻辑会跳过 `SmartisanQuickSearch.apk`、主题 APK、`theme-trans-signed.apk` 等非桌面主程序资产，避免误把附加包当成桌面覆盖更新包。
+- 更新包下载和安装走系统 `DownloadManager` 标准链路；安装时只使用 `DownloadManager.getUriForDownloadedFile(downloadId)` 返回的 `content://downloads/...` URI，并附加 `FLAG_GRANT_READ_URI_PERMISSION` 拉起系统安装器。不要改回私有文件路径、`file://` 或自建 `PackageInstaller.Session`。
+- 下载时会保存 Release `tag`、APK 文件名和 `downloadId`。再次检查到同一个线上版本时，`STATUS_SUCCESSFUL` 显示“安装”并复用已下载包，`RUNNING/PENDING` 显示“下载中”，失败或资产变化才清理旧缓存重新下载。

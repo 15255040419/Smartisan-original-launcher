@@ -94,16 +94,21 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.json.JSONArray;
@@ -118,6 +123,18 @@ public final class MaintainedLauncherSettingsHost {
     private static Bitmap sPendingThemeScreenshot;
     private static Dialog sLauncherReloadDialog;
     private static final String SETTINGS_ASSET = "settings_maintained/maintained-settings-res.apk";
+    private static final String OPERATION_LOG_PREFS = "launcher_operation_log_prefs";
+    private static final String PREF_OPERATION_LOG_ACTIVE = "operation_log_active";
+    private static final String PREF_OPERATION_LOG_FILE = "operation_log_file";
+    private static final String OPERATION_LOG_DIR = "operation_logs";
+    private static final Object OPERATION_LOG_LOCK = new Object();
+    private static BufferedWriter sOperationLogWriter;
+    private static File sOperationLogFile;
+    private static File sOperationLogcatFile;
+    private static Thread sOperationLogcatThread;
+    private static java.lang.Process sOperationLogcatProcess;
+    private static Thread.UncaughtExceptionHandler sPreviousUncaughtExceptionHandler;
+    private static boolean sOperationLogHandlerInstalled;
     private static float sSearchGestureStartX;
     private static float sSearchGestureStartY;
     private static long sSearchGestureStartTime;
@@ -129,6 +146,10 @@ public final class MaintainedLauncherSettingsHost {
     private static final String QUICK_SEARCH_DOWNLOAD_URL =
             "https://gitee.com/RANH-F/Smartisan-original-launcher-download/releases/download/launcher-1.4.8/SmartisanQuickSearch.apk";
     private static final String QUICK_SEARCH_INSTALL_ACTION = "com.smartisanos.launcher.action.QUICK_SEARCH_INSTALL_STATUS";
+    private static final String UPDATE_INSTALL_ACTION = "com.smartisanos.launcher.action.INSTALL_DOWNLOADED_UPDATE";
+    private static final String EXTRA_UPDATE_APK_PATH = "update_apk_path";
+    private static final String EXTRA_UPDATE_DOWNLOAD_ID = "update_download_id";
+    private static final String PREF_UPDATE_DOWNLOAD_ID = "launcher_update_download_id";
     private static final String SEARCH_PREFS = "launcher_search_prefs";
     private static final String SEARCH_HISTORY_KEY = "search_history_entries";
     private static final String THEME_DOWNLOAD_PREFS = "theme_download_prefs";
@@ -155,10 +176,13 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_PENDING_CUSTOM_ICON_KEY = "pending_custom_icon_key";
     private static final String PREF_PENDING_ICON_SCROLL_Y = "pending_icon_scroll_y";
     private static final int REQUEST_PICK_CUSTOM_ICON = 53026;
+    private static final long SETTINGS_CLICK_GUARD_MS = 800L;
+    private static long sSettingsClickBlockedUntil;
     private static int sRestoreIconPageScrollY = -1;
     private static int sMainSettingsScrollY = -1;
     private static int sThemePageScrollY = -1;
     private static final Map<String, Bitmap> sThemePreviewCache = new HashMap<String, Bitmap>();
+    private static final Map<String, Bitmap> sThemeLargePreviewCache = new HashMap<String, Bitmap>();
     private static final Map<String, Bitmap> sSmartisanIconCache = new HashMap<String, Bitmap>();
     private static final Map<String, Boolean> sSmartisanIconFetchPending = new HashMap<String, Boolean>();
     private static boolean sDoppelgangerBootstrapScheduled;
@@ -173,6 +197,7 @@ public final class MaintainedLauncherSettingsHost {
             "https://gitee.com/RANH-F/Smartisan-original-launcher-download/releases/download/";
     private static final String UPDATE_NOTIFICATION_CHANNEL = "launcher_update_download";
     private static final int UPDATE_NOTIFICATION_ID = 53046;
+    private static final int UPDATE_INSTALL_NOTIFICATION_ID = 53047;
     private static final ThemeEntry[] LOCAL_THEMES = new ThemeEntry[]{
             new ThemeEntry("smartisan_theme_black", "com.smartisanos.home", "经典黑", true),
     };
@@ -226,13 +251,32 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void show(Activity activity, int restoreScrollY) {
         try {
+            resumeOperationLogIfNeeded(activity);
+            cancelScheduledLauncherRestart(activity);
             Intent intent = activity.getIntent();
+            if (intent != null && UPDATE_INSTALL_ACTION.equals(intent.getAction())) {
+                long downloadId = intent.getLongExtra(EXTRA_UPDATE_DOWNLOAD_ID, -1);
+                String path = intent.getStringExtra(EXTRA_UPDATE_APK_PATH);
+                intent.setAction(null);
+                intent.removeExtra(EXTRA_UPDATE_DOWNLOAD_ID);
+                intent.removeExtra(EXTRA_UPDATE_APK_PATH);
+                tuneWindow(activity);
+                if (downloadId != -1) {
+                    installApk(activity, downloadId);
+                } else if (!TextUtils.isEmpty(path)) {
+                    installApkFile(activity, new File(path));
+                } else {
+                    Toast.makeText(activity, "未找到下载的安装包，请重新下载", Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
             if (intent != null && intent.getBooleanExtra("launcher_show_search", false)) {
                 intent.removeExtra("launcher_show_search");
                 tuneWindow(activity);
                 showSearchPage(activity);
                 return;
             }
+            armSettingsClickGuard();
             tuneWindow(activity);
             SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
@@ -241,29 +285,35 @@ public final class MaintainedLauncherSettingsHost {
             tuneScrollBars(root);
             activity.setContentView(root);
             restoreScroll(root, restoreScrollY);
-            scheduleInitialSettingsMigrations(activity);
+            scheduleInitialSettingsMigrationsIfIdle(activity);
         } catch (Throwable t) {
             showFailure(activity, t);
         }
     }
 
-    private static void scheduleInitialSettingsMigrations(Context context) {
+    private static void scheduleInitialSettingsMigrationsIfIdle(Context context) {
         if (context == null) {
             return;
         }
         final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             public void run() {
+                if (app == null || isOperationLogActive(app)) {
+                    return;
+                }
                 new Thread(new Runnable() {
                     public void run() {
+                        try {
+                            Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
+                        } catch (Throwable ignored) {
+                        }
                         migrateBuiltinIconDefaults(app);
                         migrateOldOriginalIconDefaults(app);
                         migrateIconPackDefault(app);
-                        maybeRefreshLauncherIcons(app);
                     }
                 }, "MaintainedSettingsInit").start();
             }
-        }, 350);
+        }, 15000);
     }
 
     private static void migrateBuiltinIconDefaults(Context context) {
@@ -826,7 +876,12 @@ public final class MaintainedLauncherSettingsHost {
         setFirstChildText(resources, root, "setting_ocd_options",
                 getString(resources, "ocd_setting", "OCD Settings"));
         bindCurrentThemePreviewIcon(activity, resources, root, "item_id_themes");
-        bindWallpaperSettingIcon(activity, resources, root);
+        boolean showWallpaperSetting = shouldShowLauncherWallpaperSetting(activity);
+        if (showWallpaperSetting) {
+            bindWallpaperSettingIcon(activity, resources, root);
+        } else {
+            hide(resources, root, "item_id_launcher_wallpaper");
+        }
         if (isTransparentThemeEnabled(activity)) {
             forceDefaultPageAnimation(activity);
             hide(resources, root, "item_id_themes");
@@ -1028,6 +1083,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static void showSearchPage(final Activity activity) {
+        logOperation(activity, "PAGE", "show_search");
         if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, true)) {
             activity.finish();
             return;
@@ -1939,9 +1995,14 @@ public final class MaintainedLauncherSettingsHost {
             if (launcherUri == null || launcherUri.length() == 0) {
                 launcherUri = uri.toString();
             }
+            boolean systemWallpaperApplied = setWallpaperFromUri(activity, Uri.parse(launcherUri));
+            if (!systemWallpaperApplied && !launcherUri.equals(uri.toString())) {
+                systemWallpaperApplied = setWallpaperFromUri(activity, uri);
+            }
             saveGaussianWallpaperCopy(activity, Uri.parse(launcherUri));
             String thumbPath = saveWallpaperThumbnail(activity, Uri.parse(launcherUri));
             syncLauncherWallpaperUri(activity, launcherUri);
+            setLauncherWallpaperConstant(launcherUri);
             try {
                 activity.getSharedPreferences(WALLPAPER_PREFS, Context.MODE_PRIVATE)
                         .edit()
@@ -1951,6 +2012,11 @@ public final class MaintainedLauncherSettingsHost {
                         .commit();
             } catch (Throwable ignored) {
             }
+            logOperation(activity, "WALLPAPER", "picked uri=" + launcherUri
+                    + ", thumb=" + thumbPath
+                    + ", setSystemWallpaper=" + systemWallpaperApplied);
+            Log.d(LOG_TAG, "Wallpaper picked, set system wallpaper=" + systemWallpaperApplied
+                    + ", uri=" + launcherUri);
             refreshLauncherWallpaperNow(activity);
             markWallpaperRefreshPending(activity, true);
             Toast.makeText(activity, "桌面壁纸已应用", Toast.LENGTH_SHORT).show();
@@ -1972,8 +2038,11 @@ public final class MaintainedLauncherSettingsHost {
             if (Build.VERSION.SDK_INT >= 24) {
                 try {
                     wallpaperManager.setStream(in, null, true, WallpaperManager.FLAG_SYSTEM);
+                    Log.d(LOG_TAG, "set system wallpaper with FLAG_SYSTEM ok: " + uri);
                     return true;
-                } catch (Throwable ignored) {
+                } catch (Throwable t) {
+                    Log.w(LOG_TAG, "set system wallpaper with FLAG_SYSTEM failed, retry legacy: "
+                            + shortError(t));
                     try {
                         in.close();
                     } catch (Throwable ignoredAgain) {
@@ -1985,8 +2054,10 @@ public final class MaintainedLauncherSettingsHost {
                 return false;
             }
             wallpaperManager.setStream(in);
+            Log.d(LOG_TAG, "set system wallpaper legacy ok: " + uri);
             return true;
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            Log.w(LOG_TAG, "set system wallpaper failed: " + shortError(t));
             return false;
         } finally {
             if (in != null) {
@@ -2085,7 +2156,9 @@ public final class MaintainedLauncherSettingsHost {
         }
         try {
             Settings.Global.putString(context.getContentResolver(), PREF_WALLPAPER_URI, uri);
-        } catch (Throwable ignored) {
+            logOperation(context, "WALLPAPER", "settings_global_write_ok");
+        } catch (Throwable t) {
+            logOperation(context, "WALLPAPER", "settings_global_write_failed " + shortError(t));
         }
     }
 
@@ -2245,10 +2318,15 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static boolean isLauncherWallpaperTheme(Context context) {
+        return shouldShowLauncherWallpaperSetting(context);
+    }
+
+    private static boolean shouldShowLauncherWallpaperSetting(Context context) {
+        if (isTransparentThemeEnabled(context)) {
+            return true;
+        }
         String id = currentTheme(context);
-        return "smartisan_theme_aero".equals(id)
-                || "smartisan_theme_trans".equals(id)
-                || isTransparentThemeEnabled(context);
+        return "smartisan_theme_aero".equals(id);
     }
 
     private static Bitmap decodeUriBitmap(Context context, Uri uri, int target) {
@@ -2357,6 +2435,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showThemePage(final Activity activity, final int restoreScrollY) {
+        logOperation(activity, "PAGE", "show_theme, restoreScrollY=" + restoreScrollY);
         try {
             tuneWindow(activity);
             final SettingsResourceContext context = createSettingsContext(activity);
@@ -2549,7 +2628,9 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showWallpaperPage(final Activity activity) {
+        logOperation(activity, "PAGE", "show_wallpaper");
         try {
+            armSettingsClickGuard();
             tuneWindow(activity);
             SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
@@ -2716,7 +2797,7 @@ public final class MaintainedLauncherSettingsHost {
             View row = adapter.getView(i, null, content);
             if (listeners != null && i < listeners.length && listeners[i] != null) {
                 row.setClickable(true);
-                row.setOnClickListener(listeners[i]);
+                row.setOnClickListener(guardedSettingsClick("list_row_" + i, listeners[i]));
             }
             content.addView(row);
         }
@@ -2913,6 +2994,11 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void pickWallpaper(Activity activity) {
+        if (isSettingsClickGuardActive("pick_wallpaper")) {
+            return;
+        }
+        logOperation(activity, "ACTION", "pick_wallpaper");
+        Log.d(LOG_TAG, "pickWallpaper requested by user");
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("image/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -3670,7 +3756,11 @@ public final class MaintainedLauncherSettingsHost {
         String uri = selectedWallpaperUri(context);
         if (uri != null && uri.length() > 0) {
             syncLauncherWallpaperUri(context, uri);
+            setLauncherWallpaperConstant(uri);
         }
+        logOperation(context, "WALLPAPER", "apply_change uri=" + uri
+                + ", transparent=" + isTransparentThemeEnabled(context)
+                + ", wallpaperTheme=" + isLauncherWallpaperTheme(context));
         try {
             Intent intent = new Intent("com.smartisanos.launcher.wallpaper_changed");
             context.sendBroadcast(intent);
@@ -3682,10 +3772,7 @@ public final class MaintainedLauncherSettingsHost {
             context.sendBroadcast(intent);
         } catch (Throwable ignored) {
         }
-        try {
-            context.sendBroadcast(new Intent(Intent.ACTION_WALLPAPER_CHANGED));
-        } catch (Throwable ignored) {
-        }
+        logOperation(context, "WALLPAPER", "skip_protected_wallpaper_changed_broadcast");
         try {
             notifyOriginalConfigChanged("launcher_wallpaper_uri");
             notifyOriginalConfigChanged(KEY_LOCKSCREEN_BACKGROUND);
@@ -3712,6 +3799,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void restoreDefaultWallpaper(Activity activity) {
+        logOperation(activity, "ACTION", "restore_default_wallpaper");
         try {
             clearLauncherWallpaper(activity);
             Toast.makeText(activity, "已恢复默认壁纸", Toast.LENGTH_SHORT).show();
@@ -3838,21 +3926,20 @@ public final class MaintainedLauncherSettingsHost {
         markThemeReloadLoadingPending(context, "正在加载桌面...");
         if (context instanceof Activity) {
             showRestartLoading((Activity) context);
+        } else {
+            scheduleLauncherRestart(context);
         }
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                scheduleLauncherRestart(context);
-                if (context instanceof Activity) {
-                    finishSettingsTask((Activity) context);
-                }
-                try {
-                    Process.killProcess(Process.myPid());
-                } catch (Throwable ignored) {
-                    startLauncherFromForeground(context);
-                }
-            }
-        }, 420);
+        if (context instanceof Activity) {
+            logOperation(context, "RESTART", "process_rebirth_for_launcher_reload");
+            finishSettingsTask((Activity) context);
+        } else {
+            logOperation(context, "RESTART", "scheduled_process_rebirth_for_launcher_reload");
+        }
+        try {
+            Process.killProcess(Process.myPid());
+        } catch (Throwable ignored) {
+            startLauncherFromForeground(context);
+        }
     }
 
     private static void restartLauncherByRecreate(final Activity activity) {
@@ -4033,6 +4120,27 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    private static void cancelScheduledLauncherRestart(Context context) {
+        try {
+            Intent intent = launcherHomeIntent(context);
+            int flags = PendingIntent.FLAG_NO_CREATE;
+            if (Build.VERSION.SDK_INT >= 23) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getActivity(context, 1001, intent, flags);
+            if (pendingIntent == null) {
+                return;
+            }
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null) {
+                alarmManager.cancel(pendingIntent);
+            }
+            pendingIntent.cancel();
+            logOperation(context, "RESTART", "cancel_stale_launcher_restart_alarm");
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static void startLauncherFromForeground(Context context) {
         try {
             Context launchContext = context;
@@ -4060,17 +4168,54 @@ public final class MaintainedLauncherSettingsHost {
     private static void refreshLauncherWallpaperNow(final Context context) {
         applyWallpaperChange(context);
         refreshLauncherWallpaperSurface();
+        refreshLauncherAfterWallpaperUriChanged(context);
         Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(new Runnable() {
             public void run() {
                 refreshLauncherWallpaperSurface();
+                refreshLauncherAfterWallpaperUriChanged(context);
             }
         }, 120);
         handler.postDelayed(new Runnable() {
             public void run() {
                 refreshLauncherWallpaperSurface();
+                refreshLauncherAfterWallpaperUriChanged(context);
             }
         }, 420);
+    }
+
+    private static void refreshLauncherAfterWallpaperUriChanged(Context context) {
+        try {
+            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
+                    .getMethod("getInstance").invoke(null);
+            if (mainView != null) {
+                try {
+                    mainView.getClass().getMethod("Vh").invoke(mainView);
+                    logOperation(context, "WALLPAPER", "refresh_mainview_vh_ok");
+                    return;
+                } catch (Throwable t) {
+                    logOperation(context, "WALLPAPER", "refresh_mainview_vh_failed " + shortError(t));
+                }
+                try {
+                    mainView.getClass().getMethod("oh").invoke(mainView);
+                } catch (Throwable ignored) {
+                }
+                try {
+                    mainView.getClass().getMethod("Z", Boolean.TYPE).invoke(mainView, Boolean.TRUE);
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable t) {
+            logOperation(context, "WALLPAPER", "refresh_mainview_extra_failed " + shortError(t));
+        }
+        try {
+            Object renderer = Class.forName("com.smartisanos.smengine.Ra")
+                    .getMethod("getInstance").invoke(null);
+            if (renderer != null) {
+                renderer.getClass().getMethod("wt").invoke(renderer);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void markWallpaperRefreshPending(Context context, boolean pending) {
@@ -4287,9 +4432,9 @@ public final class MaintainedLauncherSettingsHost {
         tagThemeDetailControl(btnDownload, entry);
         tagThemeDetailControl(statusIcon, entry);
         if (previewImg != null) {
-            Bitmap bitmap = themeLargePreviewBitmap(activity, entry.id);
+            Bitmap bitmap = maskedThemeLargePreviewBitmapCached(activity, resources, entry.id);
             if (bitmap != null) {
-                previewImg.setImageBitmap(maskedThemeLargePreviewBitmap(resources, bitmap));
+                previewImg.setImageBitmap(bitmap);
             }
         }
         final boolean installed = entry.local || packageInstalled(activity, entry.pkg);
@@ -4646,6 +4791,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void applyTheme(Activity activity, String id, String pkg, String name) {
+        logOperation(activity, "ACTION", "apply_theme id=" + id + ", pkg=" + pkg + ", name=" + name);
         pkg = normalizeThemePackage(activity, id, pkg);
         if ("smartisan_theme_trans".equals(id)) {
             ensureTransparentThemeRegistered(activity);
@@ -4978,6 +5124,53 @@ public final class MaintainedLauncherSettingsHost {
         return null;
     }
 
+    private static CachedUpdateDownload cachedUpdateDownload(Context context, String tag, String apkName) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(THEME_DOWNLOAD_PREFS, Context.MODE_PRIVATE);
+            long id = prefs.getLong(PREF_UPDATE_DOWNLOAD_ID, -1);
+            if (id == -1) {
+                return null;
+            }
+            String savedTag = prefs.getString(PREF_UPDATE_DOWNLOAD_ID + ".tag", "");
+            String savedName = prefs.getString(PREF_UPDATE_DOWNLOAD_ID + ".name", "");
+            if (tag != null && tag.length() > 0 && savedTag != null && savedTag.length() > 0
+                    && !tag.equals(savedTag)) {
+                return null;
+            }
+            if (apkName != null && apkName.length() > 0 && savedName != null && savedName.length() > 0
+                    && !apkName.equals(savedName)) {
+                return null;
+            }
+            int status = getDownloadStatus(context, id);
+            if (status == DownloadManager.STATUS_SUCCESSFUL
+                    || status == DownloadManager.STATUS_RUNNING
+                    || status == DownloadManager.STATUS_PENDING) {
+                return new CachedUpdateDownload(id, status);
+            }
+            if (status == DownloadManager.STATUS_FAILED || status == -1) {
+                clearCachedUpdateDownload(context, id);
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private static void clearCachedUpdateDownload(Context context, long downloadId) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(THEME_DOWNLOAD_PREFS, Context.MODE_PRIVATE);
+            prefs.edit()
+                    .remove(PREF_UPDATE_DOWNLOAD_ID)
+                    .remove(PREF_UPDATE_DOWNLOAD_ID + ".path")
+                    .remove(PREF_UPDATE_DOWNLOAD_ID + ".url")
+                    .remove(PREF_UPDATE_DOWNLOAD_ID + ".tag")
+                    .remove(PREF_UPDATE_DOWNLOAD_ID + ".name")
+                    .remove(String.valueOf(downloadId))
+                    .remove(String.valueOf(downloadId) + ".path")
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static void installApk(Activity activity, long downloadId) {
         installApk(activity, downloadId, null, null, null, null);
     }
@@ -5290,6 +5483,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void openDefaultHomeSettings(Activity activity) {
+        logOperation(activity, "ACTION", "open_default_home_settings");
         if (requestHomeRole(activity)) return;
         if (startAction(activity, "android.settings.HOME_SETTINGS")) return;
         if (startAction(activity, "android.settings.MANAGE_DEFAULT_APPS_SETTINGS")) return;
@@ -5399,6 +5593,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void checkForUpdates(final Activity activity) {
+        logOperation(activity, "ACTION", "check_for_updates");
         Toast.makeText(activity, "正在检查更新...", Toast.LENGTH_SHORT).show();
         final Handler handler = new Handler(Looper.getMainLooper());
         new Thread(new Runnable() {
@@ -5486,8 +5681,25 @@ public final class MaintainedLauncherSettingsHost {
                                         : finalBody;
                                 message += "\n\n" + shortBody;
                             }
-                            showConfirmDialog(activity, "发现新版本", message, "取消", "下载", new View.OnClickListener() {
+                            final CachedUpdateDownload cached = cachedUpdateDownload(activity, tag, finalApkName);
+                            String positive = "下载";
+                            if (cached != null && cached.status == DownloadManager.STATUS_SUCCESSFUL) {
+                                positive = "安装";
+                            } else if (cached != null && (cached.status == DownloadManager.STATUS_RUNNING
+                                    || cached.status == DownloadManager.STATUS_PENDING)) {
+                                positive = "下载中";
+                            }
+                            showConfirmDialog(activity, "发现新版本", message, "取消", positive, new View.OnClickListener() {
                                 public void onClick(View v) {
+                                    if (cached != null && cached.status == DownloadManager.STATUS_SUCCESSFUL) {
+                                        installApk(activity, cached.downloadId);
+                                        return;
+                                    }
+                                    if (cached != null && (cached.status == DownloadManager.STATUS_RUNNING
+                                            || cached.status == DownloadManager.STATUS_PENDING)) {
+                                        Toast.makeText(activity, "更新包正在后台下载，请稍后安装", Toast.LENGTH_SHORT).show();
+                                        return;
+                                    }
                                     downloadUpdateApk(activity, finalApkUrl, finalApkName, tag);
                                 }
                             });
@@ -5643,8 +5855,10 @@ public final class MaintainedLauncherSettingsHost {
                 }
             } catch (Throwable ignored) {
             }
+            cancelUpdateNotification(activity);
+            cancelPreviousUpdateDownload(activity);
             Toast.makeText(activity, "已开始下载更新包", Toast.LENGTH_SHORT).show();
-            downloadUpdateApkDirect(activity, updateDownloadCandidates(tag, name, url), out,
+            downloadUpdateApkWithDownloadManager(activity, updateDownloadCandidates(tag, name, url), out, tag,
                     showUpdateDownloadProgress(activity));
         } catch (Throwable t) {
             try {
@@ -5664,6 +5878,57 @@ public final class MaintainedLauncherSettingsHost {
             urls.add(githubUrl);
         }
         return urls.toArray(new String[urls.size()]);
+    }
+
+    private static void downloadUpdateApkWithDownloadManager(final Activity activity, final String[] urls,
+                                                             final File out, final String tag,
+                                                             final UpdateDownloadProgress ui) {
+        downloadUpdateApkWithDownloadManager(activity, urls, out, tag, ui, 0);
+    }
+
+    private static void downloadUpdateApkWithDownloadManager(final Activity activity, final String[] urls,
+                                                             final File out, final String tag,
+                                                             final UpdateDownloadProgress ui,
+                                                             final int index) {
+        try {
+            DownloadManager manager = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE);
+            if (manager == null || urls == null || urls.length == 0 || index >= urls.length) {
+                throw new IllegalStateException("DownloadManager unavailable");
+            }
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(urls[index]));
+            request.setTitle("锤子桌面更新");
+            request.setDescription("正在下载更新包");
+            request.setMimeType("application/vnd.android.package-archive");
+            try {
+                request.setDestinationUri(Uri.fromFile(out));
+            } catch (Throwable ignored) {
+            }
+            try {
+                request.allowScanningByMediaScanner();
+            } catch (Throwable ignored) {
+            }
+            if (Build.VERSION.SDK_INT >= 11) {
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            }
+            final long downloadId = manager.enqueue(request);
+            activity.getSharedPreferences(THEME_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putLong(PREF_UPDATE_DOWNLOAD_ID, downloadId)
+                    .putString(PREF_UPDATE_DOWNLOAD_ID + ".path", out.getAbsolutePath())
+                    .putString(PREF_UPDATE_DOWNLOAD_ID + ".url", urls[index])
+                    .putString(PREF_UPDATE_DOWNLOAD_ID + ".tag", tag == null ? "" : tag)
+                    .putString(PREF_UPDATE_DOWNLOAD_ID + ".name", out.getName())
+                    .putLong(String.valueOf(downloadId), downloadId)
+                    .putString(String.valueOf(downloadId) + ".path", out.getAbsolutePath())
+                    .commit();
+            updateUpdateProgressUi(activity, ui, index == 0 ? "正在连接国内镜像..." : "正在连接下载...", -1);
+            notifyUpdateDownload(activity, index == 0 ? "正在连接国内镜像..." : "正在连接下载...", -1, false, downloadId);
+            monitorUpdateDownload(activity, downloadId, ui, urls, out, tag, index);
+        } catch (Throwable t) {
+            dismissUpdateDownloadProgress(ui);
+            notifyUpdateDownload(activity, "更新包下载失败", 0, true);
+            Toast.makeText(activity, "更新包下载失败", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private static void downloadUpdateApkDirect(final Activity activity, final String[] urls,
@@ -5743,7 +6008,7 @@ public final class MaintainedLauncherSettingsHost {
                     handler.post(new Runnable() {
                         public void run() {
                             dismissUpdateDownloadProgress(ui);
-                            notifyUpdateDownload(activity, "下载完成，正在启动安装...", 100, true);
+                            notifyUpdateDownload(activity, "下载完成，点击可手动安装", 100, true, out);
                             Toast.makeText(activity, "更新包下载完成，正在启动安装...", Toast.LENGTH_LONG).show();
                             installApkFile(activity, out);
                         }
@@ -5850,6 +6115,12 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void monitorUpdateDownload(final Activity activity, final long downloadId,
                                               final UpdateDownloadProgress ui) {
+        monitorUpdateDownload(activity, downloadId, ui, null, null, null, 0);
+    }
+
+    private static void monitorUpdateDownload(final Activity activity, final long downloadId,
+                                              final UpdateDownloadProgress ui, final String[] urls,
+                                              final File out, final String tag, final int index) {
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.post(new Runnable() {
             public void run() {
@@ -5870,13 +6141,25 @@ public final class MaintainedLauncherSettingsHost {
                             cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)));
                     if (status == DownloadManager.STATUS_SUCCESSFUL) {
                         dismissUpdateDownloadProgress(ui);
+                        notifyUpdateDownload(activity, "下载完成，点击可手动安装", 100, true, downloadId);
                         Toast.makeText(activity, "更新包下载完成，正在启动安装...", Toast.LENGTH_LONG).show();
                         installApk(activity, downloadId);
                         return;
                     }
                     if (status == DownloadManager.STATUS_FAILED) {
-                        dismissUpdateDownloadProgress(ui);
-                        Toast.makeText(activity, "更新包下载失败", Toast.LENGTH_SHORT).show();
+                        if (urls != null && out != null && index + 1 < urls.length) {
+                            try {
+                                manager.remove(downloadId);
+                            } catch (Throwable ignored) {
+                            }
+                            updateUpdateProgressUi(activity, ui, "国内镜像下载失败，切换备用地址...", -1);
+                            notifyUpdateDownload(activity, "国内镜像下载失败，切换备用地址...", -1, false);
+                            downloadUpdateApkWithDownloadManager(activity, urls, out, tag, ui, index + 1);
+                        } else {
+                            dismissUpdateDownloadProgress(ui);
+                            notifyUpdateDownload(activity, "更新包下载失败", 0, true);
+                            Toast.makeText(activity, "更新包下载失败", Toast.LENGTH_SHORT).show();
+                        }
                         return;
                     }
                 } catch (Throwable ignored) {
@@ -6046,6 +6329,16 @@ public final class MaintainedLauncherSettingsHost {
         ProgressBar progress;
     }
 
+    private static final class CachedUpdateDownload {
+        final long downloadId;
+        final int status;
+
+        CachedUpdateDownload(long downloadId, int status) {
+            this.downloadId = downloadId;
+            this.status = status;
+        }
+    }
+
     private static void installApkFile(Context activity, File file) {
         if (file == null || !file.exists()) {
             Toast.makeText(activity, "未找到下载的安装包，请重新下载", Toast.LENGTH_SHORT).show();
@@ -6054,25 +6347,56 @@ public final class MaintainedLauncherSettingsHost {
         if (Build.VERSION.SDK_INT >= 21 && installApkWithPackageInstaller(activity, file)) {
             return;
         }
-        disableFileUriDeath();
-        Uri uri = Uri.fromFile(file);
-        Intent intent = new Intent(Intent.ACTION_INSTALL_PACKAGE);
-        intent.setData(uri);
+        Uri uri = apkInstallUri(activity, file);
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, "application/vnd.android.package-archive");
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        intent.putExtra(Intent.EXTRA_RETURN_RESULT, false);
         try {
+            grantInstallUri(activity, intent, uri);
             activity.startActivity(intent);
         } catch (Throwable t) {
-            Intent fallback = new Intent(Intent.ACTION_VIEW);
-            fallback.setDataAndType(uri, "application/vnd.android.package-archive");
+            Intent fallback = new Intent(Intent.ACTION_INSTALL_PACKAGE);
+            fallback.setData(uri);
             fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             fallback.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            fallback.putExtra(Intent.EXTRA_RETURN_RESULT, false);
             try {
+                grantInstallUri(activity, fallback, uri);
                 activity.startActivity(fallback);
             } catch (Throwable ignored) {
+                if (Build.VERSION.SDK_INT >= 21 && installApkWithPackageInstaller(activity, file)) {
+                    return;
+                }
                 Toast.makeText(activity, "无法拉起安装程序，请确认系统有应用安装器", Toast.LENGTH_LONG).show();
             }
+        }
+    }
+
+    private static Uri apkInstallUri(Context context, File file) {
+        disableFileUriDeath();
+        return Uri.fromFile(file);
+    }
+
+    private static void grantInstallUri(Context context, Intent intent, Uri uri) {
+        if (context == null || intent == null || uri == null || !"content".equalsIgnoreCase(uri.getScheme())) {
+            return;
+        }
+        try {
+            List<ResolveInfo> targets = context.getPackageManager()
+                    .queryIntentActivities(intent, Build.VERSION.SDK_INT >= 23 ? 0x00020000 : 0);
+            if (targets == null) {
+                return;
+            }
+            for (int i = 0; i < targets.size(); i++) {
+                ResolveInfo info = targets.get(i);
+                ActivityInfo activityInfo = info == null ? null : info.activityInfo;
+                if (activityInfo != null && activityInfo.packageName != null) {
+                    context.grantUriPermission(activityInfo.packageName, uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
+            }
+        } catch (Throwable ignored) {
         }
     }
 
@@ -6098,6 +6422,8 @@ public final class MaintainedLauncherSettingsHost {
                 output.write(buffer, 0, read);
             }
             session.fsync(output);
+            output.close();
+            output = null;
             Intent callback = new Intent(QUICK_SEARCH_INSTALL_ACTION);
             callback.setPackage(context.getPackageName());
             callback.setClassName(context, MaintainedLauncherSettingsHost.QuickSearchInstallReceiver.class.getName());
@@ -6147,9 +6473,19 @@ public final class MaintainedLauncherSettingsHost {
             if (context == null || intent == null) {
                 return;
             }
+            if (UPDATE_INSTALL_ACTION.equals(intent.getAction())) {
+                String path = intent.getStringExtra(EXTRA_UPDATE_APK_PATH);
+                if (!TextUtils.isEmpty(path)) {
+                    installApkFile(context, new File(path));
+                } else {
+                    Toast.makeText(context, "未找到下载的安装包，请重新下载", Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
             int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
             if (status == PackageInstaller.STATUS_SUCCESS) {
                 Toast.makeText(context, "安装完成", Toast.LENGTH_SHORT).show();
+                cancelUpdateNotification(context);
                 return;
             }
             if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
@@ -6161,17 +6497,35 @@ public final class MaintainedLauncherSettingsHost {
                         return;
                     } catch (Throwable ignored) {
                     }
+                    notifyInstallConfirmation(context, confirm);
+                    return;
                 }
             }
             String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
             if (TextUtils.isEmpty(message)) {
                 message = "无法拉起安装程序，请确认系统有应用安装器";
             }
+            notifyUpdateDownload(context, "安装未完成，点击可重试安装", 100, true, newestDownloadedUpdateApk(context));
             Toast.makeText(context, message, Toast.LENGTH_LONG).show();
         }
     }
 
     private static void notifyUpdateDownload(Context context, String message, int percent, boolean complete) {
+        notifyUpdateDownload(context, message, percent, complete, null);
+    }
+
+    private static void notifyUpdateDownload(Context context, String message, int percent,
+                                             boolean complete, File installFile) {
+        notifyUpdateDownload(context, message, percent, complete, installFile, -1);
+    }
+
+    private static void notifyUpdateDownload(Context context, String message, int percent,
+                                             boolean complete, long downloadId) {
+        notifyUpdateDownload(context, message, percent, complete, null, downloadId);
+    }
+
+    private static void notifyUpdateDownload(Context context, String message, int percent,
+                                             boolean complete, File installFile, long downloadId) {
         try {
             NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager == null) {
@@ -6196,6 +6550,13 @@ public final class MaintainedLauncherSettingsHost {
                     .setAutoCancel(complete)
                     .setWhen(System.currentTimeMillis())
                     .setShowWhen(true);
+            if (complete) {
+                PendingIntent installIntent = updateInstallPendingIntent(context, installFile, downloadId);
+                if (installIntent != null) {
+                    builder.setContentIntent(installIntent);
+                    builder.addAction(icon, "安装", installIntent);
+                }
+            }
             if (!complete) {
                 builder.setProgress(100, Math.max(0, percent), percent < 0);
             } else {
@@ -6212,6 +6573,27 @@ public final class MaintainedLauncherSettingsHost {
             if (manager != null) {
                 manager.cancel(UPDATE_NOTIFICATION_ID);
             }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void cancelPreviousUpdateDownload(Context context) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(THEME_DOWNLOAD_PREFS, Context.MODE_PRIVATE);
+            long id = prefs.getLong(PREF_UPDATE_DOWNLOAD_ID, -1);
+            if (id != -1) {
+                DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+                if (manager != null) {
+                    manager.remove(id);
+                }
+            }
+            prefs.edit()
+                    .remove(PREF_UPDATE_DOWNLOAD_ID)
+                    .remove(PREF_UPDATE_DOWNLOAD_ID + ".path")
+                    .remove(PREF_UPDATE_DOWNLOAD_ID + ".url")
+                    .remove(PREF_UPDATE_DOWNLOAD_ID + ".tag")
+                    .remove(PREF_UPDATE_DOWNLOAD_ID + ".name")
+                    .commit();
         } catch (Throwable ignored) {
         }
     }
@@ -6260,6 +6642,7 @@ public final class MaintainedLauncherSettingsHost {
             bindBackTitle(activity, resources, root, "view_title",
                     getString(resources, "setting_about_us", "关于我们"));
             hide(resources, root, "setting_more_product");
+            bindOperationLogSection(activity, root, resources);
             tuneScrollBars(root);
             activity.setContentView(root);
         } catch (Throwable t) {
@@ -6329,6 +6712,521 @@ public final class MaintainedLauncherSettingsHost {
         parent.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 92)));
     }
 
+    private static void bindOperationLogSection(final Activity activity, View root, Resources resources) {
+        LinearLayout content = aboutContent(root, resources);
+        if (content == null) {
+            return;
+        }
+        addAboutSectionTitle(activity, content, "操作日志");
+        TextView status = text(activity, operationLogStatus(activity), 13, 0xff8a8f99, false);
+        status.setPadding(dp(activity, 20), 0, dp(activity, 20), dp(activity, 8));
+        status.setLineSpacing(dp(activity, 2), 1.0f);
+        content.addView(status, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout actions = new LinearLayout(activity);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setPadding(dp(activity, 20), 0, dp(activity, 20), 0);
+        final boolean active = isOperationLogActive(activity);
+        TextView toggle = aboutActionButton(activity, active ? "结束并保存" : "开始记录", active ? 0xffd85b5b : 0xff5f8fe8);
+        toggle.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (isOperationLogActive(activity)) {
+                    stopOperationLog(activity, "user_stop");
+                    Toast.makeText(activity, "日志已保存", Toast.LENGTH_SHORT).show();
+                } else {
+                    startOperationLog(activity);
+                    Toast.makeText(activity, "已开始记录操作日志", Toast.LENGTH_SHORT).show();
+                }
+                showAboutPage(activity);
+            }
+        });
+        actions.addView(toggle, new LinearLayout.LayoutParams(0, dp(activity, 48), 1.0f));
+
+        TextView refresh = aboutActionButton(activity, "刷新列表", 0xff555d6d);
+        refresh.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                showAboutPage(activity);
+            }
+        });
+        LinearLayout.LayoutParams refreshLp = new LinearLayout.LayoutParams(0, dp(activity, 48), 1.0f);
+        refreshLp.leftMargin = dp(activity, 10);
+        actions.addView(refresh, refreshLp);
+        content.addView(actions, new LinearLayout.LayoutParams(-1, dp(activity, 58)));
+
+        File[] logs = operationLogFiles(activity);
+        if (logs.length == 0) {
+            TextView empty = text(activity, "暂无日志。开始记录后，日志会按日期保存在应用私有目录。", 14, 0xff999999, false);
+            empty.setPadding(dp(activity, 20), dp(activity, 8), dp(activity, 20), dp(activity, 16));
+            content.addView(empty, new LinearLayout.LayoutParams(-1, -2));
+            return;
+        }
+        for (int i = 0; i < logs.length && i < 8; i++) {
+            addOperationLogRow(activity, content, logs[i]);
+        }
+    }
+
+    private static PendingIntent updateInstallPendingIntent(Context context, File file, long downloadId) {
+        if (downloadId == -1 && (file == null || !file.exists())) {
+            return null;
+        }
+        try {
+            Intent intent = new Intent(UPDATE_INSTALL_ACTION);
+            intent.setClassName(context.getPackageName(),
+                    "com.smartisanos.launcher.theme.ThemeChooserActivity");
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            if (downloadId != -1) {
+                intent.putExtra(EXTRA_UPDATE_DOWNLOAD_ID, downloadId);
+            } else {
+                intent.putExtra(EXTRA_UPDATE_APK_PATH, file.getAbsolutePath());
+            }
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= 23) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            return PendingIntent.getActivity(context, UPDATE_NOTIFICATION_ID, intent, flags);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static void notifyInstallConfirmation(Context context, Intent confirm) {
+        try {
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager == null || confirm == null) {
+                return;
+            }
+            if (Build.VERSION.SDK_INT >= 26) {
+                NotificationChannel channel = new NotificationChannel(UPDATE_NOTIFICATION_CHANNEL,
+                        "桌面更新下载", NotificationManager.IMPORTANCE_DEFAULT);
+                manager.createNotificationChannel(channel);
+            }
+            confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= 23) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getActivity(context,
+                    UPDATE_INSTALL_NOTIFICATION_ID, confirm, flags);
+            Notification.Builder builder = Build.VERSION.SDK_INT >= 26
+                    ? new Notification.Builder(context, UPDATE_NOTIFICATION_CHANNEL)
+                    : new Notification.Builder(context);
+            int icon = context.getApplicationInfo().icon;
+            if (icon == 0) {
+                icon = android.R.drawable.stat_sys_download_done;
+            }
+            builder.setSmallIcon(icon)
+                    .setContentTitle("锤子桌面更新")
+                    .setContentText("点击确认安装")
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
+                    .setWhen(System.currentTimeMillis())
+                    .setShowWhen(true)
+                    .addAction(icon, "确认安装", pendingIntent);
+            manager.notify(UPDATE_INSTALL_NOTIFICATION_ID, builder.build());
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static File newestDownloadedUpdateApk(Context context) {
+        try {
+            File dir = context.getExternalFilesDir(null);
+            if (dir == null) {
+                dir = context.getFilesDir();
+            }
+            File[] files = dir.listFiles();
+            File newest = null;
+            if (files != null) {
+                for (File file : files) {
+                    String name = file.getName();
+                    if (file.isFile() && name != null && name.toLowerCase().endsWith(".apk")) {
+                        if (newest == null || file.lastModified() > newest.lastModified()) {
+                            newest = file;
+                        }
+                    }
+                }
+            }
+            return newest;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static LinearLayout aboutContent(View root, Resources resources) {
+        View scroll = byId(root, resources, "about_us_scrollview");
+        if (scroll instanceof ScrollView) {
+            View child = ((ScrollView) scroll).getChildAt(0);
+            if (child instanceof LinearLayout) {
+                return (LinearLayout) child;
+            }
+        }
+        return null;
+    }
+
+    private static void addAboutSectionTitle(Context context, LinearLayout parent, String title) {
+        TextView view = text(context, title, 18, 0xff666b76, true);
+        view.setGravity(Gravity.CENTER_VERTICAL);
+        view.setPadding(dp(context, 20), dp(context, 20), dp(context, 20), dp(context, 8));
+        parent.addView(view, new LinearLayout.LayoutParams(-1, dp(context, 64)));
+    }
+
+    private static TextView aboutActionButton(Context context, String label, int color) {
+        TextView button = text(context, label, 15, color, false);
+        button.setGravity(Gravity.CENTER);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xfffbfbfb);
+        bg.setStroke(1, 0xffd8d8d8);
+        bg.setCornerRadius(dp(context, 4));
+        button.setBackgroundDrawable(bg);
+        return button;
+    }
+
+    private static void addOperationLogRow(final Activity activity, LinearLayout parent, final File file) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(activity, 20), dp(activity, 4), dp(activity, 20), dp(activity, 4));
+
+        LinearLayout labels = new LinearLayout(activity);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        TextView name = text(activity, file.getName(), 14, 0xff555d6d, false);
+        TextView meta = text(activity, readableBytes(file.length()) + "  " + formatTime(file.lastModified()), 12, 0xff9a9fa8, false);
+        labels.addView(name, new LinearLayout.LayoutParams(-1, -2));
+        labels.addView(meta, new LinearLayout.LayoutParams(-1, -2));
+        row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1.0f));
+
+        TextView view = aboutActionButton(activity, "查看", 0xff5f8fe8);
+        view.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                showOperationLogPreview(activity, file);
+            }
+        });
+        row.addView(view, new LinearLayout.LayoutParams(dp(activity, 74), dp(activity, 42)));
+
+        TextView delete = aboutActionButton(activity, "删除", 0xffd85b5b);
+        delete.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (file.equals(sOperationLogFile) && isOperationLogActive(activity)) {
+                    Toast.makeText(activity, "正在记录的日志不能删除", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (file.delete()) {
+                    Toast.makeText(activity, "已删除日志", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(activity, "删除失败", Toast.LENGTH_SHORT).show();
+                }
+                showAboutPage(activity);
+            }
+        });
+        LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(dp(activity, 74), dp(activity, 42));
+        deleteLp.leftMargin = dp(activity, 8);
+        row.addView(delete, deleteLp);
+        parent.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 62)));
+    }
+
+    private static void startOperationLog(Context context) {
+        synchronized (OPERATION_LOG_LOCK) {
+            try {
+                File dir = operationLogDir(context);
+                if (!dir.exists()) {
+                    dir.mkdirs();
+                }
+                String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date());
+                sOperationLogFile = new File(dir, "operation-" + stamp + ".log");
+                sOperationLogcatFile = new File(dir, "operation-logcat-" + stamp + ".log");
+                sOperationLogWriter = new BufferedWriter(new OutputStreamWriter(
+                        new FileOutputStream(sOperationLogFile, true), "UTF-8"));
+                context.getSharedPreferences(OPERATION_LOG_PREFS, Context.MODE_PRIVATE).edit()
+                        .putBoolean(PREF_OPERATION_LOG_ACTIVE, true)
+                        .putString(PREF_OPERATION_LOG_FILE, sOperationLogFile.getAbsolutePath())
+                        .apply();
+                installOperationLogExceptionHandler(context.getApplicationContext() == null
+                        ? context : context.getApplicationContext());
+                writeOperationLogLocked("START", "package=" + context.getPackageName()
+                        + ", version=" + appVersionName(context)
+                        + ", sdk=" + Build.VERSION.SDK_INT);
+                writeOperationLogLocked("INFO", "main_log=" + sOperationLogFile.getAbsolutePath());
+                writeOperationLogLocked("INFO", "logcat_log=" + sOperationLogcatFile.getAbsolutePath());
+                startOperationLogcatThread();
+                pruneOperationLogs(context, 30);
+            } catch (Throwable t) {
+                closeQuietly(sOperationLogWriter);
+                sOperationLogWriter = null;
+                Toast.makeText(context, "无法开始记录日志：" + shortError(t), Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private static void stopOperationLog(Context context, String reason) {
+        synchronized (OPERATION_LOG_LOCK) {
+            if (sOperationLogWriter == null) {
+                File active = activeOperationLogFile(context);
+                if (active != null) {
+                    appendText(active, operationLogLine("END", "recovered_after_process_restart, reason=" + reason));
+                }
+            } else {
+                writeOperationLogLocked("END", "reason=" + reason);
+            }
+            context.getSharedPreferences(OPERATION_LOG_PREFS, Context.MODE_PRIVATE).edit()
+                    .putBoolean(PREF_OPERATION_LOG_ACTIVE, false)
+                    .remove(PREF_OPERATION_LOG_FILE)
+                    .apply();
+            stopOperationLogcatThread();
+            closeQuietly(sOperationLogWriter);
+            sOperationLogWriter = null;
+            sOperationLogFile = null;
+            sOperationLogcatFile = null;
+        }
+    }
+
+    private static boolean isOperationLogActive(Context context) {
+        if (sOperationLogWriter != null) {
+            return true;
+        }
+        return context.getSharedPreferences(OPERATION_LOG_PREFS, Context.MODE_PRIVATE)
+                .getBoolean(PREF_OPERATION_LOG_ACTIVE, false);
+    }
+
+    private static String operationLogStatus(Context context) {
+        File dir = operationLogDir(context);
+        String path = dir.getAbsolutePath();
+        if (isOperationLogActive(context)) {
+            File active = activeOperationLogFile(context);
+            return "正在记录。日志目录：" + path
+                    + (active == null ? "" : "\n当前文件：" + active.getName());
+        }
+        return "未记录。开启后会在后台自动写入关键操作和异常信息；正常使用不弹出日志。"
+                + "\n系统 logcat 会另存为配套文件，供 ADB 排查时读取。"
+                + "\nADB 路径：" + path;
+    }
+
+    private static File activeOperationLogFile(Context context) {
+        String path = context.getSharedPreferences(OPERATION_LOG_PREFS, Context.MODE_PRIVATE)
+                .getString(PREF_OPERATION_LOG_FILE, null);
+        if (path == null || path.length() == 0) {
+            return null;
+        }
+        return new File(path);
+    }
+
+    private static File operationLogDir(Context context) {
+        return new File(context.getFilesDir(), OPERATION_LOG_DIR);
+    }
+
+    private static File[] operationLogFiles(Context context) {
+        File dir = operationLogDir(context);
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return new File[0];
+        }
+        ArrayList<File> result = new ArrayList<File>();
+        for (int i = 0; i < files.length; i++) {
+            File file = files[i];
+            if (file != null && file.isFile() && file.getName().startsWith("operation-")
+                    && !file.getName().startsWith("operation-logcat-")
+                    && file.getName().endsWith(".log")) {
+                result.add(file);
+            }
+        }
+        Collections.sort(result, new Comparator<File>() {
+            public int compare(File a, File b) {
+                long diff = b.lastModified() - a.lastModified();
+                return diff == 0 ? b.getName().compareTo(a.getName()) : (diff > 0 ? 1 : -1);
+            }
+        });
+        return result.toArray(new File[result.size()]);
+    }
+
+    private static void pruneOperationLogs(Context context, int keep) {
+        File[] files = operationLogFiles(context);
+        for (int i = keep; i < files.length; i++) {
+            try {
+                files[i].delete();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static void resumeOperationLogIfNeeded(Context context) {
+        if (context == null || !isOperationLogActive(context)) {
+            return;
+        }
+        installOperationLogExceptionHandler(context.getApplicationContext() == null
+                ? context : context.getApplicationContext());
+        logOperation(context, "RESUME_CHECK", "settings_host_loaded");
+    }
+
+    private static void installOperationLogExceptionHandler(final Context context) {
+        if (sOperationLogHandlerInstalled) {
+            return;
+        }
+        sPreviousUncaughtExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            public void uncaughtException(Thread thread, Throwable ex) {
+                logOperation(context, "UNCAUGHT", threadName(thread) + " " + stackTraceText(ex));
+                if (sPreviousUncaughtExceptionHandler != null) {
+                    sPreviousUncaughtExceptionHandler.uncaughtException(thread, ex);
+                }
+            }
+        });
+        sOperationLogHandlerInstalled = true;
+    }
+
+    private static void logOperation(Context context, String event, String detail) {
+        if (context == null || !isOperationLogActive(context)) {
+            return;
+        }
+        synchronized (OPERATION_LOG_LOCK) {
+            try {
+                if (sOperationLogWriter == null) {
+                    File active = activeOperationLogFile(context);
+                    if (active == null) {
+                        return;
+                    }
+                    sOperationLogFile = active;
+                    sOperationLogWriter = new BufferedWriter(new OutputStreamWriter(
+                            new FileOutputStream(active, true), "UTF-8"));
+                    writeOperationLogLocked("RESUME", "writer_reopened");
+                }
+                writeOperationLogLocked(event, detail);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static void writeOperationLogLocked(String event, String detail) {
+        if (sOperationLogWriter == null) {
+            return;
+        }
+        try {
+            sOperationLogWriter.write(operationLogLine(event, detail));
+            sOperationLogWriter.flush();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static String operationLogLine(String event, String detail) {
+        return formatTime(System.currentTimeMillis()) + " [" + event + "] "
+                + (detail == null ? "" : detail) + "\n";
+    }
+
+    private static void startOperationLogcatThread() {
+        if (sOperationLogcatFile == null || sOperationLogcatThread != null) {
+            return;
+        }
+        final File out = sOperationLogcatFile;
+        sOperationLogcatThread = new Thread(new Runnable() {
+            public void run() {
+                BufferedReader reader = null;
+                BufferedWriter writer = null;
+                try {
+                    sOperationLogcatProcess = Runtime.getRuntime().exec(new String[]{"logcat", "-v", "threadtime"});
+                    reader = new BufferedReader(new InputStreamReader(sOperationLogcatProcess.getInputStream()));
+                    writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(out, true), "UTF-8"));
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        writer.write(line);
+                        writer.newLine();
+                        writer.flush();
+                    }
+                } catch (Throwable t) {
+                    appendText(out, operationLogLine("LOGCAT_ERROR", shortError(t)));
+                } finally {
+                    closeQuietly(reader);
+                    closeQuietly(writer);
+                }
+            }
+        }, "LauncherOperationLogcat");
+        sOperationLogcatThread.start();
+    }
+
+    private static void stopOperationLogcatThread() {
+        try {
+            if (sOperationLogcatProcess != null) {
+                sOperationLogcatProcess.destroy();
+            }
+        } catch (Throwable ignored) {
+        }
+        sOperationLogcatProcess = null;
+        sOperationLogcatThread = null;
+    }
+
+    private static void showOperationLogPreview(Activity activity, File file) {
+        showInfoDialog(activity, file.getName(), tailText(file, 6000));
+    }
+
+    private static String tailText(File file, int maxChars) {
+        BufferedReader reader = null;
+        try {
+            StringBuilder builder = new StringBuilder();
+            reader = new BufferedReader(new InputStreamReader(new java.io.FileInputStream(file), "UTF-8"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                builder.append(line).append('\n');
+                if (builder.length() > maxChars) {
+                    builder.delete(0, builder.length() - maxChars);
+                }
+            }
+            return builder.length() == 0 ? "空日志" : builder.toString();
+        } catch (Throwable t) {
+            return "读取失败：" + shortError(t);
+        } finally {
+            closeQuietly(reader);
+        }
+    }
+
+    private static void appendText(File file, String text) {
+        BufferedWriter writer = null;
+        try {
+            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true), "UTF-8"));
+            writer.write(text);
+            writer.flush();
+        } catch (Throwable ignored) {
+        } finally {
+            closeQuietly(writer);
+        }
+    }
+
+    private static String stackTraceText(Throwable throwable) {
+        if (throwable == null) {
+            return "";
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        java.io.PrintWriter writer = new java.io.PrintWriter(out);
+        throwable.printStackTrace(writer);
+        writer.flush();
+        return out.toString();
+    }
+
+    private static String threadName(Thread thread) {
+        return thread == null ? "unknown-thread" : thread.getName();
+    }
+
+    private static String readableBytes(long bytes) {
+        if (bytes < 1024L) {
+            return bytes + " B";
+        }
+        long kb = bytes / 1024L;
+        if (kb < 1024L) {
+            return kb + " KB";
+        }
+        return (kb / 1024L) + " MB";
+    }
+
+    private static String formatTime(long time) {
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date(time));
+    }
+
+    private static void closeQuietly(java.io.Closeable closeable) {
+        if (closeable == null) {
+            return;
+        }
+        try {
+            closeable.close();
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static void addFollowRow(Context context, LinearLayout parent, String left, String right) {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -6385,11 +7283,22 @@ public final class MaintainedLauncherSettingsHost {
         line.setBackgroundColor(0xffe5e5e5);
         root.addView(line, new LinearLayout.LayoutParams(-1, 1));
 
-        TextView messageView = text(activity, message, 14, 0xff666666, false);
-        messageView.setGravity(Gravity.CENTER);
+        final boolean longMessage = message != null && message.length() > 600;
+        TextView messageView = text(activity, message, longMessage ? 12 : 14, 0xff666666, false);
+        messageView.setGravity(longMessage ? (Gravity.LEFT | Gravity.TOP) : Gravity.CENTER);
         messageView.setLineSpacing(dp(activity, 2), 1.0f);
         messageView.setPadding(dp(activity, 24), dp(activity, 20), dp(activity, 24), dp(activity, 20));
-        root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
+        if (longMessage) {
+            ScrollView messageScroll = new ScrollView(activity);
+            messageScroll.setFillViewport(false);
+            messageScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+            messageScroll.addView(messageView, new ScrollView.LayoutParams(-1, -2));
+            int maxHeight = Math.max(dp(activity, 260),
+                    activity.getResources().getDisplayMetrics().heightPixels - dp(activity, 260));
+            root.addView(messageScroll, new LinearLayout.LayoutParams(-1, maxHeight));
+        } else {
+            root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
+        }
 
         View footerLine = new View(activity);
         footerLine.setBackgroundColor(0xffe5e5e5);
@@ -6441,9 +7350,35 @@ public final class MaintainedLauncherSettingsHost {
     private static void click(Context context, Resources resources, View root, String idName, View.OnClickListener listener) {
         View view = find(resources, root, idName);
         if (view != null) {
-            view.setOnClickListener(listener);
+            view.setOnClickListener(guardedSettingsClick(idName, listener));
             view.setClickable(true);
         }
+    }
+
+    private static void armSettingsClickGuard() {
+        sSettingsClickBlockedUntil = android.os.SystemClock.uptimeMillis() + SETTINGS_CLICK_GUARD_MS;
+    }
+
+    private static boolean isSettingsClickGuardActive(String source) {
+        long remain = sSettingsClickBlockedUntil - android.os.SystemClock.uptimeMillis();
+        if (remain > 0L) {
+            Log.d(LOG_TAG, "Ignore early settings click: " + source + ", remain=" + remain + "ms");
+            logOperation(null, "CLICK_BLOCKED", source + ", remain=" + remain + "ms");
+            return true;
+        }
+        return false;
+    }
+
+    private static View.OnClickListener guardedSettingsClick(final String source, final View.OnClickListener listener) {
+        return new View.OnClickListener() {
+            public void onClick(View v) {
+                if (listener == null || isSettingsClickGuardActive(source)) {
+                    return;
+                }
+                logOperation(v == null ? null : v.getContext(), "CLICK", source);
+                listener.onClick(v);
+            }
+        };
     }
 
     private static void hide(Resources resources, View root, String idName) {
@@ -6843,6 +7778,21 @@ public final class MaintainedLauncherSettingsHost {
             }
         }
         return null;
+    }
+
+    private static Bitmap maskedThemeLargePreviewBitmapCached(Context context, Resources resources, String themeId) {
+        String key = themeId + ":" + readLauncherMode(context);
+        synchronized (sThemeLargePreviewCache) {
+            if (sThemeLargePreviewCache.containsKey(key)) {
+                return sThemeLargePreviewCache.get(key);
+            }
+        }
+        Bitmap source = themeLargePreviewBitmap(context, themeId);
+        Bitmap masked = source == null ? null : maskedThemeLargePreviewBitmap(resources, source);
+        synchronized (sThemeLargePreviewCache) {
+            sThemeLargePreviewCache.put(key, masked);
+        }
+        return masked;
     }
 
     private static Bitmap maskedThemeLargePreviewBitmap(Resources resources, Bitmap source) {
@@ -7509,22 +8459,8 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void restartLauncherForIconSizeChange(Activity activity) {
         markThemeReloadLoadingPending(activity, "正在加载桌面...");
-        try {
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.addCategory(Intent.CATEGORY_HOME);
-            intent.setPackage("com.smartisanos.launcher");
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            activity.startActivity(intent);
-        } catch (Throwable ignored) {
-        }
-        try {
-            activity.finish();
-        } catch (Throwable ignored) {
-        }
-        try {
-            android.os.Process.killProcess(android.os.Process.myPid());
-        } catch (Throwable ignored) {
-        }
+        logOperation(activity, "RESTART", "icon_size_start_launcher_without_process_kill");
+        startLauncherFromForeground(activity);
     }
 
     private static void markPendingIconSizeRuntimeChange(Context context, int oldPercent, int percent) {
