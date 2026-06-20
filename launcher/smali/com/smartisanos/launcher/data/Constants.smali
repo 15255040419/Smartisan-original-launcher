@@ -8334,6 +8334,8 @@
 
     iput v1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->name_off_set_y:I
 
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/data/LayoutPropertyAdapter;->scaleFolderPreviewForIconSize(Ljava/lang/Object;F)V
+
     return-void
 .end method
 

@@ -2,6 +2,7 @@ package com.smartisanos.home.settings;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.widget.FrameLayout;
@@ -28,7 +29,9 @@ public class SettingItemTextVertical extends RelativeLayout {
         frameLayout = new FrameLayout(context);
         frameLayout.setId(0x5f100001);
         LayoutParams frameLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        frameLp.leftMargin = dp(21);
+        // Keep the preview artwork on the same left guide as the text-only
+        // setting rows below this group.
+        frameLp.leftMargin = dp(12);
         frameLp.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
         frameLp.addRule(RelativeLayout.CENTER_VERTICAL);
         addView(frameLayout, frameLp);
@@ -79,7 +82,10 @@ public class SettingItemTextVertical extends RelativeLayout {
         LayoutParams arrowLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         arrowLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
         arrowLp.addRule(RelativeLayout.CENTER_VERTICAL);
-        arrow.setPadding(0, 0, dp(30), 0);
+        // The drawable lives inside this wrap-content view. A 30dp right
+        // padding pushed the visible arrow too far left; the settings layout's
+        // standard right guide is 12dp.
+        arrow.setPadding(0, 0, dp(12), 0);
         addView(arrow, arrowLp);
 
         LinearLayout texts = new LinearLayout(context);
@@ -103,6 +109,8 @@ public class SettingItemTextVertical extends RelativeLayout {
         TextView sub = new TextView(context);
         sub.setTextSize(13.5f);
         sub.setTextColor(0xff888888);
+        sub.setMaxLines(2);
+        sub.setEllipsize(TextUtils.TruncateAt.END);
         int subRes = attrRes(attrs, "setting_item_text_vertical_subTitle");
         if (subRes != 0) sub.setText(getResources().getText(subRes));
         subTitle = sub;

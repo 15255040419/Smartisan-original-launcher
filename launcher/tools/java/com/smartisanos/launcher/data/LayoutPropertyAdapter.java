@@ -8,6 +8,27 @@ public final class LayoutPropertyAdapter {
     private static final String TAG = "LayoutPropertyAdapter";
     private static final float BASE_WIDTH = 1080.0f;
     private static final float BASE_HEIGHT = 1920.0f;
+    // The bookcase texture includes transparent side margins. A full-screen-width
+    // node produces the original launcher's roughly 84%-wide visible frame.
+    private static final float FOLDER_WIDTH_RATIO = 1.0f;
+    // The PNG's visible shelf centers are 358 px apart inside a 1356 px node.
+    private static final float FOLDER_VISIBLE_ROW_RATIO = 358.0f / 1356.0f;
+    private static final float FOLDER_ICON_TO_VISIBLE_ROW_RATIO = 0.35f;
+    private static final float FOLDER_TEXT_TO_VISIBLE_ROW_RATIO = 0.095f;
+    private static final float FOLDER_NAME_OFFSET_TO_VISIBLE_ROW_RATIO = 0.22f;
+    // Measured from the visible shelf interiors of the 246px (MODE_12) and
+    // 178px (MODE_20) closed-folder textures. Both texture sets share these
+    // normalized centers, so the same geometry works at every screen scale.
+    private static final float FOLDER_PREVIEW_ICON_RATIO_2X2 = 0.27f;
+    private static final float FOLDER_PREVIEW_ICON_RATIO_3X3 = 0.17f;
+    private static final float FOLDER_PREVIEW_FIRST_COLUMN_2X2 = 0.356f;
+    private static final float FOLDER_PREVIEW_COLUMN_PITCH_2X2 = 0.288f;
+    private static final float FOLDER_PREVIEW_FIRST_ROW_2X2 = 0.280f;
+    private static final float FOLDER_PREVIEW_ROW_PITCH_2X2 = 0.366f;
+    private static final float FOLDER_PREVIEW_FIRST_COLUMN_3X3 = 0.308f;
+    private static final float FOLDER_PREVIEW_COLUMN_PITCH_3X3 = 0.192f;
+    private static final float FOLDER_PREVIEW_FIRST_ROW_3X3 = 0.220f;
+    private static final float FOLDER_PREVIEW_ROW_PITCH_3X3 = 0.244f;
     private static final float EPSILON = 0.01f;
 
     private LayoutPropertyAdapter() {
@@ -24,7 +45,7 @@ public final class LayoutPropertyAdapter {
             return;
         }
 
-        float resourceBaseWidth = resourceBaseWidth(property);
+        float resourceBaseWidth = resourceBaseWidth(property, suffix);
         float resourceBaseHeight = resourceBaseWidth * (BASE_HEIGHT / BASE_WIDTH);
         float scaleX = width / resourceBaseWidth;
         float scaleY = height / resourceBaseHeight;
@@ -53,6 +74,7 @@ public final class LayoutPropertyAdapter {
                     }
                 }
             }
+            normalizeFolderLayout(property, suffix, width);
             Log.i(TAG, "adapt suffix=" + suffix
                     + ", screen=" + width + "x" + height
                     + ", resourceBase=" + resourceBaseWidth + "x" + resourceBaseHeight
@@ -62,7 +84,149 @@ public final class LayoutPropertyAdapter {
         }
     }
 
-    private static float resourceBaseWidth(Object property) {
+    public static void scaleFolderPreviewForIconSize(Object property, float factor) {
+        if (property == null || factor <= 0f) {
+            return;
+        }
+        String[] dimensions = {"_2_2", "_3_3"};
+        String[] names = {
+                "folder_preview_left_margin",
+                "folder_preview_top_margin",
+                "folder_preview_icon_side_length",
+                "folder_preview_icon_horizontal_space",
+                "folder_preview_icon_vertical_space"
+        };
+        for (String dimension : dimensions) {
+            for (String name : names) {
+                try {
+                    scaleNumericField(property, name + dimension, factor);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        centerFolderPreview(property, 2, "_2_2");
+        centerFolderPreview(property, 3, "_3_3");
+    }
+
+    private static void centerFolderPreview(Object property, int gridSize, String suffix) {
+        try {
+            float container = numericField(property, "icon_size_with_shadow");
+            if (container <= 0f) {
+                return;
+            }
+            float sideRatio = gridSize == 2
+                    ? FOLDER_PREVIEW_ICON_RATIO_2X2 : FOLDER_PREVIEW_ICON_RATIO_3X3;
+            float side = container * sideRatio;
+            float firstColumn = container * (gridSize == 2
+                    ? FOLDER_PREVIEW_FIRST_COLUMN_2X2 : FOLDER_PREVIEW_FIRST_COLUMN_3X3);
+            float columnPitch = container * (gridSize == 2
+                    ? FOLDER_PREVIEW_COLUMN_PITCH_2X2 : FOLDER_PREVIEW_COLUMN_PITCH_3X3);
+            float firstRow = container * (gridSize == 2
+                    ? FOLDER_PREVIEW_FIRST_ROW_2X2 : FOLDER_PREVIEW_FIRST_ROW_3X3);
+            float rowPitch = container * (gridSize == 2
+                    ? FOLDER_PREVIEW_ROW_PITCH_2X2 : FOLDER_PREVIEW_ROW_PITCH_3X3);
+            setNumericField(property, "folder_preview_icon_side_length" + suffix, side);
+            setNumericField(property, "folder_preview_icon_horizontal_space" + suffix,
+                    Math.max(0f, columnPitch - side));
+            setNumericField(property, "folder_preview_icon_vertical_space" + suffix,
+                    Math.max(0f, rowPitch - side));
+            setNumericField(property, "folder_preview_left_margin" + suffix,
+                    Math.max(0f, firstColumn - side * 0.5f));
+            setNumericField(property, "folder_preview_top_margin" + suffix,
+                    Math.max(0f, firstRow - side * 0.5f));
+            // Zi() applies this offset to the whole preview node. Once the viewport
+            // matrix itself is centered, retaining the XML-derived offset would
+            // move it a second time.
+            setNumericField(property, "folder_icon_center_offset" + suffix, 0f);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void normalizeFolderLayout(Object property, String suffix, int screenWidth)
+            throws ReflectiveOperationException {
+        if (!"_folder".equals(suffix) || screenWidth <= 0) {
+            return;
+        }
+        float bookcaseWidth = numericField(property, "folder_bookcase_width");
+        float bookcaseHeight = numericField(property, "folder_bookcase_height");
+        if (bookcaseWidth <= 0 || bookcaseHeight <= 0) {
+            return;
+        }
+        float targetWidth = screenWidth * FOLDER_WIDTH_RATIO;
+        if (bookcaseWidth > targetWidth + EPSILON) {
+            float frameFactor = targetWidth / bookcaseWidth;
+            float targetHeight = bookcaseHeight * frameFactor;
+            setNumericField(property, "folder_bookcase_width", targetWidth);
+            setNumericField(property, "folder_bookcase_cover_width", targetWidth);
+            setNumericField(property, "folder_bookcase_height", targetHeight);
+            setNumericField(property, "folder_bookcase_cover_height", targetHeight);
+            bookcaseHeight = targetHeight;
+        }
+
+        float iconSize = numericField(property, "icon_size_origin");
+        float visibleRowHeight = bookcaseHeight * FOLDER_VISIBLE_ROW_RATIO;
+        float maxIconSize = visibleRowHeight * FOLDER_ICON_TO_VISIBLE_ROW_RATIO;
+        if (iconSize > maxIconSize + EPSILON) {
+            float iconFactor = maxIconSize / iconSize;
+            scaleNumericField(property, "icon_size_origin", iconFactor);
+            scaleNumericField(property, "icon_size_with_shadow", iconFactor);
+            scaleNumericField(property, "icon_size_origin_resize", iconFactor);
+        }
+
+        float textSize = numericField(property, "text_font_size");
+        float maxTextSize = visibleRowHeight * FOLDER_TEXT_TO_VISIBLE_ROW_RATIO;
+        if (textSize > maxTextSize + EPSILON) {
+            scaleNumericField(property, "text_font_size", maxTextSize / textSize);
+        }
+
+        float nameOffset = numericField(property, "name_off_set_y");
+        float maxNameOffset = visibleRowHeight * FOLDER_NAME_OFFSET_TO_VISIBLE_ROW_RATIO;
+        if (nameOffset < -maxNameOffset - EPSILON) {
+            setNumericField(property, "name_off_set_y", -maxNameOffset);
+        } else if (nameOffset > maxNameOffset + EPSILON) {
+            setNumericField(property, "name_off_set_y", maxNameOffset);
+        }
+    }
+
+    private static float numericField(Object property, String fieldName) {
+        try {
+            Field field = property.getClass().getField(fieldName);
+            if (field.getType() == Float.TYPE) {
+                return field.getFloat(property);
+            }
+            if (field.getType() == Integer.TYPE) {
+                return field.getInt(property);
+            }
+        } catch (Throwable ignored) {
+        }
+        return 0f;
+    }
+
+    private static void setNumericField(Object property, String fieldName, float value)
+            throws ReflectiveOperationException {
+        Field field = property.getClass().getField(fieldName);
+        if (field.getType() == Float.TYPE) {
+            field.setFloat(property, value);
+        } else if (field.getType() == Integer.TYPE) {
+            field.setInt(property, Math.round(value));
+        }
+    }
+
+    private static void scaleNumericField(Object property, String fieldName, float factor)
+            throws ReflectiveOperationException {
+        setNumericField(property, fieldName, numericField(property, fieldName) * factor);
+    }
+
+    private static float resourceBaseWidth(Object property, String suffix) {
+        // Open-folder resources use the bookcase/page coordinate system.  In the
+        // xhdpi bundle that system is still 1080 wide even though dock_width is
+        // 720, so using the dock as the base stretches all row positions by 1.5x.
+        if ("_folder".equals(suffix)) {
+            float folderWidth = numericField(property, "folder_bookcase_width");
+            if (folderWidth > 0f) {
+                return folderWidth;
+            }
+        }
         int width = intField(property, "dock_width");
         if (width <= 0) {
             width = intField(property, "page_title_width");
@@ -117,6 +281,12 @@ public final class LayoutPropertyAdapter {
         }
         if (containsAny(name, "scale", "factor", "modulus", "angle")) {
             return 1.0f;
+        }
+        // The opened folder is one fixed-aspect scene designed from the screen width.
+        // Its frame, grid, icon offsets and labels must all use the same scale or the
+        // cells drift away from the shelves on tall displays.
+        if ("_folder".equals(suffix)) {
+            return scaleX;
         }
         if (name.startsWith("folder_preview_")) {
             return scale;

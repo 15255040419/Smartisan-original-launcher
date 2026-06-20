@@ -103,6 +103,7 @@ install apk:       build/theme-trans-signed.apk
 - “桌面壁纸模糊效果”对应原版 key `original_launcher_wallpaper_blur_on`，原版逻辑是更新 `Constants.isTransWallpaperBlur` 并调用 `Eb.lh()` 重建 `t_blur_background`，不是切换成黑色背景，也不需要重启整个桌面。
 - 原版会通过 `Constants.initGaussianDarkLight()` 分析当前壁纸明暗，并在毛玻璃 / 透明壁纸主题下选择普通资源或 `_light` 后缀资源；因此应用文字颜色不是按时间变化，而是按壁纸区域明暗变化。
 - 透明主题壁纸优先按原版从 `WallpaperManagerSmt` / 系统 `WallpaperManager` 获取系统裁剪后的壁纸 drawable。部分普通 Android 设备返回 null 时，移植版再退回到 `peekDrawable()` / `getFastDrawable()`；仍失败时才使用 launcher 保存的壁纸副本，并按屏幕比例中心裁剪，不能直接把整张原图拉伸到桌面纹理。
+- 透明主题 Dock 资源已按 `original_apks/com.smartisanos.launcher.theme.trans.apk` 回归。`dock_back.png` 顶部原版是轻暗边加低 alpha 半透明层，不是手工渐隐白膜；后续不要再手调透明主题 Dock 资源，除非先重新对照原始 APK 和 `clean_launcher/` 证明需要改。
 
 ## 检查更新资产规则
 

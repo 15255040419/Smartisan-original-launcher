@@ -253,6 +253,7 @@ public final class MaintainedLauncherSettingsHost {
         try {
             resumeOperationLogIfNeeded(activity);
             cancelScheduledLauncherRestart(activity);
+            cancelScheduledIconSizeLauncherRestart(activity);
             Intent intent = activity.getIntent();
             if (intent != null && UPDATE_INSTALL_ACTION.equals(intent.getAction())) {
                 long downloadId = intent.getLongExtra(EXTRA_UPDATE_DOWNLOAD_ID, -1);
@@ -8377,6 +8378,12 @@ public final class MaintainedLauncherSettingsHost {
         }
         float scale = ((float) newPercent) / ((float) oldPercent);
         try {
+            Class.forName("com.smartisanos.launcher.data.LayoutPropertyAdapter")
+                    .getMethod("setUserIconScale", Float.TYPE)
+                    .invoke(null, ((float) newPercent) / 100.0f);
+        } catch (Throwable ignored) {
+        }
+        try {
             Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
             java.lang.reflect.Field mapField = constants.getDeclaredField("layoutPropertyMap");
             mapField.setAccessible(true);
@@ -8409,6 +8416,9 @@ public final class MaintainedLauncherSettingsHost {
             scaleFloatField(property, "icon_size_with_shadow", scale);
             scaleFloatField(property, "icon_size_origin_resize", scale);
             scaleIntField(property, "name_off_set_y", (1f + scale) * 0.5f);
+            Class.forName("com.smartisanos.launcher.data.LayoutPropertyAdapter")
+                    .getMethod("scaleFolderPreviewForIconSize", Object.class, Float.TYPE)
+                    .invoke(null, property, scale);
         } catch (Throwable ignored) {
         }
     }
@@ -8453,14 +8463,73 @@ public final class MaintainedLauncherSettingsHost {
         notifyOriginalConfigChanged(KEY_LAUNCHER_ICON_SIZE);
         if (context instanceof Activity) {
             refreshIconSizeSubtitle((Activity) context, percent);
-            restartLauncherForIconSizeChange((Activity) context);
+            restartLauncherForIconSizeChange((Activity) context, oldPercent, percent);
         }
     }
 
-    private static void restartLauncherForIconSizeChange(Activity activity) {
+    private static void restartLauncherForIconSizeChange(Activity activity,
+            int oldPercent, int newPercent) {
         markThemeReloadLoadingPending(activity, "正在加载桌面...");
-        logOperation(activity, "RESTART", "icon_size_start_launcher_without_process_kill");
-        startLauncherFromForeground(activity);
+        showRestartLoading(activity);
+        // Existing icon SceneNodes retain their geometry even after a page update;
+        // partially scaling LayoutProperty only breaks folder previews. Start an
+        // explicit fresh Launcher process after killing this one so Constants,
+        // grid points, regular icons and folder previews are created atomically.
+        scheduleIconSizeLauncherRestart(activity);
+        logOperation(activity, "RESTART", "icon_size_exact_process_rebirth");
+        finishSettingsTask(activity);
+        try {
+            Process.killProcess(Process.myPid());
+        } catch (Throwable ignored) {
+            startLauncherFromForeground(activity);
+        }
+    }
+
+    private static void scheduleIconSizeLauncherRestart(Context context) {
+        try {
+            Intent intent = launcherHomeIntent(context);
+            int flags = PendingIntent.FLAG_CANCEL_CURRENT;
+            if (Build.VERSION.SDK_INT >= 23) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getActivity(context, 1002, intent, flags);
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager == null) {
+                throw new IllegalStateException("AlarmManager unavailable");
+            }
+            long trigger = android.os.SystemClock.elapsedRealtime() + 350L;
+            if (Build.VERSION.SDK_INT >= 23) {
+                alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.ELAPSED_REALTIME_WAKEUP, trigger, pendingIntent);
+            } else {
+                alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, trigger, pendingIntent);
+            }
+        } catch (Throwable ignored) {
+            startLauncherFromForeground(context);
+        }
+    }
+
+    private static void cancelScheduledIconSizeLauncherRestart(Context context) {
+        if (context == null) {
+            return;
+        }
+        try {
+            Intent intent = launcherHomeIntent(context);
+            int flags = PendingIntent.FLAG_NO_CREATE;
+            if (Build.VERSION.SDK_INT >= 23) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getActivity(context, 1002, intent, flags);
+            if (pendingIntent != null) {
+                AlarmManager alarmManager =
+                        (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+                if (alarmManager != null) {
+                    alarmManager.cancel(pendingIntent);
+                }
+                pendingIntent.cancel();
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void markPendingIconSizeRuntimeChange(Context context, int oldPercent, int percent) {

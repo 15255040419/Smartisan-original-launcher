@@ -5323,9 +5323,9 @@
 
     iget v2, v2, Lcom/smartisanos/smengine/a/j;->y:F
 
-    invoke-static {p0, p1, p2, v3}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustX(Ljava/lang/Object;IIF)F
+    invoke-static {p0, p1, p2, v2}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustY(Ljava/lang/Object;IIF)F
 
-    move-result v3
+    move-result v2
 
     iget v4, p0, Lcom/smartisanos/launcher/view/b/M;->WG:F
 
@@ -8691,9 +8691,9 @@
 
     iget v4, v4, Lcom/smartisanos/smengine/a/j;->y:F
 
-    invoke-static {p0, v9, v10, v5}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustX(Ljava/lang/Object;IIF)F
+    invoke-static {p0, v9, v10, v4}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustY(Ljava/lang/Object;IIF)F
 
-    move-result v5
+    move-result v4
 
     iget v6, p0, Lcom/smartisanos/launcher/view/b/M;->WG:F
 

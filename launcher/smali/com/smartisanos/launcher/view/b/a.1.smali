@@ -109,7 +109,7 @@
 
     int-to-float v3, v5
 
-    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->page_height:F
+    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->folder_bookcase_height:F
 
     float-to-int v0, v0
 
@@ -143,7 +143,7 @@
 
     int-to-float v3, v6
 
-    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->page_height:F
+    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->folder_bookcase_height:F
 
     float-to-int v0, v0
 
