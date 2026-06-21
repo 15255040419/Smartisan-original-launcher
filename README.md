@@ -90,7 +90,8 @@ com.smartisanos.launcher.theme.trans
 | 主题 | 支持本地主题、在线主题、主题详情、主题下载、主题设定、主题切换动画、毛玻璃主题和透明主题覆盖状态。 |
 | 壁纸 | 支持系统图片选择、私有壁纸副本、缩略图、毛玻璃 / 透明主题壁纸应用和恢复默认壁纸。 |
 | 翻页动画 | 支持默认、立体翻转、百叶窗、切牌等动画值；透明主题开启后强制使用默认动画。 |
-| 应用图标 | 支持系统原图、图标包 appfilter、redirect、自定义图片和 50%-150% 桌面图标大小调节；保存后自动重建桌面。关闭文件夹的 2x2 / 3x3 预览按外框内部可见行列中心缩放，打开文件夹按书架可见层中心排列，均不依赖固定屏幕像素。 |
+| 应用图标 | 支持系统原图、图标包 appfilter、redirect、自定义图片和 50%-150% 桌面图标大小调节；保存后自动重建桌面。普通图标、改进版图标和活动日历统一使用当前 `LayoutProperty` 内容框及 84% 可见区归一化；进程重启后会重新应用已保存比例。关闭文件夹的 2x2 / 3x3 预览按外框内部可见行列中心缩放，打开文件夹按书架可见层中心排列。 |
+| 动态日历 | 运行时识别系统声明的日历应用及常见厂商日历包；日期跟随系统更新。静态主题层会在活动日历创建后隐藏，日期层与底图使用同一坐标系，尺寸跟随普通图标内容框。 |
 | 应用分身 | 已接入多用户 / 双开应用查询、显示和启动路径，支持为分身应用叠加原版风格面具标记。 |
 | 自绘搜索页 | 搜索页由 launcher 内 `ThemeChooserActivity` / `MaintainedLauncherSettingsHost.showSearchPage()` 自绘，不再依赖、下载或构建锤子独立搜索 APK。 |
 | 检查更新 | 支持 Gitee Release 版本检查，只识别 `launcher-` 软件标签；下载走系统 `DownloadManager`，优先使用标准 Gitee Release 下载地址，失败后尝试该 Release 资产返回的备用地址；状态栏显示进度，已下载同版本时按钮直接变为“安装”。 |
@@ -106,6 +107,7 @@ com.smartisanos.launcher.theme.trans
 - 透明主题切换：开启 / 关闭透明主题要让 Launcher 重新走完整初始化链路。不能只裸 `startActivity()` 或运行时刷新，否则 `O.V()`、`Constants.isTransparentTheme`、`X.va()`、SMEngine 纹理和主题资源容易不同步。
 - 设置页闪回桌面防回归：设置页入口必须同时清理透明主题 requestCode `1001` 和图标大小 requestCode `1002` 的延迟 HOME `AlarmManager` PendingIntent。否则用户切换透明主题或修改图标尺寸后立刻重新进入设置，残留 HOME 任务会把页面顶回桌面。详细根因和修复见 `DEVELOPMENT_LOG.md` 的 2026-06-17、2026-06-20 记录。
 - 图标大小即时生效防回归：50%-150% 尺寸保存后必须完整重建 Launcher 进程，让 `Constants`、网格点、普通应用节点和文件夹预览在同一次初始化中使用新比例；不能只刷新当前页面或只改 `LayoutProperty`，否则普通图标和文件夹会使用不同几何尺寸。
+- 活动日历防回归：不要再用 `Constants.icon_scale`、固定日历倍数或厂商包名决定尺寸。活动日历根节点按 `icon_size_origin / calendar_back_size` 使用普通图标内容框，再应用与普通 / 改进版图标相同的 84% 可见区归一化；静态前景必须隐藏，日期层只在活动层绘制。Launcher 每个新进程必须从 XML 基准只应用一次已保存的 50%-150% 比例。
 - 文件夹对齐防回归：关闭预览必须以当前文件夹外框实际绘制尺寸为容器，按 PNG 内部可见搁板的归一化行列中心反算图标边长、margin 和 space；打开文件夹只在文件夹页按书架可见层中心修正 Y，普通桌面页必须保留原坐标。禁止按含透明边缘的整张 PNG 均分、恢复固定像素偏移，或把打开文件夹算法作用到桌面页。
 - 透明 / 毛玻璃主题文字：只有透明主题和毛玻璃主题按壁纸明暗切换状态栏文字和应用文字；普通不透明主题必须继续使用主题自身文字资源。
 - 壁纸模糊：只写 `original_launcher_wallpaper_blur_on` 并调用 `Eb.lh()` 让原版引擎重建 `t_blur_background`。不要手动模糊主壁纸 bitmap，也不要把 `t_blur_background` 覆盖回 `background.png`。
@@ -146,7 +148,7 @@ normal theme key: launcher_theme
 - 透明主题 Dock 已按 `original_apks\com.smartisanos.launcher.theme.trans.apk` 原版资源回归：`dock_back.png` 顶部保持原版轻暗边和低 alpha 半透明层。后续不要再手工改透明主题 Dock 资源，也不要替换 `background.png` / `t_blur_background` 的职责。
 - 应用分身在不同品牌手机上的包名、用户 ID 和启动行为可能不同，还需要 OPPO、vivo、小米、荣耀、模拟器等环境回归。
 - 微信分身面具标记已经接入，但面具大小、位置和不同图标尺寸下的观感仍需继续对照原版微调。
-- 天气和日历保留了旧 Smartisan 资源与权限线索，但入口、刷新和普通 Android 兼容还没有完整回归。
+- 天气保留了旧 Smartisan 资源与权限线索，但入口、刷新和普通 Android 兼容还没有完整回归；动态日历已完成普通 Android / VIVO Android 16 真机适配。
 - 普通 Android 通知角标不能简单等同于“应用有通知就一定显示”，后续需要通知监听或厂商 badge 兼容桥。
 - 在线主题 APK 下载后仍依赖用户手动确认安装，普通应用没有静默安装能力。
 

@@ -6,38 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="295b82c4-8572-45f1-add8-3c13ec0468e1" name="更改" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/APK_INVENTORY.md" beforeDir="false" afterPath="$PROJECT_DIR$/APK_INVENTORY.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_400dpi/MODE_12/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_400dpi/MODE_12/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_400dpi/MODE_20/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_400dpi/MODE_20/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_400dpi/MODE_9/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_400dpi/MODE_9/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_480dpi/MODE_12/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_480dpi/MODE_12/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_480dpi/MODE_20/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_480dpi/MODE_20/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_480dpi/MODE_9/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2160x1080_480dpi/MODE_9/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2242x1080/MODE_12/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2242x1080/MODE_12/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2242x1080/MODE_20/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2242x1080/MODE_20/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2242x1080/MODE_9/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2242x1080/MODE_9/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2340x1080/MODE_12/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2340x1080/MODE_12/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2340x1080/MODE_20/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2340x1080/MODE_20/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/2340x1080/MODE_9/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/2340x1080/MODE_9/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-sw411dp/MODE_12/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-sw411dp/MODE_12/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-sw411dp/MODE_20/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-sw411dp/MODE_20/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-sw411dp/MODE_9/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-sw411dp/MODE_9/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xhdpi/MODE_12/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xhdpi/MODE_12/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xhdpi/MODE_20/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xhdpi/MODE_20/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xhdpi/MODE_9/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xhdpi/MODE_9/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xxhdpi/MODE_12/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xxhdpi/MODE_12/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xxhdpi/MODE_20/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xxhdpi/MODE_20/layout.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/Constants.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/Constants.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/LayoutProperty.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/LayoutProperty.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/b/M.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/b/M.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/b/a.1.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/b/a.1.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/SettingItemTextVertical.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/SettingItemTextVertical.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/data/FolderCellPositionAdapter.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/data/FolderCellPositionAdapter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/data/LayoutPropertyAdapter.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/data/LayoutPropertyAdapter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/activeicon/m.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/activeicon/m.smali" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -178,6 +178,7 @@ public final class MaintainedLauncherSettingsHost {
     private static final int REQUEST_PICK_CUSTOM_ICON = 53026;
     private static final long SETTINGS_CLICK_GUARD_MS = 800L;
     private static long sSettingsClickBlockedUntil;
+    private static boolean sIconSizeAppliedThisProcess;
     private static int sRestoreIconPageScrollY = -1;
     private static int sMainSettingsScrollY = -1;
     private static int sThemePageScrollY = -1;
@@ -1830,6 +1831,69 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         return icon;
+    }
+
+    /**
+     * Smartisan replacement artwork often fills almost the entire bitmap,
+     * while Android application icons include an optical safe area. Keep the
+     * original canvas but cap the visible alpha bounds at 84% so replacement
+     * and non-replacement icons share the same apparent size.
+     */
+    public static Drawable normalizeImprovedIcon(Drawable icon) {
+        if (icon == null) {
+            return null;
+        }
+        try {
+            Bitmap source = drawableToBitmapForBadge(icon);
+            int width = source.getWidth();
+            int height = source.getHeight();
+            if (width <= 0 || height <= 0) {
+                return icon;
+            }
+
+            int left = width;
+            int top = height;
+            int right = -1;
+            int bottom = -1;
+            int[] row = new int[width];
+            for (int y = 0; y < height; y++) {
+                source.getPixels(row, 0, width, 0, y, width, 1);
+                for (int x = 0; x < width; x++) {
+                    if ((row[x] >>> 24) > 8) {
+                        if (x < left) left = x;
+                        if (x > right) right = x;
+                        if (y < top) top = y;
+                        if (y > bottom) bottom = y;
+                    }
+                }
+            }
+            if (right < left || bottom < top) {
+                return icon;
+            }
+
+            float visible = Math.max(right - left + 1, bottom - top + 1);
+            float target = Math.min(width, height) * 0.84f;
+            float scale = Math.min(1.0f, target / visible);
+            if (scale >= 0.995f) {
+                return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), source);
+            }
+
+            Bitmap output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(output);
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+            float cx = (left + right + 1) * 0.5f;
+            float cy = (top + bottom + 1) * 0.5f;
+            float targetCx = width * 0.5f;
+            float targetCy = height * 0.5f;
+            canvas.translate(targetCx, targetCy);
+            canvas.scale(scale, scale);
+            canvas.translate(-cx, -cy);
+            canvas.drawBitmap(source, 0f, 0f, paint);
+            source.recycle();
+            return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), output);
+        } catch (Throwable ignored) {
+            return icon;
+        }
     }
 
     public static Drawable doppelgangerBadgeDrawable(Drawable original, PackageManager pm, Drawable systemBadged) {
@@ -8554,22 +8618,22 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    public static void maybeApplyLauncherIconSize(Context context) {
+    public static synchronized void maybeApplyLauncherIconSize(Context context) {
         try {
+            if (sIconSizeAppliedThisProcess) {
+                return;
+            }
+            sIconSizeAppliedThisProcess = true;
             android.content.SharedPreferences prefs =
                     context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE);
-            if (!prefs.getBoolean(PREF_ICON_SIZE_RUNTIME_DIRTY, false)) {
-                return;
-            }
-            int oldPercent = normalizeIconSizePercent(prefs.getInt(
-                    PREF_ICON_SIZE_RUNTIME_OLD, 100));
-            int newPercent = normalizeIconSizePercent(prefs.getInt(
-                    PREF_ICON_SIZE_RUNTIME_NEW, readIconSizePercent(context)));
+            int newPercent = normalizeIconSizePercent(readIconSizePercent(context));
             prefs.edit().putBoolean(PREF_ICON_SIZE_RUNTIME_DIRTY, false).commit();
-            if (oldPercent == newPercent) {
+            if (newPercent == 100) {
                 return;
             }
-            applyRuntimeIconSizePercent(oldPercent, newPercent);
+            // Every launcher process starts from the unscaled XML layout map.
+            // Reapply the saved percentage once, regardless of the previous process.
+            applyRuntimeIconSizePercent(100, newPercent);
             applyIconChange(context);
             rebuildLauncherLayoutForIconSize();
         } catch (Throwable ignored) {
