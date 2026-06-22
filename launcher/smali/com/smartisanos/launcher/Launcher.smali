@@ -137,20 +137,22 @@
 .method public dispatchTouchEvent(Landroid/view/MotionEvent;)Z
     .locals 1
 
-    invoke-static {p0, p1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->handleLauncherSearchGesture(Landroid/app/Activity;Landroid/view/MotionEvent;)Z
-
-    move-result v0
-
-    if-eqz v0, :cond_0
-
-    const/4 v0, 0x1
-
-    return v0
-
-    :cond_0
+    # Search is an observer, not an input interceptor. Dispatch every event to
+    # RootView/SMEngine first so a recognized downward search gesture cannot
+    # steal ACTION_UP and leave page/long-press state stuck on Android 16.
     invoke-super {p0, p1}, Landroid/app/Activity;->dispatchTouchEvent(Landroid/view/MotionEvent;)Z
 
     move-result v0
+
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->handleLauncherSearchGesture(Landroid/app/Activity;Landroid/view/MotionEvent;)Z
+
+    move-result p1
+
+    if-eqz p1, :cond_0
+
+    const/4 v0, 0x1
+
+    :cond_0
 
     return v0
 .end method

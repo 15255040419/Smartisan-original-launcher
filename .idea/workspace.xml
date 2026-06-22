@@ -6,8 +6,16 @@
   <component name="ChangeListManager">
     <list default="true" id="295b82c4-8572-45f1-add8-3c13ec0468e1" name="更改" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xhdpi/MODE_9/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xhdpi/MODE_9/layout.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Launcher.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Launcher.smali" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/e/s.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/e/s.smali" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/activeicon/m.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/activeicon/m.smali" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/data/LayoutPropertyAdapter.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/data/LayoutPropertyAdapter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

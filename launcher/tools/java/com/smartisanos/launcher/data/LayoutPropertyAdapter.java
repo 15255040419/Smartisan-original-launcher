@@ -13,9 +13,9 @@ public final class LayoutPropertyAdapter {
     private static final float FOLDER_WIDTH_RATIO = 1.0f;
     // The PNG's visible shelf centers are 358 px apart inside a 1356 px node.
     private static final float FOLDER_VISIBLE_ROW_RATIO = 358.0f / 1356.0f;
-    private static final float FOLDER_ICON_TO_VISIBLE_ROW_RATIO = 0.35f;
-    private static final float FOLDER_TEXT_TO_VISIBLE_ROW_RATIO = 0.095f;
-    private static final float FOLDER_NAME_OFFSET_TO_VISIBLE_ROW_RATIO = 0.22f;
+    private static final float FOLDER_ICON_TO_VISIBLE_ROW_RATIO = 0.48f;
+    private static final float FOLDER_TEXT_TO_VISIBLE_ROW_RATIO = 0.092f;
+    private static final float FOLDER_NAME_OFFSET_TO_VISIBLE_ROW_RATIO = 0.29f;
     // Measured from the visible shelf interiors of the 246px (MODE_12) and
     // 178px (MODE_20) closed-folder textures. Both texture sets share these
     // normalized centers, so the same geometry works at every screen scale.
@@ -106,6 +106,15 @@ public final class LayoutPropertyAdapter {
         }
         centerFolderPreview(property, 2, "_2_2");
         centerFolderPreview(property, 3, "_3_3");
+        // Open-folder labels belong to the icon group as well. Keep their font
+        // proportional when the user changes the global launcher icon size.
+        if (numericField(property, "folder_bookcase_height") > 0f
+                && numericField(property, "dock_height") <= EPSILON) {
+            try {
+                scaleNumericField(property, "text_font_size", factor);
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     private static void centerFolderPreview(Object property, int gridSize, String suffix) {
@@ -134,10 +143,17 @@ public final class LayoutPropertyAdapter {
                     Math.max(0f, firstColumn - side * 0.5f));
             setNumericField(property, "folder_preview_top_margin" + suffix,
                     Math.max(0f, firstRow - side * 0.5f));
-            // Zi() applies this offset to the whole preview node. Once the viewport
-            // matrix itself is centered, retaining the XML-derived offset would
-            // move it a second time.
-            setNumericField(property, "folder_icon_center_offset" + suffix, 0f);
+            // Drop animations are centered around the folder node, while the PNG's
+            // visible shelves are slightly above its geometric center. Match the
+            // animation target to the final viewport centers so release does not
+            // land low and then jump upward when the preview texture is rebuilt.
+            float visibleCenter = gridSize == 2
+                    ? (FOLDER_PREVIEW_FIRST_ROW_2X2
+                    + FOLDER_PREVIEW_FIRST_ROW_2X2
+                    + FOLDER_PREVIEW_ROW_PITCH_2X2) * 0.5f
+                    : FOLDER_PREVIEW_FIRST_ROW_3X3 + FOLDER_PREVIEW_ROW_PITCH_3X3;
+            setNumericField(property, "folder_icon_center_offset" + suffix,
+                    container * (0.5f - visibleCenter));
         } catch (Throwable ignored) {
         }
     }
@@ -165,27 +181,26 @@ public final class LayoutPropertyAdapter {
 
         float iconSize = numericField(property, "icon_size_origin");
         float visibleRowHeight = bookcaseHeight * FOLDER_VISIBLE_ROW_RATIO;
-        float maxIconSize = visibleRowHeight * FOLDER_ICON_TO_VISIBLE_ROW_RATIO;
-        if (iconSize > maxIconSize + EPSILON) {
-            float iconFactor = maxIconSize / iconSize;
+        float targetIconSize = visibleRowHeight * FOLDER_ICON_TO_VISIBLE_ROW_RATIO;
+        if (iconSize > 0f && Math.abs(iconSize - targetIconSize) > EPSILON) {
+            float iconFactor = targetIconSize / iconSize;
             scaleNumericField(property, "icon_size_origin", iconFactor);
             scaleNumericField(property, "icon_size_with_shadow", iconFactor);
             scaleNumericField(property, "icon_size_origin_resize", iconFactor);
         }
 
         float textSize = numericField(property, "text_font_size");
-        float maxTextSize = visibleRowHeight * FOLDER_TEXT_TO_VISIBLE_ROW_RATIO;
-        if (textSize > maxTextSize + EPSILON) {
-            scaleNumericField(property, "text_font_size", maxTextSize / textSize);
+        float targetTextSize = visibleRowHeight * FOLDER_TEXT_TO_VISIBLE_ROW_RATIO;
+        if (textSize > 0f && Math.abs(textSize - targetTextSize) > EPSILON) {
+            scaleNumericField(property, "text_font_size", targetTextSize / textSize);
         }
 
         float nameOffset = numericField(property, "name_off_set_y");
-        float maxNameOffset = visibleRowHeight * FOLDER_NAME_OFFSET_TO_VISIBLE_ROW_RATIO;
-        if (nameOffset < -maxNameOffset - EPSILON) {
-            setNumericField(property, "name_off_set_y", -maxNameOffset);
-        } else if (nameOffset > maxNameOffset + EPSILON) {
-            setNumericField(property, "name_off_set_y", maxNameOffset);
-        }
+        float targetNameOffset = visibleRowHeight * FOLDER_NAME_OFFSET_TO_VISIBLE_ROW_RATIO;
+        setNumericField(property, "name_off_set_y",
+                nameOffset > 0f ? targetNameOffset : -targetNameOffset);
+        Log.i(TAG, "folder content normalized: icon=" + targetIconSize
+                + ", text=" + targetTextSize + ", row=" + visibleRowHeight);
     }
 
     private static float numericField(Object property, String fieldName) {

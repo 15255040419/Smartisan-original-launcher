@@ -254,13 +254,26 @@ public final class LauncherSettingBridge {
     }
 
     private static int effectiveIconSizePercent(int percent) {
-        int scaled = Math.round(percent * 1.12f);
+        int scaled = Math.round(percent * 1.20f);
         if (scaled < 50) {
             return 50;
         }
-        if (scaled > 168) {
-            return 168;
+        if (scaled > 180) {
+            return 180;
         }
         return scaled;
     }
+
+    public static float calendarLiveDayHeightFactor() {
+        int densityDpi = android.content.res.Resources.getSystem()
+                .getDisplayMetrics().densityDpi;
+        return densityDpi <= 320 ? 1.0f : 0.875f;
+    }
+
+    public static float calendarLiveDayYOffsetFactor() {
+        int densityDpi = android.content.res.Resources.getSystem()
+                .getDisplayMetrics().densityDpi;
+        return densityDpi <= 320 ? 0.80f : 0.72f;
+    }
+
 }

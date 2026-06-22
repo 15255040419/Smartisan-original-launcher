@@ -1819,27 +1819,26 @@ public final class MaintainedLauncherSettingsHost {
         return result;
     }
 
-    private static Drawable normalizeLauncherIcon(Drawable icon) {
-        if (icon == null) {
-            return null;
-        }
-        try {
-            Bitmap bitmap = drawableToBitmapForBadge(icon);
-            if (bitmap != null) {
-                return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), bitmap);
-            }
-        } catch (Throwable ignored) {
-        }
-        return icon;
+    public static Drawable normalizeLauncherIcon(Drawable icon) {
+        return normalizeIconVisibleBounds(icon);
     }
 
     /**
-     * Smartisan replacement artwork often fills almost the entire bitmap,
-     * while Android application icons include an optical safe area. Keep the
-     * original canvas but cap the visible alpha bounds at 84% so replacement
-     * and non-replacement icons share the same apparent size.
+     * Kept for the smali/API compatibility of older builds. All icon sources
+     * now go through the same normalizer; replacement icons must not have a
+     * separate size rule from package-manager icons.
      */
     public static Drawable normalizeImprovedIcon(Drawable icon) {
+        return normalizeIconVisibleBounds(icon);
+    }
+
+    /**
+     * Normalize the alpha-visible artwork instead of only the drawable canvas.
+     * Android 16 applications commonly ship adaptive/legacy icons with very
+     * different transparent margins. Scaling both down and up to one target
+     * keeps original, improved and custom icons optically consistent.
+     */
+    private static Drawable normalizeIconVisibleBounds(Drawable icon) {
         if (icon == null) {
             return null;
         }
@@ -1872,10 +1871,14 @@ public final class MaintainedLauncherSettingsHost {
             }
 
             float visible = Math.max(right - left + 1, bottom - top + 1);
-            float target = Math.min(width, height) * 0.84f;
-            float scale = Math.min(1.0f, target / visible);
+            float target = Math.min(width, height) * 0.90f;
+            float scale = target / visible;
+            // Avoid amplifying a tiny stray alpha pixel into a full-size icon.
+            scale = Math.max(0.70f, Math.min(1.50f, scale));
             if (scale >= 0.995f) {
-                return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), source);
+                if (scale <= 1.005f) {
+                    return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), source);
+                }
             }
 
             Bitmap output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
@@ -6259,6 +6262,7 @@ public final class MaintainedLauncherSettingsHost {
         if (activity == null) {
             return;
         }
+        disableLegacyTouchSizeSweepOnModernAndroid();
         applyLauncherNavigationBarSetting(activity);
         requestLauncherFrame(activity);
         Handler handler = new Handler(Looper.getMainLooper());
@@ -6278,6 +6282,17 @@ public final class MaintainedLauncherSettingsHost {
                 dismissPendingLauncherReloadLoading();
             }
         }, 1200);
+    }
+
+    private static void disableLegacyTouchSizeSweepOnModernAndroid() {
+        if (Build.VERSION.SDK_INT < 35) {
+            return;
+        }
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            constants.getField("sweep_threshold").setInt(null, 100);
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void showPendingLauncherReloadLoading(final Activity activity) {
