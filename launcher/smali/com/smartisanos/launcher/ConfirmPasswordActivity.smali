@@ -696,9 +696,9 @@
 
     .line 4
     :cond_0
-    sget v0, Lcom/smartisanos/launcher/fb;->fake_anim:I
+    const/4 v0, 0x0
 
-    sget v1, Lcom/smartisanos/launcher/fb;->slide_down_out:I
+    const/4 v1, 0x0
 
     invoke-virtual {p0, v0, v1}, Landroid/app/Activity;->overridePendingTransition(II)V
 
@@ -730,178 +730,15 @@
 .end method
 
 .method public onCreate(Landroid/os/Bundle;)V
-    .locals 3
+    .locals 1
 
     const/4 v0, 0x1
 
-    .line 1
     invoke-virtual {p0, v0}, Landroid/app/Activity;->requestWindowFeature(I)Z
 
-    .line 2
     invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 
-    .line 3
-    invoke-virtual {p0}, Landroid/app/Activity;->getPackageManager()Landroid/content/pm/PackageManager;
-
-    move-result-object p1
-
-    iput-object p1, p0, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->mPm:Landroid/content/pm/PackageManager;
-
-    const-string p1, "activity"
-
-    .line 4
-    invoke-virtual {p0, p1}, Landroid/app/Activity;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
-
-    move-result-object p1
-
-    check-cast p1, Landroid/app/ActivityManager;
-
-    iput-object p1, p0, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->Fa:Landroid/app/ActivityManager;
-
-    const-string p1, "device_policy"
-
-    .line 5
-    invoke-virtual {p0, p1}, Landroid/app/Activity;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
-
-    move-result-object p1
-
-    check-cast p1, Landroid/app/admin/DevicePolicyManager;
-
-    iput-object p1, p0, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->Ga:Landroid/app/admin/DevicePolicyManager;
-
-    .line 6
-    invoke-static {p0}, Lcom/smartisanos/launcher/a/I;->w(Landroid/content/Context;)Z
-
-    move-result p1
-
-    if-nez p1, :cond_0
-
-    .line 7
-    invoke-static {p0}, Lcom/smartisanos/launcher/a/I;->v(Landroid/content/Context;)Z
-
-    move-result p1
-
-    .line 8
-    sget v0, Lcom/smartisanos/launcher/ob;->change_pwd_title:I
-
-    sget v1, Lcom/smartisanos/launcher/ob;->change_pwd_content:I
-
-    new-instance v2, Lcom/smartisanos/launcher/ka;
-
-    invoke-direct {v2, p0, p1}, Lcom/smartisanos/launcher/ka;-><init>(Lcom/smartisanos/launcher/ConfirmPasswordActivity;Z)V
-
-    invoke-static {v0, v1, v2}, Lcom/smartisanos/launcher/a/I;->a(IILjava/lang/Runnable;)V
-
-    .line 9
-    invoke-direct {p0}, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->tu()V
-
-    return-void
-
-    .line 10
-    :cond_0
-    invoke-virtual {p0}, Landroid/app/Activity;->getWindow()Landroid/view/Window;
-
-    move-result-object p1
-
-    const v0, -0x7bfefd00
-
-    invoke-virtual {p1, v0}, Landroid/view/Window;->addFlags(I)V
-
-    .line 11
-    invoke-virtual {p0}, Landroid/app/Activity;->getWindow()Landroid/view/Window;
-
-    move-result-object p1
-
-    invoke-virtual {p1}, Landroid/view/Window;->getAttributes()Landroid/view/WindowManager$LayoutParams;
-
-    move-result-object p1
-
-    .line 12
-    iget v0, p1, Landroid/view/WindowManager$LayoutParams;->privateFlags:I
-
-    const/high16 v1, 0x10000000
-
-    or-int/2addr v0, v1
-
-    iput v0, p1, Landroid/view/WindowManager$LayoutParams;->privateFlags:I
-
-    .line 13
-    iget v0, p1, Landroid/view/WindowManager$LayoutParams;->privateFlags:I
-
-    or-int/lit8 v0, v0, 0x8
-
-    iput v0, p1, Landroid/view/WindowManager$LayoutParams;->privateFlags:I
-
-    .line 14
-    invoke-virtual {p0}, Landroid/app/Activity;->getWindow()Landroid/view/Window;
-
-    move-result-object p1
-
-    const/4 v0, 0x0
-
-    invoke-virtual {p1, v0}, Landroid/view/Window;->setStatusBarColor(I)V
-
-    .line 15
-    sget p1, Lcom/smartisanos/launcher/mb;->layout_confirm_password:I
-
-    invoke-virtual {p0, p1}, Landroid/app/Activity;->setContentView(I)V
-
-    .line 16
-    sget p1, Lcom/smartisanos/launcher/kb;->app_lock:I
-
-    invoke-virtual {p0, p1}, Landroid/app/Activity;->findViewById(I)Landroid/view/View;
-
-    move-result-object p1
-
-    check-cast p1, Lcom/smartisanos/securitycenter/widget/SecurityControlView;
-
-    iput-object p1, p0, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->Ha:Lcom/smartisanos/securitycenter/widget/SecurityControlView;
-
-    .line 17
-    iget-object p1, p0, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->Ha:Lcom/smartisanos/securitycenter/widget/SecurityControlView;
-
-    invoke-virtual {p1}, Lcom/smartisanos/securitycenter/widget/SecurityControlView;->da()V
-
-    .line 18
-    iget-object p1, p0, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->Ha:Lcom/smartisanos/securitycenter/widget/SecurityControlView;
-
-    invoke-virtual {p1, v0}, Lcom/smartisanos/securitycenter/widget/SecurityControlView;->i(Z)V
-
-    .line 19
-    iget-object p1, p0, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->Ha:Lcom/smartisanos/securitycenter/widget/SecurityControlView;
-
-    invoke-virtual {p1, v0}, Lcom/smartisanos/securitycenter/widget/SecurityControlView;->h(Z)V
-
-    .line 20
-    iget-object p1, p0, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->Ha:Lcom/smartisanos/securitycenter/widget/SecurityControlView;
-
-    invoke-virtual {p0}, Landroid/app/Activity;->getResources()Landroid/content/res/Resources;
-
-    move-result-object v0
-
-    sget v1, Lcom/smartisanos/launcher/ob;->unlock_page_tips:I
-
-    invoke-virtual {v0, v1}, Landroid/content/res/Resources;->getString(I)Ljava/lang/String;
-
-    move-result-object v0
-
-    invoke-virtual {p0}, Landroid/app/Activity;->getResources()Landroid/content/res/Resources;
-
-    move-result-object v1
-
-    sget v2, Lcom/smartisanos/launcher/jb;->icon_lock_check:I
-
-    invoke-virtual {v1, v2}, Landroid/content/res/Resources;->getDrawable(I)Landroid/graphics/drawable/Drawable;
-
-    move-result-object v1
-
-    invoke-virtual {p1, v0, v1}, Lcom/smartisanos/securitycenter/widget/SecurityControlView;->a(Ljava/lang/String;Landroid/graphics/drawable/Drawable;)V
-
-    .line 21
-    invoke-direct {p0}, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->wu()V
-
-    .line 22
-    invoke-direct {p0, p0}, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->qa(Landroid/content/Context;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->showLauncherPasswordActivity(Landroid/app/Activity;)V
 
     return-void
 .end method
@@ -942,8 +779,15 @@
 
     if-ne v0, p1, :cond_0
 
-    .line 1
-    invoke-direct {p0}, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->tu()V
+    const/4 p1, 0x0
+
+    invoke-virtual {p0, p1}, Landroid/app/Activity;->setResult(I)V
+
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/ConfirmPasswordActivity;->finish()V
+
+    const/4 p0, 0x1
+
+    return p0
 
     .line 2
     :cond_0

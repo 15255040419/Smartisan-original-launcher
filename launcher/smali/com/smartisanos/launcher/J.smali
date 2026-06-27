@@ -3662,9 +3662,9 @@
 
     move-result-object v0
 
-    const v1, 0x203000a
+    const/4 v1, 0x0
 
-    const v2, 0x203000b
+    const/4 v2, 0x0
 
     .line 82
     invoke-static {v0, v1, v2}, Lcom/smartisanos/launcher/e/s;->b(Landroid/content/Context;II)Landroid/os/Bundle;
@@ -6711,9 +6711,9 @@
 
     move-result-object v0
 
-    const v1, 0x203000a
+    const/4 v1, 0x0
 
-    const v2, 0x203000b
+    const/4 v2, 0x0
 
     .line 2
     invoke-static {v0, v1, v2}, Lcom/smartisanos/launcher/e/s;->b(Landroid/content/Context;II)Landroid/os/Bundle;

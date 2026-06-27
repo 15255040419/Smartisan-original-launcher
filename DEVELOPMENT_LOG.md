@@ -15,7 +15,7 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `BUILD_AND_VERSION_NOTES.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-06-22）
+## 当前状态总览（2026-06-24）
 
 ### 已完成
 
@@ -36,15 +36,23 @@
 - 应用图标页顶部“改进版图标”已改为复用首页同款 `SettingItemSwitch` / `SwitchEx`，不再手写开关；“图标包”行改用 maintained 卡片背景，与上方开关行组成一组。
 - 应用图标页新增“桌面图标大小”滑块，位置在“改进版图标”和“图标包”之间；支持 50% - 150% 连续调节，并可点击“小 / 中 / 大”快速跳到 50% / 100% / 150%；保存后回到桌面并完整重启 Launcher，让 12 / 20 宫格里的所有普通应用和桌面设置虚拟入口统一应用新尺寸。
 - 动态日历已完成普通 Android 厂商兼容：按 `CATEGORY_APP_CALENDAR` 查询系统日历并补充常见厂商包名回退，不再只认 `com.android.calendar`；纹理缓存键加入年月和年内日序，系统日期变化后不会继续复用旧日期纹理。
-- 活动日历的双层、错位和尺寸问题已收口：主题 / 改进版静态前景在识别为日历后隐藏，日期只由活动层绘制；合成 bitmap 保持原版坐标，实时 SMEngine 日期层针对现代 Android 的可见纹理边界单独校正高度和 Y 坐标；根节点使用运行时 `icon_size_origin / calendar_back_size` 显示完整锤子日历画布，不再二次缩小。图标大小不读取 `Constants.icon_scale`。
+- 活动日历的双层、错位和尺寸问题已收口到 `activeicon/m.smali`：静态图标路径覆盖 `d([B)` / `o(Bitmap)` 生成同款日历 bitmap，日期区域使用 90% 宽、80% 高和 76% Y 偏移；页面层保持 `3b973b589338b963d5b39a82e1937922577b3f4e` 的静态图层链路。不要再在 `view/a/g.1.smali` 隐藏日历静态前景，否则 Dock 左滑后点击左下设置齿轮进入的编辑设置页，日历会重新显示彩色而不是灰色。
 - 50%-150% 图标比例现在会在每个 Launcher 新进程从 XML 基准重新应用一次；修复杀进程、覆盖安装或系统回收后普通图标恢复 100%，导致日历和普通图标再次失配的问题。
 - 应用图标页单应用切换已改为行级刷新：选择左侧默认图标、右侧推荐图标或相册自定义图标后，当前页面和滚动位置保持不变；只有找不到当前行时才兜底重建并恢复滚动位置。
 - 应用图标页点击范围已收窄：只有左侧默认图标块和右侧推荐/加号图标块响应选择，右侧应用名称/说明文字区域不再弹出选择框。
 - 当前搜索页使用 launcher 内 `ThemeChooserActivity` / `MaintainedLauncherSettingsHost.showSearchPage()` 自绘页面，不再依赖、下载或构建锤子独立搜索 APK；桌面下滑只作为进入自绘搜索页的手势入口。
 - 强迫症选项已从设置首页零散开关收纳到二级页；主页入口和二级页标题走资源字符串，英文系统显示 `OCD Settings`，中文系统显示“强迫症选项”。
+- 主设置页新增“隐私密码”入口，复用页面锁同一套 Launcher 私有密码摘要；已有密码时先验证旧密码，再设置两遍新密码。
 - 双开 / 多用户应用显示和启动已补入 LauncherApps 查询与 `startActivityAsUser` 兼容路径，避免双开应用只显示主用户图标或点击后启动错用户。
 - 双开 / 多用户应用继续对照 maintained 调整：搜索页、桌面应用列表和启动链路都尽量使用 LauncherApps 多用户查询；分身应用支持叠加原版风格面具标记。
 - 应用图标识别逻辑已继续向 maintained 对齐，同时保留当前工程已有的图标识别能力，减少“闲鱼 / 酷安”等普通应用被误识别成应用商店图标，以及系统“电话 / 拨号 / 电话本”等名称匹配不稳定的问题。
+
+### 2026-06-25：日历编辑页灰度最终回归记录
+
+- 可工作的灰度基线是 `3b973b589338b963d5b39a82e1937922577b3f4e`。该版本进入桌面编辑页后，点击底部 Dock 左下齿轮进入“已选择 [0/12] 个应用程序”页，日历会和其他图标一样走静态图层灰度。
+- 后续尝试在 `view/a/g.1.smali` 新增 `showCalendarActiveIconOnly()`、或在静态纹理绑定后按 `ItemInfo.Te()` 隐藏日历静态前景，会破坏这条灰度链路：灰度静态层被隐藏，彩色活动日历层留在最上面，导致设置页日历始终红白彩色。
+- 最终方案：`view/a/g.1.smali`、`ItemInfo.smali` 的日历图层状态回到 `3b973b5` 行为；只在 `view/activeicon/m.smali` 覆盖 `d([B)` / `o(Bitmap)`，把静态图标替换为合成日历 bitmap，并同步日期矩形比例。这样普通桌面没有双层错位，编辑设置页仍能正常变灰。
+- 本轮核对：文件夹对齐相关 `LayoutPropertyAdapter.centerFolderPreview()`、`folder_icon_center_offset_*`、打开文件夹只作用文件夹页的规则未被修改；图标大小相关 `normalizeLauncherIcon()`、`normalizeImprovedIcon()`、`maybeApplyLauncherIconSize()`、50%-150% 保存后完整重启 Launcher 的链路仍保留。日历回退时误带出的 `e/s.smali` 图标 override normalize 调用已补回。
 - 毛玻璃主题已改为只保留 `smartisan_theme_aero` 作为透明壁纸主题，移除白雾主题入口和资源引用；毛玻璃桌面与编辑页文字已恢复为原版风格白色文字效果。
 - 透明主题切换已从自定义运行时旁路改回原版方向：透明模式写入 `launcher_grid_theme` 的 0/1，普通主题 ID 只写入 `launcher_theme`；透明主题包只用于资源注册，不再把 `smartisan_theme_trans` 当普通主题写入或送入普通主题切换队列，避免关闭透明主题后无法恢复上一主题。
 - 透明主题安装包使用 `build\theme-trans-signed.apk`，安装后包名为 `com.smartisanos.launcher.theme.trans`，`minSdkVersion=23`、`targetSdkVersion=28`，最终 APK 元数据已更新为 `compileSdkVersion=36`、`platformBuildVersionName=16`，用于普通 Android / Android 15 / Android 16 安装；`original_apks\com.smartisanos.launcher.theme.trans.apk` 是原始参考包，`targetSdkVersion=17`，不要作为新系统安装包。
@@ -121,6 +129,24 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-06-26：隐私密码页宽度、黑色键盘和搜索解锁链路
+
+- 隐私密码页改为复用主设置项的全宽九宫格背景尺度，“修改密码”不再额外套左右内容边距；底部“关闭密码”保持红色操作按钮，但按主设置卡片可见边缘对齐，并继续和“修改密码”同屏显示。
+- 对照 maintained 版搜索页 T9 键盘确认原版按下反馈由 action-down 状态触发并重绘。内置数字键盘现在在 `ACTION_DOWN` 立即 `setPressed(true)`、输入数字、播放点击音和触感反馈，在 `ACTION_UP/CANCEL` 清除 pressed，避免之前触摸事件被消费后 selector 没有按下态。
+- 浅色隐私密码验证页继续使用 maintained 设置资源里的 `btn_0_classic_normal` 到 `btn_9_classic_normal`、删除和收起按钮资源；黑色板块锁页因没有对应黑色数字键资源，改为同一套键位逻辑的黑底白字按钮，并提供更明显的按下亮态。
+- 搜索结果启动锁定板块内 App 时先进入 Launcher 内置黑色数字密码页，验证成功后再启动目标 App；直接点锁定板块的 requestCode 21 也统一走同一套黑色密码页，取消后会结束本次验证状态，避免再次点击无反应。
+- 追加修正：首次设置页面密码的 requestCode 20 也改为启动 `ConfirmPasswordActivity` 的全屏黑色数字键盘，不再弹旧 AlertDialog；黑色键盘资源由白色锤子 `btn_*_classic_normal.9.png` 保留九宫格边框后反色生成 `btn_*_classic_dark.9.png`；由于按下视觉态在当前兼容层里观感仍不够跟手，黑白键盘均取消视觉 pressed 变色，只保留按下即输入、点击音和触感反馈。
+- 追加修正：隐私密码页的分组标题和“修改密码”文字左边距统一回 maintained 设置页 `setting_item_text_left` 的 30dp 体系；“关闭密码”按钮高度改为 72dp，左右边缘按设置项可见边缘重新对齐。设置首页“隐私密码”图标由通用齿轮改为基于页面锁动画素材制作的灰银锁图标 `privacy_password_lock_icon.png`，保持锤子设置页的拟物灰度风格。
+- 追加修正：主设置页 Java 绑定层此前仍把“隐私密码”入口图标覆盖为 `launcher_settings`，现同步改为 `privacy_password_lock_icon`；“关闭密码”按钮高度从 72dp 收回 64dp，使可见高度更接近上方“修改密码”项。新增 `CLEANUP_CANDIDATES.md`，记录可删除/需谨慎处理的构建产物、反编译目录和被 `.gitignore` 忽略的新 PNG 资源。
+- 追加修正：`privacy_password_lock_icon.png` 从灰银系统感图标改为蓝绿色底座、金色锁体、红色提示点的彩色拟物锁图标，更贴近设置首页其他锤子风格彩色图标。角标链路对照：当前 original-port 仍有旧版 `com.smartisanos.launcher.P` 广播接收 `com.smartisanos.launcher.new_message` 并读取 `extra_packagename / extra_componentname / extra_uid / extra_message_count`，再调用 `Aa.a(..., count)` 更新 `ItemInfo.messagesNumber`；maintained 原版 `LauncherModel` 额外兼容 `badge_count_*`、HTC、Sony 等第三方角标字段，`ApplicationProxy` 还注册 `launcher_hide_badge / launcher_badge_swipe_clean` 观察者，通过 `LauncherPreferences` 刷新 `Constants.SHOW_MESSAGE_FLAG / ENABLE_SWEEP_MESSAGE_FLAG`，`Cell.updateFlagMessageNumber()` 根据计数创建或清除 `mFlagMessageRect`。本轮只记录差异，未改角标逻辑。
+- 验证：`build.bat` 已通过 maintained 设置资源构建、apktool smali、Java 兼容层编译和签名，输出 `build\launcher-signed.apk`。
+
+### 2026-06-24：设置页隐私密码入口与页面锁内置密码
+
+- 对照文档中页面锁现状，原版设置隐私密码入口没有迁到当前桌面设置页，导致用户只能在编辑模式点锁时被动设置。主设置页新增“隐私密码”行，点击后无密码则输入两遍 4-16 位数字密码；已有密码则先验证旧密码，再设置新密码。保存仍只写 Launcher 私有 `launcher_page_lock/password_hash`，摘要算法继续使用带命名域的 SHA-256，页面锁 requestCode 20/21 和原版页面状态机不变。
+- 页面锁弹窗的校验同步收紧为 4-16 位数字，避免设置页和锁入口对密码格式判断不一致。
+- 验证：`build.bat` 已完成 maintained 设置资源构建、apktool smali、Java 兼容层编译和签名，输出 `build\launcher-signed.apk`。APK 结构检查确认包含 `assets/settings_maintained/maintained-settings-res.apk`；当前 shell 中 `adb` 不在 PATH，`apksigner verify` / `aapt dump badging` 单独调用超时，未做装机交互验证。
+
 ### 2026-06-22：Android 16 触摸、图标尺寸与文件夹动画修复
 
 - Android 16 / VIVO 上压平手指后桌面不翻页：ADB 原始输入与应用事件确认触摸坐标没有中断，根因是旧 `TVelocityAndGestureTracker` 把较大的 `MotionEvent.getSize()` 当作专用 sweep 手势。Android 15+ 将旧 `sweep_threshold` 提升到 1.0，避免抢占普通翻页；下滑搜索改为先把完整 MotionEvent 交给 RootView / SMEngine，再旁路判断，避免搜索入口截断桌面触摸序列。
@@ -130,6 +156,8 @@
 - 活动日历最终保留原版底板、日期宽度和布局矩形，只校正旧SMEngine在不同 density 下的实时纹理采样：320dpi及以下使用100%日期高度、80% Y偏移；高于320dpi使用87.5%高度、72% Y偏移。根节点继续按运行时 `icon_size_origin / calendar_back_size` 缩放，因此设置50%-150%图标尺寸时，底板、挂环和日期作为一个整体同比变化；不再使用原版脱离当前设置的 `Constants.icon_scale × active_icon_scale`。
 - 日期刷新链路保持不变：系统 `DATE_CHANGED`、`TIME_SET`、`TIMEZONE_CHANGED` 广播仍由原版接收器处理，日期纹理缓存键继续包含年份和年内日序；其他手机只要能被标准日历类别或厂商包名检测到，就会显示当日日期并在跨日后更新。
 - 验证：最新 APK 通过 `build.bat` 构建签名并覆盖安装到华为 DRA-AL00（Android8.1、720×1440、320dpi），Launcher 进程正常存活，无 `VerifyError`、`NoSuchMethodError` 或崩溃；用户实机截图确认日历比例、日期高度和位置恢复正常。此前尝试把密度分支直接写入复杂 smali 方法曾触发寄存器类型 `VerifyError`，该实现已彻底删除，密度判断现位于 Java 兼容层。
+- 页面锁链路对照原版确认仍保留页状态 `0/2`、锁动画、待验证页面以及 requestCode 20（设置密码）/21（验证解锁）的结果处理；断点是原版依赖系统私有 `com.android.settings.ChooseLockPasswordFake`，已有 fallback 又启动依赖锤子安全中心控件的 `ConfirmPasswordActivity`。现改为 Launcher 内 AlertDialog：首次设置输入两遍4-16位数字密码，解锁输入一次；只在私有 `launcher_page_lock` 中保存带固定命名域的 SHA-256 摘要，验证成功后回调原版 `J.onActivityResult()`，页面锁定/隐藏/解锁仍由原版状态机执行。
+- 本轮验证：`build.bat` 构建、Java编译、apktool smali、签名均通过；APK覆盖安装到 API31 `emulator-5554` 和华为 DRA-AL00 成功，模拟器执行 `cmd package compile -m verify -f` 成功，两台设备均无 `VerifyError`、`NoSuchMethodError` 或 Launcher 崩溃。SMEngine编辑画面不暴露Android View层级，密码弹窗和页面锁交互仍需用户在当前页面点击确认。
 
 ### 2026-06-21：厂商日历识别、日期刷新、双层错位与统一图标尺寸路径
 

@@ -110,6 +110,8 @@
     <string name="icon_setting_empty_tip">No Replaceable Icons</string>
     <string name="icon_setting_sub_text">"Choose well-designed icons to replace apps' default icons"</string>
     <string name="icon_setting_text">Application Icons</string>
+    <string name="privacy_password_title">Privacy Password</string>
+    <string name="privacy_password_sub_text">Set or change the page lock password</string>
     <string name="improved_icon_text">Improved Icons</string>
     <string name="incorrect_password">Incorrect Password</string>
     <string name="initializing">Initializing</string>

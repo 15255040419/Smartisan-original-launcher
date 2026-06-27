@@ -32,6 +32,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Point;
@@ -39,6 +40,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -50,8 +52,11 @@ import android.os.StrictMode;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.Editable;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.text.style.RelativeSizeSpan;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -66,6 +71,7 @@ import android.widget.BaseAdapter;
 import android.widget.AbsListView;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.GridView;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -76,6 +82,7 @@ import android.widget.RelativeLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
+import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -175,6 +182,10 @@ public final class MaintainedLauncherSettingsHost {
     private static final String KEY_LOCKSCREEN_BACKGROUND = "lockscreen_background";
     private static final String PREF_PENDING_CUSTOM_ICON_KEY = "pending_custom_icon_key";
     private static final String PREF_PENDING_ICON_SCROLL_Y = "pending_icon_scroll_y";
+    private static final String EXTRA_PASSWORD_TARGET_PACKAGE = "launcher_password_target_package";
+    private static final String EXTRA_PASSWORD_TARGET_CLASS = "launcher_password_target_class";
+    private static final String EXTRA_PASSWORD_TARGET_USER = "launcher_password_target_user";
+    private static final String EXTRA_PASSWORD_SET_MODE = "launcher_password_set_mode";
     private static final int REQUEST_PICK_CUSTOM_ICON = 53026;
     private static final long SETTINGS_CLICK_GUARD_MS = 800L;
     private static long sSettingsClickBlockedUntil;
@@ -889,10 +900,12 @@ public final class MaintainedLauncherSettingsHost {
             hide(resources, root, "item_id_themes");
             hide(resources, root, "item_page_flip_anims");
             setBackground(find(resources, root, "item_id_launcher_wallpaper"), resources, "selector_setting_sub_item_bg_top");
-            setBackground(find(resources, root, "item_id_icons"), resources, "selector_setting_sub_item_bg_bottom");
+            setBackground(find(resources, root, "item_id_icons"), resources, "selector_setting_sub_item_bg_middle");
+            setBackground(find(resources, root, "item_id_privacy_password"), resources, "selector_setting_sub_item_bg_bottom");
         }
         bindMainSettingIcon(resources, root, "item_page_flip_anims", "page_flip_animation_default_upper", true);
         bindMainSettingIcon(resources, root, "item_id_icons", "icon_setting_icon");
+        bindMainSettingIcon(resources, root, "item_id_privacy_password", "privacy_password_lock_icon");
         TextView updateVersion = (TextView) byId(root, resources, "more_check_upgradation_text");
         if (updateVersion != null) {
             updateVersion.setText(appVersionName(activity));
@@ -920,6 +933,12 @@ public final class MaintainedLauncherSettingsHost {
             public void onClick(View v) {
                 sMainSettingsScrollY = currentScrollY(activity);
                 showIconPage(activity);
+            }
+        });
+        click(activity, resources, root, "item_id_privacy_password", new View.OnClickListener() {
+            public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
+                showSettingsPagePasswordEntry(activity);
             }
         });
         click(activity, resources, root, "setting_ocd_options", new View.OnClickListener() {
@@ -1392,6 +1411,11 @@ public final class MaintainedLauncherSettingsHost {
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             intent.setClassName(entry.packageName, entry.className);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            if (shouldVerifySearchLaunch(activity, entry)) {
+                openLauncherPasswordForSearchTarget(activity, entry);
+                activity.finish();
+                return;
+            }
             if (isDoppelgangerUserId(entry.userId)) {
                 startActivityForUser(activity, intent, null, entry.userId);
             } else {
@@ -3735,29 +3759,1046 @@ public final class MaintainedLauncherSettingsHost {
     public static void openLauncherPasswordFallback(int requestCode) {
         try {
             Class<?> launcherClass = Class.forName("com.smartisanos.launcher.J");
-            Object launcher = launcherClass.getMethod("getInstance").invoke(null);
-            Context context = (Context) launcherClass.getMethod("getContext").invoke(launcher);
-            if (context == null) {
+            final Object launcher = launcherClass.getMethod("getInstance").invoke(null);
+            final Context context = (Context) launcherClass.getMethod("getContext").invoke(launcher);
+            if (!(context instanceof Activity)) {
                 return;
             }
-            try {
-                Class<?> mainViewClass = Class.forName("com.smartisanos.launcher.view.Eb");
-                Object mainView = mainViewClass.getMethod("getInstance").invoke(null);
-                if (mainView != null) {
-                    mainViewClass.getMethod("ca", Boolean.TYPE).invoke(mainView, Boolean.FALSE);
-                }
-            } catch (Throwable ignored) {
+            if (requestCode == 20 || requestCode == 21) {
+                Intent intent = new Intent();
+                intent.setClassName(context.getPackageName(),
+                        "com.smartisanos.launcher.ConfirmPasswordActivity");
+                intent.putExtra("FROM_LAUNCHER", true);
+                intent.putExtra(EXTRA_PASSWORD_SET_MODE, requestCode == 20);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                ((Activity) context).startActivityForResult(intent, requestCode);
+                ((Activity) context).overridePendingTransition(0, 0);
+                return;
             }
-            Intent intent = new Intent();
-            intent.setClassName(context.getPackageName(),
-                    "com.smartisanos.launcher.ConfirmPasswordActivity");
-            intent.putExtra("FROM_LAUNCHER", true);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            launcherClass.getMethod("startActivityForResult", Intent.class, Integer.TYPE)
-                    .invoke(launcher, intent, Integer.valueOf(requestCode));
+            final int callbackRequestCode = requestCode;
+            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    showLauncherPagePasswordDialog((Activity) context, launcher, callbackRequestCode);
+                }
+            });
         } catch (Throwable t) {
             t.printStackTrace();
         }
+    }
+
+    public static boolean hasLauncherPagePassword(Context context) {
+        if (context == null) {
+            return false;
+        }
+        return !TextUtils.isEmpty(context.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
+                .getString("password_hash", null));
+    }
+
+    private static void showSettingsPagePasswordEntry(final Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        if (hasLauncherPagePassword(activity)) {
+            showSettingsPagePasswordVerify(activity, new Runnable() {
+                public void run() {
+                    showPrivacyPasswordPage(activity);
+                }
+            });
+        } else {
+            showSettingsPagePasswordSet(activity, false, new Runnable() {
+                public void run() {
+                    showPrivacyPasswordPage(activity);
+                }
+            });
+        }
+    }
+
+    private static boolean shouldVerifySearchLaunch(Context context, SearchEntry entry) {
+        if (context == null || entry == null || !hasLauncherPagePassword(context)) {
+            return false;
+        }
+        Integer pageIndex = findLauncherPageForPackage(context, entry.packageName, entry.className, entry.userId);
+        if (pageIndex == null) {
+            return true;
+        }
+        return isLauncherPageLocked(pageIndex.intValue());
+    }
+
+    private static void openLauncherPasswordForSearchTarget(Activity activity, SearchEntry entry) {
+        Intent intent = new Intent();
+        intent.setClassName(activity.getPackageName(), "com.smartisanos.launcher.ConfirmPasswordActivity");
+        intent.putExtra("FROM_LAUNCHER", true);
+        intent.putExtra(EXTRA_PASSWORD_TARGET_PACKAGE, entry.packageName);
+        intent.putExtra(EXTRA_PASSWORD_TARGET_CLASS, entry.className);
+        intent.putExtra(EXTRA_PASSWORD_TARGET_USER, entry.userId);
+        int flags = Intent.FLAG_ACTIVITY_NO_ANIMATION;
+        if (isDoppelgangerUserId(entry.userId)) {
+            flags |= Intent.FLAG_ACTIVITY_NEW_TASK;
+        }
+        intent.setFlags(flags);
+        activity.startActivity(intent);
+        activity.overridePendingTransition(0, 0);
+    }
+
+    private static Integer findLauncherPageForPackage(Context context, String packageName,
+            String className, int userId) {
+        if (TextUtils.isEmpty(packageName)) {
+            return null;
+        }
+        Cursor cursor = null;
+        try {
+            Uri uri = Uri.parse("content://com.smartisanos.launcher.settings/favorites");
+            String selection = "packageName=? AND pageIndex>=0";
+            String[] args = new String[]{packageName};
+            cursor = context.getContentResolver().query(uri,
+                    new String[]{"pageIndex", "componentName", "user"}, selection, args, null);
+            if (cursor == null) {
+                return null;
+            }
+            int pageCol = cursor.getColumnIndex("pageIndex");
+            int componentCol = cursor.getColumnIndex("componentName");
+            int userCol = cursor.getColumnIndex("user");
+            while (cursor.moveToNext()) {
+                int rowUser = userCol >= 0 ? cursor.getInt(userCol) : 0;
+                if (rowUser != userId && !(rowUser == 0 && userId == 0)) {
+                    continue;
+                }
+                String component = componentCol >= 0 ? cursor.getString(componentCol) : "";
+                if (!TextUtils.isEmpty(className) && !TextUtils.isEmpty(component)
+                        && component.indexOf(className) < 0) {
+                    continue;
+                }
+                if (pageCol >= 0) {
+                    return Integer.valueOf(cursor.getInt(pageCol));
+                }
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        return null;
+    }
+
+    private static boolean isLauncherPageLocked(int pageIndex) {
+        try {
+            Class<?> ebClass = Class.forName("com.smartisanos.launcher.view.Eb");
+            Object mainView = ebClass.getMethod("getInstance").invoke(null);
+            if (mainView == null) {
+                return false;
+            }
+            Object pageContainer = ebClass.getMethod("Ih").invoke(mainView);
+            if (pageContainer == null) {
+                return false;
+            }
+            Object page = null;
+            for (String methodName : new String[]{"Db", "getPage", "Eb"}) {
+                try {
+                    page = pageContainer.getClass().getMethod(methodName, Integer.TYPE)
+                            .invoke(pageContainer, Integer.valueOf(pageIndex));
+                    if (page != null) {
+                        break;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            if (page == null) {
+                return false;
+            }
+            for (String methodName : new String[]{"isLocked", "isLock", "Fp", "Gp", "Ud"}) {
+                try {
+                    Object value = page.getClass().getMethod(methodName).invoke(page);
+                    if (value instanceof Boolean) {
+                        return ((Boolean) value).booleanValue();
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    private static void showSettingsPagePasswordVerify(final Activity activity, final Runnable onVerified) {
+        showSettingsPasswordPad(activity, "验证隐私密码", "输入密码", new PasswordPadCallback() {
+            @Override
+            public void onComplete(String value, Runnable reset) {
+                String saved = activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
+                        .getString("password_hash", "");
+                if (!saved.equals(launcherPagePasswordHash(value))) {
+                    Toast.makeText(activity, "密码错误", Toast.LENGTH_SHORT).show();
+                    reset.run();
+                    return;
+                }
+                if (onVerified != null) {
+                    onVerified.run();
+                }
+            }
+        });
+    }
+
+    private static void showSettingsPagePasswordSet(final Activity activity, boolean changing) {
+        showSettingsPagePasswordSet(activity, changing, null);
+    }
+
+    private static void showSettingsPagePasswordSet(final Activity activity, boolean changing, final Runnable onSaved) {
+        final String title = changing ? "修改隐私密码" : "设置隐私密码";
+        final String[] first = new String[1];
+        showSettingsPasswordPad(activity, title, "输入新密码", new PasswordPadCallback() {
+            @Override
+            public void onComplete(String value, Runnable reset) {
+                first[0] = value;
+                showSettingsPasswordPad(activity, title, "再次输入密码", new PasswordPadCallback() {
+                    @Override
+                    public void onComplete(String value, Runnable reset) {
+                        if (!value.equals(first[0])) {
+                            Toast.makeText(activity, "两次输入的密码不一致", Toast.LENGTH_SHORT).show();
+                            reset.run();
+                            return;
+                        }
+                        activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
+                                .edit().putString("password_hash", launcherPagePasswordHash(value)).commit();
+                        Toast.makeText(activity, "隐私密码已保存", Toast.LENGTH_SHORT).show();
+                        if (onSaved != null) {
+                            onSaved.run();
+                        } else {
+                            showPrivacyPasswordPage(activity);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    private static void showPrivacyPasswordPage(final Activity activity) {
+        try {
+            tuneWindow(activity);
+            final SettingsResourceContext context = createSettingsContext(activity);
+            final Resources resources = context.getResources();
+
+            LinearLayout root = new LinearLayout(context);
+            root.setOrientation(LinearLayout.VERTICAL);
+            setBackground(root, resources, "background");
+
+            View title = inflate(activity, context, "title_layout");
+            bindTitleBar(activity, resources, title, "隐私密码", new View.OnClickListener() {
+                public void onClick(View v) {
+                    show(activity, sMainSettingsScrollY);
+                }
+            });
+            root.addView(title, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            LinearLayout content = new LinearLayout(context);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.setPadding(0, dp(activity, 18), 0, dp(activity, 14));
+            root.addView(content, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+            content.addView(privacySectionLabel(context, "隐私密码相关设置"));
+            LinearLayout settingsCard = privacyCard(context);
+            settingsCard.addView(privacyRow(activity, context, resources, "修改密码", "selector_setting_sub_item_bg_single",
+                    new View.OnClickListener() {
+                        public void onClick(View v) {
+                            showSettingsPagePasswordSet(activity, true);
+                        }
+                    }), new LinearLayout.LayoutParams(-1, dp(activity, 72)));
+            content.addView(settingsCard, cardLayoutParams(activity));
+
+            Space fill = new Space(activity);
+            content.addView(fill, new LinearLayout.LayoutParams(1, 0, 1f));
+
+            TextView close = new TextView(context);
+            close.setText("关闭密码");
+            close.setTextColor(Color.WHITE);
+            close.setTextSize(21);
+            close.setGravity(Gravity.CENTER);
+            close.setTypeface(Typeface.DEFAULT_BOLD);
+            close.setBackgroundDrawable(roundedDrawable(0xffef5a57, 0xffdc4a47, dp(activity, 8)));
+            close.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
+                            .edit().remove("password_hash").commit();
+                    Toast.makeText(activity, "隐私密码已关闭", Toast.LENGTH_SHORT).show();
+                    show(activity, sMainSettingsScrollY);
+                }
+            });
+            LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(-1, dp(activity, 64));
+            closeLp.leftMargin = dp(activity, 12);
+            closeLp.rightMargin = dp(activity, 12);
+            content.addView(close, closeLp);
+
+            activity.setContentView(root);
+        } catch (Throwable t) {
+            t.printStackTrace();
+            Toast.makeText(activity, "隐私密码页面加载失败", Toast.LENGTH_SHORT).show();
+            show(activity, sMainSettingsScrollY);
+        }
+    }
+
+    private static void showDesktopBlockLockInfoPage(final Activity activity) {
+        try {
+            tuneWindow(activity);
+            SettingsResourceContext context = createSettingsContext(activity);
+            Resources resources = context.getResources();
+            LinearLayout root = new LinearLayout(context);
+            root.setOrientation(LinearLayout.VERTICAL);
+            setBackground(root, resources, "background");
+            View title = inflate(activity, context, "title_layout");
+            bindTitleBar(activity, resources, title, "桌面板块锁", new View.OnClickListener() {
+                public void onClick(View v) {
+                    showPrivacyPasswordPage(activity);
+                }
+            });
+            root.addView(title, new LinearLayout.LayoutParams(-1, -2));
+            LinearLayout content = new LinearLayout(context);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.setPadding(dp(activity, 28), dp(activity, 36), dp(activity, 28), 0);
+            root.addView(content, new LinearLayout.LayoutParams(-1, -1));
+
+            TextView card = new TextView(context);
+            card.setText("桌面板块锁");
+            card.setTextColor(0xff333333);
+            card.setTextSize(22);
+            card.setGravity(Gravity.LEFT | Gravity.TOP);
+            card.setPadding(dp(activity, 40), dp(activity, 32), dp(activity, 40), 0);
+            card.setBackgroundDrawable(roundedDrawable(Color.WHITE, 0xffe2e2e2, dp(activity, 8)));
+            content.addView(card, new LinearLayout.LayoutParams(-1, dp(activity, 300)));
+
+            TextView desc = new TextView(context);
+            desc.setText("桌面底部由右向左滑动，进入板块编辑模式，可对一个或多个桌面进行加密和解锁");
+            desc.setTextColor(0xff888888);
+            desc.setTextSize(18);
+            desc.setLineSpacing(0, 1.15f);
+            LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(-1, -2);
+            descLp.leftMargin = dp(activity, 48);
+            descLp.rightMargin = dp(activity, 48);
+            descLp.topMargin = dp(activity, 24);
+            content.addView(desc, descLp);
+            activity.setContentView(root);
+        } catch (Throwable t) {
+            showPrivacyPasswordPage(activity);
+        }
+    }
+
+    private static void bindTitleBar(final Activity activity, Resources resources, View root,
+            String titleText, View.OnClickListener backClick) {
+        TextView btnBack = (TextView) find(resources, root, "btn_back");
+        if (btnBack != null) {
+            btnBack.setOnClickListener(backClick);
+        }
+        TextView tvTitle = (TextView) find(resources, root, "tv_title");
+        if (tvTitle != null) {
+            tvTitle.setText(titleText);
+            RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.addRule(RelativeLayout.CENTER_VERTICAL);
+            tvTitle.setLayoutParams(lp);
+            tvTitle.setGravity(Gravity.CENTER);
+        }
+        if (btnBack != null) {
+            btnBack.bringToFront();
+        }
+    }
+
+    private static TextView privacySectionLabel(Context context, String text) {
+        TextView label = new TextView(context);
+        label.setText(text);
+        label.setTextColor(0xff8a8a8a);
+        label.setTextSize(18);
+        label.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        label.setTypeface(Typeface.DEFAULT_BOLD);
+        label.setPadding(dp(context, 30), 0, 0, 0);
+        label.setSingleLine(true);
+        label.setIncludeFontPadding(false);
+        label.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(context, 42)));
+        return label;
+    }
+
+    private static LinearLayout privacyCard(Context context) {
+        LinearLayout card = new LinearLayout(context);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setClipToPadding(false);
+        return card;
+    }
+
+    private static LinearLayout.LayoutParams cardLayoutParams(Context context) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.bottomMargin = dp(context, 28);
+        return lp;
+    }
+
+    private static int settingDimen(Resources resources, String name, int fallback) {
+        try {
+            int id = resources.getIdentifier(name, "dimen", SETTINGS_PKG);
+            if (id != 0) {
+                return resources.getDimensionPixelSize(id);
+            }
+        } catch (Throwable ignored) {
+        }
+        return fallback;
+    }
+
+    private static View privacyRow(Activity activity, Context context, Resources resources, String text,
+            String bgName, View.OnClickListener listener) {
+        RelativeLayout row = new RelativeLayout(context);
+        row.setClickable(true);
+        row.setOnClickListener(listener);
+        setBackground(row, resources, bgName);
+
+        TextView title = new TextView(context);
+        title.setText(text);
+        title.setTextColor(0xff333333);
+        title.setTextSize(22);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        title.setSingleLine(true);
+        RelativeLayout.LayoutParams titleLp = new RelativeLayout.LayoutParams(-2, -1);
+        titleLp.leftMargin = settingDimen(resources, "setting_item_text_left", dp(activity, 30));
+        titleLp.rightMargin = dp(activity, 72);
+        titleLp.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+        row.addView(title, titleLp);
+
+        ImageView arrow = new ImageView(context);
+        int arrowId = resources.getIdentifier("setting_next", "drawable", SETTINGS_PKG);
+        if (arrowId != 0) {
+            arrow.setImageDrawable(resources.getDrawable(arrowId));
+        }
+        arrow.setScaleType(ImageView.ScaleType.CENTER);
+        RelativeLayout.LayoutParams arrowLp = new RelativeLayout.LayoutParams(dp(activity, 42), -1);
+        arrowLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+        arrowLp.rightMargin = dp(activity, 14);
+        row.addView(arrow, arrowLp);
+        return row;
+    }
+
+    private static boolean isValidPagePassword(String value) {
+        if (value == null || value.length() != 6) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static void showLauncherPagePasswordDialog(final Activity activity,
+            final Object launcher, final int requestCode) {
+        final boolean settingPassword = requestCode == 20;
+        final LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(activity, 24);
+        content.setPadding(padding, dp(activity, 8), padding, 0);
+
+        final EditText password = new EditText(activity);
+        password.setHint(settingPassword ? "请输入6位页面密码" : "请输入页面密码");
+        password.setSingleLine(true);
+        password.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        content.addView(password, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        final EditText confirmation;
+        if (settingPassword) {
+            confirmation = new EditText(activity);
+            confirmation.setHint("请再次输入页面密码");
+            confirmation.setSingleLine(true);
+            confirmation.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                    | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+            content.addView(confirmation, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        } else {
+            confirmation = null;
+        }
+
+        final AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setTitle(settingPassword ? "设置页面密码" : "解锁页面")
+                .setView(content)
+                .setNegativeButton("取消", null)
+                .setPositiveButton(settingPassword ? "确定" : "解锁", null)
+                .create();
+        dialog.setOnCancelListener(new android.content.DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(android.content.DialogInterface ignored) {
+                finishLauncherPasswordVerification();
+            }
+        });
+        dialog.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(android.content.DialogInterface ignored) {
+                finishLauncherPasswordVerification();
+            }
+        });
+        dialog.setOnShowListener(new android.content.DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(android.content.DialogInterface ignored) {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View ignored) {
+                String value = password.getText().toString();
+                if (!isValidPagePassword(value)) {
+                    password.setError("密码需为6位数字");
+                    return;
+                }
+                if (settingPassword) {
+                    if (confirmation == null || !value.equals(confirmation.getText().toString())) {
+                        if (confirmation != null) confirmation.setError("两次输入的密码不一致");
+                        return;
+                    }
+                    activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
+                            .edit().putString("password_hash", launcherPagePasswordHash(value)).commit();
+                } else {
+                    String saved = activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
+                            .getString("password_hash", "");
+                    if (!saved.equals(launcherPagePasswordHash(value))) {
+                        password.setError("密码错误");
+                        password.setText("");
+                        return;
+                    }
+                }
+                dispatchLauncherPasswordResult(launcher, requestCode, Activity.RESULT_OK);
+                dialog.dismiss();
+                }
+            });
+            password.requestFocus();
+            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+            }
+        });
+        dialog.show();
+    }
+
+    private static String launcherPagePasswordHash(String value) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(("smartisan-launcher-page:" + value)
+                    .getBytes(java.nio.charset.Charset.forName("UTF-8")));
+            StringBuilder out = new StringBuilder(bytes.length * 2);
+            for (byte item : bytes) out.append(String.format(java.util.Locale.US, "%02x", item & 0xff));
+            return out.toString();
+        } catch (Throwable ignored) {
+            return String.valueOf(value.hashCode());
+        }
+    }
+
+    private static void dispatchLauncherPasswordResult(Object launcher, int requestCode, int resultCode) {
+        try {
+            launcher.getClass().getMethod("onActivityResult", Integer.TYPE, Integer.TYPE, Intent.class)
+                    .invoke(launcher, Integer.valueOf(requestCode), Integer.valueOf(resultCode), new Intent());
+        } catch (Throwable t) {
+            t.printStackTrace();
+        }
+    }
+
+    private static void finishLauncherPasswordVerification() {
+        try {
+            Class<?> mainViewClass = Class.forName("com.smartisanos.launcher.view.Eb");
+            Object mainView = mainViewClass.getMethod("getInstance").invoke(null);
+            if (mainView != null) mainViewClass.getMethod("ca", Boolean.TYPE).invoke(mainView, Boolean.FALSE);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private interface PasswordPadCallback {
+        void onComplete(String value, Runnable reset);
+    }
+
+    private static void showSettingsPasswordPad(final Activity activity, String titleText,
+            String promptText, final PasswordPadCallback callback) {
+        try {
+            tuneWindow(activity);
+            final SettingsResourceContext context = createSettingsContext(activity);
+            final Resources resources = context.getResources();
+            final StringBuilder input = new StringBuilder(6);
+
+            LinearLayout page = new LinearLayout(context);
+            page.setOrientation(LinearLayout.VERTICAL);
+            setBackground(page, resources, "background");
+
+            View title = inflate(activity, context, "title_layout");
+            bindTitleBar(activity, resources, title, titleText, new View.OnClickListener() {
+                public void onClick(View v) {
+                    show(activity, sMainSettingsScrollY);
+                }
+            });
+            page.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+            LinearLayout content = new LinearLayout(context);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.setGravity(Gravity.CENTER_HORIZONTAL);
+            content.setPadding(0, 0, 0, 0);
+            page.addView(content, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+            Space top = new Space(activity);
+            content.addView(top, new LinearLayout.LayoutParams(1, 0, 1.15f));
+
+            TextView prompt = new TextView(context);
+            prompt.setText(promptText);
+            prompt.setTextColor(0xff9d9d9d);
+            prompt.setTextSize(19);
+            prompt.setGravity(Gravity.CENTER);
+            content.addView(prompt, new LinearLayout.LayoutParams(-1, -2));
+
+            final LinearLayout dots = makePasswordDotsView(activity, false);
+            LinearLayout.LayoutParams dotsLp = new LinearLayout.LayoutParams(-1, dp(activity, 26));
+            dotsLp.topMargin = dp(activity, 18);
+            content.addView(dots, dotsLp);
+
+            content.addView(new Space(activity), new LinearLayout.LayoutParams(1, 0, 1.85f));
+
+            final Runnable reset = new Runnable() {
+                @Override
+                public void run() {
+                    input.setLength(0);
+                    updatePasswordDots(dots, 0, false);
+                }
+            };
+            addPasswordKeypad(activity, page, false, false, input, dots, new PasswordPadCallback() {
+                @Override
+                public void onComplete(String value, Runnable ignored) {
+                    if (callback != null) {
+                        callback.onComplete(value, reset);
+                    }
+                }
+            });
+            activity.setContentView(page);
+        } catch (Throwable t) {
+            t.printStackTrace();
+            show(activity, sMainSettingsScrollY);
+        }
+    }
+
+    public static void showLauncherPasswordActivity(final Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        activity.setResult(Activity.RESULT_CANCELED, new Intent());
+        Window window = activity.getWindow();
+        if (window != null) {
+            window.setWindowAnimations(0);
+            window.setStatusBarColor(Color.BLACK);
+            if (Build.VERSION.SDK_INT >= 23) {
+                window.getDecorView().setSystemUiVisibility(0);
+            }
+        }
+        Intent source = activity.getIntent();
+        if (source != null && source.getBooleanExtra(EXTRA_PASSWORD_SET_MODE, false)) {
+            showLauncherPasswordSetStep(activity, null);
+            return;
+        }
+        if (!hasLauncherPagePassword(activity)) {
+            Intent target = passwordTargetIntent(activity);
+            activity.setResult(Activity.RESULT_OK, new Intent());
+            activity.finish();
+            activity.overridePendingTransition(0, 0);
+            if (target != null) {
+                startPasswordTarget(activity, target);
+            }
+            return;
+        }
+
+        final LinearLayout root = new LinearLayout(activity);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setBackgroundColor(Color.BLACK);
+
+        int height = activity.getResources().getDisplayMetrics().heightPixels;
+        int topPad = Math.max(dp(activity, 48), height / 10);
+        root.setPadding(0, topPad, 0, 0);
+
+        ImageView icon = new ImageView(activity);
+        icon.setImageDrawable(createLauncherLockIcon(activity));
+        root.addView(icon, new LinearLayout.LayoutParams(dp(activity, 76), dp(activity, 96)));
+
+        TextView title = new TextView(activity);
+        title.setText("解锁板块");
+        title.setTextColor(Color.WHITE);
+        title.setGravity(Gravity.CENTER);
+        title.setTextSize(24);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleLp.topMargin = dp(activity, 22);
+        root.addView(title, titleLp);
+
+        final LinearLayout dots = makePasswordDotsView(activity, true);
+        LinearLayout.LayoutParams dotsLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(activity, 34));
+        dotsLp.topMargin = dp(activity, 18);
+        root.addView(dots, dotsLp);
+
+        Space spacer = new Space(activity);
+        root.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));
+
+        final StringBuilder input = new StringBuilder(6);
+        addPasswordKeypad(activity, root, true, true, input, dots, new PasswordPadCallback() {
+            @Override
+            public void onComplete(String value, Runnable reset) {
+                String saved = activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
+                        .getString("password_hash", "");
+                if (saved.equals(launcherPagePasswordHash(value))) {
+                    Intent target = passwordTargetIntent(activity);
+                    activity.setResult(Activity.RESULT_OK, new Intent());
+                    activity.finish();
+                    activity.overridePendingTransition(0, 0);
+                    if (target != null) {
+                        startPasswordTarget(activity, target);
+                    }
+                } else {
+                    Toast.makeText(activity, "密码错误", Toast.LENGTH_SHORT).show();
+                    reset.run();
+                }
+            }
+        });
+        activity.setContentView(root);
+    }
+
+    private static void showLauncherPasswordSetStep(final Activity activity, final String firstPassword) {
+        final LinearLayout root = new LinearLayout(activity);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setBackgroundColor(Color.BLACK);
+
+        int height = activity.getResources().getDisplayMetrics().heightPixels;
+        int topPad = Math.max(dp(activity, 48), height / 10);
+        root.setPadding(0, topPad, 0, 0);
+
+        ImageView icon = new ImageView(activity);
+        icon.setImageDrawable(createLauncherLockIcon(activity));
+        root.addView(icon, new LinearLayout.LayoutParams(dp(activity, 76), dp(activity, 96)));
+
+        TextView title = new TextView(activity);
+        title.setText("设置页面密码");
+        title.setTextColor(Color.WHITE);
+        title.setGravity(Gravity.CENTER);
+        title.setTextSize(24);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleLp.topMargin = dp(activity, 22);
+        root.addView(title, titleLp);
+
+        TextView prompt = new TextView(activity);
+        prompt.setText(firstPassword == null ? "输入密码" : "再次输入密码");
+        prompt.setTextColor(0xff9d9d9d);
+        prompt.setGravity(Gravity.CENTER);
+        prompt.setTextSize(19);
+        LinearLayout.LayoutParams promptLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        promptLp.topMargin = dp(activity, 22);
+        root.addView(prompt, promptLp);
+
+        final LinearLayout dots = makePasswordDotsView(activity, true);
+        LinearLayout.LayoutParams dotsLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(activity, 34));
+        dotsLp.topMargin = dp(activity, 18);
+        root.addView(dots, dotsLp);
+
+        Space spacer = new Space(activity);
+        root.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));
+
+        final StringBuilder input = new StringBuilder(6);
+        addPasswordKeypad(activity, root, true, true, input, dots, new PasswordPadCallback() {
+            @Override
+            public void onComplete(String value, Runnable reset) {
+                if (firstPassword == null) {
+                    showLauncherPasswordSetStep(activity, value);
+                    return;
+                }
+                if (!firstPassword.equals(value)) {
+                    Toast.makeText(activity, "两次输入的密码不一致", Toast.LENGTH_SHORT).show();
+                    reset.run();
+                    return;
+                }
+                activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
+                        .edit().putString("password_hash", launcherPagePasswordHash(value)).commit();
+                activity.setResult(Activity.RESULT_OK, new Intent());
+                activity.finish();
+                activity.overridePendingTransition(0, 0);
+            }
+        });
+        activity.setContentView(root);
+    }
+
+    private static Intent passwordTargetIntent(Activity activity) {
+        try {
+            Intent source = activity.getIntent();
+            if (source == null) {
+                return null;
+            }
+            String pkg = source.getStringExtra(EXTRA_PASSWORD_TARGET_PACKAGE);
+            String cls = source.getStringExtra(EXTRA_PASSWORD_TARGET_CLASS);
+            if (TextUtils.isEmpty(pkg) || TextUtils.isEmpty(cls)) {
+                return null;
+            }
+            Intent target = new Intent(Intent.ACTION_MAIN);
+            target.addCategory(Intent.CATEGORY_LAUNCHER);
+            target.setClassName(pkg, cls);
+            target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            target.putExtra(EXTRA_PASSWORD_TARGET_USER,
+                    source.getIntExtra(EXTRA_PASSWORD_TARGET_USER, 0));
+            return target;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static void startPasswordTarget(Activity activity, Intent target) {
+        try {
+            int userId = target.getIntExtra(EXTRA_PASSWORD_TARGET_USER, 0);
+            target.removeExtra(EXTRA_PASSWORD_TARGET_USER);
+            if (isDoppelgangerUserId(userId)) {
+                startActivityForUser(activity, target, null, userId);
+            } else {
+                activity.startActivity(target);
+            }
+        } catch (Throwable t) {
+            Toast.makeText(activity, "无法启动应用", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private static void addPasswordKeypad(final Activity activity, LinearLayout parent, final boolean dark,
+            boolean includeCancel, final StringBuilder input, final LinearLayout dots,
+            final PasswordPadCallback callback) {
+        int height = activity.getResources().getDisplayMetrics().heightPixels;
+        int keyHeight = Math.max(dp(activity, dark ? 78 : 72),
+                Math.min(dp(activity, dark ? 104 : 98), height / (dark ? 10 : 11)));
+        LinearLayout keypad = new LinearLayout(activity);
+        keypad.setOrientation(LinearLayout.VERTICAL);
+        keypad.setBackgroundColor(dark ? Color.rgb(8, 8, 8) : 0xffe9e9e9);
+        String[] keys = includeCancel
+                ? new String[]{"1", "2\nABC", "3\nDEF", "4\nGHI", "5\nJKL", "6\nMNO",
+                "7\nPQRS", "8\nTUV", "9\nWXYZ", "取消", "0", "⌫"}
+                : new String[]{"1", "2\nABC", "3\nDEF", "4\nGHI", "5\nJKL", "6\nMNO",
+                "7\nPQRS", "8\nTUV", "9\nWXYZ", "", "0", "⌫"};
+        final Runnable reset = new Runnable() {
+            @Override
+            public void run() {
+                input.setLength(0);
+                updatePasswordDots(dots, 0, dark);
+            }
+        };
+        for (int rowIndex = 0; rowIndex < 4; rowIndex++) {
+            LinearLayout row = new LinearLayout(activity);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            keypad.addView(row, new LinearLayout.LayoutParams(-1, keyHeight));
+            for (int colIndex = 0; colIndex < 3; colIndex++) {
+                final String key = keys[rowIndex * 3 + colIndex];
+                TextView cell = new TextView(activity);
+                cell.setGravity(Gravity.CENTER);
+                Drawable keyDrawable = launcherKeyboardDrawable(activity, key, dark);
+                if (keyDrawable != null) {
+                    cell.setText("");
+                    cell.setBackgroundDrawable(keyDrawable);
+                } else {
+                    cell.setText(keyLabel(key));
+                    cell.setBackgroundDrawable(keyBackground(dark));
+                }
+                cell.setTextColor(dark ? Color.WHITE : 0xff666666);
+                cell.setTextSize(key.indexOf('\n') >= 0 ? 18 : ("取消".equals(key) ? 20 : 31));
+                cell.setIncludeFontPadding(false);
+                cell.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
+                cell.setSoundEffectsEnabled(true);
+                cell.setHapticFeedbackEnabled(true);
+                cell.setOnTouchListener(new View.OnTouchListener() {
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                        if (event == null) {
+                            return true;
+                        }
+                        int action = event.getActionMasked();
+                        if (action != MotionEvent.ACTION_DOWN) {
+                            return true;
+                        }
+                        if (TextUtils.isEmpty(key)) {
+                            return true;
+                        }
+                        v.playSoundEffect(android.view.SoundEffectConstants.CLICK);
+                        v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+                        if ("取消".equals(key)) {
+                            activity.setResult(Activity.RESULT_CANCELED, new Intent());
+                            finishLauncherPasswordVerification();
+                            activity.finish();
+                            activity.overridePendingTransition(0, 0);
+                        } else if ("⌫".equals(key)) {
+                            if (input.length() > 0) {
+                                input.deleteCharAt(input.length() - 1);
+                                updatePasswordDots(dots, input.length(), dark);
+                            }
+                        } else if (input.length() < 6) {
+                            input.append(key.charAt(0));
+                            updatePasswordDots(dots, input.length(), dark);
+                            if (input.length() == 6 && callback != null) {
+                                callback.onComplete(input.toString(), reset);
+                            }
+                        }
+                        return true;
+                    }
+                });
+                row.addView(cell, new LinearLayout.LayoutParams(0, -1, 1f));
+            }
+        }
+        parent.addView(keypad, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, keyHeight * 4));
+    }
+
+    private static Drawable launcherKeyboardDrawable(Context context, String key, boolean dark) {
+        if (context == null || key == null) {
+            return null;
+        }
+        String name = null;
+        if (key.length() > 0 && key.charAt(0) >= '0' && key.charAt(0) <= '9') {
+            name = "btn_" + key.charAt(0) + (dark ? "_classic_dark" : "_classic_normal");
+        } else if ("⌫".equals(key)) {
+            name = dark ? "btn_delete_classic_dark" : "btn_delete_classic_normal";
+        } else if (TextUtils.isEmpty(key)) {
+            name = dark ? "btn_down_classic_dark" : "btn_down_classic_normal";
+        }
+        if (name == null) {
+            return null;
+        }
+        try {
+            Resources resources = settingsResources(context);
+            int id = resources.getIdentifier(name, "drawable", SETTINGS_PKG);
+        if (id != 0) {
+                Drawable normal = resources.getDrawable(id);
+                return keyboardButtonState(normal, dark);
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private static Drawable keyboardButtonState(Drawable normal, boolean dark) {
+        if (normal == null) {
+            return null;
+        }
+        StateListDrawable state = new StateListDrawable();
+        state.addState(new int[]{}, normal);
+        return state;
+    }
+
+    private static Drawable keyBackground(boolean dark) {
+        StateListDrawable state = new StateListDrawable();
+        state.addState(new int[]{}, colorDrawable(dark ? Color.rgb(12, 12, 12) : Color.WHITE,
+                dark ? 0xff202020 : 0xffe6e6e6));
+        return state;
+    }
+
+    private static Drawable colorDrawable(int color) {
+        return colorDrawable(color, 0);
+    }
+
+    private static Drawable colorDrawable(int color, int strokeColor) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        if (strokeColor != 0) {
+            drawable.setStroke(1, strokeColor);
+        }
+        return drawable;
+    }
+
+    private static CharSequence keyLabel(String key) {
+        if (key == null || key.length() <= 1 || "取消".equals(key) || "⌫".equals(key)) {
+            return key == null ? "" : key;
+        }
+        SpannableString text = new SpannableString(key);
+        int split = key.indexOf('\n');
+        if (split >= 0) {
+            text.setSpan(new RelativeSizeSpan(1.65f), 0, split, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new RelativeSizeSpan(0.78f), split + 1, key.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return text;
+    }
+
+    private static String makePasswordDots(int filled) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            if (i > 0) out.append("  ");
+            out.append(i < filled ? "●" : "●");
+        }
+        return out.toString();
+    }
+
+    private static LinearLayout makePasswordDotsView(Context context, boolean dark) {
+        LinearLayout row = new LinearLayout(context);
+        row.setGravity(Gravity.CENTER);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < 6; i++) {
+            View dot = new View(context);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    dp(context, dark ? 14 : 12), dp(context, dark ? 14 : 12));
+            if (i > 0) {
+                lp.leftMargin = dp(context, dark ? 18 : 16);
+            }
+            row.addView(dot, lp);
+        }
+        updatePasswordDots(row, 0, dark);
+        return row;
+    }
+
+    private static void updatePasswordDots(LinearLayout row, int filled, boolean dark) {
+        if (row == null) {
+            return;
+        }
+        int empty = dark ? Color.rgb(38, 38, 38) : 0xffe4e4e4;
+        int active = dark ? Color.rgb(220, 220, 220) : 0xffffffff;
+        int activeStroke = dark ? Color.rgb(220, 220, 220) : 0xffd8d8d8;
+        for (int i = 0; i < row.getChildCount(); i++) {
+            View dot = row.getChildAt(i);
+            boolean on = i < filled;
+            GradientDrawable drawable = new GradientDrawable();
+            drawable.setShape(GradientDrawable.OVAL);
+            drawable.setColor(on ? active : empty);
+            if (on && !dark) {
+                drawable.setStroke(1, activeStroke);
+            }
+            dot.setBackgroundDrawable(drawable);
+        }
+    }
+
+    private static Drawable createLauncherLockIcon(Context context) {
+        try {
+            java.io.InputStream in = context.getAssets().open(
+                    "Textures/1080p/12/lock-anim/lock_icon_0016.png");
+            Bitmap source = BitmapFactory.decodeStream(in);
+            in.close();
+            if (source != null) {
+                return new BitmapDrawable(context.getResources(), source);
+            }
+        } catch (Throwable ignored) {
+        }
+        int w = dp(context, 92);
+        int h = dp(context, 116);
+        Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(Color.rgb(160, 160, 160));
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(context, 6));
+        RectF board = new RectF(dp(context, 14), dp(context, 4), w - dp(context, 14), h - dp(context, 4));
+        canvas.drawRoundRect(board, dp(context, 5), dp(context, 5), paint);
+        canvas.drawLine(board.left, dp(context, 34), board.right, dp(context, 34), paint);
+        paint.setStyle(Paint.Style.FILL);
+        RectF body = new RectF(dp(context, 28), dp(context, 63), w - dp(context, 28), dp(context, 94));
+        canvas.drawRoundRect(body, dp(context, 4), dp(context, 4), paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(dp(context, 5));
+        RectF shackle = new RectF(dp(context, 36), dp(context, 50), w - dp(context, 36), dp(context, 75));
+        canvas.drawArc(shackle, 180, -180, false, paint);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.BLACK);
+        canvas.drawCircle(w / 2f, dp(context, 78), dp(context, 4), paint);
+        Path path = new Path();
+        path.moveTo(w / 2f, dp(context, 80));
+        path.lineTo(w / 2f - dp(context, 6), dp(context, 91));
+        path.lineTo(w / 2f + dp(context, 6), dp(context, 91));
+        path.close();
+        canvas.drawPath(path, paint);
+        return new BitmapDrawable(context.getResources(), bitmap);
     }
 
     private static ResolveInfo resolveInfoFromLauncherActivity(PackageManager packageManager,

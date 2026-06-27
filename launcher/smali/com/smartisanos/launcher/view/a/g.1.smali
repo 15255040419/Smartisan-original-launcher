@@ -599,9 +599,9 @@
     move-result v2
 
     .line 4
-    iget-object v3, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+    sget-object v3, Lcom/smartisanos/launcher/view/activeicon/m;->PACKAGE_NAME:Ljava/lang/String;
 
-    invoke-virtual {v3}, Lcom/smartisanos/launcher/data/ItemInfo;->Te()Z
+    invoke-virtual {v0, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
     move-result v3
 
@@ -631,11 +631,7 @@
     invoke-virtual {v0}, Lcom/smartisanos/smengine/SceneNode;->updateGeometricState()V
 
     .line 10
-    const/4 v1, 0x1
-
     invoke-virtual {v0, v1}, Lcom/smartisanos/smengine/SceneNode;->setVisibility(Z)V
-
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->showCalendarActiveIconOnly()V
 
     .line 11
     iget-object v1, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
@@ -9843,25 +9839,9 @@
 
     .line 7
     :cond_1
-    iget-object p2, p0, Lcom/smartisanos/launcher/view/a/g;->TH:Ljava/lang/String;
+    iget-object p0, p0, Lcom/smartisanos/launcher/view/a/g;->TH:Ljava/lang/String;
 
-    invoke-virtual {p1, p2}, Lcom/smartisanos/smengine/SceneNode;->setImageName(Ljava/lang/String;)V
-
-    # Static/theme foreground nodes can be created after the active calendar.
-    # Suppress them at texture-binding time so only the live calendar is drawn.
-    iget-object p0, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
-
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/data/ItemInfo;->Te()Z
-
-    move-result p0
-
-    if-eqz p0, :calendar_static_texture_done
-
-    const/4 p0, 0x0
-
-    invoke-virtual {p1, p0}, Lcom/smartisanos/smengine/SceneNode;->setVisibility(Z)V
-
-    :calendar_static_texture_done
+    invoke-virtual {p1, p0}, Lcom/smartisanos/smengine/SceneNode;->setImageName(Ljava/lang/String;)V
 
     return-void
 .end method
@@ -10731,43 +10711,6 @@
     check-cast p0, Lcom/smartisanos/smengine/F;
 
     return-object p0
-.end method
-
-.method public showCalendarActiveIconOnly()V
-    .locals 3
-
-    iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
-
-    if-eqz v0, :calendar_only_done
-
-    const/4 v1, 0x0
-
-    aget-object v2, v0, v1
-
-    if-eqz v2, :calendar_only_mode_one
-
-    invoke-virtual {v2, v1}, Lcom/smartisanos/smengine/SceneNode;->setVisibility(Z)V
-
-    :calendar_only_mode_one
-    const/4 p0, 0x3
-
-    aget-object v2, v0, p0
-
-    if-eqz v2, :calendar_only_mode_two
-
-    invoke-virtual {v2, v1}, Lcom/smartisanos/smengine/SceneNode;->setVisibility(Z)V
-
-    :calendar_only_mode_two
-    const/4 p0, 0x5
-
-    aget-object v0, v0, p0
-
-    if-eqz v0, :calendar_only_done
-
-    invoke-virtual {v0, v1}, Lcom/smartisanos/smengine/SceneNode;->setVisibility(Z)V
-
-    :calendar_only_done
-    return-void
 .end method
 
 .method public fb(Z)V

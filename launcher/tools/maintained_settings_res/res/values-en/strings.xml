@@ -9,6 +9,8 @@
     <string name="os_update_dlg_ok_btn">Download Now</string>
     <string name="os_update_dlg_cancel_btn">Cancel</string>
     <string name="icon_setting_text">Icon Settings</string>
+    <string name="privacy_password_title">Privacy Password</string>
+    <string name="privacy_password_sub_text">Set or change the page lock password</string>
     <string name="follow_weixin_title">Build Author</string>
     <string name="follow_weixin_content">ConvenienceNoodles\' Studio</string>
     <string name="follow_weibo_title">Follow Weibo</string>

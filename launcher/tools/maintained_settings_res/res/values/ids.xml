@@ -393,4 +393,5 @@
     <id name="setting_switch_launcher" />
     <id name="item_id_unlock_anim" />
     <id name="id_unlock_anim_tips" />
+    <id name="item_id_privacy_password" />
 </resources>

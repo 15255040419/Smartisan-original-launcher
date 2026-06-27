@@ -91,7 +91,8 @@ com.smartisanos.launcher.theme.trans
 | 壁纸 | 支持系统图片选择、私有壁纸副本、缩略图、毛玻璃 / 透明主题壁纸应用和恢复默认壁纸。 |
 | 翻页动画 | 支持默认、立体翻转、百叶窗、切牌等动画值；透明主题开启后强制使用默认动画。 |
 | 应用图标 | 支持系统原图、图标包 appfilter、redirect、自定义图片和 50%-150% 桌面图标大小调节；保存后自动重建桌面。设置页100%对应原版视觉基准120%，普通、改进版和自定义图标按 alpha 可见区归一化到90%；活动日历使用完整锤子日历画布并跟随同一运行时内容框。进程重启后会重新应用已保存比例。关闭文件夹的2x2 / 3x3预览按外框内部可见行列中心缩放，打开文件夹按书架可见层中心排列。 |
-| 动态日历 | 运行时识别系统声明的日历应用及常见厂商日历包；日期跟随系统更新。静态主题层会在活动日历创建后隐藏，日期层与底图使用同一坐标系，尺寸跟随普通图标内容框。 |
+| 动态日历 | 日期跟随系统更新。普通桌面使用活动日历层，静态图标路径由 `activeicon/m.smali` 生成同款日历 bitmap 以避免系统图标和日期双层错位；桌面编辑设置页继续保留 `3b973b5` 的静态图层链路，使日历能和其他图标一起变灰。 |
+| 页面锁 | 编辑模式页标题的锁按钮沿用原版页面隐藏、锁定和解锁状态机；普通 Android 使用 Launcher 内置4-16位数字密码弹窗，桌面设置页可设置 / 更改同一隐私密码，不再依赖锤子系统的 `ChooseLockPasswordFake` 或安全中心密码控件。密码仅保存为 Launcher 私有 SHA-256 摘要。 |
 | 应用分身 | 已接入多用户 / 双开应用查询、显示和启动路径，支持为分身应用叠加原版风格面具标记。 |
 | 自绘搜索页 | 搜索页由 launcher 内 `ThemeChooserActivity` / `MaintainedLauncherSettingsHost.showSearchPage()` 自绘，不再依赖、下载或构建锤子独立搜索 APK。 |
 | 检查更新 | 支持 Gitee Release 版本检查，只识别 `launcher-` 软件标签；下载走系统 `DownloadManager`，优先使用标准 Gitee Release 下载地址，失败后尝试该 Release 资产返回的备用地址；状态栏显示进度，已下载同版本时按钮直接变为“安装”。 |
@@ -107,7 +108,8 @@ com.smartisanos.launcher.theme.trans
 - 透明主题切换：开启 / 关闭透明主题要让 Launcher 重新走完整初始化链路。不能只裸 `startActivity()` 或运行时刷新，否则 `O.V()`、`Constants.isTransparentTheme`、`X.va()`、SMEngine 纹理和主题资源容易不同步。
 - 设置页闪回桌面防回归：设置页入口必须同时清理透明主题 requestCode `1001` 和图标大小 requestCode `1002` 的延迟 HOME `AlarmManager` PendingIntent。否则用户切换透明主题或修改图标尺寸后立刻重新进入设置，残留 HOME 任务会把页面顶回桌面。详细根因和修复见 `DEVELOPMENT_LOG.md` 的 2026-06-17、2026-06-20 记录。
 - 图标大小即时生效防回归：50%-150% 尺寸保存后必须完整重建 Launcher 进程，让 `Constants`、网格点、普通应用节点和文件夹预览在同一次初始化中使用新比例；不能只刷新当前页面或只改 `LayoutProperty`，否则普通图标和文件夹会使用不同几何尺寸。
-- 活动日历防回归：不要再用 `Constants.icon_scale`、固定日历倍数或厂商包名决定整体尺寸。根节点必须按 `icon_size_origin / calendar_back_size` 跟随普通图标内容框。日期纹理保持原版宽度；320dpi及以下使用原版高度和80% Y偏移，高于320dpi使用87.5%高度和72% Y偏移，以抵消旧SMEngine在不同密度下的纹理采样差异。静态前景必须隐藏，日期层只在活动层绘制。
+- 活动日历防回归：编辑页灰度正确的基线是 `3b973b589338b963d5b39a82e1937922577b3f4e`。不要在 `view/a/g.1.smali` 里恢复 `showCalendarActiveIconOnly()`，不要在静态纹理绑定后隐藏日历静态前景，也不要重新引入 `CalendarAppDetector` / `ItemInfo.Te()` 的静态层强制隐藏链路；否则点击 Dock 左滑后的桌面编辑设置齿轮，日历会重新变成彩色。当前正确做法是只在 `view/activeicon/m.smali` 覆盖 `d([B)` / `o(Bitmap)`，让静态图标使用合成日历 bitmap，同时保留原版页面层灰度处理。
+- 页面锁防回归：页面可见/隐藏状态、锁动画、待验证页面和 requestCode 20/21 回调继续使用原版逻辑；普通 Android 只替换密码输入/验证层，桌面设置页只写同一个 `launcher_page_lock/password_hash`。不要重新调用不存在的 `com.android.settings.ChooseLockPasswordFake`，也不要直接启动依赖锤子安全中心环境的旧 `ConfirmPasswordActivity`。
 - 文件夹对齐防回归：关闭预览必须以当前文件夹外框实际绘制尺寸为容器，按 PNG 内部可见搁板的归一化行列中心反算图标边长、margin 和 space；打开文件夹只在文件夹页按书架可见层中心修正 Y，普通桌面页必须保留原坐标。禁止按含透明边缘的整张 PNG 均分、恢复固定像素偏移，或把打开文件夹算法作用到桌面页。
 - 透明 / 毛玻璃主题文字：只有透明主题和毛玻璃主题按壁纸明暗切换状态栏文字和应用文字；普通不透明主题必须继续使用主题自身文字资源。
 - 壁纸模糊：只写 `original_launcher_wallpaper_blur_on` 并调用 `Eb.lh()` 让原版引擎重建 `t_blur_background`。不要手动模糊主壁纸 bitmap，也不要把 `t_blur_background` 覆盖回 `background.png`。

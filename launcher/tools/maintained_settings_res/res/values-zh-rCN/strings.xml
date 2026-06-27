@@ -112,6 +112,8 @@
     <string name="icon_setting_empty_tip">无可替换的程序图标</string>
     <string name="icon_setting_sub_text">可选用精心设计过的图标替换应用默认图标</string>
     <string name="icon_setting_text">应用图标</string>
+    <string name="privacy_password_title">隐私密码</string>
+    <string name="privacy_password_sub_text">设置或更改页面锁使用的密码</string>
     <string name="improved_icon_text">改进版图标</string>
     <string name="incorrect_password">密码不正确</string>
     <string name="initializing">正在初始化</string>

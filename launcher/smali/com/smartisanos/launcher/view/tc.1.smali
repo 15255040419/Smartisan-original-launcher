@@ -3329,9 +3329,9 @@
 
     invoke-virtual {p0}, Ljava/lang/Throwable;->printStackTrace()V
 
-    const/16 p0, 0x14
+    const/16 v0, 0x14
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherPasswordFallback(I)V
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherPasswordFallback(I)V
 
     return-void
 .end method
@@ -3406,6 +3406,12 @@
 
 .method private vc(Z)V
     .locals 2
+
+    const/16 p0, 0x14
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherPasswordFallback(I)V
+
+    return-void
 
     .line 1
     sget v0, Landroid/os/Build$VERSION;->SDK_INT:I
@@ -4412,7 +4418,7 @@
 
     move-result-object v1
 
-    invoke-virtual {v1, v4, v2}, Lcom/smartisanos/launcher/J;->startActivityForResult(Landroid/content/Intent;I)V
+    invoke-static {v2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherPasswordFallback(I)V
 
     .line 17
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/Eb;->Ih()Lcom/smartisanos/launcher/view/b/fa;

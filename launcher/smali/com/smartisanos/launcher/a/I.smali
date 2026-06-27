@@ -316,26 +316,7 @@
 
     move-result-object p0
 
-    .line 46
-    sget-boolean p1, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
-
-    if-eqz p1, :cond_1
-
-    const/16 p1, 0x7e8
-
-    .line 47
-    iput p1, p0, Landroid/view/WindowManager$LayoutParams;->type:I
-
-    goto :goto_0
-
-    :cond_1
-    const/16 p1, 0x7f6
-
-    .line 48
-    iput p1, p0, Landroid/view/WindowManager$LayoutParams;->type:I
-
     .line 49
-    :goto_0
     sget-object p0, Lcom/smartisanos/launcher/a/I;->Ij:Landroid/app/AlertDialog;
 
     invoke-virtual {p0}, Landroid/app/AlertDialog;->show()V
@@ -560,6 +541,17 @@
 .method public static w(Landroid/content/Context;)Z
     .locals 2
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->hasLauncherPagePassword(Landroid/content/Context;)Z
+
+    move-result v0
+
+    if-eqz v0, :legacy_page_password_check
+
+    const/4 p0, 0x1
+
+    return p0
+
+    :legacy_page_password_check
     .line 1
     sget v0, Landroid/os/Build$VERSION;->SDK_INT:I
 

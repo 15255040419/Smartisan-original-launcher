@@ -1075,9 +1075,11 @@
 
     iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_h:F
 
-    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->calendarLiveDayHeightFactor()F
+    const v4, 0x3f666666    # 0.9f
 
-    move-result v4
+    mul-float/2addr v1, v4
+
+    const v4, 0x3f4ccccd    # 0.8f
 
     mul-float/2addr v0, v4
 
@@ -1173,9 +1175,7 @@
 
     iget p1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_offsety:F
 
-    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->calendarLiveDayYOffsetFactor()F
-
-    move-result v4
+    const v4, 0x3f428f5c    # 0.76f
 
     mul-float/2addr p1, v4
 
@@ -1183,9 +1183,7 @@
 
     iget p2, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_h:F
 
-    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->calendarLiveDayHeightFactor()F
-
-    move-result v4
+    const v4, 0x3f4ccccd    # 0.8f
 
     mul-float/2addr p2, v4
 
@@ -2999,29 +2997,35 @@
 
     move-result v0
 
+    if-eqz v0, :cond_0
+
     .line 13
-    iget-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/m;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
+    sget v0, Lcom/smartisanos/launcher/data/Constants;->icon_scale:F
 
-    iget v1, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->icon_size_origin:F
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/activeicon/m;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
 
-    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_back_size:F
+    iget v1, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->active_icon_scale:F
 
-    div-float v0, v1, v0
+    mul-float v2, v0, v1
+
+    const/high16 v3, 0x42c80000    # 100.0f
+
+    div-float/2addr v2, v3
+
+    mul-float/2addr v0, v1
+
+    div-float/2addr v0, v3
 
     const/high16 v1, 0x3f800000    # 1.0f
 
-    invoke-virtual {p0, v0, v0, v1}, Lcom/smartisanos/smengine/SceneNode;->setScale(FFF)V
+    invoke-virtual {p0, v2, v0, v1}, Lcom/smartisanos/smengine/SceneNode;->setScale(FFF)V
 
     :cond_0
-    const/4 v0, 0x1
-
-    invoke-virtual {p0, v0}, Lcom/smartisanos/smengine/SceneNode;->setVisibility(Z)V
-
     return-void
 .end method
 
 .method public createComposedBitmap()Landroid/graphics/Bitmap;
-    .locals 12
+    .locals 13
 
     const-string v0, "calendar/bg.png"
 
@@ -3204,9 +3208,27 @@
 
     iget v11, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_w:F
 
+    const v12, 0x3d4ccccd    # 0.05f
+
+    mul-float/2addr v12, v11
+
+    add-float/2addr v9, v12
+
+    const v12, 0x3f428f5c    # 0.76f
+
+    mul-float/2addr v10, v12
+
+    const v12, 0x3f666666    # 0.9f
+
+    mul-float/2addr v11, v12
+
     add-float/2addr v11, v9
 
     iget p0, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_h:F
+
+    const v12, 0x3f4ccccd    # 0.8f
+
+    mul-float/2addr p0, v12
 
     add-float/2addr p0, v10
 
@@ -3227,6 +3249,106 @@
     invoke-virtual {v3}, Landroid/graphics/Bitmap;->recycle()V
 
     return-object v4
+.end method
+
+.method private scaleComposedToSource(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+    .locals 8
+
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/activeicon/m;->createComposedBitmap()Landroid/graphics/Bitmap;
+
+    move-result-object p0
+
+    invoke-virtual {p1}, Landroid/graphics/Bitmap;->getWidth()I
+
+    move-result v0
+
+    invoke-virtual {p1}, Landroid/graphics/Bitmap;->getHeight()I
+
+    move-result v1
+
+    int-to-float v2, v0
+
+    const v3, 0x3f570a3d    # 0.84f
+
+    mul-float/2addr v2, v3
+
+    float-to-int v2, v2
+
+    int-to-float v4, v1
+
+    mul-float/2addr v4, v3
+
+    float-to-int v3, v4
+
+    const/4 v4, 0x1
+
+    invoke-static {p0, v2, v3, v4}, Landroid/graphics/Bitmap;->createScaledBitmap(Landroid/graphics/Bitmap;IIZ)Landroid/graphics/Bitmap;
+
+    move-result-object v4
+
+    sget-object v5, Landroid/graphics/Bitmap$Config;->ARGB_8888:Landroid/graphics/Bitmap$Config;
+
+    invoke-static {v0, v1, v5}, Landroid/graphics/Bitmap;->createBitmap(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;
+
+    move-result-object v5
+
+    new-instance v6, Landroid/graphics/Canvas;
+
+    invoke-direct {v6, v5}, Landroid/graphics/Canvas;-><init>(Landroid/graphics/Bitmap;)V
+
+    sub-int/2addr v0, v2
+
+    div-int/lit8 v0, v0, 0x2
+
+    int-to-float v0, v0
+
+    sub-int/2addr v1, v3
+
+    div-int/lit8 v1, v1, 0x2
+
+    int-to-float v1, v1
+
+    new-instance v7, Landroid/graphics/Paint;
+
+    invoke-direct {v7}, Landroid/graphics/Paint;-><init>()V
+
+    const/4 v2, 0x1
+
+    invoke-virtual {v7, v2}, Landroid/graphics/Paint;->setAntiAlias(Z)V
+
+    invoke-virtual {v7, v2}, Landroid/graphics/Paint;->setFilterBitmap(Z)V
+
+    invoke-virtual {v6, v4, v0, v1, v7}, Landroid/graphics/Canvas;->drawBitmap(Landroid/graphics/Bitmap;FFLandroid/graphics/Paint;)V
+
+    invoke-virtual {p0}, Landroid/graphics/Bitmap;->recycle()V
+
+    invoke-virtual {v4}, Landroid/graphics/Bitmap;->recycle()V
+
+    return-object v5
+.end method
+
+.method public d([B)Landroid/graphics/Bitmap;
+    .locals 1
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/e/s;->c([B)Landroid/graphics/Bitmap;
+
+    move-result-object v0
+
+    invoke-direct {p0, v0}, Lcom/smartisanos/launcher/view/activeicon/m;->scaleComposedToSource(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
+.method public o(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+    .locals 0
+
+    invoke-direct {p0, p1}, Lcom/smartisanos/launcher/view/activeicon/m;->scaleComposedToSource(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+
+    move-result-object p0
+
+    return-object p0
 .end method
 
 .method public g(ZZ)V

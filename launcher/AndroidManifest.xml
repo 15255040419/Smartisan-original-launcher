@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="24" android:versionName="v1.4.9" package="com.smartisanos.launcher">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="26" android:versionName="v1.5.1" package="com.smartisanos.launcher">
   <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
   <uses-feature android:glEsVersion="0x00020000" />
   <permission android:name="com.smartisanos.launcher.READ_DATABASE" android:protectionLevel="signature" />
@@ -107,7 +107,7 @@
         <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
       </intent-filter>
     </activity>
-    <activity android:theme="@0x7f0c0160" android:name="com.smartisanos.launcher.ConfirmPasswordActivity" android:exported="true" android:taskAffinity="smartisanos.task.launcher.confirm" android:multiprocess="true" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" android:configChanges="0x00002480">
+    <activity android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:name="com.smartisanos.launcher.ConfirmPasswordActivity" android:exported="true" android:taskAffinity="smartisanos.task.launcher.confirm" android:multiprocess="true" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" android:configChanges="0x00002480">
       <intent-filter>
         <action android:name="com.smartisanos.launcher.verify_password" />
         <category android:name="android.intent.category.DEFAULT" />

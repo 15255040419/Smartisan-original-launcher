@@ -2170,13 +2170,13 @@
 
     if-eqz v2, :cond_icon_override_done
 
+    invoke-static {v2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->normalizeImprovedIcon(Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v2
+
     move-object v1, v2
 
     :cond_icon_override_done
-
-    invoke-static {v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->normalizeLauncherIcon(Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
-
-    move-result-object v1
 
     .line 231
     sget-boolean v2, Lcom/smartisanos/launcher/va;->DBG:Z
