@@ -1,0 +1,635 @@
+Signature-Version: 1.0
+Created-By: 1.0 (Android SignApk)
+SHA-256-Digest-Manifest: BiFtQuWgWKdZ+1bTD+elaGKi/clc4s3ji1YvX8sQSu8=
+X-Android-APK-Signed: 2, 3
+
+Name: AndroidManifest.xml
+SHA-256-Digest: lE5plOt45jjY49q0eYc0v+UPCBnLG2ImGJYv/Cig+wI=
+
+Name: assets/Textures/1080p/12/back1.png
+SHA-256-Digest: Sd/7TMm52M5QZLyOWvTPvPPeg2f8sULyv34AdOlum6M=
+
+Name: assets/Textures/1080p/12/back10.png
+SHA-256-Digest: u53CpbjoNoy9o+Be/4ojo4dL1aNOnttVRePfJJ60lsM=
+
+Name: assets/Textures/1080p/12/back11.png
+SHA-256-Digest: 37Qhbz3mltodQKMciWwDEaNNLFO1lc0nccEa4qWJaT8=
+
+Name: assets/Textures/1080p/12/back12.png
+SHA-256-Digest: 4rFv8nONsnvRodAUEtS/SYVkCYFCR3nbODqoQT9w7cI=
+
+Name: assets/Textures/1080p/12/back2.png
+SHA-256-Digest: FrmyRwG0ZJFpc1+rvsdjz82++q4HpBgXKAxmDfBc2a0=
+
+Name: assets/Textures/1080p/12/back3.png
+SHA-256-Digest: +5825bcBKxq1YerfIGYeQCdP9Mbiv/57UejfwXTDD2E=
+
+Name: assets/Textures/1080p/12/back4.png
+SHA-256-Digest: 34Xf4zu43YpPsiKQ3i/L4Io+IsW9vsqH8jpiE2BQn2s=
+
+Name: assets/Textures/1080p/12/back5.png
+SHA-256-Digest: tuz+oIPPgT8ExJmYGHKWZfNBZlK0bosmLRfBy4ysNXM=
+
+Name: assets/Textures/1080p/12/back6.png
+SHA-256-Digest: oDBBnF0U8EszWG3mSFsU0sY9nsh0gFryS+OT0aEt45s=
+
+Name: assets/Textures/1080p/12/back7.png
+SHA-256-Digest: B0vU+Ctse20w5sxeEkvkfP6uoRgS7E468CnttcTf5jE=
+
+Name: assets/Textures/1080p/12/back8.png
+SHA-256-Digest: +TgcKsrZX1CeIUi1qjWcADgKavgpWD2mxPzqOENV02o=
+
+Name: assets/Textures/1080p/12/back9.png
+SHA-256-Digest: 32EQs/nugigNM5b6gc8FBbhdhP6v2BFAJXgKEZBApHQ=
+
+Name: assets/Textures/1080p/12/brick_selected.png
+SHA-256-Digest: R1Ui1kaGPRppnCURvf+9REXTZSMVJ7DdEC1rMIb6Mv4=
+
+Name: assets/Textures/1080p/12/brick_selected_bg.png
+SHA-256-Digest: vp7M2DWW93OXYskGptdJKIyK1SXlQCEPFurd5m5KaQs=
+
+Name: assets/Textures/1080p/12/brick_shadow.png
+SHA-256-Digest: 0sSF6R5pxzwjpDzyRCQYn6DHY55vLxI6o5fZFde5r5g=
+
+Name: assets/Textures/1080p/12/brick_unselect.png
+SHA-256-Digest: 8KmhDdfSY5R4dL/DFONW45e9V6gzdLCYOb14vCIwy9w=
+
+Name: assets/Textures/1080p/12/brick_up_overlay.png
+SHA-256-Digest: w1Kn6GMVPJNnoJk0zGeKVpj5QJc3T2FUGnpwlJ+nHME=
+
+Name: assets/Textures/1080p/12/brick_up_shadow.png
+SHA-256-Digest: rX5wrQtQpdkF5X9RpikvmE3uhEQyzMbombei7bzhOyk=
+
+Name: assets/Textures/1080p/12/dock_back.png
+SHA-256-Digest: Cl2LVD9D3PDgiNuheIGc27qkQL4U64PM5j2kl6qn/MA=
+
+Name: assets/Textures/1080p/12/edit_icon.png
+SHA-256-Digest: vuoHvR73MZ8IpRrBZvNOWU41BkNSHziQOvbZ6R/B6Oo=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0001.png
+SHA-256-Digest: VfnJdB3wpsFo2z3B8umUlhE7KODI9yCTNWo94GsA3j4=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0002.png
+SHA-256-Digest: mL5/97RgzDlN2unWHJf7J+UwQMJoBDtahRK5aIddr84=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0003.png
+SHA-256-Digest: WLgQx4udC0Kux8rLr6Gqaba/Pd/CS4VNubwZ2pz7JGw=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0004.png
+SHA-256-Digest: Pnq1VUJJLQjoTlsf0hDnR9kUD7CgKyjiMsgYmhQKo4Y=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0005.png
+SHA-256-Digest: R8cW2f699Vgv7Igj0+IWpTx5Jb49+M0qwuITzmPox10=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0006.png
+SHA-256-Digest: MLwvhsW2GK3+no+UxJ27slYjI+/OolTfOqXtvRQR4SY=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0007.png
+SHA-256-Digest: 8G8jWm/ZJSb0sIK9/sq1EZi7la3U02eoAQrHMTMwiUA=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0008.png
+SHA-256-Digest: 1LlqWwVBCYNpUn0pTvAfG5bvxyCmZrlR3o+d3xoqyr0=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0009.png
+SHA-256-Digest: phr3oJKDU6LCD5JRkqm4Wbv2bamXszmQghYemcOKPnY=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0010.png
+SHA-256-Digest: 7F9556U4dGdA5VsXg+KzRklxP+AxikxvdeXmjO1vTsI=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0011.png
+SHA-256-Digest: bigc63UWxI+PW4G0jdq+ljqWOULDZq1NedxJmHKRC4E=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0012.png
+SHA-256-Digest: j58UV+/ooOcou7yFJZyuZbmW4pQKqRz+d9L50ViAxAU=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0013.png
+SHA-256-Digest: krnWYttCBmPNfUPfqz0RgZrOU5/G9ESOASSEk5v6xKA=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0014.png
+SHA-256-Digest: WEPvsk2rM+ZBxYuEI1PxTUMg4+p+Jp960LssaHzLl+M=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0015.png
+SHA-256-Digest: FKoN+THo1aon9dA3sbdvGobTg4OXyHUS3dfv4UDzv7k=
+
+Name: assets/Textures/1080p/12/eye-anim/eye_icon_0016.png
+SHA-256-Digest: u3/r0LZlXRh+/lizP2V53En2euyXQhGOz4nkpNLeMPs=
+
+Name: assets/Textures/1080p/12/eye_close.png
+SHA-256-Digest: xEsjAcoW8k4ksCNzT0m+qAotjQtkHQbx1/Fc3mcxjso=
+
+Name: assets/Textures/1080p/12/eye_cover.png
+SHA-256-Digest: YG5A/Pnih9zsPNybtIMM0q+BEeXBFjuZ6C+jTdjyANQ=
+
+Name: assets/Textures/1080p/12/eye_open.png
+SHA-256-Digest: X8Q7cFD59gHS70lGfHs2+00AZrVY2v24dRisPrwRfXQ=
+
+Name: assets/Textures/1080p/12/folder_shadow.png
+SHA-256-Digest: pV/RWwY9w/YkGqXwyaTgxB+J6++zB/gZymxPy0BsoFA=
+
+Name: assets/Textures/1080p/12/green_overlay.png
+SHA-256-Digest: EGunMNo6HFgdpkIyZUFmqlcSGx7MFEfFnUlW4bXP+zg=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0001.png
+SHA-256-Digest: kxzyUB3EOqPIGCh1294PnuwqDqfl0+0EEWt3XHy2QKU=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0002.png
+SHA-256-Digest: mt0GQkFTuo/fMPdT7HM1zqV7K/JV6PCxcvkuqXrUKQc=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0003.png
+SHA-256-Digest: dgAuNB3f8LE0JwNwyR7+9xcrLKDNnWJ3bUGNZ5yCyFg=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0004.png
+SHA-256-Digest: UW1SkAs3ofLLFy58Er4Y8U2qwTb5aaKubQ2qxAmhMHE=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0005.png
+SHA-256-Digest: pKKxD0qv8sevIEQZ86BILiswtEy0UWq3NU2XijU8MHU=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0006.png
+SHA-256-Digest: 7YiHSj5y000ixSsFX1N2C0TdvD5EmlNDGX/HGLqNnFM=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0007.png
+SHA-256-Digest: qui60XkkYHCCWOWKlwrwLQ10chBRIPZm1EXgkJ3Vme0=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0008.png
+SHA-256-Digest: Zb7sAB0khxzGrByo9XmV46RHVqZcfr6FvSskTLJw1uc=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0009.png
+SHA-256-Digest: nS4e1DK79QnkRx2J2ZWW70DfNqOEfVDqE2mm9NLnsXA=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0010.png
+SHA-256-Digest: eL/lx2qAKcO1arifWBGgRRQiKcRp6JvypeFMbL48oLs=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0011.png
+SHA-256-Digest: L4AbV0+PmlQI+JTRCSN7b1sqc0C3iI06HWKfh5wsWbI=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0012.png
+SHA-256-Digest: TJdnBfcefw0k+WawqzqWPcbcbIaWLgWp25X/j5OVdYc=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0013.png
+SHA-256-Digest: paiYjg7xwB3BjIodLd18Kizff2pDcJti0LFgllXX9F4=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0014.png
+SHA-256-Digest: u8EhXTmfoTsPayQ5vuga/kN/OFkavUqQv/vq9tA6XFU=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0015.png
+SHA-256-Digest: 8ef76fql2DLe5Fj3zJEXybO/G7uZyv/pByoGFDZcMiw=
+
+Name: assets/Textures/1080p/12/lock-anim/lock_icon_0016.png
+SHA-256-Digest: ah6Q3EaddDTlnOA828fbNAJrC9aJd2zVN52J842SUWE=
+
+Name: assets/Textures/1080p/12/lock_close.png
+SHA-256-Digest: mEd9rP2tHybj/1I+wq3ME4GxTLLIATiL/fGw275jREs=
+
+Name: assets/Textures/1080p/12/lock_cover.png
+SHA-256-Digest: FPSl3BjYcXgJ03qxg4uw6Ghomu7mEoXbbuFqT7mibm4=
+
+Name: assets/Textures/1080p/12/lock_mask.png
+SHA-256-Digest: K/zu1wb5xPmybbyo7BvpoI82Hb/CbAig7jQjupfuaNA=
+
+Name: assets/Textures/1080p/12/lock_open.png
+SHA-256-Digest: AGfJBCTh9PWJEFf3IPdssrxcNQU6qH498CLt1umB2hE=
+
+Name: assets/Textures/1080p/12/newapp.png
+SHA-256-Digest: XrWUDu+TVIW5Z7hBJ5VJ3c5R2G/264ggwexCSdiQS+8=
+
+Name: assets/Textures/1080p/12/openapp_shadow.png
+SHA-256-Digest: q+DJBzvnR8WsAsi8V1er3bqZ3boljpxPh8MTRFv4leA=
+
+Name: assets/Textures/1080p/12/page_mask.png
+SHA-256-Digest: wIInuqBLTamfzlGc9UgOdnekOgFOT/IT1aCN6v6oscg=
+
+Name: assets/Textures/1080p/12/red_overlay.png
+SHA-256-Digest: wpTVsUPBe1J0DMUIqI+2Kuj6s/5odsOOxGl3efOToVU=
+
+Name: assets/Textures/1080p/12/title.png
+SHA-256-Digest: P2rdWbfwhwn3ahOgGuqkGvwgzUxvrcqo3qWMxjlut1E=
+
+Name: assets/Textures/1080p/12/title_mask.png
+SHA-256-Digest: aLnroL8adAuhorC/lmkIF0M6lXF/3Xjp3Zwkg6XVHjw=
+
+Name: assets/Textures/1080p/12/title_shadow.png
+SHA-256-Digest: DkaZOmqtyk8NdpSuvCLvx3rwh3AeuBWXogxBgWTdSUo=
+
+Name: assets/Textures/1080p/12/unlock_front_cover.png
+SHA-256-Digest: Uj05DS5cc72+bh1sI2lXRkhOv7j1ssI171Q0I0dKNT8=
+
+Name: assets/Textures/1080p/12/workspace_overlay.png
+SHA-256-Digest: Q0SindEDfSu2WxvDlsMU1Zw/LfTDaGelcMx7GX07IOg=
+
+Name: assets/Textures/1080p/20/back1.png
+SHA-256-Digest: dHUec0YOym2bheHRJSZ0Fl1OCACsucuYkUFxwLigXFE=
+
+Name: assets/Textures/1080p/20/back10.png
+SHA-256-Digest: 1vveg18K5lgmQKVm97QQQU4L6Rs1pCX+jhYWOhKwB6o=
+
+Name: assets/Textures/1080p/20/back11.png
+SHA-256-Digest: vUXPx4tKKTOywpATeX6KrU8kJhL1oPk+f3pBuV+TlnM=
+
+Name: assets/Textures/1080p/20/back12.png
+SHA-256-Digest: HGXC36lajIR+G2WYv4zCDR58jS0HSYRyhm0Ix+t5Xrs=
+
+Name: assets/Textures/1080p/20/back13.png
+SHA-256-Digest: dd+Hwnlgj3R6SHbGERamNIboCBdKbo71RksK0UMCUBc=
+
+Name: assets/Textures/1080p/20/back14.png
+SHA-256-Digest: A4mEYW+hA4U5ii9wD5X2EYINrLHjvhxKZOnNwWKFGFM=
+
+Name: assets/Textures/1080p/20/back15.png
+SHA-256-Digest: 3MdEimEhOQU7HObyYM0c/Q+4VdOFFgPXYoRuRqEnyZg=
+
+Name: assets/Textures/1080p/20/back16.png
+SHA-256-Digest: K3PYCxSe5LL1LiVotY3I0RGD9ibCBbJkNXsPhoZxX+g=
+
+Name: assets/Textures/1080p/20/back17.png
+SHA-256-Digest: PluyjERx9wuYlukKEqjSEbjxqqbp05f0J+mGtCwzhCc=
+
+Name: assets/Textures/1080p/20/back18.png
+SHA-256-Digest: QeN3dht+I0p4IADtTXPDy8Tp0GD8IE7MyZVLcCBMtSs=
+
+Name: assets/Textures/1080p/20/back19.png
+SHA-256-Digest: H7RgbTuiMgtAttGLF8Bzv3pTegOYpCOcBWdm5c3h/8g=
+
+Name: assets/Textures/1080p/20/back2.png
+SHA-256-Digest: 1bRTf/0WrDYZE9KK9ZyU0A/JXRLfjlkBZaboFgGMM9M=
+
+Name: assets/Textures/1080p/20/back20.png
+SHA-256-Digest: OqrEP8UFmF1UgEy/wIq8NmEUD9pA2xusWABe9gCT6to=
+
+Name: assets/Textures/1080p/20/back3.png
+SHA-256-Digest: 9j0bZa22hZtqrmbkoMkjtoSoMdEmLAv68X+kavtWSto=
+
+Name: assets/Textures/1080p/20/back4.png
+SHA-256-Digest: cXi2QHg5ZWfmHT2yRon0O3STz4sdT7mhLxG20MyRCNw=
+
+Name: assets/Textures/1080p/20/back5.png
+SHA-256-Digest: APtJJNMDcaTpYTQ4UieIU0aW/n6zjyjPqdWbI2nMldc=
+
+Name: assets/Textures/1080p/20/back6.png
+SHA-256-Digest: hOIakwuWrVTlGV2bWDrv1HuXd2tVP6O7grlJIOfFFB4=
+
+Name: assets/Textures/1080p/20/back7.png
+SHA-256-Digest: bJ7Xh4P77jcnlSSTbrLuphol1FiF51jbXN5UhrricYs=
+
+Name: assets/Textures/1080p/20/back8.png
+SHA-256-Digest: /RP5zucAwXiyFQOARjjpCn1SA8W29cih6BpQT8nXQaw=
+
+Name: assets/Textures/1080p/20/back9.png
+SHA-256-Digest: wv+etjUvHhJTooQi81UUGx3TjzCsv8Z0ITFu9p0hCPc=
+
+Name: assets/Textures/1080p/20/brick_selected.png
+SHA-256-Digest: u70wE0S6+hMd4BXnM5yehyn2ImlmstneLHMKDrnEZN0=
+
+Name: assets/Textures/1080p/20/brick_selected_bg.png
+SHA-256-Digest: u+e1LSnjbw5IUASgPOkh0p9A4TpRcZisuZ/gxWGGGuA=
+
+Name: assets/Textures/1080p/20/brick_shadow.png
+SHA-256-Digest: nYkz+k7e7ZQRl9v6X22uQddNjmtywZjsVorS75uRNKU=
+
+Name: assets/Textures/1080p/20/brick_unselect.png
+SHA-256-Digest: NGHBe7edowAy5SX7PIkWG+nwzQB5FrMMiWKkAeHXbBQ=
+
+Name: assets/Textures/1080p/20/brick_up_overlay.png
+SHA-256-Digest: E6jeS5jeqldLZO2Gx10zfLEj4JFkWXHTuM7bPKi6TiQ=
+
+Name: assets/Textures/1080p/20/brick_up_shadow.png
+SHA-256-Digest: XgSy+W7ZGISH9Cdej//a8/rtxp/eWBNBZ92Q1fPPpgE=
+
+Name: assets/Textures/1080p/20/dock_back.png
+SHA-256-Digest: Lfip9AN88bir1uDORABhH1GDDztGA7RXbDmFvfuhmUw=
+
+Name: assets/Textures/1080p/20/edit_icon.png
+SHA-256-Digest: UB9SU6IVLfjIeT85qgBC+kOScnE/QnovQopr22rxLbs=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0001.png
+SHA-256-Digest: tRD8cmSMhPoYhzaz09VtLVbjkmwxK2pI5hPcZBhR7Lk=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0002.png
+SHA-256-Digest: UpKzJdzj231cfb6OgAJUiv/wzALiygVeu8zeXCIqCJo=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0003.png
+SHA-256-Digest: ppzH7NbOYEmlE2LINIG7aAUdIQJugwefn0r7pxmCGgI=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0004.png
+SHA-256-Digest: wfRlGkqcm452KsKZxXJbYN3BGt9pWaC+XIKcbpAGeKY=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0005.png
+SHA-256-Digest: vPYZceHEZG32Fe/4cbWNVTx0jDEyn0WJ5AzsPN4hFQw=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0006.png
+SHA-256-Digest: 1g2dgGmsBkFqOwx9Gi+pDQ5E6pe4VFNaE8UEFDb2oXg=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0007.png
+SHA-256-Digest: /PzqzS2s3tkna07F84j03vNTqGaNhDpFoGSymw0a+HY=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0008.png
+SHA-256-Digest: U7JisjSTkrOjFRAEJHZVdEXdLL5oLZwaPR8+c3i8y4o=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0009.png
+SHA-256-Digest: XDUdLxUJC6bBLgNgfIFLdMeeBN483s+ZNf2CWzP3ZYM=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0010.png
+SHA-256-Digest: M6jhOj15Js3u7oCM2mim20l7qCe95E+fYSxgLzevwec=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0011.png
+SHA-256-Digest: VhyxWta+rqdz6BNplROv1Me14G4UauuGu/AWVaxVzn0=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0012.png
+SHA-256-Digest: KOZEuS7LLJXLH5vLQUhZ2E0CWR+P5y0nQ+JLgrWHHus=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0013.png
+SHA-256-Digest: YR1kODiZ7TIn7SgUNdlSdyl8YpzwBwLPEd55W0Yc2TQ=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0014.png
+SHA-256-Digest: tj0YQ4Dr0JfTMT1MXdy80ep+z6bN+SqH+pFyNrrqYNE=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0015.png
+SHA-256-Digest: M8yKQqZYNBDY6hL5MijQIodHDHXAKogMVrkIB21/gY8=
+
+Name: assets/Textures/1080p/20/eye-anim/eye_icon_0016.png
+SHA-256-Digest: +CC6o2QqvsD5Vo3wmTQ5HHDIBpoKWu9vKNdAo77NWos=
+
+Name: assets/Textures/1080p/20/eye_close.png
+SHA-256-Digest: eBQW+DWPbcVcLPXH8fbGNoawY2cntVamJ8L8JknGSac=
+
+Name: assets/Textures/1080p/20/eye_cover.png
+SHA-256-Digest: 1mL9z/t2d5jg/CtbnKrtSZKcInfC/xs/XzoGUkDNzYk=
+
+Name: assets/Textures/1080p/20/eye_open.png
+SHA-256-Digest: mHVdCArAS+NoVy6utiJKxnXktRivo3Uk9RJbmIsGnN4=
+
+Name: assets/Textures/1080p/20/folder_shadow.png
+SHA-256-Digest: W6Kq2E1p6/Xt8fzOx5Eaii2JeRKDE0dkNt+gM1p0b9M=
+
+Name: assets/Textures/1080p/20/green_overlay.png
+SHA-256-Digest: q11RHDj4TlY1d7QNEtW+X9i2rx392PvE43aDY36NLDA=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0001.png
+SHA-256-Digest: d1Eb93y0a7QaZX5AUsKAsQJERDVRAk8J/B3mCnf9MxM=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0002.png
+SHA-256-Digest: mkHNz0m0GnfdCBJHBAfqIMf6LheXjHWKr23ByVPbC5U=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0003.png
+SHA-256-Digest: IWYp9ZjQCq+Yvun50ZiOeDjWX92C5UScQb+56Kwnq0I=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0004.png
+SHA-256-Digest: z0rEeTZogApOzEMeXPlx9sfcxcdIwPamOW94vCpRde8=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0005.png
+SHA-256-Digest: 44ohM2scWFRzRYN1zPX7AhVHnsygVmzyHUlTCLTwja4=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0006.png
+SHA-256-Digest: Di5Uj7p7avqf8s9jljlnLPEgmSvN8QkWSBp1h92lMNs=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0007.png
+SHA-256-Digest: z8fjucmQYrc91BXHnrrLoCmCzymvSWkf5nQrCZ7f8uA=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0008.png
+SHA-256-Digest: broUiDZh3IO633kKj6n5nporHYYdX0ebBrebZIUGyqY=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0009.png
+SHA-256-Digest: wRnZVe47BjcfedAQHPXg/GZ5kC+CQLEwN6tk06sShqI=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0010.png
+SHA-256-Digest: /TakbZ+K9rScpdE/XG8gLpUEaQmGPjVWWT40rg5plaI=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0011.png
+SHA-256-Digest: kX4UshlD5WnmPA7ekbb7pctMEeUHKQchbQGm9hy4SrU=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0012.png
+SHA-256-Digest: awq/5fzrG3x67TnENcDNDtEBFqbjCp3QRfSJTlDKYkU=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0013.png
+SHA-256-Digest: i7QrOALY215LZ5T6pDlQn/wBNOyChqk33V5TKrUFGK4=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0014.png
+SHA-256-Digest: eRZIb6cRFdQhfAw+RX8ToJSnWI9WfQnxyhk1Fkot87Q=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0015.png
+SHA-256-Digest: 59VRFnDYgZZoFGUt+T40o4UOijl7SmiX9NiM7u9rSVU=
+
+Name: assets/Textures/1080p/20/lock-anim/lock_icon_0016.png
+SHA-256-Digest: blTCbJPA2U91IWFjedhSWf8kjbrkahGQiDrSEo/ckKQ=
+
+Name: assets/Textures/1080p/20/lock_close.png
+SHA-256-Digest: aKvNaLxjB2kwGVE52zUdMtaDCoIjuxunnWDsKGOkr4g=
+
+Name: assets/Textures/1080p/20/lock_cover.png
+SHA-256-Digest: ew55uZ6D9cZm+8GgQDxrp2FAqQTibEA7pRcrcnmY1tU=
+
+Name: assets/Textures/1080p/20/lock_mask.png
+SHA-256-Digest: qQNLbyBesuDcO3bseznezEaSMa7x7xxTXpbVk0+EwE0=
+
+Name: assets/Textures/1080p/20/lock_open.png
+SHA-256-Digest: kFjmlGFP0U05K7gBAoPfLOksiVxqOkemxVuU/Gl3wEs=
+
+Name: assets/Textures/1080p/20/newapp.png
+SHA-256-Digest: +nmpoLq4JieEqoxps9lcMyNoroL35SP/b12ywU0cdYk=
+
+Name: assets/Textures/1080p/20/openapp_shadow.png
+SHA-256-Digest: 7Brf/OPkAjybsSEBZnwvGqIptX/791/zdTHbYU2yBKM=
+
+Name: assets/Textures/1080p/20/page_mask.png
+SHA-256-Digest: QgYQLCx8cCd+2V9EExc+24QyJjsaU8YiBReYY7sDMGM=
+
+Name: assets/Textures/1080p/20/red_overlay.png
+SHA-256-Digest: Q2+ghN3hrBknP5mSQP3ilyGSSmRHzfQGuqylJfo9ENk=
+
+Name: assets/Textures/1080p/20/title.png
+SHA-256-Digest: 35mqRvhBPX+g1NtoGwXS0/omSPogpyjjIloKQYtZU5k=
+
+Name: assets/Textures/1080p/20/title_mask.png
+SHA-256-Digest: VLsHhNxZ1+0kTGFWgSnbr0l3NQNhE0VAxq8ge+advpI=
+
+Name: assets/Textures/1080p/20/title_shadow.png
+SHA-256-Digest: 7hwvRO7TXebdU5T9vHDreG7NzaG72HFx0RtipOy5GkM=
+
+Name: assets/Textures/1080p/20/unlock_front_cover.png
+SHA-256-Digest: IaCYoYMSl69yvEdr7ds8V6BPLXzp+k0zYWl+Km0Zo1k=
+
+Name: assets/Textures/1080p/20/workspace_overlay.png
+SHA-256-Digest: FKNl4M7rqP2xaJ7Es9XC7XDcYOzdrB4stwhJCttijzo=
+
+Name: assets/Textures/1080p/background.png
+SHA-256-Digest: PH/NdKy7FJAQ4a/NKpnLr7y7Zwx1PQKxj+Eb9Ugqup4=
+
+Name: assets/Textures/1080p/brick_selected_new.png
+SHA-256-Digest: h29SsyxHzZSjLEYKTBxnHwUARvIgM3IndFaM5TnsxVo=
+
+Name: assets/Textures/1080p/dot_fix.png
+SHA-256-Digest: /A+m8wsXnRYcxYcrQziGomK5CtVEDzN5DjhgDybKzUY=
+
+Name: assets/Textures/1080p/dot_mask.png
+SHA-256-Digest: G6i9woV4PmTl1uQ+Z0dMV0EflZUnZ6Sa5YwR1KMDdig=
+
+Name: assets/Textures/1080p/dot_move.png
+SHA-256-Digest: Hr/R9rLxhhMLpicB6c6E/hr2JbCi6Glfd0XgWfZPLbY=
+
+Name: assets/Textures/1080p/dot_shadow.png
+SHA-256-Digest: 9YbG7oJTKQUlWW4X3lsY4OOGz08wVAX0BGD+Ep8dnGs=
+
+Name: assets/Textures/1080p/flip_anim_side.png
+SHA-256-Digest: SNIYvfi0VIbx2ORz5W+IMqS6v0RqX/c6CTLxxmE7a7g=
+
+Name: assets/Textures/1080p/folder/dark/12/folder_2_2.png
+SHA-256-Digest: 0U1ud7vcrcLB8dDvJHPYQ2a3DXG+yzdkB2GzugTW2sA=
+
+Name: assets/Textures/1080p/folder/dark/12/folder_3_3.png
+SHA-256-Digest: 5PdQyWAkWLEguJaWwc52QeaoC2XcPikoPUgsX/maGew=
+
+Name: assets/Textures/1080p/folder/dark/20/folder_2_2.png
+SHA-256-Digest: 8sXv2IylkGTe6p6f45wCeIXPqqvzX1WNuoLgU9z18Bg=
+
+Name: assets/Textures/1080p/folder/dark/20/folder_3_3.png
+SHA-256-Digest: Q33ekpfs8dGiiwlgyPP5N+RHBVHjK7fuPD9gb/9oEa8=
+
+Name: assets/Textures/1080p/folder/folder_open_3_3.png
+SHA-256-Digest: eyttiVr+c54UhLYgkRwl1wbvmbwZ86CE3BVnLvYx2cE=
+
+Name: assets/Textures/1080p/folder/folder_open_3_3_cover.png
+SHA-256-Digest: 1YqiHCPec06sMUMTQygRBtN/6rY4oFb5aQ4d26vi4oE=
+
+Name: assets/Textures/1080p/folder/folder_open_bg_default.jpg
+SHA-256-Digest: 5T7czOElLNvkunB5qGyxYCwMxOQrgtyJagRGMUcYXSc=
+
+Name: assets/Textures/1080p/folder/light/12/folder_2_2.png
+SHA-256-Digest: 5g+NEc4sEM9yoxrp88z877E6RUy1NRp6u1SpgoZjh68=
+
+Name: assets/Textures/1080p/folder/light/12/folder_3_3.png
+SHA-256-Digest: hr9xDhTbZ3p4ru5e58rDRDA8PRm9bqBdruIspO1u2Ts=
+
+Name: assets/Textures/1080p/folder/light/20/folder_2_2.png
+SHA-256-Digest: oM6hvAG3cgSXbH7YDVRAUCyE6d9/CLB/LnlB7oVCfpk=
+
+Name: assets/Textures/1080p/folder/light/20/folder_3_3.png
+SHA-256-Digest: GJqbR6CDXsVAeG+ttF0ugQCR8wVG8Lylt/vUW1//+gI=
+
+Name: assets/Textures/1080p/folder/trans/12/folder_2_2.png
+SHA-256-Digest: hRqh588wGppcuHGyGGtmcwaht6muwHxNG5tTlDG6D+Q=
+
+Name: assets/Textures/1080p/folder/trans/12/folder_3_3.png
+SHA-256-Digest: 2hiXecguZ85aHaWTs0NH9grufBJ7DFCxbzX+R5ax91E=
+
+Name: assets/Textures/1080p/folder/trans/20/folder_2_2.png
+SHA-256-Digest: ZnvxQmY61wKaUhgNpcJJNQdaJzNkat6k7hMb21WaWy0=
+
+Name: assets/Textures/1080p/folder/trans/20/folder_3_3.png
+SHA-256-Digest: 91/Uc7tAQCH6zLnV2Y9VgJ5ERdPmNRuhFYS7FPDMCk4=
+
+Name: assets/Textures/1080p/gaussian.png
+SHA-256-Digest: 65zbI3xRQIn/Wb9nCZCu9BDuRtvAIRXRqSGzrh16KGI=
+
+Name: assets/Textures/1080p/ic_create_folder.png
+SHA-256-Digest: JxUa9borHEtBeMg2ne09F/Abe3pE6ZHBJS4TgwPfbZM=
+
+Name: assets/Textures/1080p/ic_delete.png
+SHA-256-Digest: xIaSgT1wqG219YQRhD+RmHtsM6h8MVEUfF6Z/Ily+nQ=
+
+Name: assets/Textures/1080p/navigation_bar.png
+SHA-256-Digest: SWJVY6hmKbppASiVYj1JQK9iKuxiJ7hYxxZrxjk7dIE=
+
+Name: assets/Textures/1080p/page_bg.png
+SHA-256-Digest: 6+Jz/cGy0Lyl6zfUIDeKM2H1I47SlRrEKl7FF8OSqp8=
+
+Name: assets/Textures/1080p/setting_button/editBtn_bg.png
+SHA-256-Digest: RBD0p58M6uCZ5F8YJX3hZxLai3KOjEXFMmwYAfImQsU=
+
+Name: assets/Textures/1080p/setting_button/editBtn_gear.png
+SHA-256-Digest: DBUFphxbAOMf0nam+bVj/QUftpSbM5NxyyQlAWUxjeI=
+
+Name: assets/Textures/1080p/setting_button/editBtn_inShadow.png
+SHA-256-Digest: e4q9w6kX/MBn1eQcISJQB+GE5MpowK5M+zvH3KV5zB0=
+
+Name: assets/Textures/1080p/setting_button/editBtn_pressed_bg.png
+SHA-256-Digest: gzsDisW136/0/HM2ihvXVRW3fd6vncz5rZD7RxCfze0=
+
+Name: assets/Textures/1080p/sort_by_category_cover_icon.png
+SHA-256-Digest: WX+yteoQnOtUyJroBMANzaLtEBovAS4ScHRvJGo59ag=
+
+Name: assets/Textures/1080p/sort_by_category_icon.png
+SHA-256-Digest: /pDSEFuVTWuzxawFRUe/NZ5S7zrcyU1wCESPmDOOFYI=
+
+Name: assets/Textures/1080p/sort_by_color_cover_icon.png
+SHA-256-Digest: BJZIe677HbbREVNJUOqdr9FfKb09cqq3GC23sDPDJug=
+
+Name: assets/Textures/1080p/sort_by_color_icon.png
+SHA-256-Digest: qR9iXC3TmjT7wI256BL0lhJT25EIu3cbXmj/if3G3Mk=
+
+Name: assets/Textures/1080p/sort_by_install_time_cover_icon.png
+SHA-256-Digest: pO9+jJDvQzdNMvQJkFKPO6Uuhlfbr7gKlBIzu5YSEdc=
+
+Name: assets/Textures/1080p/sort_by_install_time_icon.png
+SHA-256-Digest: I+byFGSxf3WS1p/hvioXxJ5gSlSqI6AnBjTlQH3Q3sI=
+
+Name: assets/Textures/1080p/sort_by_usage_frequency_cover_icon.png
+SHA-256-Digest: fBb5CPJ/PDdu5MpK98CF8uAwkY3XRXH0CzdW7AKxdkA=
+
+Name: assets/Textures/1080p/sort_by_usage_frequency_icon.png
+SHA-256-Digest: lAzNbX0JaJV4ZbtEq0HwLRG+UyGJJl2IUzOHvFItKPI=
+
+Name: assets/Textures/1080p/sort_cancel.png
+SHA-256-Digest: cuBd/fdr2RmKyeDk8V/7obI9IpTFNbMIuh0wTUB3+qY=
+
+Name: assets/Textures/1080p/sort_cancel_cover.png
+SHA-256-Digest: CgX/NLCIJY4rJBrpG8LoT84kPSxXaagJwZcX2fPsMO8=
+
+Name: assets/Textures/1080p/sort_confirm.png
+SHA-256-Digest: ECwa/i3iehjYR7fWKnX87ZvBJCEmk2vEB+duiwWonic=
+
+Name: assets/Textures/1080p/sort_confirm_cover.png
+SHA-256-Digest: nu7dTUUnXWgpRZ0jJ9qQCOrEfIYdAMlnsgsw6jZ80Js=
+
+Name: assets/Textures/1080p/status_bar.png
+SHA-256-Digest: hSBPlDwPXN1xV5UbKqwpMNk4/1Kf1uWmjiQRG3DRZ3w=
+
+Name: assets/Textures/1080p/trash.png
+SHA-256-Digest: GvQ+WKBFJCpqqju4flGyJVsD0bnMLRuet06hqimpBbA=
+
+Name: assets/Textures/1080p/trash_shadow.png
+SHA-256-Digest: 9gCchHZta8QOo+tlVy2xqkBzoIGV1j3Q4PbhNKaYTkE=
+
+Name: classes.dex
+SHA-256-Digest: bLzYt1DRRhe7fg+ZQPizqiMfQnpxJOblRqlp33JOYu8=
+
+Name: res/drawable-hdpi-v4/icon.png
+SHA-256-Digest: c/fI/KMIjj0QNXvF1ZSUbvrN+rI94f3GW/U28wXV3Uo=
+
+Name: res/drawable-xxhdpi-v4/bubble_for_sort.9.png
+SHA-256-Digest: WIR6Kq1CqFSMGOCzUV8H8PnoDbXLna7OQ5QDSrmS4kE=
+
+Name: res/drawable-xxhdpi-v4/label_bubble.9.png
+SHA-256-Digest: x77imDrvpVYwQSxr7kaQwn9U/KtPApBv514VRLWBfmU=
+
+Name: res/drawable-xxhdpi-v4/label_bubble_base16.9.png
+SHA-256-Digest: 5a6UxNV4xNwq880JjtLLrU5qB79esYdIrvkjDFQeTDE=
+
+Name: res/drawable-xxhdpi-v4/preview_16.jpg
+SHA-256-Digest: 7MO93Yn8l2H7gjePfOrwhxvz5NsY5ierQd/TYd1+Cak=
+
+Name: res/drawable-xxhdpi-v4/preview_36.jpg
+SHA-256-Digest: kXcLyxVRSMgSU41QxUDXencwgbP/dfRBcFZFFTTt9T0=
+
+Name: res/drawable-xxhdpi-v4/preview_64.jpg
+SHA-256-Digest: hpgSUCMR1Ir/RQxizYLMszXkZwHZ7oubwLrcUaWIoN0=
+
+Name: res/drawable-xxhdpi-v4/preview_81.jpg
+SHA-256-Digest: U13hfWdlsdzbcA5KYOOxBlXmw8BFPZT1U4QnPbQbxas=
+
+Name: res/drawable-xxhdpi-v4/preview_9.jpg
+SHA-256-Digest: ea+PtMrcyyUCG3mSZuIxfnIZc7pI0vTbX7QwVFQUhRs=
+
+Name: res/drawable-xxhdpi-v4/thumbnail_16.png
+SHA-256-Digest: avRmOhihksDjXjXfZqTjkrWq2DCsgh1FBKUYZiaBtd8=
+
+Name: res/drawable-xxhdpi-v4/thumbnail_9.png
+SHA-256-Digest: ZN+Ppfxh1+FXqjBCgUyO+KMiEJyUsoTDSAde5hFc3k8=
+
+Name: res/drawable-xxhdpi-v4/thumbnail_settings.png
+SHA-256-Digest: VtLwgQkVJVxkunFM5cu3sJSDyf7kHH6RF+oB+um0vlE=
+
+Name: res/drawable-xxhdpi-v4/thumbnail_settings_16.png
+SHA-256-Digest: 5W8Nr4znyrxwaReD2vn1QoIVFOJmkjjCvbB/8o25bTM=
+
+Name: resources.arsc
+SHA-256-Digest: uVpw+mSdFkq9aBBORVGsBe8LaBcvlwql49KiYPDmfAQ=
+

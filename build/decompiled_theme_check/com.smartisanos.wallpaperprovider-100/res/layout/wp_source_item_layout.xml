@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="@dimen/source_item_width" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <RelativeLayout android:layout_width="match_parent" android:layout_height="45.0dp">
+        <ImageView android:id="@id/icon" android:layout_width="@dimen/source_item_icon_scale" android:layout_height="@dimen/source_item_icon_scale" android:layout_marginLeft="15.0dp" android:src="@drawable/pop_icon_all" android:layout_alignParentLeft="true" android:layout_centerVertical="true" />
+        <ImageView android:id="@id/check_image" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="5.0dp" android:src="@drawable/pop_icon_selected" android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+        <TextView android:textSize="15.0sp" android:textColor="#9a000000" android:id="@id/name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="13.0dp" android:singleLine="true" android:layout_toLeftOf="@id/check_image" android:layout_toRightOf="@id/icon" android:layout_centerVertical="true" />
+    </RelativeLayout>
+    <View android:id="@id/bottom_line" android:background="@drawable/pop_line" android:layout_width="match_parent" android:layout_height="1.0px" />
+</LinearLayout>

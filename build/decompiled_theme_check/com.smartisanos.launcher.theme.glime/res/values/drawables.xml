@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <drawable name="label_bubble">@drawable/label_bubble</drawable>
+    <drawable name="label_bubble_base16">@drawable/label_bubble_base16</drawable>
+</resources>

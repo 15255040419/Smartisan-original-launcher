@@ -232,11 +232,7 @@
     iput-object v1, p0, Lcom/smartisanos/launcher/ja;->mh:Ljava/lang/String;
 
     .line 15
-    new-instance v0, Lcom/smartisanos/launcher/ha;
-
-    invoke-direct {v0, p0}, Lcom/smartisanos/launcher/ha;-><init>(Lcom/smartisanos/launcher/ja;)V
-
-    iput-object v0, p0, Lcom/smartisanos/launcher/ja;->nh:Landroid/app/IActivityObserver$Stub;
+    iput-object v1, p0, Lcom/smartisanos/launcher/ja;->nh:Landroid/app/IActivityObserver$Stub;
 
     .line 16
     new-instance v0, Lcom/smartisanos/launcher/ia;

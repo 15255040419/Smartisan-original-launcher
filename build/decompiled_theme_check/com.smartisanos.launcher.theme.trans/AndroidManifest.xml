@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:compileSdkVersion="36" android:compileSdkVersionCodename="16" package="com.smartisanos.launcher.theme.trans" platformBuildVersionCode="36" platformBuildVersionName="16">
+    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28"/>
+    <application android:extractNativeLibs="false" android:icon="@drawable/icon" android:label="@string/app_name" android:permission="com.smartisanos.launcher.permissions.READ_THEME">
+        <activity android:name="Themes"/>
+    </application>
+</manifest>

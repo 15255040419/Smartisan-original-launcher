@@ -45,15 +45,15 @@ build\theme-trans-signed.apk
 当前测试构建和兼容基线：
 
 ```text
-versionName: v1.4.9
-versionCode: 24
+versionName: v1.5.1
+versionCode: 26
 minSdkVersion: 23
 targetSdkVersion: 28
 Android compatibility: Android 6.0+ (API 23+), including Android 15 / Android 16
 launcher APK size: about 50.2 MB
 ```
 
-当前工作区临时保持 `v1.4.9 / 24` 用于测试“检查更新”能否发现线上 `v1.5.0 / 25` 并覆盖安装。正式发布前必须按 `BUILD_AND_VERSION_NOTES.md` 恢复目标版本，最终以 `aapt2 dump badging build\launcher-signed.apk` 为准。
+当前正式版本为 `v1.5.1 / 26`。最终版本以 `aapt2 dump badging build\launcher-signed.apk` 为准；文本 Manifest、二进制 Manifest 和设置页版本字符串必须保持一致。
 
 当前工程保留原版桌面的 `12 / 20 宫格` 方向，不再退回 maintained 的 `9 / 16 宫格` 语义。
 

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:id="@id/menu_item">
+        <item android:icon="@drawable/icon_noti" android:id="@id/item_notification" android:title="@string/menu_item_notification" android:showAsAction="always" />
+        <item android:icon="@drawable/icon_setting" android:id="@id/item_permission" android:title="@string/menu_item_permission" android:showAsAction="always" />
+        <item android:title="smtdivider" />
+        <item android:icon="@drawable/icon_send" android:id="@id/item_send" android:title="@string/menu_item_send" android:showAsAction="always" />
+        <item android:icon="@drawable/icon_info" android:id="@id/item_info" android:title="@string/menu_item_info" android:showAsAction="always" />
+        <item android:title="smtdivider" />
+        <item android:icon="@drawable/icon_delete" android:id="@id/item_delete" android:title="@string/menu_item_delete" android:showAsAction="always" />
+    </group>
+</menu>

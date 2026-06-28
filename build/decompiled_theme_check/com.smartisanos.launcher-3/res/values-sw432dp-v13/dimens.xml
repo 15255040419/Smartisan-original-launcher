@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="keyboard_button_margin">4.799988dp</dimen>
+    <dimen name="keyboard_padding_bottom">31.199982dp</dimen>
+    <dimen name="keyboard_padding_sides">14.399994dp</dimen>
+    <dimen name="keyboard_padding_top">9.599976dp</dimen>
+    <dimen name="unlocker_area_operate_height">418.79688dp</dimen>
+    <dimen name="unlocker_button_height">48.0dp</dimen>
+    <dimen name="unlocker_button_padding_bottom">36.0dp</dimen>
+    <dimen name="unlocker_button_padding_sides">31.199982dp</dimen>
+    <dimen name="unlocker_button_space">4.799988dp</dimen>
+    <dimen name="unlocker_faceid_img_size">60.0dp</dimen>
+    <dimen name="unlocker_faceid_margin_top">26.799988dp</dimen>
+    <dimen name="unlocker_fp_tips_logo_size">84.0dp</dimen>
+    <dimen name="unlocker_fp_tips_margin_bottom">210.0dp</dimen>
+    <dimen name="unlocker_fp_tips_space">6.0dp</dimen>
+    <dimen name="unlocker_fp_tips_text_size">14.399994sp</dimen>
+    <dimen name="unlocker_hint_logo_padding">7.1999817dp</dimen>
+    <dimen name="unlocker_hint_logo_size">86.399994dp</dimen>
+    <dimen name="unlocker_hint_pin_view_margin_top">24.0dp</dimen>
+    <dimen name="unlocker_hint_text_margin_top">21.599976dp</dimen>
+    <dimen name="unlocker_navbar_height_margin_bottom">18.0dp</dimen>
+    <dimen name="unlocker_pin_dot_size">18.0dp</dimen>
+    <dimen name="unlocker_pin_space">14.399994dp</dimen>
+    <dimen name="unlocker_txt_button">20.399994sp</dimen>
+    <dimen name="unlocker_txt_button_finger_txt">16.199982sp</dimen>
+    <dimen name="unlocker_txt_button_num">33.599976dp</dimen>
+    <dimen name="unlocker_txt_button_txt">16.799988sp</dimen>
+    <dimen name="unlocker_txt_main">19.199982sp</dimen>
+    <dimen name="unlocker_txt_secondary">15.599976sp</dimen>
+    <dimen name="unlocker_width_pc">489.59375dp</dimen>
+    <dimen name="unlocker_width_pc_limit_height">533.2969dp</dimen>
+</resources>

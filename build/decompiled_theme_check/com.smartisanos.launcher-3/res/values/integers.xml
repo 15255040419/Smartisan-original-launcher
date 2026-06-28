@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer name="abc_config_activityDefaultDur">220</integer>
+    <integer name="abc_config_activityShortDur">150</integer>
+    <integer name="cancel_button_image_alpha">127</integer>
+    <integer name="config_tooltipAnimTime">150</integer>
+    <integer name="bgZ">2000</integer>
+    <integer name="mainCameraZ">3800</integer>
+    <integer name="mainCameraFar">6000</integer>
+    <integer name="mainCameraNear">2000</integer>
+    <integer name="pinch_scale_threshold">200</integer>
+    <integer name="tap_threshold">30</integer>
+    <integer name="text_typeface_bold">1</integer>
+    <integer name="btn_text_size">15</integer>
+    <integer name="btn_icon_size">16</integer>
+    <integer name="btn_create_folder_text_width">75</integer>
+    <integer name="btn_delete_text_width">30</integer>
+    <integer name="btn_text_height">21</integer>
+    <integer name="btn_text_margin_left">38</integer>
+    <integer name="btn_text_margin_right">13</integer>
+    <integer name="btn_icon_margin_left">15</integer>
+    <integer name="large_screen_page_width">464</integer>
+</resources>

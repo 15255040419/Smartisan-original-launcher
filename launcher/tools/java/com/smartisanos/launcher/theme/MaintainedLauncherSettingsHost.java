@@ -3818,11 +3818,47 @@ public final class MaintainedLauncherSettingsHost {
         if (context == null || entry == null || !hasLauncherPagePassword(context)) {
             return false;
         }
-        Integer pageIndex = findLauncherPageForPackage(context, entry.packageName, entry.className, entry.userId);
-        if (pageIndex == null) {
-            return true;
+        return isSearchEntryOnLockedPage(entry);
+    }
+
+    private static boolean isSearchEntryOnLockedPage(SearchEntry entry) {
+        if (entry == null || TextUtils.isEmpty(entry.packageName)) {
+            return false;
         }
-        return isLauncherPageLocked(pageIndex.intValue());
+        try {
+            Class<?> ebClass = Class.forName("com.smartisanos.launcher.view.Eb");
+            Object mainView = ebClass.getMethod("getInstance").invoke(null);
+            if (mainView == null) {
+                return false;
+            }
+            Object pageContainer = ebClass.getMethod("Ih").invoke(mainView);
+            if (pageContainer == null) {
+                return false;
+            }
+            Object value = pageContainer.getClass().getMethod("Ua", String.class)
+                    .invoke(pageContainer, entry.packageName);
+            if (!(value instanceof java.util.Collection)) {
+                return false;
+            }
+            for (Object cell : (java.util.Collection<?>) value) {
+                if (cell == null) {
+                    continue;
+                }
+                try {
+                    Object page = cell.getClass().getMethod("Af").invoke(cell);
+                    if (page == null) {
+                        continue;
+                    }
+                    Object locked = page.getClass().getMethod("On").invoke(page);
+                    if (locked instanceof Boolean && ((Boolean) locked).booleanValue()) {
+                        return true;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     private static void openLauncherPasswordForSearchTarget(Activity activity, SearchEntry entry) {

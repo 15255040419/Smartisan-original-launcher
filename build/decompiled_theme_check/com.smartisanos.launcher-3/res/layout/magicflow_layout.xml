@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout android:id="@id/layout_magicflow" android:background="@color/background_shadow" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/gaussian_blur_view" android:layout_width="match_parent" android:layout_height="match_parent" />
+    <ImageView android:id="@id/mask_view" android:background="@color/black" android:layout_width="match_parent" android:layout_height="match_parent" android:alpha="0.5" />
+    <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="match_parent">
+        <include layout="@layout/search_layout" />
+        <FrameLayout android:layout_width="match_parent" android:layout_height="match_parent">
+            <com.smartisanos.magicflow.view.MagicflowScrollView android:id="@id/magicflow_scrollview" android:paddingLeft="@dimen/magicflow_cards_list_padding_horizontal" android:paddingRight="@dimen/magicflow_cards_list_padding_horizontal" android:scrollbars="none" android:layout_width="match_parent" android:layout_height="match_parent" android:overScrollMode="always">
+                <LinearLayout android:orientation="vertical" android:id="@id/remote_view_root" android:layout_width="match_parent" android:layout_height="wrap_content" />
+            </com.smartisanos.magicflow.view.MagicflowScrollView>
+            <ImageView android:id="@id/search_shadow" android:background="@drawable/tab_shadow" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        </FrameLayout>
+    </LinearLayout>
+    <ImageView android:layout_gravity="bottom" android:id="@id/navigation_bar_bg" android:layout_width="match_parent" android:layout_height="wrap_content" />
+</FrameLayout>

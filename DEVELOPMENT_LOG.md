@@ -15,12 +15,12 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `BUILD_AND_VERSION_NOTES.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-06-24）
+## 当前状态总览（2026-06-28）
 
 ### 已完成
 
 - APK 可通过 `build.bat` 构建、签名并输出 `build\launcher-signed.apk`，最近多次安装验证通过。
-- 正式发布目标为 `v1.5.0 / 25`；当前工作区处于临时测试版本 `v1.4.9 / 24`，用于测试“检查更新”从低版本升级到线上版本。最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单和 `aapt2 dump badging build\launcher-signed.apk` 为准，文本 Manifest、设置页字符串和二进制 Manifest 必须同步维护。
+- 当前正式版本为 `v1.5.1 / 26`。最终 APK 仍以 `launcher/original/AndroidManifest.xml` 二进制清单和 `aapt2 dump badging build\launcher-signed.apk` 为准，文本 Manifest、设置页字符串和二进制 Manifest 必须同步维护。
 - 当前桌面主 APK 为 `minSdkVersion=23`、`targetSdkVersion=28`，理论安装基线是 Android 6.0+（API 23+）；最终 APK 元数据已更新为 `compileSdkVersion=36`、`platformBuildVersionName=16`，按 Android 16 安装方向保留 target 28。
 - 兼容安装与包体瘦身已持续推进：最终 APK 的 `minSdkVersion` 从 29 降到 23，`targetSdkVersion` 调整为 28；纹理资源统一走 `1080p`，删除冗余资源和不再使用的独立搜索产物后，当前 `build\launcher-signed.apk` 约 50.2MB。
 - 构建签名流程已从 `jarsigner` 旧 v1 签名改为 `zipalign -p` 后用 `apksigner` 输出 v1/v2/v3 签名，修复 Android 12 等新系统上可能因只有 v1/JAR 签名而安装失败的问题。
@@ -46,6 +46,46 @@
 - 双开 / 多用户应用显示和启动已补入 LauncherApps 查询与 `startActivityAsUser` 兼容路径，避免双开应用只显示主用户图标或点击后启动错用户。
 - 双开 / 多用户应用继续对照 maintained 调整：搜索页、桌面应用列表和启动链路都尽量使用 LauncherApps 多用户查询；分身应用支持叠加原版风格面具标记。
 - 应用图标识别逻辑已继续向 maintained 对齐，同时保留当前工程已有的图标识别能力，减少“闲鱼 / 酷安”等普通应用被误识别成应用商店图标，以及系统“电话 / 拨号 / 电话本”等名称匹配不稳定的问题。
+
+### 2026-06-28：Moto G100 Android 16 启动兼容、页面锁搜索刷新与 v1.5.1
+
+问题与根因：
+
+- Moto G100 升级 Android 16 后 Launcher 无法正常启动。`ja` 构造阶段会实例化继承隐藏接口 `android.app.IActivityObserver$Stub` 的观察器；该 Smartisan 私有系统接口在普通 Android 16 ROM 上不可用，应用会在初始化阶段失败。
+- 搜索启动此前在无法从 favorites 数据库确认 App 所属页面时直接按“已锁定”处理。取消页面锁后页面映射可能暂时查不到，因此搜索打开仍错误弹出密码页。
+- 文本 Manifest 已写 `v1.5.1 / 26`，但构建末尾注入的二进制 Manifest 和设置页版本仍停留在 `v1.4.9 / 24`，导致最终 APK 版本被覆盖。
+
+修复：
+
+- 在 `launcher`、`clean_launcher`、`clean_launcher_raw` 三份 `ja.1.smali` 中不再创建 `IActivityObserver` 实例，将 `nh` 初始化为 `null`，避开 Android 16 对已移除/不可访问隐藏接口的初始化失败；保留其余广播与桌面初始化流程。
+- 搜索启动不再依赖 favorites 查询失败后的“默认锁定”兜底，而是从原版页面容器 `fa.Ua(packageName)` 实时取得 App 单元格，经 `g.Af()` 找到所属页面，再用原版 `M.On()` 判断页面当前是否锁定。原版状态中 `M.Nn()` 是隐藏页（`yI == 1`），`M.On()` 才是锁定页（`yI == 2`）；原版页面点击也只有 `On()` 分支会调用 `Zp()` 验证密码。只有明确处在锁定页面时进入密码页，解除页面锁后下一次搜索启动会直接读取新状态并放行。
+- 版本三个写入点统一为 `v1.5.1 / 26`，并在构建后通过 `aapt2 dump badging` 核对最终 APK。
+- `.gitignore` 放行根目录 `build` 和本次新增的 maintained 彩色隐私密码锁图标、黑色键盘图片，确保这些产物可以提交到 GitHub，同时避免把其余历史图片资源全部误列为新文件。
+
+验证：
+
+- `build.bat` 完整构建、资源编译和签名通过。
+- `aapt2 dump badging build\launcher-signed.apk` 确认 `versionCode='26'`、`versionName='v1.5.1'`、`compileSdkVersion='36'`、`targetSdkVersion='28'`。
+- 2026-06-28 用户安装到真机后完成最终回归：锁住板块时，从自绘搜索结果点击该板块内 App 会进入数字密码页；解除板块锁后，再从搜索点击同一 App 会直接启动，不再误弹密码。两条路径均确认正常。
+
+防回归规则：
+
+- 不要把 `M.Nn()` 当作页面锁状态；它表示隐藏页。页面锁必须检查 `M.On()`。
+- 不要恢复“找不到 App 页面就默认要求密码”的逻辑，否则解除锁、数据库尚未同步或桌面未完全初始化时会误拦普通搜索启动。
+- 不要让搜索结果缓存一个独立的 `locked` 布尔值。每次点击搜索结果时都应重新执行 `fa.Ua(packageName) -> g.Af() -> M.On()`，以当前桌面页面对象为准。
+- 不要在 `ConfirmPasswordActivity` 中判断 App 是否属于锁定页面；该 Activity 只负责密码输入和验证，是否需要进入它由搜索启动入口决定。
+- 修改这段链路后必须同时回归两种状态：`锁住板块 -> 搜索打开 -> 必须验证密码`，以及 `解除板块锁 -> 搜索打开 -> 必须直接启动`。
+
+涉及文件：
+
+- `launcher/smali/com/smartisanos/launcher/ja.1.smali`
+- `clean_launcher/smali/com/smartisanos/launcher/ja.1.smali`
+- `clean_launcher_raw/smali/com/smartisanos/launcher/ja.1.smali`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/AndroidManifest.xml`
+- `launcher/original/AndroidManifest.xml`
+- `launcher/tools/maintained_settings_res/res/values/strings.xml`
+- `.gitignore`
 
 ### 2026-06-25：日历编辑页灰度最终回归记录
 

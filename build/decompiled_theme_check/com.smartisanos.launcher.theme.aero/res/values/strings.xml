@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Translucent</string>
+    <string name="theme_author">Smartisan</string>
+    <string name="theme_desc">Translucent</string>
+    <string name="theme_id">smartisan_theme_aero</string>
+    <string name="theme_name">Translucent</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@android:color/transparent" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_centerInParent="true"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:id="@id/hint_app_logo" android:background="@android:color/transparent" android:padding="@dimen/unlocker_hint_logo_padding" android:layout_width="@dimen/unlocker_hint_logo_size" android:layout_height="@dimen/unlocker_hint_logo_size" android:layout_marginBottom="@dimen/unlocker_hint_text_margin_top" android:src="@null" android:layout_centerHorizontal="true" android:contentDescription="@string/unlocker_unlock_app" />
+    <TextView android:id="@id/hint_text" android:text="@string/unlocker_unlock_app" android:layout_below="@id/hint_app_logo" android:layout_centerHorizontal="true" style="@style/unlocker.text.main" />
+    <include android:visibility="visible" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/unlocker_hint_pin_view_margin_top" android:layout_below="@id/hint_text" android:layout_centerHorizontal="true" layout="@layout/security_control_pin" />
+</RelativeLayout>

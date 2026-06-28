@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:gravity="center" android:orientation="vertical" android:id="@id/test_content" android:background="#ff000000" android:paddingLeft="16.0dp" android:paddingRight="16.0dp" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_margin="16.0dp" android:splitMotionEvents="true"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textAppearance="?android:textAppearanceMedium" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_gravity" />
+    <TextView android:textAppearance="?android:textAppearanceSmall" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_gravity_description" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textAppearance="?android:textAppearanceSmall" android:id="@id/test_gravity_x" android:layout_width="60.0dp" android:layout_height="wrap_content" android:text="@string/test_x" />
+        <SeekBar android:orientation="horizontal" android:id="@id/test_gravity_x_p" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textAppearance="?android:textAppearanceSmall" android:id="@id/test_gravity_y" android:layout_width="60.0dp" android:layout_height="wrap_content" android:text="@string/test_y" />
+        <SeekBar android:orientation="horizontal" android:id="@id/test_gravity_y_p" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <ImageView android:background="#ffff0000" android:layout_width="match_parent" android:layout_height="1.0dp" />
+    <TextView android:textAppearance="?android:textAppearanceMedium" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_velocity" />
+    <TextView android:textAppearance="?android:textAppearanceSmall" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_velocity_description" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textAppearance="?android:textAppearanceSmall" android:id="@id/test_velocity_x" android:layout_width="60.0dp" android:layout_height="wrap_content" android:text="@string/test_x" />
+        <SeekBar android:orientation="horizontal" android:id="@id/test_velocity_x_p" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textAppearance="?android:textAppearanceSmall" android:id="@id/test_velocity_y" android:layout_width="60.0dp" android:layout_height="wrap_content" android:text="@string/test_y" />
+        <SeekBar android:orientation="horizontal" android:id="@id/test_velocity_y_p" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textAppearance="?android:textAppearanceSmall" android:id="@id/test_velocity_i" android:layout_width="60.0dp" android:layout_height="wrap_content" android:text="@string/test_span" />
+        <SeekBar android:orientation="horizontal" android:id="@id/test_velocity_i_p" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <ImageView android:background="#ffff0000" android:layout_width="match_parent" android:layout_height="1.0dp" />
+    <TextView android:textAppearance="?android:textAppearanceMedium" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_life" />
+    <TextView android:textAppearance="?android:textAppearanceSmall" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_life_description" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textAppearance="?android:textAppearanceSmall" android:id="@id/test_life_l" android:layout_width="60.0dp" android:layout_height="wrap_content" android:text="@string/test_low" />
+        <SeekBar android:orientation="horizontal" android:id="@id/test_life_l_p" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textAppearance="?android:textAppearanceSmall" android:id="@id/test_life_h" android:layout_width="60.0dp" android:layout_height="wrap_content" android:text="@string/test_high" />
+        <SeekBar android:orientation="horizontal" android:id="@id/test_life_h_p" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <ImageView android:background="#ffff0000" android:layout_width="match_parent" android:layout_height="1.0dp" />
+    <TextView android:textAppearance="?android:textAppearanceMedium" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_particle_num" />
+    <TextView android:textAppearance="?android:textAppearanceSmall" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_particle_num_description" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textAppearance="?android:textAppearanceSmall" android:id="@id/test_num" android:layout_width="60.0dp" android:layout_height="wrap_content" android:text="@string/test_num" />
+        <SeekBar android:orientation="horizontal" android:id="@id/test_num_p" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <ImageView android:background="#ffff0000" android:layout_width="match_parent" android:layout_height="1.0dp" />
+    <TextView android:textAppearance="?android:textAppearanceMedium" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_anim_time" />
+    <TextView android:textAppearance="?android:textAppearanceSmall" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/test_anim_time_description" />
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:textAppearance="?android:textAppearanceSmall" android:id="@id/test_time" android:layout_width="60.0dp" android:layout_height="wrap_content" android:text="@string/test_time" />
+        <SeekBar android:orientation="horizontal" android:id="@id/test_time_p" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+    <LinearLayout android:gravity="center" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20.0dp">
+        <Button android:textAppearance="?android:textAppearanceMedium" android:id="@id/test_btn" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_marginLeft="3.0dp" android:layout_marginRight="3.0dp" android:text="@string/test_reset" android:layout_weight="1.0" />
+        <Button android:textAppearance="?android:textAppearanceMedium" android:id="@id/test_btn_a" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_marginLeft="3.0dp" android:layout_marginRight="3.0dp" android:text="@string/test_gen" android:layout_weight="1.0" />
+        <Button android:textAppearance="?android:textAppearanceMedium" android:id="@id/test_btn_b" android:layout_width="0.0dp" android:layout_height="wrap_content" android:layout_marginLeft="3.0dp" android:layout_marginRight="3.0dp" android:text="@string/test_try" android:layout_weight="1.0" />
+    </LinearLayout>
+</LinearLayout>

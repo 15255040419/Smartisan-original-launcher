@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:id="@id/page_scroll_list_item" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="16.0sp" android:gravity="left" android:id="@id/name" android:layout_width="200.0dp" android:layout_height="wrap_content" android:layout_marginLeft="30.0dp" />
+    <RadioButton android:id="@id/radio_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="10.0dp" />
+</LinearLayout>

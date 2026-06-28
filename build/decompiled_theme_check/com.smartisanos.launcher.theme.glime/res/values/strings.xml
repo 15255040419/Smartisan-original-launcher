@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Glime</string>
+    <string name="theme_name">Glime</string>
+    <string name="theme_desc">Glime</string>
+    <string name="theme_author">Smartisan</string>
+    <string name="theme_id">smartisan_theme_aero</string>
+</resources>

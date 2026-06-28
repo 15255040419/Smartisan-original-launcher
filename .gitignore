@@ -3,8 +3,12 @@ build/
 *.png
 *.jpg
 *.jpeg
+!/build/
+!/build/**
 !launcher/assets/settings_native/
 !launcher/assets/settings_native/*.png
+!launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/privacy_password_lock_icon.png
+!launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/btn_*_classic_dark.9.png
 launcher/scratch/
 scratch/
 decoded_desktop/

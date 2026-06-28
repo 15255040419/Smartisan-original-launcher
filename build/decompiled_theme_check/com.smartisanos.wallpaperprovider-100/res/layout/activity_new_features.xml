@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@drawable/background" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:smartisanos="http://schemas.android.com/apk/res/smartisanos">
+    <smartisanos.widget.TitleBar android:id="@id/view_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" smartisanos:shadowVisible="true" smartisanos:title_bar_center_text="@string/new_features" />
+    <LinearLayout android:orientation="vertical" android:paddingTop="@dimen/settings_item_top_bottom_margin" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/view_title">
+        <FrameLayout android:id="@id/webview_container" android:background="" android:paddingLeft="20.0dp" android:paddingRight="20.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <smartisanos.widget.ShadowButton android:id="@id/btn_ok" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="15.0dp" android:text="@string/use_smartisan_ime" style="" />
+        <smartisanos.widget.ShadowButton android:id="@id/btn_cancel" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18.0dp" android:layout_marginBottom="18.0dp" android:text="@string/short_cancel" style="" />
+    </LinearLayout>
+</RelativeLayout>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:background="@android:color/white" android:clipChildren="false" android:clipToPadding="true" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:smartisanos="http://schemas.android.com/apk/res/smartisanos" xmlns:app="http://schemas.android.com/apk/res-auto">
+    <View android:id="@id/notch_gap" android:background="@android:color/transparent" android:visibility="gone" android:layout_width="match_parent" android:layout_height="@dimen/full_screen_camera_height" android:layout_alignParentTop="true" />
+    <RelativeLayout android:id="@id/view_title_container" android:background="@drawable/preview_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/notch_gap" android:layout_alignParentTop="true">
+        <smartisanos.widget.TitleBar android:id="@id/view_title" smartisanos:shadowVisible="true" smartisanos:title_bar_center_text="@string/wallpaper_preview_title" style="@style/TitleStyle" />
+        <LinearLayout android:orientation="horizontal" android:id="@id/bottom_layout" android:background="@drawable/lockscreen_preview_slider_bg" android:layout_width="match_parent" android:layout_height="@dimen/lockscreen_preview_bottom_options_height" android:layout_alignParentBottom="true">
+            <androidx.recyclerview.widget.RecyclerView android:id="@id/recycler_view" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4.0dp" android:layout_marginBottom="4.0dp" android:overScrollMode="never" />
+        </LinearLayout>
+        <FrameLayout android:id="@id/resized_preview_layout" android:clipChildren="false" android:clipToPadding="true" android:layout_width="match_parent" android:layout_height="match_parent" />
+    </RelativeLayout>
+    <androidx.viewpager.widget.ViewPager android:id="@id/viewpager" android:visibility="gone" android:layout_width="match_parent" android:layout_height="match_parent" />
+</RelativeLayout>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer name="page_untitle_text_shadow_dx">0</integer>
+    <integer name="page_untitle_text_shadow_dx_light">0</integer>
+    <integer name="page_untitle_text_shadow_dy">-1</integer>
+    <integer name="page_untitle_text_shadow_dy_light">-1</integer>
+    <integer name="page_untitle_text_shadow_radius">2</integer>
+    <integer name="page_untitle_text_shadow_radius_light">2</integer>
+    <integer name="text_shadow_dx">0</integer>
+    <integer name="text_shadow_dx_light">0</integer>
+    <integer name="text_shadow_dy">3</integer>
+    <integer name="text_shadow_dy_light">3</integer>
+    <integer name="text_shadow_radius">1</integer>
+    <integer name="text_shadow_radius_light">1</integer>
+    <integer name="text_typeface_bold">1</integer>
+    <integer name="text_typeface_bold_light">1</integer>
+</resources>
