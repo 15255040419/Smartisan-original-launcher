@@ -35,6 +35,17 @@
 
     .line 2
     :cond_0
+    const-string p2, "android.intent.action.SCREEN_OFF"
+
+    invoke-virtual {p2, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result p2
+
+    if-eqz p2, :cond_codex_unlock_action_ready
+
+    const-string p1, "action_keyguard_on"
+
+    :cond_codex_unlock_action_ready
     sget-boolean p2, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
 
     const-string v0, "action_keyguard_on"
@@ -306,6 +317,17 @@
 
     .line 27
     :cond_d
+    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->shouldSkipUnlockAnimation()Z
+
+    move-result p1
+
+    if-eqz p1, :cond_codex_unlock_state_ready
+
+    return-void
+
+    :cond_codex_unlock_state_ready
+    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->noteOriginalUnlockBroadcast()V
+
     sget-boolean p1, Lcom/smartisanos/launcher/va;->DBG:Z
 
     if-eqz p1, :cond_e

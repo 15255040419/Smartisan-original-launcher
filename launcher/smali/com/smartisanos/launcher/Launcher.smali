@@ -242,6 +242,8 @@
     .line 1
     invoke-super {p0}, Landroid/app/Activity;->onPause()V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onLauncherPausedForUnlock(Landroid/app/Activity;)V
+
     .line 2
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
 
@@ -264,6 +266,8 @@
     move-result-object v0
 
     invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->onResume()V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onLauncherResumedForUnlock(Landroid/app/Activity;)V
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyLauncherNavigationBarSetting(Landroid/app/Activity;)V
 

@@ -27,7 +27,7 @@ E:\FANG\smartisan\smartisan-launcher-original-port
 
 | APK | 用途 | 反编译 / 工作目录 | 当前状态 | 备注 |
 | --- | --- | --- | --- | --- |
-| `original_apks/com.smartisanos.launcher-3.apk` | 原版锤子桌面主 APK。当前移植项目的核心来源，包括桌面、宫格、Dock、主题桥接、图标加载、桌面设置入口和运行时 smali hook。 | `launcher/` | 当前可编辑构建源码 | `build.bat` 使用这个目录构建 `build/launcher-signed.apk`。`clean_launcher_raw/` 是同一个 launcher APK 的干净参考反编译目录。 |
+| `original_apks/com.smartisanos.launcher-3.apk` | 原版锤子桌面主 APK。当前移植项目的核心来源，包括桌面、宫格、Dock、主题桥接、图标加载、解锁动画、桌面设置入口和运行时 smali hook。 | `launcher/` | 当前可编辑构建源码 | `build.bat` 使用这个目录构建 `build/launcher-signed.apk`。解锁动画控制器和 9/12/16/20 宫格颜色资源属于主 Launcher，不依赖独立锁屏 APK；`clean_launcher_raw/` 是同一个 launcher APK 的干净参考反编译目录。 |
 | `original_apks/com.smartisanos.desktop-3.apk` | 锤子桌面 / 壁纸相关伴随包。主要用来对照壁纸、桌面预览和原版 Smartisan UI 行为。 | `decoded_desktop/` | 参考反编译目录 | `desktop_orig/`、`desktop_orig_norsc/` 是更早的 desktop 反编译尝试；目前通常优先看 `decoded_desktop/`。 |
 | `original_apks/com.android.settings-100.apk` | 原版 Smartisan 设置 APK。用于对照桌面设置页、预览组件、壁纸 UI 和系统设置 key。 | `build/decompiled_theme_check/com.android.settings-100/` | 临时参考缓存 | 可以查看 smali / resources，但因为缺少 Smartisan framework 资源，这个缓存没有完整 `apktool.yml`。只当只读参考。 |
 | `original_apks/com.smartisanos.launcher.theme.aero.apk` | 毛玻璃 / 半透明桌面主题包。 | `build/decompiled_theme_check/com.smartisanos.launcher.theme.aero/` | 完整参考反编译目录 | 包名是 `com.smartisanos.launcher.theme.aero`，内部 `theme_id` 是 `smartisan_theme_aero`。 |
@@ -39,7 +39,7 @@ E:\FANG\smartisan\smartisan-launcher-original-port
 
 | 文件 | 当前用途 | 备注 |
 | --- | --- | --- |
-| `build/launcher-signed.apk` | 当前桌面主 APK。 | 最近构建大小约 `50.2MB`，`compileSdkVersion=36`、`minSdkVersion=23`、`targetSdkVersion=28`，可安装基线为 Android 6.0+，包含 Android 15 / Android 16；不包含独立 QuickSearch APK；发布 GitHub / Gitee Release 时需要上传。 |
+| `build/launcher-signed.apk` | 当前桌面主 APK。 | 最近构建大小约 `54.8MB`，版本 `v1.5.2 / 27`，`compileSdkVersion=36`、`minSdkVersion=23`、`targetSdkVersion=28`，可安装基线为 Android 6.0+，包含 Android 15 / Android 16；不包含独立 QuickSearch APK 和在线图标库；发布 GitHub / Gitee Release 时需要上传。 |
 | `build/theme-trans-signed.apk` | 当前透明主题安装包。 | 安装后包名为 `com.smartisanos.launcher.theme.trans`；`compileSdkVersion=36`、`minSdkVersion=23`、`targetSdkVersion=28`，Android 15 / Android 16 使用这个包；发布 GitHub / Gitee Release 时建议随主 APK 一起上传。 |
 | `original_apks/com.smartisanos.launcher.theme.trans.apk` | 原始透明主题参考包。 | `minSdkVersion=29`、`targetSdkVersion=17`；只作资源参考，不作为 Android 15 / Android 16 安装包。 |
 | `original_apks/com.smartisanos.launcher.theme.aero.apk` | 毛玻璃主题安装包 / 原版参考。 | 包名为 `com.smartisanos.launcher.theme.aero`，不能当透明主题包使用。 |

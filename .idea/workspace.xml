@@ -5,14 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="295b82c4-8572-45f1-add8-3c13ec0468e1" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/badge/BadgeBridge.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/badge/SmartisanBadgeListenerService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/app_operation.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tools/patch_badge_service_manifest.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tools/patch_manifest_exported_components.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tools/patch_manifest_internal_permissions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tools/generate_icon_index.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tools/set_launcher_version.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/APK_INVENTORY.md" beforeDir="false" afterPath="$PROJECT_DIR$/APK_INVENTORY.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/BUILD_AND_VERSION_NOTES.md" beforeDir="false" afterPath="$PROJECT_DIR$/BUILD_AND_VERSION_NOTES.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
@@ -20,29 +16,15 @@
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-unsigned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-unsigned.apk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/icons/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/icons/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/launcher/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xxhdpi/MODE_9/layout.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/assets/layout/portrait/values-xxhdpi/MODE_9/layout.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/launcher/original/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/original/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/android/support/v7/appcompat/Manifest$permission.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/android/support/v7/appcompat/Manifest$permission.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/android/support/v7/recyclerview/Manifest$permission.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/android/support/v7/recyclerview/Manifest$permission.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Cb.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Cb.smali" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Launcher.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Launcher.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/StartActivityForSearch.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/StartActivityForSearch.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/L.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/L.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/a/a.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/a/a.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/A.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/A.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/O.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/O.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/SearchProvider.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/SearchProvider.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/e/s.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/e/s.smali" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/ia.1.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/ia.1.smali" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/ja.1.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/ja.1.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/Eb.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/Eb.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/Mc.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/Mc.smali" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/a/g.1.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/a/g.1.smali" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconPackManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconPackManager.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/privacy_password_lock_icon.png" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/privacy_password_lock_icon.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/layout/setting_main.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/layout/setting_main.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/layout/setting_ocd_options.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/layout/setting_ocd_options.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values/strings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values/strings.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

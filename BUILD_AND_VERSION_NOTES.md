@@ -147,7 +147,8 @@ python tools\patch_badge_service_manifest.py
 
 当前约定：
 
-- 当前正式版本：`v1.5.1 / 26`。
+- 当前正式版本：`v1.5.2 / 27`。
+- 推荐执行 `python tools/set_launcher_version.py v1.5.2 27` 同步文本 Manifest、设置页字符串和二进制 Manifest，再进行完整构建。
 - 临时降版只能用于检查更新测试；发布构建前必须恢复正式版本，并同步三个版本写入点。
 - 发 GitHub / Gitee Release 前必须恢复正式版本，并用 `aapt2 dump badging build\launcher-signed.apk` 确认最终 APK 元数据；不要只看文本 Manifest。
 
@@ -394,7 +395,7 @@ D:\sdk\platform-tools\adb.exe shell dumpsys package com.smartisanos.launcher |
 
 ## 发版前注意
 
-- 正式发布前必须把临时降版改回正式版本；当前为 `v1.5.1 / 26`。
+- 正式发布前必须把临时降版改回正式版本；当前为 `v1.5.2 / 27`。
 - 三个版本入口必须同步：文本 Manifest、设置页字符串、二进制 Manifest。
 - 最终判断只看 `aapt2 dump badging build\launcher-signed.apk`。
 - `build\theme-trans-signed.apk` 是透明主题 Android 15 / Android 16 兼容安装包；发 Release 时建议和主 APK 一起上传。当前策略是用 Android 16 SDK 元数据重新打包，但保留 `targetSdkVersion=28` 兼容旧桌面逻辑。

@@ -16674,7 +16674,7 @@
 
     move-result-object v1
 
-    invoke-virtual {v1}, Lcom/smartisanos/launcher/J;->getPackageManager()Landroid/content/pm/PackageManager;
+    invoke-virtual {v1}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
 
     move-result-object v1
 
@@ -16694,7 +16694,15 @@
 
     iget-object v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
 
-    invoke-virtual {v1, v2}, Landroid/content/pm/PackageManager;->getApplicationIcon(Ljava/lang/String;)Landroid/graphics/drawable/Drawable;
+    iget-object v5, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-object v5, v5, Lcom/smartisanos/launcher/data/ItemInfo;->componentName:Ljava/lang/String;
+
+    iget-object v6, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-object v6, v6, Lcom/smartisanos/launcher/data/ItemInfo;->title:Ljava/lang/String;
+
+    invoke-static {v1, v2, v5, v6}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->loadIconForDesktopItem(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Landroid/graphics/drawable/Drawable;
 
     move-result-object v1
     :try_end_0

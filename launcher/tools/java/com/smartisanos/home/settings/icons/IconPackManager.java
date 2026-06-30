@@ -42,6 +42,11 @@ public final class IconPackManager {
         if (!TextUtils.isEmpty(className)) {
             drawable = sComponentToDrawable.get(flatten(packageName, className));
         }
+        // A package-level contacts mapping must not replace its separate
+        // DialtactsActivity. Only an explicit component mapping may do that.
+        if (TextUtils.isEmpty(drawable) && isDialerComponent(className)) {
+            return null;
+        }
         if (TextUtils.isEmpty(drawable)) {
             drawable = sPackageToDrawable.get(packageName);
         }
@@ -58,6 +63,15 @@ public final class IconPackManager {
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    private static boolean isDialerComponent(String className) {
+        if (TextUtils.isEmpty(className)) {
+            return false;
+        }
+        String value = className.toLowerCase();
+        return value.contains("dialtacts") || value.contains("dialer")
+                || value.contains("dialpad") || value.contains("phoneactivity");
     }
 
     public static ArrayList<String> getIconPackPackages(Context context) {

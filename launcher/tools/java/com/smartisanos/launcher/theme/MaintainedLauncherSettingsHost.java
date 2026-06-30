@@ -13,8 +13,8 @@ import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.ComponentName;
-import android.content.Intent;
 import android.content.BroadcastReceiver;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
@@ -203,10 +203,25 @@ public final class MaintainedLauncherSettingsHost {
     private static final Map<String, Bitmap> sThemeLargePreviewCache = new HashMap<String, Bitmap>();
     private static final Map<String, Bitmap> sSmartisanIconCache = new HashMap<String, Bitmap>();
     private static final Map<String, Boolean> sSmartisanIconFetchPending = new HashMap<String, Boolean>();
+    private static boolean sSmartisanIconRefreshScheduled;
+    private static long sSmartisanIconLastWriteUptime;
     private static boolean sDoppelgangerBootstrapScheduled;
-    private static final String SMARTISAN_ICON_CACHE_PREFS = "smartisan_icon_cache";
-    private static final String SMARTISAN_ICON_CACHE_DIR = "smartisan_icon_cache";
+    private static boolean sLauncherPausedForScreenOff;
+    private static long sLastLifecycleUnlockUptime;
+    private static long sLastOriginalUnlockUptime;
+    private static long sThemeChangeGuardUntilUptime;
+    private static final String SMARTISAN_ICON_CACHE_PREFS = "online_icon_cache_v3";
+    private static final String SMARTISAN_ICON_CACHE_DIR = "online_icon_cache_v3";
     private static final long SMARTISAN_ICON_MISS_RETRY_MS = 7L * 24L * 60L * 60L * 1000L;
+    private static final java.util.concurrent.ExecutorService SMARTISAN_ICON_FETCH_EXECUTOR =
+            // Launcher usually needs dozens of independent small PNG files on
+            // first run. Two workers made later desktop rows wait behind slow
+            // mirrors; six remains modest while removing most queue latency.
+            java.util.concurrent.Executors.newFixedThreadPool(6);
+    private static final String[] ONLINE_ICON_BASE_URLS = new String[]{
+            "https://gitee.com/RANH-F/Smartisan-original-launcher-download/raw/master/icons/drawable/",
+            "https://raw.githubusercontent.com/RANH-F/Smartisan-original-launcher/main/icons/drawable/"
+    };
     private static final String THEME_DOWNLOAD_BASE =
             "https://gitee.com/RANH-F/Smartisan-original-launcher-download/releases/download/themes-v1/";
     private static final String UPDATE_RELEASE_API =
@@ -893,7 +908,7 @@ public final class MaintainedLauncherSettingsHost {
         bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
         bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
         bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
-        bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
+        bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
         bindSwitch(activity, resources, root, "multi_block_fast_launch_app", "fast_launch_app_on", true);
         bindTransparentThemeSwitch(activity, resources, root);
 
@@ -1843,6 +1858,210 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    /**
+     * ColorOS/OriginOS may skip USER_PRESENT for the selected HOME process.
+     * Record a pause only after the display is really non-interactive, so an
+     * app launch, back gesture, settings screen, or theme reload cannot be
+     * mistaken for a device unlock.
+     */
+    public static void onLauncherPausedForUnlock(final Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    PowerManager power = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
+                    if (power != null && !power.isInteractive()) {
+                        sLauncherPausedForScreenOff = true;
+                        android.util.Log.i(LOG_TAG, "launcher pause confirmed as screen-off");
+                    }
+                } catch (Throwable error) {
+                    android.util.Log.w(LOG_TAG, "unable to inspect screen-off pause", error);
+                }
+            }
+        }, 250L);
+    }
+
+    public static void onLauncherResumedForUnlock(final Activity activity) {
+        if (activity == null || !sLauncherPausedForScreenOff) {
+            return;
+        }
+        sLauncherPausedForScreenOff = false;
+        final long now = android.os.SystemClock.uptimeMillis();
+        if (now - sLastLifecycleUnlockUptime < 1500L) {
+            return;
+        }
+        sLastLifecycleUnlockUptime = now;
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (android.os.SystemClock.uptimeMillis() - sLastOriginalUnlockUptime < 1200L) {
+                    android.util.Log.i(LOG_TAG, "lifecycle unlock fallback skipped: original receiver handled unlock");
+                    return;
+                }
+                if (shouldSkipUnlockAnimation()) {
+                    android.util.Log.i(LOG_TAG, "lifecycle unlock fallback skipped: transient launcher UI state");
+                    return;
+                }
+                android.util.Log.i(LOG_TAG, "dispatching lifecycle unlock fallback");
+                dispatchOriginalLockAction(activity, "action_keyguard_on");
+                dispatchOriginalLockAction(activity, Intent.ACTION_USER_PRESENT);
+            }
+        }, 120L);
+    }
+
+    public static void noteOriginalUnlockBroadcast() {
+        sLastOriginalUnlockUptime = android.os.SystemClock.uptimeMillis();
+    }
+
+    public static boolean shouldSkipUnlockAnimation() {
+        if (android.os.SystemClock.uptimeMillis() < sThemeChangeGuardUntilUptime) {
+            return true;
+        }
+        try {
+            Class<?> themeHandler = Class.forName("com.smartisanos.launcher.theme.t");
+            Object handler = themeHandler.getMethod("getInstance").invoke(null);
+            if (handler != null && Boolean.TRUE.equals(themeHandler.getMethod("Wf").invoke(handler))) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            Class<?> mainView = Class.forName("com.smartisanos.launcher.view.Eb");
+            Object view = mainView.getMethod("getInstance").invoke(null);
+            if (view == null) {
+                return false;
+            }
+            Object folderController = mainView.getMethod("Bh").invoke(view);
+            if (folderController == null) {
+                return false;
+            }
+            Object openFolder = folderController.getClass().getMethod("hh").invoke(folderController);
+            if (openFolder != null) {
+                android.util.Log.i(LOG_TAG, "unlock animation skipped while folder is open");
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    private static void dispatchOriginalLockAction(Context context, String action) {
+        try {
+            Class<?> proxyClass = Class.forName("com.smartisanos.launcher.ja");
+            Object proxy = proxyClass.getMethod("getInstance").invoke(null);
+            if (proxy == null) {
+                android.util.Log.w(LOG_TAG, "unlock fallback ignored: ApplicationProxy is not ready");
+                return;
+            }
+            Class<?> receiverClass = Class.forName("com.smartisanos.launcher.ia");
+            java.lang.reflect.Constructor<?> constructor = receiverClass.getDeclaredConstructor(proxyClass);
+            constructor.setAccessible(true);
+            Object receiver = constructor.newInstance(proxy);
+            receiverClass.getMethod("onReceive", Context.class, Intent.class)
+                    .invoke(receiver, context, new Intent(action));
+        } catch (Throwable error) {
+            android.util.Log.e(LOG_TAG, "unable to dispatch original lock action " + action, error);
+        }
+    }
+
+    /** Load first-frame icons through the same component-aware path as refreshes. */
+    public static Drawable loadIconForComponent(Context context, String packageName, String className) {
+        if (context == null || TextUtils.isEmpty(packageName)) {
+            return null;
+        }
+        try {
+            PackageManager pm = context.getPackageManager();
+            ResolveInfo info = resolveLauncherActivity(pm, packageName, className);
+            if (info != null) {
+                return loadIcon(info, pm);
+            }
+            return normalizeLauncherIcon(pm.getApplicationIcon(packageName));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Desktop ItemInfo keeps the actual launcher title. On several vendor ROMs
+     * the contacts alias still targets a dialer-named Activity, so that title
+     * is more precise than package/class metadata after a database refresh.
+     */
+    public static Drawable loadIconForDesktopItem(Context context, String packageName,
+                                                  String className, String title) {
+        if (context == null || TextUtils.isEmpty(packageName)) {
+            return null;
+        }
+        String normalizedTitle = title == null ? "" : title.trim().toLowerCase();
+        try {
+            SettingsResourceContext settings = createSettingsContext(context);
+            Resources resources = settings.getResources();
+            if (isContactsLabel(normalizedTitle)) {
+                Drawable online = smartisanNetworkIconDrawable(context, "com.android.contacts");
+                Drawable contact = online != null ? online
+                        : maintainedResourceIcon(context, resources, "source_contactcommon_icon");
+                if (contact != null) {
+                    return normalizeLauncherIcon(contact);
+                }
+            } else if (isDialerLabel(normalizedTitle)) {
+                Drawable phone = maintainedResourceIcon(context, resources, "app_icon_phone");
+                if (phone != null) {
+                    return normalizeLauncherIcon(phone);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return loadIconForComponent(context, packageName, className);
+    }
+
+    private static ResolveInfo resolveLauncherActivity(PackageManager pm, String packageName, String className) {
+        if (pm == null || TextUtils.isEmpty(packageName)) {
+            return null;
+        }
+        String normalizedClass = className;
+        if (!TextUtils.isEmpty(normalizedClass)) {
+            try {
+                ComponentName component;
+                if (normalizedClass.indexOf('/') >= 0) {
+                    component = ComponentName.unflattenFromString(normalizedClass);
+                } else {
+                    if (normalizedClass.startsWith(".")) normalizedClass = packageName + normalizedClass;
+                    component = new ComponentName(packageName, normalizedClass);
+                }
+                if (component != null) {
+                    ActivityInfo activityInfo = pm.getActivityInfo(component, 0);
+                    if (activityInfo != null) {
+                        ResolveInfo exact = new ResolveInfo();
+                        exact.activityInfo = activityInfo;
+                        exact.resolvePackageName = packageName;
+                        return exact;
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        try {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setPackage(packageName);
+            List<ResolveInfo> matches = pm.queryIntentActivities(intent, 0);
+            if (matches == null || matches.isEmpty()) return null;
+            if (!TextUtils.isEmpty(className)) {
+                for (ResolveInfo candidate : matches) {
+                    ActivityInfo ai = candidate == null ? null : candidate.activityInfo;
+                    if (ai != null && (className.equals(ai.name) || className.endsWith("/" + ai.name))) {
+                        return candidate;
+                    }
+                }
+            }
+            return matches.get(0);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     public static Bundle launcherIconBundle(Context context, Bundle extras) {
         Bundle result = new Bundle();
         if (context == null || extras == null) {
@@ -1860,26 +2079,13 @@ public final class MaintainedLauncherSettingsHost {
                 return result;
             }
 
+            String className = extras.getString("key_component");
+            if (TextUtils.isEmpty(className)) className = extras.getString("key_componentname");
+            if (TextUtils.isEmpty(className)) className = extras.getString("key_class");
+            if (TextUtils.isEmpty(className)) className = extras.getString("extra_componentname");
             PackageManager pm = context.getPackageManager();
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.addCategory(Intent.CATEGORY_LAUNCHER);
-            intent.setPackage(packageName);
-            java.util.List<ResolveInfo> matches = pm.queryIntentActivities(intent, 0);
-            if (matches == null || matches.isEmpty()) {
-                return result;
-            }
-
-            ResolveInfo best = null;
-            for (ResolveInfo info : matches) {
-                if (info != null && info.activityInfo != null
-                        && packageName.equals(info.activityInfo.packageName)) {
-                    best = info;
-                    break;
-                }
-            }
-            if (best == null) {
-                best = matches.get(0);
-            }
+            ResolveInfo best = resolveLauncherActivity(pm, packageName, className);
+            if (best == null) return result;
 
             Drawable icon = null;
             if (!isOriginalIconForced(best) && shouldShowIconEntry(best)) {
@@ -3636,6 +3842,9 @@ public final class MaintainedLauncherSettingsHost {
         item.setCheckedAnimated(next);
         writeBoolSetting(context, key, next);
         applyLauncherSettingChange(context, key);
+        if ("launcher_unlock_animation_enabled".equals(key)) {
+            applyUnlockAnimationEnabled(next);
+        }
         if ("launcher_hide_badge".equals(key)) {
             applyBadgeVisibility(context, next, true);
         }
@@ -4932,6 +5141,14 @@ public final class MaintainedLauncherSettingsHost {
         return label;
     }
 
+    private static void applyUnlockAnimationEnabled(boolean enabled) {
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            constants.getField("ENABLE_UNLOCK_ANIMATION").setBoolean(null, enabled);
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static LinearLayout privacyCard(Context context) {
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -5862,9 +6079,12 @@ public final class MaintainedLauncherSettingsHost {
         markThemeReloadLoadingPending(context, "正在加载桌面...");
         if (context instanceof Activity) {
             showRestartLoading((Activity) context);
-        } else {
-            scheduleLauncherRestart(context);
         }
+        // Always arrange the relaunch before killing this process. Some OEM
+        // launchers (notably vivo/OriginOS) do not immediately start the HOME
+        // activity again after its process exits, even when the request came
+        // from a foreground settings activity.
+        scheduleLauncherRestart(context);
         if (context instanceof Activity) {
             logOperation(context, "RESTART", "process_rebirth_for_launcher_reload");
             finishSettingsTask((Activity) context);
@@ -6047,7 +6267,14 @@ public final class MaintainedLauncherSettingsHost {
             PendingIntent pendingIntent = PendingIntent.getActivity(context, 1001, intent, flags);
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
             if (alarmManager != null) {
-                alarmManager.set(AlarmManager.RTC, System.currentTimeMillis() + 650, pendingIntent);
+                long trigger = android.os.SystemClock.elapsedRealtime() + 650L;
+                if (Build.VERSION.SDK_INT >= 23) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP, trigger, pendingIntent);
+                } else {
+                    alarmManager.setExact(
+                            AlarmManager.ELAPSED_REALTIME_WAKEUP, trigger, pendingIntent);
+                }
             } else {
                 context.startActivity(intent);
             }
@@ -6593,7 +6820,20 @@ public final class MaintainedLauncherSettingsHost {
         messageView.setLineSpacing(dp(activity, 4), 1.08f);
         messageView.setPadding(dp(activity, updateStyle ? 26 : 30), dp(activity, 8),
                 dp(activity, updateStyle ? 26 : 30), dp(activity, 22));
-        root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
+        boolean scrollMessage = updateStyle && message != null
+                && (message.length() > 420 || message.split("\\n", -1).length > 12);
+        if (scrollMessage) {
+            ScrollView messageScroll = new ScrollView(activity);
+            messageScroll.setFillViewport(false);
+            messageScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+            messageScroll.setVerticalScrollBarEnabled(true);
+            messageScroll.addView(messageView, new ScrollView.LayoutParams(-1, -2));
+            int maxHeight = Math.max(dp(activity, 260),
+                    activity.getResources().getDisplayMetrics().heightPixels - dp(activity, 360));
+            root.addView(messageScroll, new LinearLayout.LayoutParams(-1, maxHeight));
+        } else {
+            root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
+        }
 
         View line = new View(activity);
         line.setBackgroundColor(0xffeeeeee);
@@ -6739,6 +6979,7 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void applyTheme(Activity activity, String id, String pkg, String name) {
         logOperation(activity, "ACTION", "apply_theme id=" + id + ", pkg=" + pkg + ", name=" + name);
+        sThemeChangeGuardUntilUptime = android.os.SystemClock.uptimeMillis() + 4000L;
         pkg = normalizeThemePackage(activity, id, pkg);
         if ("smartisan_theme_trans".equals(id)) {
             ensureTransparentThemeRegistered(activity);
@@ -6760,21 +7001,21 @@ public final class MaintainedLauncherSettingsHost {
             writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false);
             applyTransparentThemeRuntimeFlags(activity);
         }
-        boolean queued = queueThemeChangeForLauncher(id);
-        if (queued) {
-            Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                public void run() {
-                    prepareThemeTransitionScreenshot(activity);
-                    startLauncherFromForeground(activity);
-                }
-            }, 120);
-            return;
-        }
+        // Persist first: the old implementation returned immediately when the
+        // in-process message was queued. If an OEM killed or recreated the
+        // process before Launcher consumed that static message, no theme ID
+        // had been saved and tapping "Apply" appeared to do nothing.
         boolean stored = applyThemeViaOriginalStack(activity, id, pkg);
         storeThemeSelection(activity, id);
-        Toast.makeText(activity, (stored ? "正在应用：" : "已记录：") + name, Toast.LENGTH_SHORT).show();
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+        // The original stack already posts MESSAGE_CHANGE_THEME. Posting the
+        // same static message again leaves a duplicate in the launcher queue;
+        // if the screen is locked immediately, that duplicate runs on unlock.
+        boolean queued = !stored && queueThemeChangeForLauncher(id);
+        logOperation(activity, "THEME", "persisted_before_dispatch id=" + id
+                + ", original=" + stored + ", queued=" + queued);
+        Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(new Runnable() {
             public void run() {
                 prepareThemeTransitionScreenshot(activity);
                 startLauncherFromForeground(activity);
@@ -7608,14 +7849,14 @@ public final class MaintainedLauncherSettingsHost {
                     handler.post(new Runnable() {
                         public void run() {
                             String current = appVersionName(activity);
-                            boolean same = sameVersionTag(tag, current);
+                            int versionComparison = compareVersionTag(tag, current);
                             if (finalApkUrl == null) {
                                 showInfoDialog(activity, "检查更新",
                                         "已找到线上版本：" + finalName
                                                 + "\n但该 Release 没有桌面主 APK 安装包\n当前版本：" + appVersion(activity));
                                 return;
                             }
-                            if (same) {
+                            if (versionComparison <= 0) {
                                 showInfoDialog(activity, "检查更新",
                                         "当前已是最新版本\n版本：" + appVersion(activity));
                                 return;
@@ -7623,10 +7864,7 @@ public final class MaintainedLauncherSettingsHost {
                             String message = "发现线上版本：" + finalName
                                     + "\n当前版本：" + appVersion(activity);
                             if (finalBody != null && finalBody.length() > 0) {
-                                String shortBody = finalBody.length() > 120
-                                        ? finalBody.substring(0, 120) + "..."
-                                        : finalBody;
-                                message += "\n\n" + shortBody;
+                                message += "\n\n" + finalBody;
                             }
                             final CachedUpdateDownload cached = cachedUpdateDownload(activity, tag, finalApkName);
                             String positive = "下载";
@@ -9255,7 +9493,7 @@ public final class MaintainedLauncherSettingsHost {
             bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
             bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
             styleNotificationAccessLink(activity, resources, root);
-            bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
+            bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
             bindSwitch(activity, resources, root, "item_id_search_page_enabled", KEY_SEARCH_PAGE_ENABLED, true);
             tuneScrollBars(root);
             activity.setContentView(root);
@@ -9318,8 +9556,9 @@ public final class MaintainedLauncherSettingsHost {
         line.setBackgroundColor(0xffe5e5e5);
         root.addView(line, new LinearLayout.LayoutParams(-1, 1));
 
-        final boolean longMessage = message != null && message.length() > 600;
-        TextView messageView = text(activity, message, longMessage ? 12 : 14, 0xff666666, false);
+        final boolean longMessage = message != null
+                && (message.length() > 420 || message.split("\\n", -1).length > 12);
+        TextView messageView = text(activity, message, longMessage ? 13 : 14, 0xff666666, false);
         messageView.setGravity((longMessage || updateStyle)
                 ? (Gravity.LEFT | Gravity.TOP) : Gravity.CENTER);
         messageView.setLineSpacing(dp(activity, updateStyle ? 4 : 2), updateStyle ? 1.08f : 1.0f);
@@ -9329,9 +9568,10 @@ public final class MaintainedLauncherSettingsHost {
             ScrollView messageScroll = new ScrollView(activity);
             messageScroll.setFillViewport(false);
             messageScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+            messageScroll.setVerticalScrollBarEnabled(true);
             messageScroll.addView(messageView, new ScrollView.LayoutParams(-1, -2));
             int maxHeight = Math.max(dp(activity, 260),
-                    activity.getResources().getDisplayMetrics().heightPixels - dp(activity, 260));
+                    activity.getResources().getDisplayMetrics().heightPixels - dp(activity, 330));
             root.addView(messageScroll, new LinearLayout.LayoutParams(-1, maxHeight));
         } else {
             root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
@@ -10690,9 +10930,10 @@ public final class MaintainedLauncherSettingsHost {
         if (item != null) {
             item.setCheckedAnimated(enabled);
         }
-        applyIconChange(context);
         applyGlobalImprovedSelection(context, enabled);
         reloadOriginalSettings(context);
+        postDatabaseRefreshEvent();
+        applyIconChange(context);
         if (context instanceof Activity) {
             refreshIconRowsInCurrentPage((Activity) context);
         }
@@ -10704,9 +10945,10 @@ public final class MaintainedLauncherSettingsHost {
         if (toggle != null) {
             toggle.setCheckedAnimated(enabled);
         }
-        applyIconChange(context);
         applyGlobalImprovedSelection(context, enabled);
         reloadOriginalSettings(context);
+        postDatabaseRefreshEvent();
+        applyIconChange(context);
         if (context instanceof Activity) {
             refreshIconRowsInCurrentPage((Activity) context);
         }
@@ -11860,6 +12102,18 @@ public final class MaintainedLauncherSettingsHost {
                 return custom;
             }
         }
+        boolean useImproved = redirect == null
+                ? isImprovedIconEnabled(context)
+                : redirect.useImprovedAppIcon && RedirectIconDB.MODE_AUTO.equals(mode);
+        // A vendor dialer may expose both the phone and contacts activities
+        // from one package. Resolve the activity category before a package-wide
+        // packed icon can turn both entries into the handset icon.
+        if (useImproved && smartisanSystemIconAlias(context, info) != null) {
+            Drawable systemCategory = smartisanIconDrawable(context, info, resources);
+            if (systemCategory != null) {
+                return systemCategory;
+            }
+        }
         Drawable packed = packedIcon(context, info);
         if (packed != null) {
             return packed;
@@ -11902,11 +12156,236 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static Drawable smartisanIconDrawable(Context context, ResolveInfo info, Resources resources) {
+        String systemAlias = smartisanSystemIconAlias(context, info);
+        if (systemAlias != null) {
+            Drawable onlineSystemIcon = smartisanNetworkIconDrawable(context, systemAlias);
+            if (onlineSystemIcon != null) {
+                return onlineSystemIcon;
+            }
+        }
         Drawable local = maintainedResourceIcon(context, resources, smartisanIconNameFor(context, info));
         if (local != null) {
             return local;
         }
         return smartisanNetworkIconDrawable(context, info);
+    }
+
+    /**
+     * Map vendor-specific system packages to one canonical Smartisan icon.
+     * The alias is deliberately restricted to system/updated-system apps so a
+     * third-party app named "Camera" or "Music" is never replaced by accident.
+     * Calendar and clock stay on the existing dynamic-icon implementation.
+     */
+    private static String smartisanSystemIconAlias(Context context, ResolveInfo info) {
+        ActivityInfo ai = info == null ? null : info.activityInfo;
+        if (ai == null) {
+            return null;
+        }
+        String pkg = ai.packageName == null ? "" : ai.packageName.toLowerCase();
+        String cls = ai.name == null ? "" : ai.name.toLowerCase();
+        String key = pkg + " " + cls;
+        String label = "";
+        try {
+            CharSequence loaded = context == null ? null : info.loadLabel(context.getPackageManager());
+            label = loaded == null ? "" : loaded.toString().trim().toLowerCase();
+        } catch (Throwable ignored) {
+        }
+        boolean allowPackageMatch = isSystemApp(ai) || isKnownVendorSystemPackage(pkg);
+
+        // Some ROMs publish dialer and contacts as two launcher activities of
+        // the same package. Activity identity must win over the package name.
+        if (isDialerActivity(info, label)) {
+            return null;
+        }
+        if (isContactsActivity(info, label)) {
+            return "com.android.contacts";
+        }
+
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"camera", "com.oplus.camera", "com.coloros.camera", "com.miui.camera", "com.vivo.camera", "com.huawei.camera", "com.sec.android.app.camera"},
+                new String[]{"相机", "照相机", "camera"})) {
+            return "com.android.camera2";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"gallery", "photos", "album", "com.coloros.gallery3d", "com.miui.gallery", "com.vivo.gallery", "com.huawei.photos"},
+                new String[]{"相册", "图库", "照片", "gallery", "photos"})) {
+            return "com.android.gallery3d";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"browser", "com.heytap.browser", "com.android.chrome", "com.sec.android.app.sbrowser"},
+                new String[]{"浏览器", "browser", "internet"})) {
+            return "com.android.browser";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"mms", "messaging", "message"},
+                new String[]{"短信", "信息", "消息", "messages"})) {
+            return "com.android.mms";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"email", "mail"},
+                new String[]{"邮件", "邮箱", "email", "mail"})) {
+            return "com.android.email";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"appstore", "app.market", "market", "store"},
+                new String[]{"软件商店", "应用商店", "应用市场", "软件商城", "商店", "app market", "app store"})) {
+            return "com.smartisanos.appstore";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"cloudservice", "cloud.service", "cloudsync", "cloudspace"},
+                new String[]{"云服务", "云空间", "云同步", "cloud service", "cloud"})) {
+            return "com.smartisanos.cloudsync";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"security", "safecenter", "securitycenter", "phone.manager", "phonemanager", "mobilemanager"},
+                new String[]{"手机管家", "安全中心", "系统管家", "安全", "phone manager", "security"})) {
+            return "com.smartisanos.security";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"wallet", "pay.wallet"},
+                new String[]{"钱包", "卡包", "wallet"})) {
+            return "com.smartisanos.wallet";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"calculator", "calc"},
+                new String[]{"计算器", "calculator"})) {
+            return "com.smartisanos.calculator";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"filemanager", "fileexplorer", "file.manager", "file_manager"},
+                new String[]{"文件管理", "文件管理器", "文件", "files"})) {
+            return "com.smartisanos.filemanager";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"compass"},
+                new String[]{"指南针", "compass"})) {
+            return "com.smartisanos.compass";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"soundrecorder", "voicerecorder", "recorder"},
+                new String[]{"录音", "录音机", "录音器", "recorder"})) {
+            return "com.smartisanos.recorder";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"music", "audio.player"},
+                new String[]{"音乐", "music"})) {
+            return "com.smartisanos.music";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"video", "videoplayer"},
+                new String[]{"视频", "视频播放器", "video"})) {
+            return "com.smartisanos.videoplayerproject";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"weather"},
+                new String[]{"天气", "weather"})) {
+            return "com.smartisanos.weather";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"notes", "notepad", "memo"},
+                new String[]{"便签", "笔记", "备忘录", "notes"})) {
+            return "com.smartisanos.notes";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"assistant", "voiceassist", "breeno", "xiaobu"},
+                new String[]{"小布助手", "语音助手", "智能助理", "assistant"})) {
+            return "com.smartisanos.voice";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"settings"},
+                new String[]{"设置", "settings"})) {
+            return "com.android.settings";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"packageinstaller", "permissioncontroller"},
+                new String[]{"软件包安装程序", "安装程序", "package installer"})) {
+            return "com.android.packageinstaller";
+        }
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{".stk", "simtoolkit"},
+                new String[]{"sim卡应用", "sim toolkit"})) {
+            return "com.android.stk";
+        }
+        return null;
+    }
+
+    private static boolean isSystemIconCategory(String key, String label, boolean allowPackageMatch,
+                                                String[] keyTokens, String[] labels) {
+        if (labels != null) {
+            for (String candidate : labels) {
+                if (candidate != null && candidate.equals(label)) {
+                    return true;
+                }
+            }
+        }
+        if (allowPackageMatch && keyTokens != null) {
+            for (String token : keyTokens) {
+                if (token != null && token.length() > 0 && key.contains(token)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isDialerActivity(ResolveInfo info, String label) {
+        ActivityInfo ai = info == null ? null : info.activityInfo;
+        String cls = ai == null || ai.name == null ? "" : ai.name.toLowerCase();
+        String normalizedLabel = label == null ? "" : label.trim().toLowerCase();
+        // Vendor aliases occasionally retain a dialer-like target class while
+        // exposing a contacts-labelled launcher entry. The visible launcher
+        // label is the only reliable discriminator in that case.
+        if (isContactsLabel(normalizedLabel)) {
+            return false;
+        }
+        if (isDialerLabel(normalizedLabel)) {
+            return true;
+        }
+        return cls.contains("dialtacts") || cls.contains("dialer")
+                || cls.contains("dialpad") || cls.contains("phoneactivity");
+    }
+
+    private static boolean isContactsActivity(ResolveInfo info, String label) {
+        ActivityInfo ai = info == null ? null : info.activityInfo;
+        String cls = ai == null || ai.name == null ? "" : ai.name.toLowerCase();
+        String normalizedLabel = label == null ? "" : label.trim().toLowerCase();
+        if (isDialerLabel(normalizedLabel)) {
+            return false;
+        }
+        if (isContactsLabel(normalizedLabel)) {
+            return true;
+        }
+        return cls.contains("peopleactivity") || cls.contains("contactactivity")
+                || cls.contains("contactsactivity") || cls.contains("people");
+    }
+
+    private static boolean isDialerLabel(String label) {
+        return "拨号".equals(label) || "电话".equals(label)
+                || "dialer".equals(label) || "phone".equals(label);
+    }
+
+    private static boolean isContactsLabel(String label) {
+        return "联系人".equals(label) || "通讯录".equals(label)
+                || "电话本".equals(label) || "contacts".equals(label)
+                || "contact".equals(label) || "people".equals(label);
+    }
+
+    private static boolean isKnownVendorSystemPackage(String pkg) {
+        if (pkg == null) {
+            return false;
+        }
+        String[] prefixes = new String[]{
+                "com.android.", "com.google.android.", "com.smartisanos.",
+                "com.oplus.", "com.coloros.", "com.heytap.", "com.oneplus.", "com.realme.",
+                "com.miui.", "com.xiaomi.", "com.vivo.", "com.bbk.",
+                "com.huawei.", "com.hihonor.", "com.sec.android.", "com.samsung."
+        };
+        for (String prefix : prefixes) {
+            if (pkg.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String smartisanIconNameFor(Context context, ResolveInfo info) {
@@ -11963,6 +12442,13 @@ public final class MaintainedLauncherSettingsHost {
         if (!isSystemApp(ai)) {
             return null;
         }
+        // Resolve the exact launcher Activity before package-wide fallbacks.
+        if (isDialerActivity(info, label)) {
+            return "app_icon_phone";
+        }
+        if (isContactsActivity(info, label)) {
+            return "source_contactcommon_icon";
+        }
         if ("com.android.dialer".equals(pkg) || "com.android.phone".equals(pkg)
                 || "com.google.android.dialer".equals(pkg) || "com.smartisanos.phone".equals(pkg)
                 || key.contains("dialer")
@@ -11975,8 +12461,7 @@ public final class MaintainedLauncherSettingsHost {
             return "app_icon_mms";
         }
         if ("com.android.contacts".equals(pkg) || "com.google.android.contacts".equals(pkg)
-                || "com.smartisanos.contacts".equals(pkg) || key.contains("contacts")
-                || "联系人".equals(label) || "通讯录".equals(label) || "电话本".equals(label)) {
+                || "com.smartisanos.contacts".equals(pkg)) {
             return "source_contactcommon_icon";
         }
         if ("com.android.calendar".equals(pkg) || "com.google.android.calendar".equals(pkg)
@@ -12039,12 +12524,24 @@ public final class MaintainedLauncherSettingsHost {
         if (context == null || ai == null || ai.packageName == null || ai.packageName.length() == 0) {
             return null;
         }
-        Bitmap bitmap = smartisanNetworkIconBitmap(context, ai.packageName);
+        return smartisanNetworkIconDrawable(context, ai.packageName);
+    }
+
+    private static Drawable smartisanNetworkIconDrawable(Context context, String packageName) {
+        if (context == null || packageName == null || packageName.length() == 0) {
+            return null;
+        }
+        Bitmap bitmap = smartisanNetworkIconBitmap(context, packageName);
         return bitmap == null ? null : new android.graphics.drawable.BitmapDrawable(context.getResources(), bitmap);
     }
 
     private static Bitmap smartisanNetworkIconBitmap(Context context, String packageName) {
-        if (packageName == null || packageName.length() == 0) {
+        return smartisanNetworkIconBitmap(context, packageName, false);
+    }
+
+    private static Bitmap smartisanNetworkIconBitmap(Context context, String packageName, boolean allowNetwork) {
+        if (packageName == null || packageName.length() == 0
+                || !packageName.matches("[A-Za-z0-9._-]+")) {
             return null;
         }
         synchronized (sSmartisanIconCache) {
@@ -12062,38 +12559,68 @@ public final class MaintainedLauncherSettingsHost {
         if (shouldSkipSmartisanIconFetch(context, packageName)) {
             return null;
         }
-        if (Looper.myLooper() == Looper.getMainLooper()) {
+        // Icon loading also runs on Launcher's model/database worker. Blocking
+        // that thread on HTTP keeps the desktop on "initializing". Only the
+        // dedicated fetch executor may perform network I/O.
+        if (!allowNetwork) {
             scheduleSmartisanIconFetch(context, packageName);
             return null;
         }
         Bitmap bitmap = null;
-        InputStream in = null;
         StrictMode.ThreadPolicy oldPolicy = null;
         try {
             oldPolicy = StrictMode.getThreadPolicy();
             StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder(oldPolicy).permitNetwork().build());
-            URL url = new URL("http://icon.smartisan.com/drawable/" + packageName + "/icon_provided_by_smartisan.png");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(900);
-            conn.setReadTimeout(1200);
-            conn.setUseCaches(true);
-            if (conn.getResponseCode() == 200) {
-                in = conn.getInputStream();
-                byte[] data = readAllBytes(in, 64 * 1024);
-                bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-                writeCachedSmartisanIcon(context, packageName, bitmap);
+            for (String baseUrl : ONLINE_ICON_BASE_URLS) {
+                InputStream in = null;
+                HttpURLConnection conn = null;
+                try {
+                    URL url = new URL(baseUrl + packageName + ".png");
+                    conn = (HttpURLConnection) url.openConnection();
+                    // Fail over quickly when one domestic/overseas mirror is
+                    // unreachable instead of blocking every queued icon.
+                    conn.setConnectTimeout(1200);
+                    conn.setReadTimeout(1800);
+                    conn.setUseCaches(true);
+                    conn.setRequestProperty("Accept", "image/png");
+                    conn.setRequestProperty("User-Agent", "SmartisanLauncher-OnlineIcon/1");
+                    if (conn.getResponseCode() != 200) {
+                        continue;
+                    }
+                    String contentType = conn.getContentType();
+                    if (contentType != null && !contentType.toLowerCase().startsWith("image/")) {
+                        continue;
+                    }
+                    in = conn.getInputStream();
+                    byte[] data = readAllBytes(in, 512 * 1024);
+                    Bitmap decoded = BitmapFactory.decodeByteArray(data, 0, data.length);
+                    if (decoded != null && decoded.getWidth() >= 48 && decoded.getHeight() >= 48
+                            && decoded.getWidth() <= 1024 && decoded.getHeight() <= 1024) {
+                        bitmap = decoded;
+                        writeCachedSmartisanIcon(context, packageName, bitmap);
+                        break;
+                    }
+                } catch (Throwable ignored) {
+                } finally {
+                    if (in != null) {
+                        try {
+                            in.close();
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                    if (conn != null) {
+                        try {
+                            conn.disconnect();
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                }
             }
         } catch (Throwable ignored) {
         } finally {
             if (oldPolicy != null) {
                 try {
                     StrictMode.setThreadPolicy(oldPolicy);
-                } catch (Throwable ignored) {
-                }
-            }
-            if (in != null) {
-                try {
-                    in.close();
                 } catch (Throwable ignored) {
                 }
             }
@@ -12118,17 +12645,17 @@ public final class MaintainedLauncherSettingsHost {
             sSmartisanIconFetchPending.put(packageName, Boolean.TRUE);
         }
         final Context appContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
-        new Thread(new Runnable() {
+        SMARTISAN_ICON_FETCH_EXECUTOR.execute(new Runnable() {
             public void run() {
                 try {
-                    smartisanNetworkIconBitmap(appContext, packageName);
+                    smartisanNetworkIconBitmap(appContext, packageName, true);
                 } finally {
                     synchronized (sSmartisanIconFetchPending) {
                         sSmartisanIconFetchPending.remove(packageName);
                     }
                 }
             }
-        }, "SmartisanIconFetch").start();
+        });
     }
 
     private static Bitmap readCachedSmartisanIcon(Context context, String packageName) {
@@ -12165,6 +12692,7 @@ public final class MaintainedLauncherSettingsHost {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
             context.getSharedPreferences(SMARTISAN_ICON_CACHE_PREFS, Context.MODE_PRIVATE).edit()
                     .remove("miss." + packageName).apply();
+            scheduleSmartisanIconRefresh(context);
         } catch (Throwable ignored) {
         } finally {
             if (out != null) {
@@ -12174,6 +12702,36 @@ public final class MaintainedLauncherSettingsHost {
                 }
             }
         }
+    }
+
+    private static void scheduleSmartisanIconRefresh(Context context) {
+        if (context == null) {
+            return;
+        }
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            sSmartisanIconLastWriteUptime = android.os.SystemClock.uptimeMillis();
+            if (sSmartisanIconRefreshScheduled) {
+                return;
+            }
+            sSmartisanIconRefreshScheduled = true;
+        }
+        final Context app = context.getApplicationContext() == null
+                ? context : context.getApplicationContext();
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            public void run() {
+                long quietFor;
+                synchronized (MaintainedLauncherSettingsHost.class) {
+                    quietFor = android.os.SystemClock.uptimeMillis() - sSmartisanIconLastWriteUptime;
+                    if (quietFor < 2000L) {
+                        new Handler(Looper.getMainLooper()).postDelayed(this, 2000L - quietFor);
+                        return;
+                    }
+                    sSmartisanIconRefreshScheduled = false;
+                }
+                postDatabaseRefreshEvent();
+                applyIconChange(app);
+            }
+        }, 2000L);
     }
 
     private static boolean shouldSkipSmartisanIconFetch(Context context, String packageName) {
