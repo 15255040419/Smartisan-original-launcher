@@ -2,9 +2,9 @@
   "schema": 1,
   "updated": "2026-06-30",
   "path": "icons/drawable/{packageName}.png",
-  "count": 2209,
+  "count": 2254,
   "mirrors": [
-    "https://gitee.com/RANH-F/Smartisan-original-launcher/raw/main/icons/drawable/",
+    "https://gitee.com/RANH-F/Smartisan-original-launcher-download/raw/master/icons/drawable/",
     "https://raw.githubusercontent.com/RANH-F/Smartisan-original-launcher/main/icons/drawable/"
   ],
   "icons": [
@@ -807,6 +807,12 @@
       "sha256": "8f2638cd332ac5037f2323a6bd0a95c5dc1104d2f6a5101c3d282aa46c0705aa"
     },
     {
+      "package": "cn.wps.moffice",
+      "file": "cn.wps.moffice.png",
+      "bytes": 50409,
+      "sha256": "3c44194f6bf915e56831c0287bd12bc25ef5903097d0c769157ec45095b78cdc"
+    },
+    {
       "package": "cn.wps.moffice_eng",
       "file": "cn.wps.moffice_eng.png",
       "bytes": 26314,
@@ -815,12 +821,6 @@
     {
       "package": "cn.wps.moffice_i18n",
       "file": "cn.wps.moffice_i18n.png",
-      "bytes": 50409,
-      "sha256": "3c44194f6bf915e56831c0287bd12bc25ef5903097d0c769157ec45095b78cdc"
-    },
-    {
-      "package": "cn.wps.moffice",
-      "file": "cn.wps.moffice.png",
       "bytes": 50409,
       "sha256": "3c44194f6bf915e56831c0287bd12bc25ef5903097d0c769157ec45095b78cdc"
     },
@@ -1089,6 +1089,24 @@
       "sha256": "147e42fb765ef33bda54288e1a22a733091f06644cb3aa6b907aaa074ec12afc"
     },
     {
+      "package": "com.android.browser",
+      "file": "com.android.browser.png",
+      "bytes": 39199,
+      "sha256": "730dac0de2ea921f0d2414bee46a4dface4c03e6e4aa095d6b1f61292766f8a4"
+    },
+    {
+      "package": "com.android.calendar",
+      "file": "com.android.calendar.png",
+      "bytes": 22699,
+      "sha256": "3987395891bfe8872f655cfa0bcf32b8dcedb2cfbe1a8061bd33ac74e7402e78"
+    },
+    {
+      "package": "com.android.camera2",
+      "file": "com.android.camera2.png",
+      "bytes": 65341,
+      "sha256": "9579df6337fa80680168afdaba99b4eea5ffca8a41b2b7b5ac580f5f5a927191"
+    },
+    {
       "package": "com.android.cheyooh",
       "file": "com.android.cheyooh.png",
       "bytes": 28104,
@@ -1105,6 +1123,12 @@
       "file": "com.android.comicsisland.activity.png",
       "bytes": 35415,
       "sha256": "07d3ae2b1eea4f6725891ef425d17ca73de5592b0f9132afb6635e831dc68f38"
+    },
+    {
+      "package": "com.android.contacts",
+      "file": "com.android.contacts.png",
+      "bytes": 20150,
+      "sha256": "074eff67ccf34f44fb2f370c130f1ff31a3d9fd1b454fc7f56fc0d042df88e40"
     },
     {
       "package": "com.android.coolwind",
@@ -1131,10 +1155,52 @@
       "sha256": "628ee3e5db284386b850958485b29ddfa2ece2eee7dcc080b8642e4758779f20"
     },
     {
+      "package": "com.android.email",
+      "file": "com.android.email.png",
+      "bytes": 39526,
+      "sha256": "8a90f3b37665e21ffb5a301cb18c11ae51026d7c658d1dbfb8225d3b315b8e19"
+    },
+    {
+      "package": "com.android.exchange",
+      "file": "com.android.exchange.png",
+      "bytes": 14574,
+      "sha256": "c21c233927c008c0a5de926be72eb2f7f0ef7f6047813d1444cb635f1441cc87"
+    },
+    {
+      "package": "com.android.gallery3d",
+      "file": "com.android.gallery3d.png",
+      "bytes": 43796,
+      "sha256": "0f4dd490472fa39d6d4171f239644722025dd8119f56a943f50a32d51d03d5a0"
+    },
+    {
+      "package": "com.android.mms",
+      "file": "com.android.mms.png",
+      "bytes": 17524,
+      "sha256": "77be991f8eba175f6d131605dde60b73a16c55b8b75058da654555e8573870f1"
+    },
+    {
       "package": "com.android.mobile.diandao",
       "file": "com.android.mobile.diandao.png",
       "bytes": 37147,
       "sha256": "3c2f33824ba4df5fa57bfe1f16beafb9214d815cef00aa3097eed39de320e145"
+    },
+    {
+      "package": "com.android.packageinstaller",
+      "file": "com.android.packageinstaller.png",
+      "bytes": 8389,
+      "sha256": "d3d65b4a0a1052e7a0e5949ccc83cd961ac578cc96c53d66170ac094853a17ca"
+    },
+    {
+      "package": "com.android.settings",
+      "file": "com.android.settings.png",
+      "bytes": 42715,
+      "sha256": "c73c8b87df7e86db43f8351d6dece9073c819d10d9159351db5884b250bb1a82"
+    },
+    {
+      "package": "com.android.stk",
+      "file": "com.android.stk.png",
+      "bytes": 11201,
+      "sha256": "a3ab3359a77e5f8316ac914facd7e5594c08c09b1e1a76cb9deb7396f9b62008"
     },
     {
       "package": "com.android.tataufo",
@@ -1575,16 +1641,16 @@
       "sha256": "f0cb0522bdd84c3179ff634cdd2025e0f5b6105ecfb96d67d80f947c583da0b2"
     },
     {
-      "package": "com.baidu.tieba_mini",
-      "file": "com.baidu.tieba_mini.png",
-      "bytes": 42863,
-      "sha256": "b6e1466d21c3f5388526ccba84d6b66c06eefffefa00d4b671120e658787cc1a"
-    },
-    {
       "package": "com.baidu.tieba",
       "file": "com.baidu.tieba.png",
       "bytes": 38982,
       "sha256": "f5a024af9138e325f1d3966d31600fcb9dc9d96ccd4b459666b788442e37f957"
+    },
+    {
+      "package": "com.baidu.tieba_mini",
+      "file": "com.baidu.tieba_mini.png",
+      "bytes": 42863,
+      "sha256": "b6e1466d21c3f5388526ccba84d6b66c06eefffefa00d4b671120e658787cc1a"
     },
     {
       "package": "com.baidu.travel",
@@ -2307,16 +2373,16 @@
       "sha256": "d87b240c3ffdb08728dda37908cb6aab129c69896d200a26c38f63b1896ca407"
     },
     {
-      "package": "com.cleanmaster.security_cn",
-      "file": "com.cleanmaster.security_cn.png",
-      "bytes": 48214,
-      "sha256": "fb011574e1630d49b42f9d4637e7feefac1676251b769e343278d9e1bbf4a013"
-    },
-    {
       "package": "com.cleanmaster.security",
       "file": "com.cleanmaster.security.png",
       "bytes": 37613,
       "sha256": "cfccb388ef83d79774db4d518c25803a3dc58bcb657ba221d619d98d0debd651"
+    },
+    {
+      "package": "com.cleanmaster.security_cn",
+      "file": "com.cleanmaster.security_cn.png",
+      "bytes": 48214,
+      "sha256": "fb011574e1630d49b42f9d4637e7feefac1676251b769e343278d9e1bbf4a013"
     },
     {
       "package": "com.cleevio.spendee",
@@ -9027,10 +9093,214 @@
       "sha256": "92a24a73c5e246481d74459cdbb623782da8900af81329dab4073fc7dedbb956"
     },
     {
+      "package": "com.smartisanos.appstore",
+      "file": "com.smartisanos.appstore.png",
+      "bytes": 38281,
+      "sha256": "3a45888ef3a43709b28e15ba5e55f843a0293a3f708adcbabbbfa20cc1662a0f"
+    },
+    {
+      "package": "com.smartisanos.bug2go",
+      "file": "com.smartisanos.bug2go.png",
+      "bytes": 21554,
+      "sha256": "4f1f9e6eb8b0e48f9ba110ba28b31ce0a15b1cedc5de2390a5951679ebdaa002"
+    },
+    {
+      "package": "com.smartisanos.calculator",
+      "file": "com.smartisanos.calculator.png",
+      "bytes": 8119,
+      "sha256": "0ec805aa2e8e8bebe879f5c7b7c8ff52218cba65082e77d49ff0fcf49c7f049d"
+    },
+    {
+      "package": "com.smartisanos.cleaner",
+      "file": "com.smartisanos.cleaner.png",
+      "bytes": 26757,
+      "sha256": "7168eb8ad4763c2b0f16a5e09f08e4d7d50f800b00ef81dcaebe19deeb754d62"
+    },
+    {
+      "package": "com.smartisanos.clock",
+      "file": "com.smartisanos.clock.png",
+      "bytes": 57645,
+      "sha256": "5576b269cbcd35ca313759bef476feaefecd09087bf264a32e045f27512ab795"
+    },
+    {
+      "package": "com.smartisanos.cloudagent",
+      "file": "com.smartisanos.cloudagent.png",
+      "bytes": 13024,
+      "sha256": "e5b681277bb8f87c509293781030250297681bf9e55ecf53b92e3217bf2d4c9e"
+    },
+    {
+      "package": "com.smartisanos.cloudsync",
+      "file": "com.smartisanos.cloudsync.png",
+      "bytes": 7946,
+      "sha256": "edac0fa530eb4bc1dbe5a9aa00f6283a20cdc97ce31525487ded93371cfd7969"
+    },
+    {
+      "package": "com.smartisanos.compass",
+      "file": "com.smartisanos.compass.png",
+      "bytes": 35639,
+      "sha256": "0cd25c73b2c80f586950ee82566b239dd81f956e9bda976e2e17f6ad4fba6e82"
+    },
+    {
+      "package": "com.smartisanos.filemanager",
+      "file": "com.smartisanos.filemanager.png",
+      "bytes": 18675,
+      "sha256": "c2c01711a4bcb7e2fe265509428eb0316f1062e9f2439523fc5b6ff14557e632"
+    },
+    {
+      "package": "com.smartisanos.gamespeedup",
+      "file": "com.smartisanos.gamespeedup.png",
+      "bytes": 12924,
+      "sha256": "9dd19ddc782283f79728227b1a1de19d176b4f31ec3fcb904a401e237ca4ff2d"
+    },
+    {
+      "package": "com.smartisanos.gamestore",
+      "file": "com.smartisanos.gamestore.png",
+      "bytes": 32491,
+      "sha256": "c5a7c0730f6fb1ac633b63e3b6865a82f237b31356e80f6eae2a8b1980845248"
+    },
+    {
+      "package": "com.smartisanos.handinhand",
+      "file": "com.smartisanos.handinhand.png",
+      "bytes": 38139,
+      "sha256": "e47110aa711365d27bc7ca9c9eaf8b2a297a6575e7bad1ce051b6f53b108657a"
+    },
+    {
       "package": "com.smartisanos.home.downloader",
       "file": "com.smartisanos.home.downloader.png",
       "bytes": 39822,
       "sha256": "9821556e3836e785977bbb5a81dd3fb72cc3d695c72a16f480d65f5a02dc2de0"
+    },
+    {
+      "package": "com.smartisanos.ideapills",
+      "file": "com.smartisanos.ideapills.png",
+      "bytes": 38527,
+      "sha256": "07d0ae2b901ec02aee76966522491728888010a76965732a77c8725aa5c0ea44"
+    },
+    {
+      "package": "com.smartisanos.ime",
+      "file": "com.smartisanos.ime.png",
+      "bytes": 37126,
+      "sha256": "ff54bb56df6fdb8b8b63639fcc08fb40b66114f95ecfebebcf56099c2caaa16f"
+    },
+    {
+      "package": "com.smartisanos.launcher",
+      "file": "com.smartisanos.launcher.png",
+      "bytes": 39366,
+      "sha256": "96b4cd7bc629274fa08d13fb10577ca9bb6895b33c262b5078e44b4884533e37"
+    },
+    {
+      "package": "com.smartisanos.magicflow",
+      "file": "com.smartisanos.magicflow.png",
+      "bytes": 10859,
+      "sha256": "8f12d4e780449267ea589df9ba55edf5406683d5b8d3b3e14904dd8ca1a5806f"
+    },
+    {
+      "package": "com.smartisanos.music",
+      "file": "com.smartisanos.music.png",
+      "bytes": 52158,
+      "sha256": "6843d26e330ac56bc6c7a235ae81b8138a1467d371cec3252099bb8d30e173cd"
+    },
+    {
+      "package": "com.smartisanos.notes",
+      "file": "com.smartisanos.notes.png",
+      "bytes": 60573,
+      "sha256": "68afc2199f7fb726b12d71fa46e65c4185971d7884ed44929c39407cb1375394"
+    },
+    {
+      "package": "com.smartisanos.previewer",
+      "file": "com.smartisanos.previewer.png",
+      "bytes": 8210,
+      "sha256": "1208051c40ad9821a58b9df52646289495198f4a0fd38553f467cbe60b187e52"
+    },
+    {
+      "package": "com.smartisanos.quicksearch",
+      "file": "com.smartisanos.quicksearch.png",
+      "bytes": 35516,
+      "sha256": "39e78c6bae45da1dfba4505eb96ee48c7717ccd8edc7dc4a95b46273682f7cc2"
+    },
+    {
+      "package": "com.smartisanos.recorder",
+      "file": "com.smartisanos.recorder.png",
+      "bytes": 34651,
+      "sha256": "f43b56549270d130ecf83f0bbab5e37cf7bd59b7e3d7653cb2ce09b04351d1dc"
+    },
+    {
+      "package": "com.smartisanos.screenrecorder",
+      "file": "com.smartisanos.screenrecorder.png",
+      "bytes": 14298,
+      "sha256": "ce3bbe1c37c8d4529a9f0f4c0706f2f92eb6f21eefe9e4c6bbfad122109d320d"
+    },
+    {
+      "package": "com.smartisanos.security.ime",
+      "file": "com.smartisanos.security.ime.png",
+      "bytes": 55632,
+      "sha256": "8a81cc79a0ee546284acfe8143aef7b49f794525c56035888a83031649c9e92f"
+    },
+    {
+      "package": "com.smartisanos.security",
+      "file": "com.smartisanos.security.png",
+      "bytes": 66656,
+      "sha256": "f4aa480c2ccafa720294a5d3572aaca835bb44cf1d0a9130b49e870de63706cf"
+    },
+    {
+      "package": "com.smartisanos.sidebar",
+      "file": "com.smartisanos.sidebar.png",
+      "bytes": 66766,
+      "sha256": "7af1aaf589d07e6279499fa821b739ceda1684247f139f40b626842267ef9bb9"
+    },
+    {
+      "package": "com.smartisanos.smartfolder.aoa",
+      "file": "com.smartisanos.smartfolder.aoa.png",
+      "bytes": 19914,
+      "sha256": "72194a525178091f16cb5766e47d9eaee343616b7be9c4d9c54d824bc914accc"
+    },
+    {
+      "package": "com.smartisanos.textboom",
+      "file": "com.smartisanos.textboom.png",
+      "bytes": 107964,
+      "sha256": "3038dd6092fc965862d3049898b077b5fa4f49f83935a801481c64355071a68b"
+    },
+    {
+      "package": "com.smartisanos.videoplayerproject",
+      "file": "com.smartisanos.videoplayerproject.png",
+      "bytes": 63304,
+      "sha256": "619ac5606b6c6c2c08085922b73a0dba850008d64f3e603486645bc33c5433b8"
+    },
+    {
+      "package": "com.smartisanos.virtualremoter",
+      "file": "com.smartisanos.virtualremoter.png",
+      "bytes": 5990,
+      "sha256": "627e296c2c158ed13b695b0fa45efe3b4ba4ff090cbd387ac63c2a807322c8bc"
+    },
+    {
+      "package": "com.smartisanos.voice",
+      "file": "com.smartisanos.voice.png",
+      "bytes": 43685,
+      "sha256": "c19719f07491bb4d1ea05c86bf35cd01401266b906bec69974d36d8033fa39f8"
+    },
+    {
+      "package": "com.smartisanos.wallet",
+      "file": "com.smartisanos.wallet.png",
+      "bytes": 60211,
+      "sha256": "17a8c64735e2e392ebc1eab03950c5b37e50aab1eeac966366324aed310c08cb"
+    },
+    {
+      "package": "com.smartisanos.weather",
+      "file": "com.smartisanos.weather.png",
+      "bytes": 42983,
+      "sha256": "103ceba85a42ca592c71b948bea29d416f62d4c752ca28be25babf3a2cd4c7d5"
+    },
+    {
+      "package": "com.smartisanos.whiteboard",
+      "file": "com.smartisanos.whiteboard.png",
+      "bytes": 19435,
+      "sha256": "eebdd0c09e1709e81e43d19b23b30d5d9f1b87b422d6e756adbb35ea6bf28ee3"
+    },
+    {
+      "package": "com.smartisanos.writer",
+      "file": "com.smartisanos.writer.png",
+      "bytes": 87217,
+      "sha256": "09c1e841a13a7a099391377d3595a24d2149a79ca148c84d20ea06178d9e0362"
     },
     {
       "package": "com.smile.gifmaker",
@@ -11571,16 +11841,16 @@
       "sha256": "e879599ddb55bd732cbbdb1fa66c9dff33f6869c7f576e1c25ef39be7b85b8bb"
     },
     {
-      "package": "com.yodo1.ctr_original.YODO1_01",
-      "file": "com.yodo1.ctr_original.YODO1_01.png",
-      "bytes": 53199,
-      "sha256": "4ab6915d5ee6606069ec9dba66db9c0117fa18606b05bb098b388da5e174cc3a"
-    },
-    {
       "package": "com.yodo1.ctr2.YODO1_01",
       "file": "com.yodo1.ctr2.YODO1_01.png",
       "bytes": 43463,
       "sha256": "682160ac183cfda49bbb7c649d8b61e5de09d4e588a46c1ebc132c584fb19b8a"
+    },
+    {
+      "package": "com.yodo1.ctr_original.YODO1_01",
+      "file": "com.yodo1.ctr_original.YODO1_01.png",
+      "bytes": 53199,
+      "sha256": "4ab6915d5ee6606069ec9dba66db9c0117fa18606b05bb098b388da5e174cc3a"
     },
     {
       "package": "com.yodo1.SD009.megajump",
@@ -11949,18 +12219,6 @@
       "sha256": "1ed0a5129f4d0a0c82ad4edc924b6c3cecaccc56e83090f065ef863838f35895"
     },
     {
-      "package": "com.zhan_dui.animetaste",
-      "file": "com.zhan_dui.animetaste.png",
-      "bytes": 35534,
-      "sha256": "7ad0b504b8ddb293a4866c53c4e601c859c284b025d383ea82acf61234bbb342"
-    },
-    {
-      "package": "com.zhan_dui.evermemo",
-      "file": "com.zhan_dui.evermemo.png",
-      "bytes": 13649,
-      "sha256": "6ffafcc006e27631378114210b8d336c8a3678bd9ca66ba4547143d8ced0b93c"
-    },
-    {
       "package": "com.zhan.dui.animetaste",
       "file": "com.zhan.dui.animetaste.png",
       "bytes": 24561,
@@ -11971,6 +12229,18 @@
       "file": "com.zhan.dui.evermemo.png",
       "bytes": 21731,
       "sha256": "cd88430bacf19d6e02e9001ce42751c67e2160440c4dfe6f4d7b0a7ac0a54e75"
+    },
+    {
+      "package": "com.zhan_dui.animetaste",
+      "file": "com.zhan_dui.animetaste.png",
+      "bytes": 35534,
+      "sha256": "7ad0b504b8ddb293a4866c53c4e601c859c284b025d383ea82acf61234bbb342"
+    },
+    {
+      "package": "com.zhan_dui.evermemo",
+      "file": "com.zhan_dui.evermemo.png",
+      "bytes": 13649,
+      "sha256": "6ffafcc006e27631378114210b8d336c8a3678bd9ca66ba4547143d8ced0b93c"
     },
     {
       "package": "com.zhangdan.app",

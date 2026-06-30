@@ -22,10 +22,22 @@ icons/drawable/com.tencent.wework.png
 
 ## 加载顺序
 
-1. Gitee `main` 分支镜像。
+1. Gitee 下载镜像仓库 `Smartisan-original-launcher-download` 的 `master` 分支。
 2. GitHub `main` 分支镜像。
 3. 两个镜像都失败时使用应用原图。
 
 成功下载后写入桌面本地缓存；失败记录保留七天，避免每次启动重复请求。
 更新同名图片后，如需立即让已下载用户刷新，应递增代码中的缓存目录版本，
-例如从 `online_icon_cache_v1` 改为 `online_icon_cache_v2`。
+例如从 `online_icon_cache_v2` 改为 `online_icon_cache_v3`。
+
+## 系统应用自适应
+
+不同厂商的系统应用包名并不统一。Launcher 会先确认目标是系统应用或更新后的系统应用，再按包名、Activity 名称和系统应用标签识别相机、相册、浏览器、联系人、短信、邮件、计算器、文件管理、指南针、录音、音乐、视频、天气、便签、设置、安装器和 SIM 工具包，并映射到本目录中的锤子标准图标。第三方同名应用不会套用该映射。
+
+日历和时钟继续使用 Launcher 已有的动态日期 / 指针实现，不会被静态在线图片覆盖。
+
+新增或替换图片后执行：
+
+```powershell
+python tools/generate_icon_index.py
+```
