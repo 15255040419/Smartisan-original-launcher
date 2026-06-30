@@ -2723,6 +2723,8 @@
     move-result-object p0
 
     .line 37
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/badge/BadgeBridge;->suppressPackages(Landroid/content/Context;Ljava/util/Collection;)V
+
     invoke-static {p0, v1}, Lcom/smartisanos/launcher/e/s;->a(Landroid/content/Context;Ljava/util/List;)V
 
     :cond_9

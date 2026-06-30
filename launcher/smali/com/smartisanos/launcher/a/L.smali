@@ -152,8 +152,44 @@
 
     move-result-object v1
 
+    const-string v2, "maintained_profile_package"
+
+    invoke-virtual {p1, v2}, Landroid/content/Intent;->getStringExtra(Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v2
+
+    if-eqz v2, :profile_package_ready
+
+    move-object v1, v2
+
+    :profile_package_ready
+
     .line 28
     iput-object v1, v0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
+
+    const-string v2, "maintained_profile_component"
+
+    invoke-virtual {p1, v2}, Landroid/content/Intent;->getStringExtra(Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v2
+
+    if-eqz v2, :profile_component_ready
+
+    iput-object v2, v0, Lcom/smartisanos/launcher/data/ItemInfo;->componentName:Ljava/lang/String;
+
+    :profile_component_ready
+
+    const-string v2, "maintained_profile_shortcut_id"
+
+    invoke-virtual {p1, v2}, Landroid/content/Intent;->getStringExtra(Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v2
+
+    if-eqz v2, :profile_shortcut_id_ready
+
+    iput-object v2, v0, Lcom/smartisanos/launcher/data/QuickLaunchItem;->shortcutId:Ljava/lang/String;
+
+    :profile_shortcut_id_ready
 
     .line 29
     iget-object v2, v0, Lcom/smartisanos/launcher/data/ItemInfo;->title:Ljava/lang/String;
@@ -190,12 +226,10 @@
 
     move-result p1
 
-    const/16 p2, 0xa
-
-    if-ne p1, p2, :cond_4
+    if-lez p1, :cond_4
 
     .line 33
-    iput p2, v0, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I
+    iput p1, v0, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I
 
     goto :goto_1
 
@@ -749,6 +783,10 @@
 
     .line 1
     :cond_0
+    const/4 v0, 0x1
+
+    return v0
+
     sget-object v1, Lcom/smartisanos/launcher/a/L;->Lj:[Ljava/lang/String;
 
     array-length v2, v1

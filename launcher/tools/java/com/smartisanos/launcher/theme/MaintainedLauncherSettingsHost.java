@@ -58,6 +58,7 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.style.RelativeSizeSpan;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -147,6 +148,8 @@ public final class MaintainedLauncherSettingsHost {
     private static long sSearchGestureStartTime;
     private static boolean sSearchGestureConsumed;
     private static boolean sSearchGestureInvalid;
+    private static boolean sSearchGestureTracking;
+    private static boolean sSearchGestureSawMove;
     private static long sSearchGestureLastOpenTime;
     private static final String SETTINGS_PKG = "com.smartisanos.home";
     private static final String QUICK_SEARCH_PKG = "com.smartisanos.quicksearch";
@@ -159,6 +162,8 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_UPDATE_DOWNLOAD_ID = "launcher_update_download_id";
     private static final String SEARCH_PREFS = "launcher_search_prefs";
     private static final String SEARCH_HISTORY_KEY = "search_history_entries";
+    private static final String PROFILE_APPS_PREFS = "launcher_profile_apps";
+    private static final String PROFILE_DISABLED_PREFIX = "disabled.";
     private static final String THEME_DOWNLOAD_PREFS = "theme_download_prefs";
     private static final String ICON_OVERRIDE_PREFS = "icon_override_prefs";
     private static final String WALLPAPER_PREFS = "launcher_settings";
@@ -185,6 +190,7 @@ public final class MaintainedLauncherSettingsHost {
     private static final String EXTRA_PASSWORD_TARGET_PACKAGE = "launcher_password_target_package";
     private static final String EXTRA_PASSWORD_TARGET_CLASS = "launcher_password_target_class";
     private static final String EXTRA_PASSWORD_TARGET_USER = "launcher_password_target_user";
+    private static final String EXTRA_PASSWORD_TARGET_SERIAL = "launcher_password_target_serial";
     private static final String EXTRA_PASSWORD_SET_MODE = "launcher_password_set_mode";
     private static final int REQUEST_PICK_CUSTOM_ICON = 53026;
     private static final long SETTINGS_CLICK_GUARD_MS = 800L;
@@ -446,21 +452,17 @@ public final class MaintainedLauncherSettingsHost {
         }
         final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
         Handler handler = new Handler(Looper.getMainLooper());
+        bootstrapDoppelgangerPackages(app);
         handler.postDelayed(new Runnable() {
             public void run() {
                 bootstrapDoppelgangerPackages(app);
             }
-        }, 12000);
+        }, 2000);
         handler.postDelayed(new Runnable() {
             public void run() {
                 bootstrapDoppelgangerPackages(app);
             }
-        }, 30000);
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                bootstrapDoppelgangerPackages(app);
-            }
-        }, 60000);
+        }, 8000);
     }
 
     private static void bootstrapDoppelgangerPackages(final Context context) {
@@ -471,69 +473,15 @@ public final class MaintainedLauncherSettingsHost {
             public void run() {
                 HashMap<Integer, HashMap<String, Boolean>> packagesByUser =
                         new HashMap<Integer, HashMap<String, Boolean>>();
-                try {
-                    LauncherApps launcherApps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
-                    if (launcherApps != null) {
-                        ArrayList<Integer> userIds = doppelgangerUserIds(context);
-                        for (int u = 0; u < userIds.size(); u++) {
-                            int userId = userIds.get(u).intValue();
-                            UserHandle user = userHandleForIdentifier(userId);
-                            if (user == null) {
-                                continue;
-                            }
-                            List<LauncherActivityInfo> activities = launcherApps.getActivityList(null, user);
-                            if (activities != null) {
-                                for (int i = 0; i < activities.size(); i++) {
-                                    LauncherActivityInfo info = activities.get(i);
-                                    if (info != null && info.getComponentName() != null) {
-                                        String pkg = info.getComponentName().getPackageName();
-                                        if (pkg != null && pkg.length() > 0) {
-                                            addDoppelgangerPackage(packagesByUser, userId, pkg);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (Throwable ignored) {
-                }
-                if (packagesByUser.isEmpty()) {
-                    try {
-                        Method method = PackageManager.class.getMethod("getInstalledPackagesAsUser",
-                                Integer.TYPE, Integer.TYPE);
-                        ArrayList<Integer> userIds = doppelgangerUserIds(context);
-                        for (int u = 0; u < userIds.size(); u++) {
-                            int userId = userIds.get(u).intValue();
-                            List list = (List) method.invoke(context.getPackageManager(), 0, userId);
-                            if (list != null) {
-                                for (int i = 0; i < list.size(); i++) {
-                                    Object item = list.get(i);
-                                    if (item instanceof android.content.pm.PackageInfo) {
-                                        String pkg = ((android.content.pm.PackageInfo) item).packageName;
-                                        if (pkg != null && pkg.length() > 0) {
-                                            addDoppelgangerPackage(packagesByUser, userId, pkg);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (Throwable ignored) {
-                    }
-                }
-                for (Integer userId : packagesByUser.keySet()) {
-                    HashMap<String, Boolean> packages = packagesByUser.get(userId);
-                    if (packages == null) {
-                        continue;
-                    }
-                    for (String pkg : packages.keySet()) {
-                        try {
-                            ArrayList params = new ArrayList();
-                            params.add(pkg);
-                            params.add(userId);
-                            postDatabaseUserPackageAdded(params);
-                            postDatabaseUserPackageChanged(params);
-                        } catch (Throwable ignored) {
-                        }
+                List<ProfileAppEntry> entries = discoverProfileApps(context, true);
+                for (ProfileAppEntry entry : entries) {
+                    if (entry != null && isProfileAppEnabled(context, entry)) {
+                        addDoppelgangerPackage(packagesByUser, entry.userId, entry.packageName);
+                        removeLegacyProfileShortcutRows(context, entry);
+                        ArrayList params = new ArrayList();
+                        params.add(entry.packageName);
+                        params.add(Integer.valueOf(entry.userId));
+                        postDatabaseUserPackageAdded(params);
                     }
                 }
                 if (!packagesByUser.isEmpty()) {
@@ -637,6 +585,37 @@ public final class MaintainedLauncherSettingsHost {
         if (pm == null || intent == null) {
             return out;
         }
+        if (userId > 0 && Build.VERSION.SDK_INT >= 21) {
+            try {
+                Context context = currentApplicationContext();
+                LauncherApps launcherApps = context == null ? null
+                        : (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+                List<UserHandle> profiles = launcherApps == null ? null : launcherApps.getProfiles();
+                if (profiles != null) {
+                    for (UserHandle profile : profiles) {
+                        if (profile == null || userIdentifier(profile) != userId) {
+                            continue;
+                        }
+                        List<LauncherActivityInfo> activities = launcherApps.getActivityList(
+                                intent.getPackage(), profile);
+                        if (activities != null) {
+                            for (LauncherActivityInfo activity : activities) {
+                                ResolveInfo resolved = resolveInfoFromLauncherActivity(pm, activity, flags);
+                                if (resolved != null) {
+                                    out.add(resolved);
+                                }
+                            }
+                        }
+                        logOperation(context, "PROFILE_QUERY", "launcher_apps userId=" + userId
+                                + ", package=" + intent.getPackage() + ", count=" + out.size());
+                        return out;
+                    }
+                }
+            } catch (Throwable t) {
+                logOperation(currentApplicationContext(), "PROFILE_QUERY",
+                        "launcher_apps_failed userId=" + userId + ", error=" + shortError(t));
+            }
+        }
         try {
             Method method = PackageManager.class.getMethod("queryIntentActivitiesAsUser",
                     Intent.class, Integer.TYPE, Integer.TYPE);
@@ -652,6 +631,44 @@ public final class MaintainedLauncherSettingsHost {
                 out.addAll(list);
             }
         } catch (Throwable ignored) {
+        }
+        return out;
+    }
+
+    public static List queryProfileLauncherActivities(Context context, String packageName, int userId) {
+        ArrayList out = new ArrayList();
+        if (context == null || TextUtils.isEmpty(packageName) || userId <= 0
+                || Build.VERSION.SDK_INT < 21) {
+            return out;
+        }
+        try {
+            LauncherApps launcherApps =
+                    (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            List<UserHandle> profiles = launcherApps == null ? null : launcherApps.getProfiles();
+            if (profiles == null) {
+                return out;
+            }
+            PackageManager pm = context.getPackageManager();
+            for (UserHandle profile : profiles) {
+                if (profile == null || userIdentifier(profile) != userId) {
+                    continue;
+                }
+                List<LauncherActivityInfo> activities = launcherApps.getActivityList(packageName, profile);
+                if (activities != null) {
+                    for (LauncherActivityInfo activity : activities) {
+                        ResolveInfo resolved = resolveInfoFromLauncherActivity(pm, activity, 0);
+                        if (resolved != null) {
+                            out.add(resolved);
+                        }
+                    }
+                }
+                logOperation(context, "PROFILE_QUERY", "direct_context userId=" + userId
+                        + ", package=" + packageName + ", count=" + out.size());
+                return out;
+            }
+        } catch (Throwable t) {
+            logOperation(context, "PROFILE_QUERY", "direct_context_failed userId=" + userId
+                    + ", package=" + packageName + ", error=" + shortError(t));
         }
         return out;
     }
@@ -726,6 +743,10 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void postDatabaseUserPackageChanged(ArrayList params) {
         postDatabaseUserPackageEvent("EVENT_USER_PACKAGE_CHANGED", params);
+    }
+
+    private static void postDatabaseUserPackageRemoved(ArrayList params) {
+        postDatabaseUserPackageEvent("EVENT_USER_PACKAGE_REMOVED", params);
     }
 
     private static void postDatabaseUserPackageEvent(String eventName, ArrayList params) {
@@ -871,6 +892,7 @@ public final class MaintainedLauncherSettingsHost {
         bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
         bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
         bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
+        bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
         bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
         bindSwitch(activity, resources, root, "multi_block_fast_launch_app", "fast_launch_app_on", true);
         bindTransparentThemeSwitch(activity, resources, root);
@@ -885,6 +907,7 @@ public final class MaintainedLauncherSettingsHost {
         hide(resources, root, "item_id_hide_lable");
         hide(resources, root, "item_id_hide_navigation_bar");
         hide(resources, root, "item_id_hide_badge");
+        hide(resources, root, "item_id_badge_swipe_clean");
         hide(resources, root, "item_id_unlock_anim");
         setFirstChildText(resources, root, "setting_ocd_options",
                 getString(resources, "ocd_setting", "OCD Settings"));
@@ -901,10 +924,12 @@ public final class MaintainedLauncherSettingsHost {
             hide(resources, root, "item_page_flip_anims");
             setBackground(find(resources, root, "item_id_launcher_wallpaper"), resources, "selector_setting_sub_item_bg_top");
             setBackground(find(resources, root, "item_id_icons"), resources, "selector_setting_sub_item_bg_middle");
+            setBackground(find(resources, root, "item_id_profile_apps"), resources, "selector_setting_sub_item_bg_middle");
             setBackground(find(resources, root, "item_id_privacy_password"), resources, "selector_setting_sub_item_bg_bottom");
         }
         bindMainSettingIcon(resources, root, "item_page_flip_anims", "page_flip_animation_default_upper", true);
         bindMainSettingIcon(resources, root, "item_id_icons", "icon_setting_icon");
+        bindMainSettingIcon(resources, root, "item_id_profile_apps", "app_operation");
         bindMainSettingIcon(resources, root, "item_id_privacy_password", "privacy_password_lock_icon");
         TextView updateVersion = (TextView) byId(root, resources, "more_check_upgradation_text");
         if (updateVersion != null) {
@@ -933,6 +958,12 @@ public final class MaintainedLauncherSettingsHost {
             public void onClick(View v) {
                 sMainSettingsScrollY = currentScrollY(activity);
                 showIconPage(activity);
+            }
+        });
+        click(activity, resources, root, "item_id_profile_apps", new View.OnClickListener() {
+            public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
+                showProfileAppsPage(activity);
             }
         });
         click(activity, resources, root, "item_id_privacy_password", new View.OnClickListener() {
@@ -1026,19 +1057,25 @@ public final class MaintainedLauncherSettingsHost {
         if (action == MotionEvent.ACTION_DOWN) {
             sSearchGestureStartX = event.getX();
             sSearchGestureStartY = event.getY();
-            sSearchGestureStartTime = android.os.SystemClock.uptimeMillis();
+            sSearchGestureStartTime = event.getDownTime();
             sSearchGestureConsumed = false;
             sSearchGestureInvalid = false;
+            sSearchGestureTracking = event.getPointerCount() == 1;
+            sSearchGestureSawMove = false;
             return false;
         }
         if (action == MotionEvent.ACTION_CANCEL
                 || action == MotionEvent.ACTION_POINTER_DOWN
                 || action == MotionEvent.ACTION_POINTER_UP) {
             sSearchGestureInvalid = true;
+            sSearchGestureTracking = false;
             return false;
         }
-        if (event.getPointerCount() != 1) {
+        if (!sSearchGestureTracking
+                || event.getPointerCount() != 1
+                || event.getDownTime() != sSearchGestureStartTime) {
             sSearchGestureInvalid = true;
+            sSearchGestureTracking = false;
             return false;
         }
         if (action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP) {
@@ -1050,25 +1087,34 @@ public final class MaintainedLauncherSettingsHost {
         float dx = event.getX() - sSearchGestureStartX;
         float dy = event.getY() - sSearchGestureStartY;
         float absDx = Math.abs(dx);
-        if (dy < -dp(activity, 24)
-                || absDx > Math.max(dp(activity, 96), Math.max(dy, 1f) * 0.55f)) {
+        if (action == MotionEvent.ACTION_MOVE) {
+            sSearchGestureSawMove = true;
+        }
+        if (dy < -dp(activity, 12)
+                || absDx > Math.max(dp(activity, 48), Math.max(dy, 1f) * 0.70f)) {
             sSearchGestureInvalid = true;
         }
         if (action != MotionEvent.ACTION_UP) {
             return false;
         }
-        long now = android.os.SystemClock.uptimeMillis();
-        long duration = now - sSearchGestureStartTime;
-        if (sSearchGestureInvalid || now - sSearchGestureLastOpenTime < 1000) {
+        long now = event.getEventTime();
+        long duration = now - event.getDownTime();
+        boolean validSequence = sSearchGestureTracking && sSearchGestureSawMove;
+        sSearchGestureTracking = false;
+        sSearchGestureSawMove = false;
+        if (!validSequence || sSearchGestureInvalid
+                || duration <= 0 || duration > 500
+                || now - sSearchGestureLastOpenTime < 1000) {
             return false;
         }
         int height = activity.getResources().getDisplayMetrics().heightPixels;
         boolean fromDesktop = sSearchGestureStartY > dp(activity, 96)
                 && sSearchGestureStartY < height - dp(activity, 280);
-        float minDistance = Math.max(dp(activity, 180), height * 0.14f);
-        boolean downward = dy > minDistance && absDx < dy * 0.28f;
-        boolean deliberate = duration >= 120 && duration <= 900;
-        if (fromDesktop && downward && deliberate) {
+        // The original launcher recognizes roughly 150 physical pixels within
+        // 500 ms. 48dp is the equivalent on the xxhdpi devices this port targets.
+        float minDistance = Math.max(dp(activity, 48), height * 0.055f);
+        boolean downward = dy > minDistance && absDx < dy * 0.55f;
+        if (fromDesktop && downward) {
             if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, true)) {
                 return false;
             }
@@ -1120,8 +1166,6 @@ public final class MaintainedLauncherSettingsHost {
             Toast.makeText(activity, "无法打开搜索页：" + shortError(t), Toast.LENGTH_SHORT).show();
             return;
         }
-        loadSearchEntries(activity, all);
-
         final LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xffedf3f8);
@@ -1183,38 +1227,6 @@ public final class MaintainedLauncherSettingsHost {
         emptyPanel.setPadding(0, dp(activity, 22), 0, 0);
         root.addView(emptyPanel, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        final HorizontalScrollView commonScroll = new HorizontalScrollView(activity);
-        commonScroll.setHorizontalScrollBarEnabled(false);
-        commonScroll.setFillViewport(true);
-        commonScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        LinearLayout commonApps = new LinearLayout(activity);
-        commonApps.setOrientation(LinearLayout.HORIZONTAL);
-        commonApps.setGravity(Gravity.CENTER);
-        commonScroll.addView(commonApps, new HorizontalScrollView.LayoutParams(-2, -1));
-        emptyPanel.addView(commonScroll, new LinearLayout.LayoutParams(-1, dp(activity, 96)));
-        int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        final int commonItemWidth = Math.max(dp(activity, 68), screenWidth / 4);
-        int appCount = Math.min(20, all.size());
-        for (int i = 0; i < appCount; i++) {
-            LinearLayout.LayoutParams shortcutLp = new LinearLayout.LayoutParams(commonItemWidth, -1);
-            commonApps.addView(searchShortcut(activity, all.get(i), commonItemWidth), shortcutLp);
-        }
-        commonScroll.setOnTouchListener(new View.OnTouchListener() {
-            public boolean onTouch(View v, MotionEvent event) {
-                int action = event.getActionMasked();
-                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                    commonScroll.postDelayed(new Runnable() {
-                        public void run() {
-                            int target = Math.round(commonScroll.getScrollX() / (float) commonItemWidth)
-                                    * commonItemWidth;
-                            commonScroll.smoothScrollTo(target, 0);
-                        }
-                    }, 80);
-                }
-                return false;
-            }
-        });
-
         RelativeLayout historyTitle = new RelativeLayout(activity);
         TextView history = new TextView(activity);
         history.setText("搜索历史");
@@ -1243,7 +1255,6 @@ public final class MaintainedLauncherSettingsHost {
         chipBox.setOrientation(LinearLayout.VERTICAL);
         chipBox.setPadding(dp(activity, 20), 0, dp(activity, 20), 0);
         emptyPanel.addView(chipBox, new LinearLayout.LayoutParams(-1, -2));
-        addSearchHistoryChips(activity, chipBox, all);
         historyClear.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 clearSearchHistory(activity);
@@ -1315,6 +1326,32 @@ public final class MaintainedLauncherSettingsHost {
                 }
             }
         }, 250);
+
+        // PackageManager label/icon loading can take several seconds on a cold start.
+        // Keep it off the UI thread so the search shell and keyboard appear immediately.
+        final Context appContext = activity.getApplicationContext() == null
+                ? activity : activity.getApplicationContext();
+        new Thread(new Runnable() {
+            public void run() {
+                final ArrayList<SearchEntry> loaded = new ArrayList<SearchEntry>();
+                loadSearchEntries(appContext, loaded);
+                activity.runOnUiThread(new Runnable() {
+                    public void run() {
+                        if (activity.isFinishing()
+                                || (Build.VERSION.SDK_INT >= 17 && activity.isDestroyed())) {
+                            return;
+                        }
+                        all.clear();
+                        all.addAll(loaded);
+                        chipBox.removeAllViews();
+                        addSearchHistoryChips(activity, chipBox, all);
+                        CharSequence currentQuery = query.getText();
+                        filterSearchEntries(currentQuery == null ? "" : currentQuery.toString(),
+                                all, visible, adapter);
+                    }
+                });
+            }
+        }, "launcher-search-loader").start();
     }
 
     private static Drawable roundedDrawable(int color, int strokeColor, int radius) {
@@ -1407,6 +1444,8 @@ public final class MaintainedLauncherSettingsHost {
     private static void launchSearchEntry(Activity activity, SearchEntry entry) {
         try {
             recordSearchHistory(activity, entry);
+            com.smartisanos.launcher.badge.BadgeBridge.onPackageLaunched(
+                    activity, entry.packageName);
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             intent.setClassName(entry.packageName, entry.className);
@@ -1416,8 +1455,13 @@ public final class MaintainedLauncherSettingsHost {
                 activity.finish();
                 return;
             }
-            if (isDoppelgangerUserId(entry.userId)) {
-                startActivityForUser(activity, intent, null, entry.userId);
+            if (entry.profileUser != null) {
+                LauncherApps launcherApps = (LauncherApps) activity.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+                if (launcherApps == null) {
+                    throw new IllegalStateException("LauncherApps unavailable");
+                }
+                launcherApps.startMainActivity(new ComponentName(entry.packageName, entry.className),
+                        entry.profileUser, null, null);
             } else {
                 activity.startActivity(intent);
             }
@@ -1434,7 +1478,7 @@ public final class MaintainedLauncherSettingsHost {
             final ArrayList<String> history = readSearchHistory(context);
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
-            List<ResolveInfo> infos = queryLauncherActivitiesWithProfiles(pm, intent, 0);
+            List<ResolveInfo> infos = pm.queryIntentActivities(intent, 0);
             for (ResolveInfo info : infos) {
                 if (info == null || info.activityInfo == null) {
                     continue;
@@ -1455,6 +1499,25 @@ public final class MaintainedLauncherSettingsHost {
                 }
                 String title = label == null ? pkg : label.toString();
                 SearchEntry entry = new SearchEntry(title, pkg, cls, userId, icon);
+                entry.historyRank = history.indexOf(entry.key);
+                out.add(entry);
+            }
+            List<ProfileAppEntry> profileApps = discoverProfileApps(context, false);
+            for (ProfileAppEntry profile : profileApps) {
+                if (profile == null || profile.componentName == null) {
+                    continue;
+                }
+                Drawable icon = profile.icon;
+                if (icon == null) {
+                    try {
+                        icon = pm.getApplicationIcon(profile.packageName);
+                    } catch (Throwable ignored) {
+                    }
+                }
+                icon = doppelgangerBadgeDrawable(icon, pm, null);
+                SearchEntry entry = new SearchEntry(profile.label, profile.packageName,
+                        profile.componentName.getClassName(), profile.userId, icon,
+                        profile.profileUser, profile.profileSerial);
                 entry.historyRank = history.indexOf(entry.key);
                 out.add(entry);
             }
@@ -1997,41 +2060,108 @@ public final class MaintainedLauncherSettingsHost {
         if (width <= 0 || height <= 0) {
             return base;
         }
+        if (hasDoppelgangerBadge(base, width, height)) {
+            return base;
+        }
         Bitmap out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(out);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
         canvas.drawBitmap(base, 0, 0, paint);
 
-        float size = Math.max(14f, Math.min(width, height) * 0.23f);
-        float left = Math.max(1f, width * 0.06f);
-        float top = height - size - Math.max(1f, height * 0.12f);
-        RectF shield = new RectF(left, top, left + size, top + size);
-        float radius = size * 0.20f;
+        float size = Math.max(13f, Math.min(width, height) * 0.19f);
+        float left = Math.max(1f, width * 0.110f);
+        float bottom = height - Math.max(1f, height * 0.135f);
+        float top = bottom - size;
+        RectF shield = new RectF(left, top, left + size, bottom);
+        Path shieldPath = buildDoppelgangerBadgePath(shield);
 
         paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0x33000000);
-        canvas.drawRoundRect(new RectF(shield.left + 1f, shield.top + 1.5f,
-                shield.right + 1f, shield.bottom + 1.5f), radius, radius, paint);
+        paint.setColor(0x2a000000);
+        canvas.save();
+        canvas.translate(Math.max(0.8f, size * 0.035f), Math.max(1.2f, size * 0.055f));
+        canvas.drawPath(shieldPath, paint);
+        canvas.restore();
+
         paint.setColor(0xff2b3036);
-        canvas.drawRoundRect(shield, radius, radius, paint);
+        canvas.drawPath(shieldPath, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(1.2f, size * 0.08f));
-        paint.setColor(0xffffffff);
-        canvas.drawRoundRect(shield, radius, radius, paint);
+        paint.setStrokeWidth(Math.max(1.05f, size * 0.06f));
+        paint.setColor(0xfafafafa);
+        canvas.drawPath(shieldPath, paint);
 
-        RectF inner = new RectF(shield.left + size * 0.12f, shield.top + size * 0.12f,
-                shield.right - size * 0.12f, shield.bottom - size * 0.12f);
+        RectF inner = new RectF(shield.left + size * 0.15f, shield.top + size * 0.15f,
+                shield.right - size * 0.15f, shield.bottom - size * 0.18f);
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(0xffffffff);
-        canvas.drawCircle(inner.left + size * 0.25f, inner.top + size * 0.35f, size * 0.055f, paint);
-        canvas.drawCircle(inner.left + size * 0.56f, inner.top + size * 0.35f, size * 0.055f, paint);
+        canvas.drawCircle(inner.left + size * 0.20f, inner.top + size * 0.28f, size * 0.045f, paint);
+        canvas.drawCircle(inner.left + size * 0.48f, inner.top + size * 0.28f, size * 0.045f, paint);
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(1f, size * 0.055f));
-        RectF smile = new RectF(inner.left + size * 0.23f, inner.top + size * 0.39f,
-                inner.left + size * 0.62f, inner.top + size * 0.72f);
-        canvas.drawArc(smile, 25, 130, false, paint);
+        paint.setStrokeWidth(Math.max(0.9f, size * 0.045f));
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        RectF smile = new RectF(inner.left + size * 0.12f, inner.top + size * 0.27f,
+                inner.left + size * 0.57f, inner.top + size * 0.63f);
+        canvas.drawArc(smile, 20, 140, false, paint);
         paint.setStyle(Paint.Style.FILL);
+        paint.setStrokeCap(Paint.Cap.BUTT);
         return out;
+    }
+
+    private static boolean hasDoppelgangerBadge(Bitmap bitmap, int width, int height) {
+        try {
+            float size = Math.max(13f, Math.min(width, height) * 0.19f);
+            float left = Math.max(1f, width * 0.110f);
+            float bottom = height - Math.max(1f, height * 0.135f);
+            float top = bottom - size;
+            int sampleX = clamp(Math.round(left + size * 0.5f), 0, width - 1);
+            int sampleY = clamp(Math.round(top + size * 0.45f), 0, height - 1);
+            int center = bitmap.getPixel(sampleX, sampleY);
+            if (!isNearColor(center, 0xff2b3036, 52)) {
+                return false;
+            }
+            int borderX = clamp(Math.round(left + size * 0.22f), 0, width - 1);
+            int borderY = clamp(Math.round(top + size * 0.18f), 0, height - 1);
+            int border = bitmap.getPixel(borderX, borderY);
+            return isNearColor(border, 0xffffffff, 72) || isNearColor(border, 0xfff0f0f0, 72);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static Path buildDoppelgangerBadgePath(RectF rect) {
+        float width = rect.width();
+        float height = rect.height();
+        float radius = width * 0.18f;
+        float bottomArcDepth = height * 0.18f;
+        Path path = new Path();
+        path.moveTo(rect.left + radius, rect.top);
+        path.lineTo(rect.right - radius, rect.top);
+        path.quadTo(rect.right, rect.top, rect.right, rect.top + radius);
+        path.lineTo(rect.right, rect.bottom - height * 0.34f);
+        path.quadTo(rect.right, rect.bottom - height * 0.08f,
+                rect.centerX(), rect.bottom + bottomArcDepth * 0.16f);
+        path.quadTo(rect.left, rect.bottom - height * 0.08f,
+                rect.left, rect.bottom - height * 0.34f);
+        path.lineTo(rect.left, rect.top + radius);
+        path.quadTo(rect.left, rect.top, rect.left + radius, rect.top);
+        path.close();
+        return path;
+    }
+
+    private static int clamp(int value, int min, int max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
+    }
+
+    private static boolean isNearColor(int color, int expected, int tolerance) {
+        return Math.abs(Color.red(color) - Color.red(expected)) <= tolerance
+                && Math.abs(Color.green(color) - Color.green(expected)) <= tolerance
+                && Math.abs(Color.blue(color) - Color.blue(expected)) <= tolerance
+                && Math.abs(Color.alpha(color) - Color.alpha(expected)) <= tolerance;
     }
 
     public static boolean onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
@@ -2788,21 +2918,7 @@ public final class MaintainedLauncherSettingsHost {
                 applyTransparentWallpaperBlur(activity);
             }
         };
-        item.setOnClickListener(listener);
-        if (item.getSwitch() != null) {
-            item.getSwitch().setClickable(true);
-            item.getSwitch().setOnTouchListener(new View.OnTouchListener() {
-                public boolean onTouch(View v, MotionEvent event) {
-                    if (event.getAction() == MotionEvent.ACTION_UP) {
-                        boolean next = !item.isChecked();
-                        item.setCheckedAnimated(next);
-                        writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, next);
-                        applyTransparentWallpaperBlur(activity);
-                    }
-                    return true;
-                }
-            });
-        }
+        bindSwitchControlOnly(item, listener);
     }
 
     private static void showPageFlipPage(final Activity activity) {
@@ -3189,22 +3305,30 @@ public final class MaintainedLauncherSettingsHost {
         }
         final SettingItemSwitch item = (SettingItemSwitch) view;
         item.setChecked(readSystemBool(context, key, def));
-        item.setOnClickListener(new View.OnClickListener() {
+        bindSwitchControlOnly(item, new View.OnClickListener() {
             public void onClick(View v) {
                 toggleBoundSwitch(context, item, key);
             }
         });
-        if (item.getSwitch() != null) {
-            item.getSwitch().setClickable(true);
-            item.getSwitch().setOnTouchListener(new View.OnTouchListener() {
-                public boolean onTouch(View v, MotionEvent event) {
-                    if (event.getAction() == MotionEvent.ACTION_UP) {
-                        toggleBoundSwitch(context, item, key);
-                    }
-                    return true;
-                }
-            });
+    }
+
+    private static void bindSwitchControlOnly(final SettingItemSwitch item,
+                                              final View.OnClickListener listener) {
+        item.setOnClickListener(null);
+        item.setClickable(false);
+        if (item.getSwitch() == null) {
+            return;
         }
+        item.getSwitch().setClickable(true);
+        item.getSwitch().setOnClickListener(null);
+        item.getSwitch().setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_UP && listener != null) {
+                    listener.onClick(v);
+                }
+                return true;
+            }
+        });
     }
 
     private static void bindTransparentThemeSwitch(final Activity activity, Resources resources, View root) {
@@ -3219,18 +3343,7 @@ public final class MaintainedLauncherSettingsHost {
                 toggleTransparentTheme(activity, item);
             }
         };
-        item.setOnClickListener(listener);
-        if (item.getSwitch() != null) {
-            item.getSwitch().setClickable(true);
-            item.getSwitch().setOnTouchListener(new View.OnTouchListener() {
-                public boolean onTouch(View v, MotionEvent event) {
-                    if (event.getAction() == MotionEvent.ACTION_UP) {
-                        toggleTransparentTheme(activity, item);
-                    }
-                    return true;
-                }
-            });
-        }
+        bindSwitchControlOnly(item, listener);
     }
 
     private static void toggleTransparentTheme(Activity activity, SettingItemSwitch item) {
@@ -3523,6 +3636,14 @@ public final class MaintainedLauncherSettingsHost {
         item.setCheckedAnimated(next);
         writeBoolSetting(context, key, next);
         applyLauncherSettingChange(context, key);
+        if ("launcher_hide_badge".equals(key)) {
+            applyBadgeVisibility(context, next, true);
+        }
+        if (next && "launcher_badge_swipe_clean".equals(key)
+                && !com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(context)) {
+            Toast.makeText(context, "请授予锤子桌面通知使用权，以显示和横扫清除角标", Toast.LENGTH_LONG).show();
+            com.smartisanos.launcher.badge.BadgeBridge.openNotificationAccessSettings(context);
+        }
     }
 
     private static void writeBoolSetting(Context context, String key, boolean value) {
@@ -3663,6 +3784,54 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    private static void applyBadgeVisibility(Context context, boolean hidden, boolean refresh) {
+        setBadgeRuntimeVisibility(context, hidden);
+        refreshBadgeSceneNodes(context);
+        if (refresh) {
+            postDatabaseRefreshEvent();
+            requestLauncherFrameFromContext(context);
+            applyIconChange(context);
+            final Context app = context.getApplicationContext() == null
+                    ? context : context.getApplicationContext();
+            final boolean hiddenAfterReload = hidden;
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                public void run() {
+                    setBadgeRuntimeVisibility(app, hiddenAfterReload);
+                    refreshBadgeSceneNodes(app);
+                    requestLauncherFrameFromContext(app);
+                }
+            }, 180);
+        }
+    }
+
+    private static void setBadgeRuntimeVisibility(Context context, boolean hidden) {
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            constants.getField("SHOW_MESSAGE_FLAG").setBoolean(null, !hidden);
+            logOperation(context, "BADGE_VISIBILITY", "hidden=" + hidden + ", runtime=true");
+        } catch (Throwable t) {
+            logOperation(context, "BADGE_VISIBILITY", "runtime_failed " + shortError(t));
+        }
+    }
+
+    private static void refreshBadgeSceneNodes(Context context) {
+        try {
+            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
+                    .getMethod("getInstance").invoke(null);
+            if (mainView != null) {
+                mainView.getClass().getMethod("ii").invoke(mainView);
+            }
+        } catch (Throwable t) {
+            logOperation(context, "BADGE_VISIBILITY", "scene_refresh_failed " + shortError(t));
+        }
+    }
+
+    private static void requestLauncherFrameFromContext(Context context) {
+        if (context instanceof Activity) {
+            requestLauncherFrame((Activity) context);
+        }
+    }
+
     public static List<ResolveInfo> queryLauncherActivitiesWithProfiles(
             PackageManager packageManager, Intent intent, int flags) {
         List<ResolveInfo> result = new ArrayList<ResolveInfo>();
@@ -3680,6 +3849,10 @@ public final class MaintainedLauncherSettingsHost {
         if (context == null || Build.VERSION.SDK_INT < 21) {
             return result;
         }
+        if (!hasEnabledProfileApps(context)) {
+            return result;
+        }
+        scheduleDoppelgangerBootstrap(context);
 
         try {
             LauncherApps launcherApps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
@@ -3713,6 +3886,16 @@ public final class MaintainedLauncherSettingsHost {
                     continue;
                 }
                 for (LauncherActivityInfo activityInfo : activities) {
+                    ComponentName component = activityInfo == null ? null : activityInfo.getComponentName();
+                    if (component == null) {
+                        continue;
+                    }
+                    ProfileAppEntry profileEntry = new ProfileAppEntry(
+                            component.getPackageName(), component, profile,
+                            userIdentifier(profile), profileSerial(context, profile), null);
+                    if (!isProfileAppEnabled(context, profileEntry)) {
+                        continue;
+                    }
                     ResolveInfo clone = resolveInfoFromLauncherActivity(packageManager, activityInfo, flags);
                     String key = resolveInfoKey(clone);
                     if (clone != null && key != null && !seen.containsKey(key)) {
@@ -3742,9 +3925,26 @@ public final class MaintainedLauncherSettingsHost {
         if (context == null || intent == null) {
             return;
         }
-        if (userId < 0) {
+        ComponentName component = intent.getComponent();
+        String targetPackage = component == null ? intent.getPackage() : component.getPackageName();
+        if (!TextUtils.isEmpty(targetPackage) && !context.getPackageName().equals(targetPackage)) {
+            com.smartisanos.launcher.badge.BadgeBridge.onPackageLaunched(context, targetPackage);
+        }
+        if (userId <= 0) {
             context.startActivity(intent, options);
             return;
+        }
+        LauncherApps launcherApps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+        if (launcherApps != null && component != null) {
+            List<UserHandle> profiles = launcherApps.getProfiles();
+            if (profiles != null) {
+                for (UserHandle profile : profiles) {
+                    if (profile != null && userIdentifier(profile) == userId) {
+                        launcherApps.startMainActivity(component, profile, null, options);
+                        return;
+                    }
+                }
+            }
         }
         java.lang.reflect.Constructor<UserHandle> constructor =
                 UserHandle.class.getDeclaredConstructor(Integer.TYPE);
@@ -3814,6 +4014,474 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    public static boolean launchSearchUriTarget(Activity activity, Uri uri) {
+        if (activity == null || uri == null
+                || !"content".equals(uri.getScheme())
+                || !"com.smartisanos.launcher.data.SearchProvider".equals(uri.getAuthority())) {
+            return false;
+        }
+        try {
+            List<String> segments = uri.getPathSegments();
+            if (segments == null || segments.size() < 2) {
+                return false;
+            }
+            ComponentName component = new ComponentName(segments.get(0), segments.get(1));
+            if (segments.size() >= 3) {
+                long serial = Long.parseLong(segments.get(2));
+                UserHandle profile = userHandleForSerial(activity, serial);
+                LauncherApps launcherApps =
+                        (LauncherApps) activity.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+                if (profile != null && launcherApps != null) {
+                    try {
+                        launcherApps.startMainActivity(component, profile, null, null);
+                        logOperation(activity, "PROFILE_LAUNCH", "launcher_apps_ok component="
+                                + component + ", serial=" + serial + ", userId="
+                                + userIdentifier(profile));
+                        return true;
+                    } catch (Throwable launcherError) {
+                        logOperation(activity, "PROFILE_LAUNCH", "launcher_apps_failed component="
+                                + component + ", serial=" + serial + ", error="
+                                + shortError(launcherError));
+                        Intent profileIntent = new Intent(Intent.ACTION_MAIN);
+                        profileIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+                        profileIntent.setComponent(component);
+                        profileIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                        try {
+                            Method startAsUser = Context.class.getMethod("startActivityAsUser",
+                                    Intent.class, UserHandle.class);
+                            startAsUser.setAccessible(true);
+                            startAsUser.invoke(activity, profileIntent, profile);
+                            logOperation(activity, "PROFILE_LAUNCH", "start_as_user_ok component="
+                                    + component + ", userId=" + userIdentifier(profile));
+                            return true;
+                        } catch (Throwable fallbackError) {
+                            logOperation(activity, "PROFILE_LAUNCH", "start_as_user_failed component="
+                                    + component + ", userId=" + userIdentifier(profile)
+                                    + ", error=" + shortError(fallbackError));
+                            return false;
+                        }
+                    }
+                }
+                logOperation(activity, "PROFILE_LAUNCH", "profile_not_found component="
+                        + component + ", serial=" + serial);
+                return false;
+            }
+            Intent target = new Intent(Intent.ACTION_MAIN);
+            target.addCategory(Intent.CATEGORY_LAUNCHER);
+            target.setComponent(component);
+            target.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            activity.startActivity(target);
+            return true;
+        } catch (Throwable ignored) {
+            logOperation(activity, "PROFILE_LAUNCH", "failed uri=" + uri
+                    + ", error=" + shortError(ignored));
+            return false;
+        }
+    }
+
+    public static Uri appendProfileSerialToSearchUri(Context context, Uri uri, int userId) {
+        if (context == null || uri == null || userId <= 0) {
+            return uri;
+        }
+        try {
+            LauncherApps launcherApps =
+                    (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (launcherApps == null) {
+                return uri;
+            }
+            List<UserHandle> profiles = launcherApps.getProfiles();
+            if (profiles == null) {
+                return uri;
+            }
+            for (UserHandle profile : profiles) {
+                if (profile != null && userIdentifier(profile) == userId) {
+                    long serial = profileSerial(context, profile);
+                    if (serial >= 0L) {
+                        return uri.buildUpon().appendPath(String.valueOf(serial)).build();
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return uri;
+    }
+
+    private static long profileSerial(Context context, UserHandle user) {
+        if (context == null || user == null) {
+            return -1L;
+        }
+        try {
+            android.os.UserManager manager =
+                    (android.os.UserManager) context.getSystemService(Context.USER_SERVICE);
+            if (manager != null) {
+                long serial = manager.getSerialNumberForUser(user);
+                if (serial >= 0L) {
+                    return serial;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return userIdentifier(user);
+    }
+
+    private static UserHandle userHandleForSerial(Context context, long serial) {
+        if (context == null || serial < 0L) {
+            return null;
+        }
+        try {
+            android.os.UserManager manager =
+                    (android.os.UserManager) context.getSystemService(Context.USER_SERVICE);
+            if (manager != null) {
+                UserHandle user = manager.getUserForSerialNumber(serial);
+                if (user != null) {
+                    return user;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return userHandleForIdentifier((int) serial);
+    }
+
+    private static String profileAppPreferenceKey(ProfileAppEntry entry) {
+        if (entry == null || entry.componentName == null) {
+            return PROFILE_DISABLED_PREFIX + "invalid";
+        }
+        return PROFILE_DISABLED_PREFIX + entry.profileSerial + "."
+                + entry.componentName.flattenToString();
+    }
+
+    private static boolean isProfileAppEnabled(Context context, ProfileAppEntry entry) {
+        try {
+            return !context.getSharedPreferences(PROFILE_APPS_PREFS, Context.MODE_PRIVATE)
+                    .getBoolean(profileAppPreferenceKey(entry), true);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean hasEnabledProfileApps(Context context) {
+        if (context == null) {
+            return false;
+        }
+        try {
+            Map<String, ?> values = context.getSharedPreferences(
+                    PROFILE_APPS_PREFS, Context.MODE_PRIVATE).getAll();
+            for (Map.Entry<String, ?> value : values.entrySet()) {
+                if (value.getKey().startsWith(PROFILE_DISABLED_PREFIX)
+                        && value.getValue() instanceof Boolean
+                        && !((Boolean) value.getValue()).booleanValue()) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    private static void setProfileAppEnabled(Context context, ProfileAppEntry entry, boolean enabled) {
+        if (context == null || entry == null) {
+            return;
+        }
+        try {
+            context.getSharedPreferences(PROFILE_APPS_PREFS, Context.MODE_PRIVATE).edit()
+                    .putBoolean(profileAppPreferenceKey(entry), !enabled).commit();
+        } catch (Throwable ignored) {
+        }
+        logOperation(context, "PROFILE_SWITCH", "enabled=" + enabled
+                + ", package=" + entry.packageName + ", component=" + entry.componentName
+                + ", userId=" + entry.userId + ", serial=" + entry.profileSerial);
+        removeLegacyProfileShortcutRows(context, entry);
+        try {
+            ArrayList params = new ArrayList();
+            params.add(entry.packageName);
+            params.add(Integer.valueOf(entry.userId));
+            if (enabled) {
+                postDatabaseUserPackageAdded(params);
+                logOperation(context, "PROFILE_NATIVE_ITEM", "add package=" + entry.packageName
+                        + ", userId=" + entry.userId);
+            } else {
+                postDatabaseUserPackageRemoved(params);
+                logOperation(context, "PROFILE_NATIVE_ITEM", "remove package=" + entry.packageName
+                        + ", userId=" + entry.userId);
+            }
+        } catch (Throwable t) {
+            logOperation(context, "PROFILE_NATIVE_ITEM", "failed package=" + entry.packageName
+                    + ", userId=" + entry.userId + ", error=" + shortError(t));
+        }
+        postDatabaseRefreshEvent();
+        final Context app = context.getApplicationContext() == null
+                ? context : context.getApplicationContext();
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            public void run() {
+                postDatabaseRefreshEvent();
+                applyIconChange(app);
+            }
+        }, 350);
+    }
+
+    private static void updateProfileShortcut(Context context, ProfileAppEntry entry,
+                                              boolean enabled) {
+        if (context == null || entry == null || entry.componentName == null
+                || entry.profileSerial < 0L || entry.userId <= 0) {
+            return;
+        }
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            final Context app = context.getApplicationContext() == null
+                    ? context : context.getApplicationContext();
+            final ProfileAppEntry queuedEntry = entry;
+            final boolean queuedEnabled = enabled;
+            logOperation(context, "PROFILE_SHORTCUT", "queued_on_main package=" + entry.packageName
+                    + ", enabled=" + enabled);
+            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                public void run() {
+                    updateProfileShortcut(app, queuedEntry, queuedEnabled);
+                }
+            });
+            return;
+        }
+        try {
+            Uri data = new Uri.Builder()
+                    .scheme("content")
+                    .encodedAuthority("com.smartisanos.launcher.data.SearchProvider")
+                    .appendEncodedPath(entry.packageName)
+                    .appendEncodedPath(entry.componentName.getClassName())
+                    .appendEncodedPath(String.valueOf(entry.profileSerial))
+                    .build();
+            Intent target = new Intent();
+            target.setClassName(context.getPackageName(),
+                    "com.smartisanos.launcher.StartActivityForSearch");
+            target.setData(data);
+
+            Intent shortcut = new Intent(enabled
+                    ? "com.android.launcher.action.INSTALL_SHORTCUT"
+                    : "com.android.launcher.action.UNINSTALL_SHORTCUT");
+            shortcut.setPackage(context.getPackageName());
+            shortcut.putExtra(Intent.EXTRA_SHORTCUT_INTENT, target);
+            shortcut.putExtra(Intent.EXTRA_SHORTCUT_NAME, entry.label);
+            shortcut.putExtra("duplicate", false);
+            shortcut.putExtra("maintained_profile_package", entry.packageName);
+            shortcut.putExtra("maintained_profile_component",
+                    entry.componentName.getClassName() + "#profileSerial=" + entry.profileSerial);
+            shortcut.putExtra("maintained_profile_shortcut_id", "profile:"
+                    + entry.profileSerial + ":" + entry.componentName.flattenToString());
+            if (enabled && entry.icon != null) {
+                Bitmap icon = drawableToBitmapForBadge(entry.icon);
+                Bitmap badged = icon == null ? null : drawDoppelgangerBadge(icon);
+                if (badged != null) {
+                    shortcut.putExtra(Intent.EXTRA_SHORTCUT_ICON, badged);
+                }
+            }
+            String handlerName = enabled ? "a" : "b";
+            boolean handledDirectly = false;
+            try {
+                Class<?> handler = Class.forName("com.smartisanos.launcher.a.L");
+                if (enabled) {
+                    removeLegacyProfileShortcutRows(context, entry);
+                }
+                Method method = handler.getDeclaredMethod(handlerName, Context.class, Intent.class);
+                method.setAccessible(true);
+                method.invoke(null, context, shortcut);
+                handledDirectly = true;
+            } catch (Throwable directError) {
+                logOperation(context, "PROFILE_SHORTCUT", "direct_failed enabled=" + enabled
+                        + ", package=" + entry.packageName + ", error=" + shortError(directError));
+            }
+            if (!handledDirectly) {
+                context.sendBroadcast(shortcut);
+            }
+            logOperation(context, "PROFILE_SHORTCUT", "enabled=" + enabled
+                    + ", package=" + entry.packageName + ", component=" + entry.componentName
+                    + ", userId=" + entry.userId + ", serial=" + entry.profileSerial
+                    + ", direct=" + handledDirectly + ", uri=" + data);
+        } catch (Throwable t) {
+            Log.w(LOG_TAG, "Unable to update profile shortcut", t);
+            logOperation(context, "PROFILE_SHORTCUT", "failed enabled=" + enabled
+                    + ", package=" + entry.packageName + ", error=" + shortError(t));
+        }
+    }
+
+    private static void removeLegacyProfileShortcutRows(Context context, ProfileAppEntry entry) {
+        if (context == null || entry == null) {
+            return;
+        }
+        String[] packages = new String[]{entry.packageName, context.getPackageName()};
+        int[] users = new int[]{-1, 0, entry.userId};
+        for (String pkg : packages) {
+            for (int userId : users) {
+                try {
+                    ArrayList params = new ArrayList();
+                    params.add(pkg);
+                    params.add(Integer.valueOf(userId));
+                    params.add(new ArrayList());
+                    postDatabaseUserPackageEvent("EVENT_UNINSTALL_SHORTCUT", params);
+                    logOperation(context, "PROFILE_CLEANUP", "package=" + pkg
+                            + ", userId=" + userId);
+                } catch (Throwable t) {
+                    logOperation(context, "PROFILE_CLEANUP", "failed package=" + pkg
+                            + ", userId=" + userId + ", error=" + shortError(t));
+                }
+            }
+        }
+    }
+
+    private static List<ProfileAppEntry> discoverProfileApps(Context context, boolean includeDisabled) {
+        ArrayList<ProfileAppEntry> result = new ArrayList<ProfileAppEntry>();
+        if (context == null || Build.VERSION.SDK_INT < 21) {
+            return result;
+        }
+        try {
+            LauncherApps launcherApps =
+                    (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (launcherApps == null) {
+                return result;
+            }
+            List<UserHandle> profiles = launcherApps.getProfiles();
+            logOperation(context, "PROFILE_DISCOVERY", "profiles="
+                    + (profiles == null ? "null" : String.valueOf(profiles.size()))
+                    + ", includeDisabled=" + includeDisabled);
+            if (profiles == null || profiles.size() <= 1) {
+                return result;
+            }
+            UserHandle current = Process.myUserHandle();
+            HashMap<String, Boolean> seen = new HashMap<String, Boolean>();
+            for (UserHandle profile : profiles) {
+                if (profile == null || profile.equals(current)) {
+                    continue;
+                }
+                int userId = userIdentifier(profile);
+                long serial = profileSerial(context, profile);
+                logOperation(context, "PROFILE_DISCOVERY", "profile userId=" + userId
+                        + ", serial=" + serial + ", handle=" + profile);
+                if (userId < 0 || serial < 0L) {
+                    continue;
+                }
+                List<LauncherActivityInfo> activities;
+                try {
+                    activities = launcherApps.getActivityList(null, profile);
+                } catch (Throwable ignored) {
+                    logOperation(context, "PROFILE_DISCOVERY", "activity_list_failed userId=" + userId
+                            + ", error=" + shortError(ignored));
+                    continue;
+                }
+                logOperation(context, "PROFILE_DISCOVERY", "activity_count userId=" + userId
+                        + ", count=" + (activities == null ? "null" : String.valueOf(activities.size())));
+                if (activities == null) {
+                    continue;
+                }
+                for (LauncherActivityInfo info : activities) {
+                    if (info == null || info.getComponentName() == null) {
+                        continue;
+                    }
+                    ComponentName component = info.getComponentName();
+                    String key = serial + "\t" + component.flattenToString();
+                    if (seen.containsKey(key)) {
+                        continue;
+                    }
+                    CharSequence labelValue = null;
+                    Drawable icon = null;
+                    // ColorOS returns an already badged and framed drawable for MultiApp.
+                    // Always prefer the ordinary user-0 app/activity artwork, then add only
+                    // the Smartisan mask badge ourselves.
+                    icon = loadMainProfileLauncherIcon(context, component.getPackageName());
+                    try {
+                        labelValue = info.getLabel();
+                    } catch (Throwable ignored) {
+                    }
+                    if (icon == null) {
+                        try {
+                            icon = info.getIcon(0);
+                        } catch (Throwable ignored) {
+                            try {
+                                icon = info.getBadgedIcon(0);
+                            } catch (Throwable ignored2) {
+                            }
+                        }
+                    }
+                    ProfileAppEntry entry = new ProfileAppEntry(
+                            labelValue == null ? component.getPackageName() : labelValue.toString(),
+                            component, profile, userId, serial, icon);
+                    if (includeDisabled || isProfileAppEnabled(context, entry)) {
+                        result.add(entry);
+                        seen.put(key, Boolean.TRUE);
+                        logOperation(context, "PROFILE_APP", "package=" + entry.packageName
+                                + ", component=" + component + ", userId=" + userId
+                                + ", serial=" + serial + ", enabled="
+                                + isProfileAppEnabled(context, entry));
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+            logOperation(context, "PROFILE_DISCOVERY", "failed " + shortError(ignored));
+        }
+        Collections.sort(result, new Comparator<ProfileAppEntry>() {
+            public int compare(ProfileAppEntry a, ProfileAppEntry b) {
+                int label = a.label.compareToIgnoreCase(b.label);
+                if (label != 0) {
+                    return label;
+                }
+                return a.profileSerial < b.profileSerial ? -1
+                        : (a.profileSerial == b.profileSerial ? 0 : 1);
+            }
+        });
+        return result;
+    }
+
+    private static Drawable loadMainProfileLauncherIcon(Context context, String packageName) {
+        if (context == null || TextUtils.isEmpty(packageName)) {
+            return null;
+        }
+        try {
+            PackageManager pm = context.getPackageManager();
+            Intent query = new Intent(Intent.ACTION_MAIN);
+            query.addCategory(Intent.CATEGORY_LAUNCHER);
+            query.setPackage(packageName);
+            List<ResolveInfo> matches = pm.queryIntentActivities(query, 0);
+            if (matches != null) {
+                for (ResolveInfo info : matches) {
+                    if (info != null && info.activityInfo != null
+                            && packageName.equals(info.activityInfo.packageName)) {
+                        Drawable icon = loadIcon(info, pm);
+                        if (icon != null) {
+                            return icon;
+                        }
+                    }
+                }
+            }
+            return pm.getApplicationIcon(packageName);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /** Fast guard for the original fixed-user doppelganger package event path. */
+    public static boolean hasSecondaryLauncherProfile(Context context) {
+        if (context == null || Build.VERSION.SDK_INT < 21) {
+            return false;
+        }
+        // No enabled record means the user has never switched on a cloned app.
+        // Check this cheap local preference before asking LauncherApps for profiles.
+        if (!hasEnabledProfileApps(context)) {
+            return false;
+        }
+        try {
+            LauncherApps launcherApps =
+                    (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            List<UserHandle> profiles = launcherApps == null ? null : launcherApps.getProfiles();
+            if (profiles == null || profiles.size() <= 1) {
+                return false;
+            }
+            UserHandle current = Process.myUserHandle();
+            for (UserHandle profile : profiles) {
+                if (profile != null && !profile.equals(current)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
     private static boolean shouldVerifySearchLaunch(Context context, SearchEntry entry) {
         if (context == null || entry == null || !hasLauncherPagePassword(context)) {
             return false;
@@ -3845,6 +4513,16 @@ public final class MaintainedLauncherSettingsHost {
                     continue;
                 }
                 try {
+                    Object itemInfo = cell.getClass().getMethod("Rl").invoke(cell);
+                    if (itemInfo != null) {
+                        try {
+                            int cellUserId = itemInfo.getClass().getField("userId").getInt(itemInfo);
+                            if (cellUserId != entry.userId) {
+                                continue;
+                            }
+                        } catch (Throwable ignored) {
+                        }
+                    }
                     Object page = cell.getClass().getMethod("Af").invoke(cell);
                     if (page == null) {
                         continue;
@@ -3868,6 +4546,7 @@ public final class MaintainedLauncherSettingsHost {
         intent.putExtra(EXTRA_PASSWORD_TARGET_PACKAGE, entry.packageName);
         intent.putExtra(EXTRA_PASSWORD_TARGET_CLASS, entry.className);
         intent.putExtra(EXTRA_PASSWORD_TARGET_USER, entry.userId);
+        intent.putExtra(EXTRA_PASSWORD_TARGET_SERIAL, entry.profileSerial);
         int flags = Intent.FLAG_ACTIVITY_NO_ANIMATION;
         if (isDoppelgangerUserId(entry.userId)) {
             flags |= Intent.FLAG_ACTIVITY_NEW_TASK;
@@ -4008,6 +4687,93 @@ public final class MaintainedLauncherSettingsHost {
         });
     }
 
+    private static void showProfileAppsPage(final Activity activity) {
+        try {
+            tuneWindow(activity);
+            final SettingsResourceContext context = createSettingsContext(activity);
+            final Resources resources = context.getResources();
+            LinearLayout root = new LinearLayout(context);
+            root.setOrientation(LinearLayout.VERTICAL);
+            setBackground(root, resources, "background");
+
+            View title = inflate(activity, context, "title_layout");
+            bindTitleBar(activity, resources, title, "应用分身", new View.OnClickListener() {
+                public void onClick(View v) {
+                    show(activity, sMainSettingsScrollY);
+                }
+            });
+            root.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+            ScrollView scroll = new ScrollView(context);
+            final LinearLayout content = new LinearLayout(context);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.setPadding(0, dp(context, 18), 0, dp(context, 28));
+            content.addView(privacySectionLabel(context, "系统可用的分身应用"));
+            final TextView status = new TextView(context);
+            status.setText("正在读取分身应用…");
+            status.setTextColor(0xff8b8b8b);
+            status.setTextSize(16);
+            status.setGravity(Gravity.CENTER);
+            content.addView(status, new LinearLayout.LayoutParams(-1, dp(context, 96)));
+            scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+            root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+            activity.setContentView(root);
+
+            final Context app = activity.getApplicationContext() == null
+                    ? activity : activity.getApplicationContext();
+            new Thread(new Runnable() {
+                public void run() {
+                    final List<ProfileAppEntry> entries = discoverProfileApps(app, true);
+                    activity.runOnUiThread(new Runnable() {
+                        public void run() {
+                            if (activity.isFinishing()) {
+                                return;
+                            }
+                            content.removeView(status);
+                            if (entries.isEmpty()) {
+                                TextView empty = new TextView(context);
+                                empty.setText("未发现分身应用，或当前系统不支持读取分身应用");
+                                empty.setTextColor(0xff8b8b8b);
+                                empty.setTextSize(16);
+                                empty.setGravity(Gravity.CENTER);
+                                empty.setPadding(dp(context, 28), 0, dp(context, 28), 0);
+                                content.addView(empty, new LinearLayout.LayoutParams(-1, dp(context, 110)));
+                                return;
+                            }
+                            for (int i = 0; i < entries.size(); i++) {
+                                final ProfileAppEntry entry = entries.get(i);
+                                final SettingItemSwitch item = new SettingItemSwitch(context);
+                                String title = entry.label;
+                                if (TextUtils.isEmpty(title)) {
+                                    title = entry.packageName;
+                                }
+                                item.setTitle(title + "分身");
+                                item.setChecked(isProfileAppEnabled(app, entry));
+                                setBackground(item, resources, "selector_setting_sub_item_bg_single");
+                                View.OnClickListener click = new View.OnClickListener() {
+                                    public void onClick(View v) {
+                                        boolean enabled = !item.isChecked();
+                                        item.setCheckedAnimated(enabled);
+                                        setProfileAppEnabled(app, entry, enabled);
+                                    }
+                                };
+                                bindSwitchControlOnly(item, click);
+                                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+                                lp.topMargin = settingDimen(resources, "settings_item_top_bottom_margin",
+                                        dp(context, 20));
+                                content.addView(item, lp);
+                            }
+                        }
+                    });
+                }
+            }, "ProfileAppsSettings").start();
+        } catch (Throwable t) {
+            t.printStackTrace();
+            Toast.makeText(activity, "应用分身页面加载失败", Toast.LENGTH_SHORT).show();
+            show(activity, sMainSettingsScrollY);
+        }
+    }
+
     private static void showPrivacyPasswordPage(final Activity activity) {
         try {
             tuneWindow(activity);
@@ -4140,16 +4906,29 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static TextView privacySectionLabel(Context context, String text) {
+        Resources resources = context.getResources();
         TextView label = new TextView(context);
         label.setText(text);
-        label.setTextColor(0xff8a8a8a);
-        label.setTextSize(18);
+        int colorId = resources.getIdentifier("setting_item_tips_color", "color", SETTINGS_PKG);
+        if (colorId != 0) {
+            try {
+                label.setTextColor(resources.getColor(colorId));
+            } catch (Throwable ignored) {
+                label.setTextColor(0xff7e818b);
+            }
+        } else {
+            label.setTextColor(0xff7e818b);
+        }
+        label.setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                settingDimen(resources, "settings_item_tips_text_size", dp(context, 14)));
         label.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        label.setTypeface(Typeface.DEFAULT_BOLD);
-        label.setPadding(dp(context, 30), 0, 0, 0);
+        label.setPadding(settingDimen(resources, "settings_item_title_left_margin", dp(context, 30)),
+                0,
+                settingDimen(resources, "settings_item_title_right_margin", dp(context, 30)),
+                0);
         label.setSingleLine(true);
         label.setIncludeFontPadding(false);
-        label.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(context, 42)));
+        label.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
         return label;
     }
 
@@ -4576,6 +5355,8 @@ public final class MaintainedLauncherSettingsHost {
             target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
             target.putExtra(EXTRA_PASSWORD_TARGET_USER,
                     source.getIntExtra(EXTRA_PASSWORD_TARGET_USER, 0));
+            target.putExtra(EXTRA_PASSWORD_TARGET_SERIAL,
+                    source.getLongExtra(EXTRA_PASSWORD_TARGET_SERIAL, -1L));
             return target;
         } catch (Throwable ignored) {
             return null;
@@ -4585,8 +5366,18 @@ public final class MaintainedLauncherSettingsHost {
     private static void startPasswordTarget(Activity activity, Intent target) {
         try {
             int userId = target.getIntExtra(EXTRA_PASSWORD_TARGET_USER, 0);
+            long serial = target.getLongExtra(EXTRA_PASSWORD_TARGET_SERIAL, -1L);
             target.removeExtra(EXTRA_PASSWORD_TARGET_USER);
-            if (isDoppelgangerUserId(userId)) {
+            target.removeExtra(EXTRA_PASSWORD_TARGET_SERIAL);
+            UserHandle profile = userHandleForSerial(activity, serial);
+            if (profile != null && target.getComponent() != null) {
+                LauncherApps launcherApps =
+                        (LauncherApps) activity.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+                if (launcherApps == null) {
+                    throw new IllegalStateException("LauncherApps unavailable");
+                }
+                launcherApps.startMainActivity(target.getComponent(), profile, null, null);
+            } else if (isDoppelgangerUserId(userId)) {
                 startActivityForUser(activity, target, null, userId);
             } else {
                 activity.startActivity(target);
@@ -5783,18 +6574,25 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void showConfirmDialog(final Activity activity, String title, String message, String negative, String positive, final View.OnClickListener positiveClick) {
         final Dialog dialog = new Dialog(activity);
+        final boolean updateStyle = title != null
+                && (title.contains("更新") || title.contains("版本"));
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(0, dp(activity, 18), 0, 0);
-        root.setBackgroundColor(0xfffbfbfb);
+        GradientDrawable dialogBackground = new GradientDrawable();
+        dialogBackground.setColor(0xfffbfbfb);
+        dialogBackground.setCornerRadius(dp(activity, 8));
+        root.setBackground(dialogBackground);
 
         TextView titleView = text(activity, title, 18, 0xff333333, true);
         titleView.setGravity(Gravity.CENTER);
         root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 40)));
 
         TextView messageView = text(activity, message, 14, 0xff777777, false);
-        messageView.setGravity(Gravity.CENTER);
-        messageView.setPadding(dp(activity, 30), 0, dp(activity, 30), dp(activity, 18));
+        messageView.setGravity(updateStyle ? (Gravity.LEFT | Gravity.TOP) : Gravity.CENTER);
+        messageView.setLineSpacing(dp(activity, 4), 1.08f);
+        messageView.setPadding(dp(activity, updateStyle ? 26 : 30), dp(activity, 8),
+                dp(activity, updateStyle ? 26 : 30), dp(activity, 22));
         root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
 
         View line = new View(activity);
@@ -5831,7 +6629,11 @@ public final class MaintainedLauncherSettingsHost {
         dialog.show();
         Window shown = dialog.getWindow();
         if (shown != null) {
-            shown.setLayout(dp(activity, 294), -2);
+            int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+            int width = updateStyle
+                    ? Math.min(dp(activity, 380), screenWidth - dp(activity, 32))
+                    : dp(activity, 294);
+            shown.setLayout(width, -2);
         }
     }
 
@@ -7341,6 +8143,12 @@ public final class MaintainedLauncherSettingsHost {
         }
         disableLegacyTouchSizeSweepOnModernAndroid();
         applyLauncherNavigationBarSetting(activity);
+        applyBadgeVisibility(activity,
+                readSystemBool(activity, "launcher_hide_badge", false), false);
+        // Some ColorOS builds grant notification-listener access in the installer UI
+        // but do not bind the service until the settings page is opened. Re-check and
+        // request the binding whenever HOME becomes active, without requiring that detour.
+        com.smartisanos.launcher.badge.BadgeBridge.replay(activity);
         requestLauncherFrame(activity);
         Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(new Runnable() {
@@ -7912,7 +8720,7 @@ public final class MaintainedLauncherSettingsHost {
 
         File[] logs = operationLogFiles(activity);
         if (logs.length == 0) {
-            TextView empty = text(activity, "暂无日志。开始记录后，日志会按日期保存在应用私有目录。", 14, 0xff999999, false);
+            TextView empty = text(activity, "暂无日志。开始记录后，日志会按日期保存在应用私有目录；结束记录后可直接发送。", 14, 0xff999999, false);
             empty.setPadding(dp(activity, 20), dp(activity, 8), dp(activity, 20), dp(activity, 16));
             content.addView(empty, new LinearLayout.LayoutParams(-1, -2));
             return;
@@ -8058,7 +8866,17 @@ public final class MaintainedLauncherSettingsHost {
                 showOperationLogPreview(activity, file);
             }
         });
-        row.addView(view, new LinearLayout.LayoutParams(dp(activity, 74), dp(activity, 42)));
+        row.addView(view, new LinearLayout.LayoutParams(dp(activity, 62), dp(activity, 42)));
+
+        TextView share = aboutActionButton(activity, "发送", 0xff5f8fe8);
+        share.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                shareOperationLog(activity, file);
+            }
+        });
+        LinearLayout.LayoutParams shareLp = new LinearLayout.LayoutParams(dp(activity, 62), dp(activity, 42));
+        shareLp.leftMargin = dp(activity, 6);
+        row.addView(share, shareLp);
 
         TextView delete = aboutActionButton(activity, "删除", 0xffd85b5b);
         delete.setOnClickListener(new View.OnClickListener() {
@@ -8075,8 +8893,8 @@ public final class MaintainedLauncherSettingsHost {
                 showAboutPage(activity);
             }
         });
-        LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(dp(activity, 74), dp(activity, 42));
-        deleteLp.leftMargin = dp(activity, 8);
+        LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(dp(activity, 62), dp(activity, 42));
+        deleteLp.leftMargin = dp(activity, 6);
         row.addView(delete, deleteLp);
         parent.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 62)));
     }
@@ -8152,8 +8970,9 @@ public final class MaintainedLauncherSettingsHost {
             return "正在记录。日志目录：" + path
                     + (active == null ? "" : "\n当前文件：" + active.getName());
         }
-        return "未记录。开启后会在后台自动写入关键操作和异常信息；正常使用不弹出日志。"
-                + "\n系统 logcat 会另存为配套文件，供 ADB 排查时读取。"
+        return "未记录。开启后会写入关键操作、分身发现过程、异常及本应用可读取的 logcat。"
+                + "\n结束后点击“发送”，会把主日志和配套 logcat 合并为文字发送。"
+                + "\n受 Android 权限限制，它不能代替电脑 ADB 读取全部系统和其他应用日志。"
                 + "\nADB 路径：" + path;
     }
 
@@ -8312,6 +9131,27 @@ public final class MaintainedLauncherSettingsHost {
         showInfoDialog(activity, file.getName(), tailText(file, 6000));
     }
 
+    private static void shareOperationLog(Activity activity, File file) {
+        try {
+            String stamp = file.getName().substring("operation-".length());
+            File logcat = new File(file.getParentFile(), "operation-logcat-" + stamp);
+            StringBuilder body = new StringBuilder();
+            body.append("锤子桌面诊断日志\n\n=== 操作日志 ===\n")
+                    .append(tailText(file, 90000));
+            if (logcat.exists()) {
+                body.append("\n\n=== 应用可读取的 logcat ===\n")
+                        .append(tailText(logcat, 90000));
+            }
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_SUBJECT, "锤子桌面诊断日志 " + stamp);
+            send.putExtra(Intent.EXTRA_TEXT, body.toString());
+            activity.startActivity(Intent.createChooser(send, "发送诊断日志"));
+        } catch (Throwable t) {
+            Toast.makeText(activity, "发送日志失败：" + shortError(t), Toast.LENGTH_LONG).show();
+        }
+    }
+
     private static String tailText(File file, int maxChars) {
         BufferedReader reader = null;
         try {
@@ -8413,6 +9253,8 @@ public final class MaintainedLauncherSettingsHost {
             bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
             bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
             bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
+            bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
+            styleNotificationAccessLink(activity, resources, root);
             bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
             bindSwitch(activity, resources, root, "item_id_search_page_enabled", KEY_SEARCH_PAGE_ENABLED, true);
             tuneScrollBars(root);
@@ -8422,14 +9264,50 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    private static void styleNotificationAccessLink(final Activity activity, Resources resources, View root) {
+        try {
+            int viewId = resources.getIdentifier("item_id_badge_notification_access", "id", SETTINGS_PKG);
+            View candidate = root.findViewById(viewId);
+            if (!(candidate instanceof TextView)) {
+                return;
+            }
+            TextView view = (TextView) candidate;
+            String full = String.valueOf(view.getText());
+            String action = getString(resources, "obsession_badge_notification_access_action",
+                    "Tap to configure");
+            int start = full.lastIndexOf(action);
+            if (start < 0) {
+                return;
+            }
+            SpannableString styled = new SpannableString(full);
+            int end = start + action.length();
+            styled.setSpan(new android.text.style.ClickableSpan() {
+                public void onClick(View widget) {
+                    com.smartisanos.launcher.badge.BadgeBridge.openNotificationAccessSettings(activity);
+                }
+
+                public void updateDrawState(android.text.TextPaint paint) {
+                    paint.setColor(0xff4f7edc);
+                    paint.setUnderlineText(true);
+                }
+            }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            view.setText(styled);
+            view.setOnClickListener(null);
+            view.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
+            view.setHighlightColor(Color.TRANSPARENT);
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static void showInfoDialog(final Activity activity, String title, String message) {
         final Dialog dialog = new Dialog(activity);
+        final boolean updateStyle = title != null && title.contains("更新");
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(0, 0, 0, 0);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0xfffbfbfb);
-        bg.setCornerRadius(dp(activity, 4));
+        bg.setCornerRadius(dp(activity, updateStyle ? 8 : 4));
         root.setBackground(bg);
 
         TextView titleView = text(activity, title, 18, 0xff333333, true);
@@ -8442,9 +9320,11 @@ public final class MaintainedLauncherSettingsHost {
 
         final boolean longMessage = message != null && message.length() > 600;
         TextView messageView = text(activity, message, longMessage ? 12 : 14, 0xff666666, false);
-        messageView.setGravity(longMessage ? (Gravity.LEFT | Gravity.TOP) : Gravity.CENTER);
-        messageView.setLineSpacing(dp(activity, 2), 1.0f);
-        messageView.setPadding(dp(activity, 24), dp(activity, 20), dp(activity, 24), dp(activity, 20));
+        messageView.setGravity((longMessage || updateStyle)
+                ? (Gravity.LEFT | Gravity.TOP) : Gravity.CENTER);
+        messageView.setLineSpacing(dp(activity, updateStyle ? 4 : 2), updateStyle ? 1.08f : 1.0f);
+        messageView.setPadding(dp(activity, updateStyle ? 26 : 24), dp(activity, 20),
+                dp(activity, updateStyle ? 26 : 24), dp(activity, 20));
         if (longMessage) {
             ScrollView messageScroll = new ScrollView(activity);
             messageScroll.setFillViewport(false);
@@ -8477,7 +9357,11 @@ public final class MaintainedLauncherSettingsHost {
         dialog.show();
         Window shown = dialog.getWindow();
         if (shown != null) {
-            shown.setLayout(dp(activity, 300), -2);
+            int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+            int width = updateStyle
+                    ? Math.min(dp(activity, 380), screenWidth - dp(activity, 32))
+                    : dp(activity, 300);
+            shown.setLayout(width, -2);
         }
     }
 
@@ -9106,27 +9990,18 @@ public final class MaintainedLauncherSettingsHost {
             item.setTitle(titleText);
             item.setChecked(isImprovedIconEnabled(context));
             setBackground(item, resources, bgName);
-            item.setOnClickListener(new View.OnClickListener() {
+            View.OnClickListener listener = new View.OnClickListener() {
                 public void onClick(View v) {
                     toggleImprovedIcon(activity, item);
                 }
-            });
-            if (item.getSwitch() != null) {
-                item.getSwitch().setClickable(true);
-                item.getSwitch().setOnTouchListener(new View.OnTouchListener() {
-                    public boolean onTouch(View v, MotionEvent event) {
-                        if (event.getAction() == MotionEvent.ACTION_UP) {
-                            toggleImprovedIcon(activity, item);
-                        }
-                        return true;
-                    }
-                });
-            }
+            };
+            bindSwitchControlOnly(item, listener);
             return item;
         }
         RelativeLayout row = new RelativeLayout(context);
         setBackground(row, resources, bgName);
         row.setClickable(click != null);
+        row.setOnClickListener(click);
 
         LinearLayout texts = new LinearLayout(context);
         texts.setGravity(Gravity.CENTER_VERTICAL);
@@ -9175,13 +10050,7 @@ public final class MaintainedLauncherSettingsHost {
             if (iconSizeRow) {
                 subtitle.setTag(TAG_ICON_SIZE_SUBTITLE);
             }
-            if (click != null) {
-                subtitle.setClickable(true);
-                subtitle.setOnClickListener(click);
-                subtitle.setContentDescription(subtitleText);
-            }
-        } else if (click != null) {
-            row.setOnClickListener(click);
+            subtitle.setContentDescription(subtitleText);
         }
         return row;
     }
@@ -11555,6 +12424,8 @@ public final class MaintainedLauncherSettingsHost {
         final String packageName;
         final String className;
         final int userId;
+        final UserHandle profileUser;
+        final long profileSerial;
         final String key;
         final String pinyinSpaced;
         final String pinyinCompact;
@@ -11565,16 +12436,45 @@ public final class MaintainedLauncherSettingsHost {
         int lastScore;
 
         SearchEntry(String label, String packageName, String className, int userId, Drawable icon) {
+            this(label, packageName, className, userId, icon, null, -1L);
+        }
+
+        SearchEntry(String label, String packageName, String className, int userId, Drawable icon,
+                    UserHandle profileUser, long profileSerial) {
             this.label = label;
             this.labelLower = label == null ? "" : label.toLowerCase();
             this.packageName = packageName;
             this.className = className;
             this.userId = userId;
-            this.key = packageName + "\t" + className + "\t" + userId;
+            this.profileUser = profileUser;
+            this.profileSerial = profileSerial;
+            this.key = packageName + "\t" + className + "\t"
+                    + (profileSerial >= 0L ? profileSerial : userId);
             this.pinyinSpaced = toLatinPinyin(label);
             this.pinyinCompact = compactLetters(this.pinyinSpaced);
             this.initials = pinyinInitials(this.pinyinSpaced);
             this.t9Code = toT9Code(label + " " + packageName + " " + pinyinCompact + " " + initials);
+            this.icon = icon;
+        }
+    }
+
+    private static final class ProfileAppEntry {
+        final String label;
+        final String packageName;
+        final ComponentName componentName;
+        final UserHandle profileUser;
+        final int userId;
+        final long profileSerial;
+        final Drawable icon;
+
+        ProfileAppEntry(String label, ComponentName componentName, UserHandle profileUser,
+                        int userId, long profileSerial, Drawable icon) {
+            this.label = label == null ? "" : label;
+            this.componentName = componentName;
+            this.packageName = componentName == null ? "" : componentName.getPackageName();
+            this.profileUser = profileUser;
+            this.userId = userId;
+            this.profileSerial = profileSerial;
             this.icon = icon;
         }
     }

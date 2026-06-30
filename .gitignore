@@ -1,13 +1,17 @@
 build/
 *.apk
 *.png
+!icons/drawable/*.png
 *.jpg
 *.jpeg
 !/build/
 !/build/**
 !launcher/assets/settings_native/
 !launcher/assets/settings_native/*.png
+!launcher/assets/folder_theme_bg/wallpaper_preview_*.png
+!launcher/assets/folder_theme_bg/wallpaper_preview_*.jpg
 !launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/privacy_password_lock_icon.png
+!launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/app_operation.png
 !launcher/tools/maintained_settings_res/res/drawable-xxhdpi-v4/btn_*_classic_dark.9.png
 launcher/scratch/
 scratch/

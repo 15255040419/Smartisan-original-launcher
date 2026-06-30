@@ -15,7 +15,7 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `BUILD_AND_VERSION_NOTES.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-06-28）
+## 当前状态总览（2026-06-30）
 
 ### 已完成
 
@@ -32,6 +32,7 @@
 - 透明主题壁纸链路已接入 `launcher_wallpaper_uri`、私有壁纸副本、缩略图和 `gaussian_wallpaper.png` 兜底；“恢复默认壁纸”会清理自定义副本并回到当前主题内置背景。
 - 主设置页缩略图已按 maintained 方向调整：桌面主题 / 桌面壁纸 / 桌面翻页动画使用竖向带框缩略图，应用图标不额外加白色外框。
 - 文件夹打开与关闭两套布局均已按各自可见边框自适应对齐：预览在 4 项以内使用 2x2、5-9 项使用 3x3；关闭预览以当前 `icon_size_with_shadow` 为容器，按文件夹 PNG 内部列中心和每层可见区域中心计算图标边长、边距与间距；打开状态按书架 PNG 的可见层中心和固定三列摆放。两套逻辑都使用归一化比例，不依赖某个屏幕的固定像素偏移。
+- 文件夹打开背景已不再依赖 `res/drawable` 中额外补入的 `wallpaper_preview_*` 资源表项；当前改为优先从主 APK `assets/folder_theme_bg/` 直接读取与主题 ID 对应的背景图，普通主题、浅金主题和透明主题均可稳定命中，不再因 apktool 资源表未收录新增 drawable 而回退成默认黑底。
 - 应用图标替换链路已从设置页预览扩展到桌面主图标加载入口，支持 redirect、自定义图片、图标包 appfilter 和系统原图回退。
 - 应用图标页顶部“改进版图标”已改为复用首页同款 `SettingItemSwitch` / `SwitchEx`，不再手写开关；“图标包”行改用 maintained 卡片背景，与上方开关行组成一组。
 - 应用图标页新增“桌面图标大小”滑块，位置在“改进版图标”和“图标包”之间；支持 50% - 150% 连续调节，并可点击“小 / 中 / 大”快速跳到 50% / 100% / 150%；保存后回到桌面并完整重启 Launcher，让 12 / 20 宫格里的所有普通应用和桌面设置虚拟入口统一应用新尺寸。
@@ -42,10 +43,187 @@
 - 应用图标页点击范围已收窄：只有左侧默认图标块和右侧推荐/加号图标块响应选择，右侧应用名称/说明文字区域不再弹出选择框。
 - 当前搜索页使用 launcher 内 `ThemeChooserActivity` / `MaintainedLauncherSettingsHost.showSearchPage()` 自绘页面，不再依赖、下载或构建锤子独立搜索 APK；桌面下滑只作为进入自绘搜索页的手势入口。
 - 强迫症选项已从设置首页零散开关收纳到二级页；主页入口和二级页标题走资源字符串，英文系统显示 `OCD Settings`，中文系统显示“强迫症选项”。
+- 通知角标已补齐普通 Android 数据源：通知监听服务按包名和 UID 统计有效活动通知，转换为原版 `com.smartisanos.launcher.new_message` 协议并继续使用原版数字纹理、文件夹汇总和横扫动画。强迫症页在“隐藏图标上的角标”下面提供“紧贴屏幕横扫清除角标”开关和通知使用权入口；横扫后抑制旧通知 key，新通知到达后角标会重新出现。
 - 主设置页新增“隐私密码”入口，复用页面锁同一套 Launcher 私有密码摘要；已有密码时先验证旧密码，再设置两遍新密码。
 - 双开 / 多用户应用显示和启动已补入 LauncherApps 查询与 `startActivityAsUser` 兼容路径，避免双开应用只显示主用户图标或点击后启动错用户。
 - 双开 / 多用户应用继续对照 maintained 调整：搜索页、桌面应用列表和启动链路都尽量使用 LauncherApps 多用户查询；分身应用支持叠加原版风格面具标记。
 - 应用图标识别逻辑已继续向 maintained 对齐，同时保留当前工程已有的图标识别能力，减少“闲鱼 / 酷安”等普通应用被误识别成应用商店图标，以及系统“电话 / 拨号 / 电话本”等名称匹配不稳定的问题。
+
+### 2026-06-30：文件夹背景打包链路改为 assets 直读
+
+问题与根因：
+
+- 之前为普通主题文件夹背景补入了 `wallpaper_preview_*` / `wallpaper_light_gold` 图片文件，但当前主桌面工程是 `apktool + resources.arsc` 的半反编译结构，不是完整的 Android 源码资源工程。
+- `build.bat` 构建主桌面时使用的是 `apktool b launcher`。这条链路会保留已有资源表，但不会像完整 `aapt2 link` 那样自动为后补的 drawable 生成稳定资源表项。
+- 结果是：代码里主题 ID 到 `wallpaper_preview_*` 的名字映射存在，最终 APK 里也能看到这些字符串，但 `res/*wallpaper_preview_*` 实际图片并没有被打进主 APK 资源表。运行时 `Resources.getIdentifier(drawable)` 对透明主题还能命中老资源 `t_blur_background_folder`，普通主题却始终找不到，只能回退成默认黑色文件夹背景。
+
+修复：
+
+- 不再继续依赖主 APK 的 drawable 资源表补录文件夹背景，而是新增稳定资产目录 `launcher/assets/folder_theme_bg/`。
+- 将普通主题所需的 `wallpaper_preview_*`、`wallpaper_light_gold` 文件复制到该 assets 目录中，由 APK 作为普通资产直接打包。
+- 修改 `launcher/smali/com/smartisanos/launcher/e/s.smali`：
+  - 新增私有方法 `th(String)`，优先从 `assets/folder_theme_bg/<imageName>.jpg/.png` 直接解码 bitmap。
+  - `ug()` 保留原来的主题资源 / 本包资源 / 外部包资源查询顺序，但在本包 drawable 查询失败后，先走新的 assets 解码链路，再回落原版默认背景。
+- 这样主桌面 APK 即使仍然不把新增 `wallpaper_preview_*` 注册进资源表，也不会影响普通主题文件夹背景跟随主题变化。
+
+验证：
+
+- `build.bat` 完整通过，新的 `build/launcher-signed.apk` 成功生成。
+- 解包检查确认：最终 APK 中已包含 `assets/folder_theme_bg/wallpaper_preview_*.jpg/.png` 与 `assets/folder_theme_bg/wallpaper_light_gold.jpg`；同时 `res/*wallpaper_preview*` 仍为空，说明运行时已切换到新的 assets 读取链路，而不是继续误依赖资源表。
+- 实机复测确认：文件夹背景现已随主题正常变化，不再只在透明主题正常、其他主题回退默认黑底。
+
+防回归规则：
+
+- 后续如果再补新的普通主题文件夹背景，不要只往 `launcher/res/drawable-*` 里塞图，然后假设 `Resources.getIdentifier()` 一定能取到。
+- 这类“新增但原始资源表里没有登记”的背景图，应该优先视作运行时资产，补到 `assets/folder_theme_bg/`，并沿用 `s.ug() -> th()` 的读取链路。
+- 若以后把主桌面切换成完整 `aapt2` 资源工程，再评估是否回归标准 drawable 资源表；在那之前，`assets/folder_theme_bg/` 是当前可信基线。
+
+涉及文件：
+
+- `launcher/smali/com/smartisanos/launcher/e/s.smali`
+- `launcher/assets/folder_theme_bg/*`
+- `build.bat`
+
+### 2026-06-29：应用分身诊断日志与角标隐藏开关修复
+
+文档校对补充（当前可信结论）：
+
+- 本仓库当前关于“应用分身”的可信修复基线，应以 `2026-06-28：通用应用分身管理、首次加载和搜索启动` 与本节为准；更早的 `2026-06-06` 记录只可作为历史背景，不可再直接当成当前实现说明。
+- 历史记录里曾出现过“分身开关改为直接安装 / 卸载 profile 快捷方式”的阶段性方案，但该方案随后已被本节上方记录明确撤销；当前正式链路仍是恢复并修正原版 `EVENT_USER_PACKAGE_ADDED / REMOVED` 应用项数据库路径，而不是长期依赖 `QuickLaunchItem` 模拟分身。
+- 历史记录里还写过“分身图标会走 `PackageManager.getUserBadgedIcon` 和当前工程的面具绘制兜底”。这在当时是阶段性描述，但对 OPPO / ColorOS 等 ROM 会产生厂商角标 + 锤子面具叠加、甚至与旧微信专用 `wechat_shortcut` 叠加的双面具问题。当前可信规则是：优先读取主用户原始 Activity / Application 图标，只叠加一层锤子风格面具，不再把 `getUserBadgedIcon` 当作当前标准链路说明。
+- 防回归时必须同时检查三条链路是否只保留一套面具来源：`LauncherApps/桌面应用项生成`、`ItemInfo.iconData -> doppelgangerIconBytes()`、`快捷方式/搜索图标生成`。如果其中两条以上同时叠加面具，就会再次出现双面具或厂商角标混入。
+
+- 根据 OPPO user 999 诊断日志撤销“用 QuickLaunchItem 模拟分身”的主方案：日志显示快捷方式安装/卸载调用虽然返回成功，但点击从未进入 `PROFILE_LAUNCH`，且旧条目因 package/user/shortcutId 不同无法被新版删除。恢复原版 `EVENT_USER_PACKAGE_ADDED/REMOVED` 应用项链路，只在用户明确启用或已启用项的轻量恢复阶段触发，不恢复首次启动全量扫描。
+- 原版新增分身处理器已支持从事件参数读取动态 userId；本轮继续将删除处理器从固定 user 10 改为读取事件中的 userId，因此 OPPO 999、小米/工作资料等其他 profile 均按真实用户删除。
+- 启用/关闭分身前会清理历史版本创建的 `com.tencent.mm`/Launcher 包名、user -1/0/真实 profile user 下的无效快捷方式；随后创建的是 `itemType=应用`、真实 userId 的桌面项。图标走普通 user 0 的锤子主题图标链路后叠加面具，点击走 `LauncherApps.startMainActivity(component, profile)` 启动系统现有分身。
+- 对照 `rianlu/smartisan-launcher-maintained`：其设置页通过 `LauncherApps.getProfiles/getActivityList` 发现分身，并以 `componentName#profileSerial`/profile serial 区分身份；当前移植保留相同的动态 profile 发现思想，但复用本版本已经存在的原版 user-package 应用项数据库链路，以匹配当前 `QuickLaunchItem`/DatabaseUpdater 数据结构。
+- 修复“隐藏图标上的角标”仍显示：原版 `data.O` 仍直接读取 `Settings.System.launcher_hide_badge`，普通 APK 无系统设置写权限，重新加载时会把隐藏状态覆盖为 false。两个原版读取点均改用 `LauncherSettingBridge.readBool`，统一读取应用内持久化设置；切换后同时调用 `Eb.ii()` 更新已有 SceneNode，并在图标刷新结束后再次同步，确保现有角标立即消失而非只影响新建图标。
+- OPPO 实机截图进一步确认：旧快捷方式错误地把桌面自身的中转 Activity 标记为 user 999，导致系统尝试在未安装 Launcher 的分身用户中启动中转页，点击无响应。现改为快捷方式归属 user 0，由中转页再通过 `LauncherApps.startMainActivity` 启动真实 user 999 应用，并增加 `startActivityAsUser` 反射兜底及启动结果日志。
+- 分身图标不再使用 ColorOS 已经套过圆框和厂商分身角标的 `LauncherActivityInfo` 图标；优先读取 user 0 的原始 Activity/Application 图标，只叠加锤子面具角标。安装正确快捷方式前会先清理旧版无效条目。
+- OPPO ADB 日志显示通知监听授权后曾发生 `binding died`，打开系统设置只是间接触发重新绑定。Launcher 每次恢复时现主动检查授权、请求 `NotificationListenerService.requestRebind` 并重放角标，无需再次点击“前往设置”。
+- “关于手机/关于桌面”的操作日志新增“发送”按钮：结束记录后，可将结构化操作日志与配套的本应用 logcat 合并为文字，通过系统分享发送。界面明确提示受 Android 权限限制，应用内日志不能替代电脑 ADB 的全系统日志。
+- 分身诊断新增 profile 数量、userId、serial、LauncherActivityInfo 数量、组件名、开关状态、快捷方式 URI、直接处理/广播兜底结果及异常记录。
+- 分身快捷方式安装/删除优先在桌面进程内反射调用原版 `com.smartisanos.launcher.a.L` 处理器，避免 OPPO 等系统拦截或延迟自发快捷方式广播；直接调用失败时仍保留定向广播兜底。
+- “隐藏图标上的角标”不再只保存设置值：切换时直接同步 `Constants.SHOW_MESSAGE_FLAG = !hidden` 并刷新桌面，Launcher 每次恢复前也重新应用持久化值，避免进程重建后失效。
+- 验证：`build.bat` 完整通过，输出 `build/launcher-signed.apk`；当前没有连接 ADB 设备，OPPO 分身和角标交互需真机验证。
+
+### 2026-06-29：应用分身落桌面与通知角标生命周期修复
+
+问题与根因：
+
+- 应用分身设置页能发现并开启微信分身，但原版 `EVENT_USER_PACKAGE_ADDED` 处理器读取参数中的真实 userId 后没有保存结果，后续仍把查询、`ItemInfo.userId` 和启动目标硬编码为 user 10。小米等使用 user 999/其他 profile 的分身因此不会写入桌面。
+- 横扫清除只保存 suppressed 通知 key，没有把 `COUNTS` 中的持久化数字改为 0。Launcher 进程或桌面场景重建时，`BadgeBridge.replay()` 会重新广播旧数字。
+- 企业微信等应用会复用同一个通知 key 更新内容。只按 key 抑制会把后续新通知永久当作旧通知，出现第一次显示、以后不再刷新的现象。
+- 打开应用后，如果应用自身没有撤销通知，监听器仍会把活动通知重新统计出来；原版桌面期望从桌面点击应用时先清除该应用当前角标。
+
+修复：
+
+- 分身数据库事件完整保留设置页发现的真实 userId，查询对应用户、写入 `ItemInfo.userId` 并通过 `LauncherApps.startMainActivity(component, realUserHandle, ...)` 启动；反射 `startActivityAsUser` 只保留为旧 ROM 兜底。
+- OPPO Android 12 复测表明，仅修正原版 `EVENT_USER_PACKAGE_ADDED` 的 userId 仍不可靠：该事件需要再次按目标用户查询 `ResolveInfo`，部分 OEM 对第三方 Launcher 返回空结果，因此开关已开启但桌面没有新增项。
+- 对照 `rianlu/smartisan-launcher-maintained` 的 `ProfileAppsSettingsActivity` 后，分身开关改为直接安装/卸载 profile 快捷方式：快捷方式目标是 Launcher 内 `StartActivityForSearch`，URI 保存 `package / activity / profileSerial`，点击时再由 `LauncherApps` 启动真实 profile。该路径不依赖第二次 Launcher 数据扫描。
+- 当前 v26 基线的快捷方式处理器原本只允许微信/支付宝等少量包且只把 user 10 写入 `ItemInfo`；已调整为接受设置页明确创建的 profile 快捷方式，并从 `extra_uid` 还原任意正数 userId。已启用分身在 Launcher 启动同步时也会补发快捷方式安装，升级 APK 后无需先关闭再开启开关。
+- 所有 `userId > 0` 的分身图标继续统一经过 `doppelgangerIconBytes()`，叠加同一套原版面具标记，不限定微信或 user 10。
+- 通知抑制标识改成 `notification key + postTime`，只屏蔽被清除的那一轮通知；同 key 的后续新发布/更新会重新计数。
+- 横扫和应用点击清除时同步保存 `COUNTS=0` 并立即广播 0，Launcher 重建后不会重放旧数字。
+- 桌面/搜索启动第三方应用前调用 `BadgeBridge.onPackageLaunched()` 清除该应用当前角标；通知真正移除或后续新通知到达时，监听器继续按实时状态刷新。
+- `BadgeBridge.replay()` 在已有通知使用权时主动请求重新绑定监听服务，改善强行停止、覆盖安装或 ROM 后台限制解除后监听器没有及时恢复的问题。
+
+验证与限制：
+
+- `build.bat` 完整通过，BlackBerry 用户 0 真机覆盖安装与 Launcher 冷启动成功，无 `FATAL EXCEPTION` / `VerifyError`。
+- 当前连接设备没有第二 profile，微信分身写入、面具显示和正确 profile 启动仍需在原问题手机复测。
+- BlackBerry 日志显示该 ROM 在应用处于 restricted/force-stop 状态时会拒绝绑定通知监听；启动 Launcher 后通过主动 rebind 恢复。其他 ROM 仍需确保已授予通知使用权，并避免系统长期冻结 Launcher。
+
+涉及文件：
+
+- `launcher/smali/com/smartisanos/launcher/data/A.smali`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/java/com/smartisanos/launcher/badge/BadgeBridge.java`
+- `launcher/tools/java/com/smartisanos/launcher/badge/SmartisanBadgeListenerService.java`
+
+### 2026-06-28：跨 ROM 安装、首次启动与下滑搜索性能收口
+
+问题与根因：
+
+- 小米 / HyperOS 安装返回 `-112 (INSTALL_FAILED_DUPLICATE_PERMISSION)`。二进制 Manifest 仍声明 7 个原版锤子私有权限，其中一个错误占用 `android.permission.*` 命名空间；手机上存在同名权限但签名不同时会在安装阶段直接拒绝 APK。
+- 新安装没有保存过 `ro.build.date.utc`，原版逻辑把空值与当前系统构建时间不一致误判为 OTA。首次建库生成图标后，OTA 路径立即删除全部图标和阴影缓存并再次生成，造成重复 I/O、解码和数据库写入。
+- 原版固定 user 10 的分身事件路径会在未启用任何分身时逐包查询第二用户，普通 ROM 上查询全部失败却仍消耗十几秒。
+- 自绘搜索页此前在 `setContentView()` 前同步枚举所有 Launcher Activity 并读取全部名称、图标和 profile，导致页面本身延迟数秒；改为异步后，常用图标仍要等待完整索引完成才一起显示。
+
+修复：
+
+- 7 个应用内部 signature 权限统一迁移到 `com.ranhf.smartisanlauncher.permission.*`，同步文本 Manifest、保留的二进制 Manifest、Provider 权限引用、Smali 常量和预装完成广播权限。新增 `tools/patch_manifest_internal_permissions.py`，避免以后重新处理二进制清单时恢复冲突权限。
+- 首次建库与 OTA 刷新设为互斥：首次安装只生成一次图标；已有数据库且系统构建时间确实变化时仍执行 OTA 缓存刷新。
+- 原版分身包事件增加已启用记录与真实第二 profile 双重门禁；没有用户明确启用的分身时不枚举 profile，也不进入固定 user 10 的逐包处理。
+- 搜索页先绘制搜索框并弹出键盘，完整应用索引在 `launcher-search-loader` 后台线程生成。
+- 最终取消搜索框下方的常用应用图标区，避免搜索页首帧后再补图标造成明显的二次跳变；完整应用、历史和已启用分身索引仍在后台生成，用户输入搜索时继续覆盖全部应用。
+- 强迫症选项里的通知使用权提示把中文“前往设置”/英文“Tap to configure”单独改为蓝色下划线链接样式，并把跳转范围严格限制在链接文字本身。
+- 通知使用权提示移动到“隐藏图标上的角标”开关正下方；底部上扫说明继续跟随“紧贴屏幕横扫清除角标”开关，避免权限说明与手势说明归属混淆。
+- 设置页交互按控件类型收口：所有 `SettingItemSwitch` 行（含动态创建的透明主题、壁纸模糊、应用分身和改进版图标）取消整行点击，只触摸右侧 `SwitchEx` 滑块才切换；通知权限只点击蓝色下划线“前往设置”文字才跳转；“图标包”“桌面图标大小”等带右箭头的导航标签保持整行任意位置可点击。
+- 安装兼容静态审计补齐 5 个旧组件的显式 `android:exported="true"`：Launcher、PinShortcutActivity、LauncherReceiver、DataSyncReceiver、DataDumpReceiver。文本与二进制 Manifest 已同步，避免部分 HyperOS / OriginOS / Android 16 安装器把缺省 exported 判为 `MANIFEST_MALFORMED`。
+- “检查更新”结果与新版本确认弹窗改为接近屏幕可用宽度的锤子式圆角卡片：标题居中，版本信息和更新说明统一左对齐，正文增加左右留白与行距，底部继续使用细分割线和分栏按钮；普通确认弹窗保持原尺寸与对齐方式。
+
+验证：
+
+- `build.bat` 完整通过；APK 的 v1/v2/v3 签名和 16KB zipalign 检查通过。
+- BlackBerry 真机覆盖安装成功；冷启动 Activity 显示约 `1.284s`，含进程拉起总计约 `2.235s`，无分身全包扫描和 `FATAL EXCEPTION`。
+- 自绘搜索 Activity 冷启动显示约 `254ms`；完整索引继续后台加载，不阻塞搜索页首帧。
+- 最终 APK 确认 `minSdk=23 / targetSdk=28 / compileSdk=36`，包含 arm64-v8a、armeabi-v7a、armeabi、x86、x86_64；自定义权限已使用独有命名空间，带 intent-filter 的旧组件已显式 exported。目前静态审计未发现新的通用安装阻断项。
+- 小米 17 的 `-112` 修复需在对应设备重新安装最终 APK 完成最终确认；若仍失败，应使用 `adb install` 保存 PackageManager 返回的冲突权限或冲突包名。
+
+涉及文件：
+
+- `launcher/AndroidManifest.xml`
+- `launcher/original/AndroidManifest.xml`
+- `launcher/smali/com/smartisanos/launcher/data/A.smali`
+- `launcher/smali/com/smartisanos/launcher/ja.1.smali`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `tools/patch_manifest_internal_permissions.py`
+- `tools/patch_manifest_exported_components.py`
+
+### 2026-06-28：通用应用分身管理、首次加载和搜索启动
+
+问题与根因：
+
+- 工程原先已有零散的 `userId`、分身角标和 `LauncherApps` 兼容代码，但补录任务首次延迟 12 秒，而且没有稳定参与桌面模型第一次扫描。首轮桌面加载完成后才把分身写入数据库，因此微信分身通常要完全退出 Launcher、第二次启动才显示。
+- 旧实现混用 `UserManager.getUserProfiles()`、常见用户 ID 猜测和反射构造 `UserHandle(id)`；搜索又把 `LauncherActivityInfo` 转成 `ResolveInfo` 后从 UID 反推用户。不同 ROM 的分身用户 ID 并不固定，容易只对微信或某个厂商的 user 10/999 偶然有效。
+- 原版搜索 URI 只保存包名和组件名，主应用与分身组件相同时无法表达目标 profile；直接 `startActivity()` 会打开主应用。
+
+实现：
+
+- 统一通过 `LauncherApps.getProfiles()` 获取系统实际暴露的 profile，再对每个非当前用户调用 `LauncherApps.getActivityList(null, userHandle)`。没有写死微信、淘宝、京东、拼多多、支付宝或 QQ 包名，系统暴露的所有 Launcher Activity 都可进入同一逻辑。
+- 分身记录同时保留 `ComponentName`、真实 `UserHandle`、Launcher 数据库使用的 `userId` 和 `UserManager.getSerialNumberForUser()` 返回的 profile serial。设置偏好和搜索历史键使用 `serial + component`，主应用与分身不会因包名/组件名相同而覆盖。
+- 分身改为默认全部关闭。没有任何分身被用户启用时，桌面模型直接返回普通应用列表，不调用 `LauncherApps.getProfiles()`，避免为默认隐藏的功能增加冷启动等待。只有进入“应用分身”设置页时才枚举系统 profile。
+- 桌面设置新增“应用分身”入口。页面异步列出所有 profile 应用并提供默认关闭的开关；打开时保存 `serial + component` 状态，发送原版用户包新增/变更事件并刷新桌面。启用过分身后，后续桌面启动才会参与 profile 枚举，并保留立即、2 秒、8 秒重试。关闭时发送 `EVENT_USER_PACKAGE_REMOVED` 并刷新数据库、桌面和搜索。没有额外 profile 或接口不可用时显示正常提示。
+- 当前自绘搜索直接从 profile 枚举追加分身结果，不依赖桌面数据库是否已完成首轮补录。分身搜索项保存真实 `UserHandle` 和 serial，点击后使用 `LauncherApps.startMainActivity(componentName, userHandle, null, null)`；普通应用仍使用原来的 `Activity.startActivity()`。
+- 原版 `SearchProvider` 生成分身结果 URI 时，根据 `ItemInfo.userId` 找到对应 profile 并追加第三段 serial；`StartActivityForSearch` 优先解析第三段，通过 `UserManager.getUserForSerialNumber()` 还原 `UserHandle` 后调用 `LauncherApps.startMainActivity()`。两段 URI 的普通应用保持原启动方式。
+- 页面锁搜索判断继续按 `ItemInfo.userId` 区分同包主应用和分身。分身位于锁定板块时，密码验证完成后也使用保存的 profile serial 启动真正的分身，不会落回主应用。
+
+防回归规则：
+
+- 不得按 `packageName + componentName` 单独去重分身，唯一键必须包含 profile serial 或真实用户标识。
+- 不得用固定 user 10/999/888 列表代替 `LauncherApps.getProfiles()`；固定 ID 只能作为旧 ROM 兼容兜底，不能作为主发现路径。
+- 分身启动必须使用 `LauncherApps.startMainActivity()` 和发现时保存的 `UserHandle`。不要用普通 `startActivity()`，也不要只依赖反射构造 `UserHandle`。
+- 不得让默认关闭状态在桌面冷启动时扫描 profile；只有至少一个 `serial + component` 被明确启用后，桌面模型才允许枚举和短延时重试。
+- 设置开关、桌面数据库、当前自绘搜索和旧 SearchProvider URI 必须使用同一份启用状态；关闭分身后不能只隐藏设置行或只删除桌面图标。
+- 修改页面锁链路时必须分别验证主应用和同包分身，不能因为包名相同而共用错误的页面锁状态。
+
+验证：
+
+- `build.bat` 完整通过，包括 maintained 设置资源、apktool smali、Java/classes2.dex、zipalign 和签名。
+- 当前连接的 BlackBerry 设备覆盖安装成功；该设备只有用户 0，可确认无 profile 调用不会导致安装或 Launcher 启动崩溃。
+- 初版 SearchProvider serial 补丁曾错误复用仍保存 `ResolveInfo` 的 `v10`，导致 Android Verifier 报 `VerifyError`，Launcher 在安装 ContentProvider 阶段无法启动。已改用后续会被重新赋值的 `v12` 暂存 `userId`，保留 `v10` 的引用类型；此类 smali 修改必须通过真机冷启动验证，不能只以 apktool 构建成功作为验收。
+- 修正后通过 ADB 覆盖安装并执行 `am force-stop` 后冷启动 `.Launcher`：Activity 启动成功、Launcher 进程持续存活且保持前台，logcat 中无 `FATAL EXCEPTION`、`VerifyError` 或 Launcher 崩溃记录。
+- Android 16 多 profile 真机仍需完成最终动态验收：微信、淘宝、京东、拼多多首次发现，设置开关即时增删，搜索命中并打开正确分身，以及主应用/分身共存。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/smali/com/smartisanos/launcher/data/SearchProvider.smali`
+- `launcher/smali/com/smartisanos/launcher/StartActivityForSearch.smali`
+- `launcher/tools/maintained_settings_res/res/layout/setting_main.xml`
+- `launcher/tools/maintained_settings_res/res/values/strings.xml`
+- `launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml`
 
 ### 2026-06-28：Moto G100 Android 16 启动兼容、页面锁搜索刷新与 v1.5.1
 
@@ -155,7 +333,7 @@
   - [x] 下滑 / 上滑搜索：已改为进入 launcher 内 `ThemeChooserActivity` 承载的自绘搜索页；当前不再依赖锤子独立搜索 APK。
   - [ ] 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议按 maintained 的方向优先拉起系统 / 已安装天气应用。
   - [x] 日历：已支持系统 / 厂商日历识别、随系统日期刷新、静态层去重以及 50%-150% 图标尺寸联动；已在 VIVO Android 16 真机验证。
-- 提醒角标可以作为后续功能实现目标，但不能简单等同于“应用有通知就一定显示”。当前 old Smartisan / 厂商未读数广播或系统 badge 数据能接入时才有机会显示；普通 Android 通知角标需要额外接入通知监听或 badge 兼容桥。
+- 提醒角标已接入通知监听兼容桥；其语义是有效活动通知数，不承诺等于第三方应用私有数据库中的真实未读消息数。应用未发通知、用户关闭通知、工作资料夹被系统策略隔离等情况无法由 Launcher 绕过。
 - 在线主题 APK 下载后仍依赖用户手动安装，普通应用没有静默安装能力。
 - 12 / 20 宫格、文件夹、编辑模式、拖拽落点、Dock 动画仍需要更多分辨率和真机回归。
 
@@ -168,6 +346,23 @@
 3. 需要追溯原因时，按每日记录由近到远阅读；已被后续修复覆盖的旧结论不再保留。
 
 ## 每日修复记录（倒序）
+
+### 2026-06-28：普通 Android 通知角标与横扫清除
+
+- 原版机制确认：Smartisan 系统通过 `com.smartisanos.launcher.new_message` 携带包名、组件、UID 和计数，Launcher 将其写入 `ItemInfo.messagesNumber`，再由 `g.qb(count)` 生成数字纹理；文件夹汇总和横扫动画均属于 Launcher 内部能力，并不依赖 Smartisan ROM。
+- 新增 `SmartisanBadgeListenerService`，使用 Android 公共 `NotificationListenerService` API 监听通知新增、更新和移除，并在连接时通过 `getActiveNotifications()` 全量恢复。按 `packageName + uid` 隔离主用户/分身，按通知 key 去重，过滤 Launcher 自身、ongoing 通知、禁用 badge 的通知渠道和有子通知时的 group summary。
+- 计数优先使用通知提供的 `Notification.number`，否则每条有效通知计 1，最高限制 999；结果转换为原版 `new_message` 广播，因此原版绘制、数据库、文件夹汇总和隐藏角标开关无需重写。
+- 角标快照写入 Launcher 私有偏好，Launcher `onResume()` 会重放，解决通知监听服务已常驻但桌面动态广播接收器稍后才注册造成的计数丢失。
+- 强迫症选项在“隐藏图标上的角标”下新增“紧贴屏幕横扫清除角标”开关，并增加“通知使用权”入口；首次开启横扫且尚未授权时也会跳转系统授权页。通知使用权必须由用户手动授予，应用不能静默获取。
+- 横扫继续执行原版 `Yh() -> wx()` 动画和本地数据库归零，同时记录当时存在的通知 key。旧通知继续留在通知栏也不会马上把角标顶回来；只有出现新的通知 key 才重新计数。横扫不会擅自删除系统通知。
+- 文本 Manifest 和最终注入 APK 的二进制 Manifest 均注册通知监听服务；新增 `tools/patch_badge_service_manifest.py` 用于向保留的 AXML 清单安全追加服务节点，避免只改文本 Manifest 导致最终 APK 丢失服务。
+
+验证：
+
+- `build.bat` 完整通过，Java 监听服务编译进 `classes2.dex`，APK 使用 v1/v2/v3 签名。
+- `aapt2 dump xmltree build/launcher-signed.apk --file AndroidManifest.xml` 确认最终二进制清单包含 `SmartisanBadgeListenerService`、`BIND_NOTIFICATION_LISTENER_SERVICE` 和正确的 service action。
+- 当前连接设备覆盖安装成功；`dumpsys package` 确认系统识别通知监听 service intent filter；真机进入“强迫症选项”确认“隐藏图标上的角标”下方显示“紧贴屏幕横扫清除角标”。
+- 仍需用户在目标机手动授予通知使用权后，用微信、短信等实际通知完成数字变化、通知移除、文件夹汇总和横扫后新通知恢复四项动态验收。
 
 ### 2026-06-26：隐私密码页宽度、黑色键盘和搜索解锁链路
 
@@ -408,9 +603,10 @@ ADB 结论：
   - 设置页“检查更新”默认版本字符串同步为 `v1.4.6`。
 
 - 应用分身：
+  - 下面几条是当时阶段性判断，后续已被 `2026-06-28` 与 `2026-06-29` 的记录进一步修正；如果与顶部当前状态或 6 月 28/29 日记录冲突，以后者为准。
   - 对照 maintained 的多用户查询思路，把桌面应用列表、搜索页和启动链路继续向 `LauncherApps` / 用户句柄查询靠拢。
   - 修复首次安装后桌面第一次进入只显示一个微信、退出重开才显示两个微信的竞态问题方向：启动和恢复时会触发分身应用 bootstrap，减少多用户列表未及时进入桌面的情况。
-  - 修复分身应用图标叠加面具标记的链路，分身图标会走 `PackageManager.getUserBadgedIcon` 和当前工程的面具绘制兜底。
+  - 历史阶段曾让分身图标走 `PackageManager.getUserBadgedIcon` 和当前工程的面具绘制兜底；该描述后来被证实会在部分 ROM 上叠加厂商角标，不再代表当前可信实现。
   - 继续调整面具标记大小、位置和颜色，使其更接近原版锤子桌面左下角黑色面具效果。
 
 - 图标识别：

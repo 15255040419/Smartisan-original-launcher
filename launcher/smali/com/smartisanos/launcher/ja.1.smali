@@ -1156,7 +1156,7 @@
 
     iget-object v3, p0, Lcom/smartisanos/launcher/ja;->mH:Landroid/os/Handler;
 
-    const-string v4, "com.smartisanos.launcher.smt.action.preinstall_done"
+    const-string v4, "com.ranhf.smartisanlauncher.permission.PREINSTALL_DONE"
 
     invoke-virtual {v1, v2, v0, v4, v3}, Landroid/app/Application;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;)Landroid/content/Intent;
 

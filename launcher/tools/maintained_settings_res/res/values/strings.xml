@@ -112,6 +112,8 @@
     <string name="icon_setting_text">Application Icons</string>
     <string name="privacy_password_title">Privacy Password</string>
     <string name="privacy_password_sub_text">Set or change the page lock password</string>
+    <string name="profile_apps_title">Cloned Apps</string>
+    <string name="profile_apps_subtitle">Cloned apps are hidden until you enable them here</string>
     <string name="improved_icon_text">Improved Icons</string>
     <string name="incorrect_password">Incorrect Password</string>
     <string name="initializing">Initializing</string>
@@ -157,6 +159,9 @@
     <string name="mutiselect_first_notice">Press and drag to move selected apps.</string>
     <string name="net_is_not_available">Net is not available</string>
     <string name="obsession_badge_swipe_clean">Swipe to Clean Icon Badges</string>
+    <string name="obsession_badge_swipe_clean_tips">Swipe upward from the bottom edge to clear app notification badges.</string>
+    <string name="obsession_badge_notification_access">Notification access is required for badges. Tap to configure.</string>
+    <string name="obsession_badge_notification_access_action">Tap to configure</string>
     <string name="obsession_header_title">OCD Settings</string>
     <string name="obsession_hide_badge">Hide Icon Badge</string>
     <string name="obsession_hide_lable">Hide Icon Labels</string>

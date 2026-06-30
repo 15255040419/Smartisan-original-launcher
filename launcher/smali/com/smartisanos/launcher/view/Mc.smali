@@ -1186,7 +1186,7 @@
 
     move-result-object v0
 
-    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->text_font_size:I
+    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->folder_text_font_size:I
 
     .line 59
     new-instance v1, Landroid/graphics/Paint;
@@ -1228,15 +1228,22 @@
 
     invoke-virtual {v0, v1}, Landroid/graphics/Paint;->setTypeface(Landroid/graphics/Typeface;)Landroid/graphics/Typeface;
 
+    goto :goto_2
+
     .line 65
     :cond_4
     sget-object v0, Lcom/smartisanos/launcher/view/Mc;->GO:Landroid/graphics/Paint;
 
-    const/high16 v1, 0x3f800000    # 1.0f
+    invoke-static {v4}, Landroid/graphics/Typeface;->defaultFromStyle(I)Landroid/graphics/Typeface;
 
-    const/high16 v2, 0x40400000    # 3.0f
+    move-result-object v1
 
-    invoke-virtual {v0, v1, v8, v2, v4}, Landroid/graphics/Paint;->setShadowLayer(FFFI)V
+    invoke-virtual {v0, v1}, Landroid/graphics/Paint;->setTypeface(Landroid/graphics/Typeface;)Landroid/graphics/Typeface;
+
+    :goto_2
+    sget-object v0, Lcom/smartisanos/launcher/view/Mc;->GO:Landroid/graphics/Paint;
+
+    invoke-virtual {v0}, Landroid/graphics/Paint;->clearShadowLayer()V
 
     .line 66
     sget-object v0, Lcom/smartisanos/launcher/view/Mc;->GO:Landroid/graphics/Paint;

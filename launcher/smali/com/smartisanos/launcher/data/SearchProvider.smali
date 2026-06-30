@@ -1472,6 +1472,16 @@
 
     move-result-object v8
 
+    invoke-virtual {p0}, Landroid/content/ContentProvider;->getContext()Landroid/content/Context;
+
+    move-result-object v9
+
+    iget v12, v7, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I
+
+    invoke-static {v9, v8, v12}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->appendProfileSerialToSearchUri(Landroid/content/Context;Landroid/net/Uri;I)Landroid/net/Uri;
+
+    move-result-object v8
+
     .line 19
     invoke-direct {p0, v10}, Lcom/smartisanos/launcher/data/SearchProvider;->a(Landroid/content/pm/ResolveInfo;)Ljava/lang/String;
 

@@ -35,6 +35,16 @@
 .method private b(Landroid/net/Uri;)V
     .locals 2
 
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->launchSearchUriTarget(Landroid/app/Activity;Landroid/net/Uri;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_profile_uri_fallback
+
+    return-void
+
+    :cond_profile_uri_fallback
+
     if-nez p1, :cond_0
 
     return-void

@@ -241,17 +241,10 @@
     :goto_0
     if-eqz p0, :cond_5
 
-    .line 13
-    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
-
-    move-result-object p0
-
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
-
-    move-result-object p0
-
-    .line 14
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherSearch(Landroid/content/Context;)V
+    # The maintained port handles downward search gestures only in
+    # Launcher.dispatchTouchEvent. Keep the original SMEngine fling detector
+    # from opening the same page for an upward gesture.
+    goto :cond_4
 
     .line 17
     :cond_4

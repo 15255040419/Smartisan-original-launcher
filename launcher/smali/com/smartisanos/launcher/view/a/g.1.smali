@@ -16713,6 +16713,13 @@
     if-eqz v1, :cond_0
 
     .line 4
+    # The first desktop frame loads directly from PackageManager, before the
+    # asynchronous icon database refresh. Normalize this drawable here too so
+    # startup and refreshed frames use identical visible bounds.
+    invoke-static {v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->normalizeLauncherIcon(Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v1
+
     invoke-static {v1}, Lcom/smartisanos/launcher/e/s;->drawableToBitmap(Landroid/graphics/drawable/Drawable;)Landroid/graphics/Bitmap;
 
     move-result-object v1

@@ -133,6 +133,14 @@ popd
 
 因此最终 APK 的版本号以 `launcher\original\AndroidManifest.xml` 为准。文本 Manifest 和设置页字符串只是同步入口，不能只改其中一个。
 
+通知角标服务等新增组件也必须同时进入这个二进制 Manifest。当前可使用：
+
+```powershell
+python tools\patch_badge_service_manifest.py
+```
+
+脚本会以幂等方式向保留的 AXML 字符串池和 `application` 节点追加 `SmartisanBadgeListenerService`；执行后仍必须通过最终 APK 的 `aapt2 dump xmltree` 验证组件确实存在。
+
 ## 版本号写入点
 
 正式改版本或临时降版测试检查更新时，需要同步这三处：

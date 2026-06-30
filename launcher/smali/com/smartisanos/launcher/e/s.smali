@@ -1306,22 +1306,7 @@
     .line 287
     sget v3, Lcom/smartisanos/launcher/jb;->contact_shortcut:I
 
-    const-string v4, "com.tencent.mm"
-
     .line 288
-    invoke-virtual {p2, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
-
-    move-result v4
-
-    if-eqz v4, :cond_2
-
-    .line 289
-    sget v3, Lcom/smartisanos/launcher/jb;->wechat_shortcut:I
-
-    goto :goto_0
-
-    .line 290
-    :cond_2
     sget-object v4, Lcom/smartisanos/launcher/data/T;->PHONE:Lcom/smartisanos/launcher/data/S;
 
     iget-object v4, v4, Lcom/smartisanos/launcher/data/S;->pkg:Ljava/lang/String;
@@ -1330,14 +1315,15 @@
 
     move-result v4
 
-    if-eqz v4, :cond_3
+    if-eqz v4, :cond_2
 
-    .line 291
+    .line 289
     sget v3, Lcom/smartisanos/launcher/jb;->contact_shortcut:I
 
     goto :goto_0
 
-    :cond_3
+    .line 290
+    :cond_2
     const-string v4, "com.eg.android.AlipayGphone"
 
     .line 292
@@ -2170,13 +2156,16 @@
 
     if-eqz v2, :cond_icon_override_done
 
-    invoke-static {v2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->normalizeImprovedIcon(Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
-
-    move-result-object v2
-
     move-object v1, v2
 
     :cond_icon_override_done
+
+    # Normalize every icon source at the common exit. This corrects differing
+    # transparent/opaque content bounds while leaving the later runtime
+    # LayoutProperty/icon_scale size adjustment intact.
+    invoke-static {v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->normalizeLauncherIcon(Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v1
 
     .line 231
     sget-boolean v2, Lcom/smartisanos/launcher/va;->DBG:Z
@@ -5894,7 +5883,9 @@
 .end method
 
 .method public static b(Landroid/content/Context;Ljava/lang/String;I)Ljava/util/List;
-    .locals 8
+    .locals 9
+
+    move-object v8, p0
 
     .line 1
     invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
@@ -5921,7 +5912,7 @@
     const/4 v1, 0x0
 
     .line 5
-    invoke-static {p0, v0, v1, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->safeQueryIntentActivitiesForUser(Landroid/content/pm/PackageManager;Landroid/content/Intent;II)Ljava/util/List;
+    invoke-static {v8, p1, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->queryProfileLauncherActivities(Landroid/content/Context;Ljava/lang/String;I)Ljava/util/List;
 
     move-result-object v2
 
@@ -6081,7 +6072,7 @@
     invoke-virtual {v2, v4}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     .line 15
-    invoke-static {p0, v0, v1, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->safeQueryIntentActivitiesForUser(Landroid/content/pm/PackageManager;Landroid/content/Intent;II)Ljava/util/List;
+    invoke-static {v8, p1, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->queryProfileLauncherActivities(Landroid/content/Context;Ljava/lang/String;I)Ljava/util/List;
 
     move-result-object v2
 
@@ -12689,6 +12680,87 @@
     return-object v0
 .end method
 
+.method private static th(Ljava/lang/String;)Landroid/graphics/Bitmap;
+    .locals 4
+
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v0
+
+    const/4 v1, 0x0
+
+    if-nez v0, :cond_0
+
+    return-object v1
+
+    :cond_0
+    invoke-virtual {v0}, Landroid/content/Context;->getAssets()Landroid/content/res/AssetManager;
+
+    move-result-object v0
+
+    :try_start_0
+    new-instance v2, Ljava/lang/StringBuilder;
+
+    invoke-direct {v2}, Ljava/lang/StringBuilder;-><init>()V
+
+    const-string v3, "folder_theme_bg/"
+
+    invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v2, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v3, ".jpg"
+
+    invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v2
+
+    invoke-static {v0, v2}, Lcom/smartisanos/launcher/xa;->a(Landroid/content/res/AssetManager;Ljava/lang/String;)Landroid/graphics/Bitmap;
+
+    move-result-object v2
+    :try_end_0
+    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
+
+    return-object v2
+
+    :catch_0
+    :try_start_1
+    new-instance v2, Ljava/lang/StringBuilder;
+
+    invoke-direct {v2}, Ljava/lang/StringBuilder;-><init>()V
+
+    const-string v3, "folder_theme_bg/"
+
+    invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v2, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string p0, ".png"
+
+    invoke-virtual {v2, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object p0
+
+    invoke-static {v0, p0}, Lcom/smartisanos/launcher/xa;->a(Landroid/content/res/AssetManager;Ljava/lang/String;)Landroid/graphics/Bitmap;
+
+    move-result-object p0
+    :try_end_1
+    .catch Ljava/lang/Exception; {:try_start_1 .. :try_end_1} :catch_1
+
+    return-object p0
+
+    :catch_1
+    return-object v1
+.end method
+
 .method public static u(Ljava/lang/String;Ljava/lang/String;)V
     .locals 1
 
@@ -12728,7 +12800,7 @@
 .method public static ug()Landroid/graphics/Bitmap;
     .locals 6
 
-    const-string v0, "com.smartisanos.wallpapers"
+    const-string v0, "com.smartisanos.wallpaperprovider"
 
     .line 1
     :try_start_0
@@ -12768,6 +12840,81 @@
 
     .line 4
     :cond_0
+    iget-object v3, v1, Lcom/smartisanos/launcher/theme/v;->mResources:Landroid/content/res/Resources;
+
+    if-eqz v3, :cond_0a
+
+    const-string v4, "drawable"
+
+    iget-object v5, v1, Lcom/smartisanos/launcher/theme/v;->mPackage:Ljava/lang/String;
+
+    invoke-virtual {v3, v2, v4, v5}, Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I
+
+    move-result v4
+
+    if-eqz v4, :cond_0a
+
+    invoke-virtual {v3, v4}, Landroid/content/res/Resources;->getDrawable(I)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v3
+
+    if-eqz v3, :cond_0a
+
+    invoke-static {v3}, Lcom/smartisanos/launcher/e/s;->drawableToBitmap(Landroid/graphics/drawable/Drawable;)Landroid/graphics/Bitmap;
+
+    move-result-object v0
+
+    return-object v0
+
+    :cond_0a
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v3
+
+    invoke-virtual {v3}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v3
+
+    if-eqz v3, :cond_0b
+
+    invoke-virtual {v3}, Landroid/content/Context;->getResources()Landroid/content/res/Resources;
+
+    move-result-object v4
+
+    const-string v5, "drawable"
+
+    invoke-virtual {v3}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+
+    move-result-object v3
+
+    invoke-virtual {v4, v2, v5, v3}, Landroid/content/res/Resources;->getIdentifier(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I
+
+    move-result v3
+
+    if-eqz v3, :cond_0b
+
+    invoke-virtual {v4, v3}, Landroid/content/res/Resources;->getDrawable(I)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v3
+
+    if-eqz v3, :cond_0b
+
+    invoke-static {v3}, Lcom/smartisanos/launcher/e/s;->drawableToBitmap(Landroid/graphics/drawable/Drawable;)Landroid/graphics/Bitmap;
+
+    move-result-object v0
+
+    return-object v0
+
+    :cond_0b
+    invoke-static {v2}, Lcom/smartisanos/launcher/e/s;->th(Ljava/lang/String;)Landroid/graphics/Bitmap;
+
+    move-result-object v3
+
+    if-eqz v3, :cond_0c
+
+    return-object v3
+
+    :cond_0c
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
 
     move-result-object v3

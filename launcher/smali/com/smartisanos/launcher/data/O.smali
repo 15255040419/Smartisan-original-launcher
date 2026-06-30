@@ -364,12 +364,7 @@
     :goto_0
     sget-object v1, Lcom/smartisanos/launcher/data/M;->LAUNCHER_HIDE_BADGE:Ljava/lang/String;
 
-    invoke-static {p1, v1}, Landroid/provider/Settings$System;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
-
-    move-result-object v1
-
-    .line 8
-    invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-static {v8, v1, v3}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
 
     move-result v0
 
@@ -1060,23 +1055,13 @@
 .end method
 
 .method public K(Landroid/content/Context;)Z
-    .locals 1
-
-    .line 1
-    invoke-virtual {p1}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
-
-    move-result-object p1
+    .locals 2
 
     sget-object v0, Lcom/smartisanos/launcher/data/M;->LAUNCHER_HIDE_BADGE:Ljava/lang/String;
 
-    invoke-static {p1, v0}, Landroid/provider/Settings$System;->getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;
+    const/4 v1, 0x0
 
-    move-result-object p1
-
-    const-string v0, "true"
-
-    .line 2
-    invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-static {p1, v0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
 
     move-result p1
 

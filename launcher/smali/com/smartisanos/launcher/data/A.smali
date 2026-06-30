@@ -5493,9 +5493,7 @@
     move-result-object v10
 
     .line 296
-    invoke-static {v10, v8}, Lcom/smartisanos/launcher/Cb;->a(Landroid/graphics/drawable/Drawable;Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
-
-    move-result-object v8
+    move-object v8, v10
 
     const/16 v20, 0x0
 
@@ -6478,11 +6476,6 @@
 
     .line 246
     invoke-static {v6, v8}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->loadIcon(Landroid/content/pm/ResolveInfo;Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
-
-    move-result-object v6
-
-    .line 247
-    invoke-static {v6, v8}, Lcom/smartisanos/launcher/Cb;->a(Landroid/graphics/drawable/Drawable;Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
 
     move-result-object v6
 
@@ -10668,6 +10661,14 @@
     const/4 v5, 0x1
 
     :cond_1
+    # A fresh database has no stored build timestamp, which used to make the
+    # first launch look like an OTA. Do not delete and regenerate the icons
+    # that were just created; real OTA refreshes still run on existing data.
+    if-eqz v5, :not_first_init_ota
+
+    const/4 v1, 0x0
+
+    :not_first_init_ota
     if-eqz v5, :cond_2
 
     .line 8
@@ -11627,12 +11628,24 @@
 
     move/from16 v5, p1
 
+    if-eqz v20, :not_first_init_icon_ota_1
+
+    const/4 v5, 0x0
+
+    :not_first_init_icon_ota_1
+
     if-eqz v5, :cond_25
 
     goto :goto_e
 
     :cond_23
     move/from16 v5, p1
+
+    if-eqz v20, :not_first_init_icon_ota_2
+
+    const/4 v5, 0x0
+
+    :not_first_init_icon_ota_2
 
     .line 92
     :goto_e
@@ -14186,6 +14199,24 @@
 .method private static h(Ljava/util/List;Ljava/util/List;)V
     .locals 14
 
+    invoke-static {}, Lcom/smartisanos/launcher/ja;->getInstance()Lcom/smartisanos/launcher/ja;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/ja;->getApplication()Landroid/app/Application;
+
+    move-result-object v0
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->hasSecondaryLauncherProfile(Landroid/content/Context;)Z
+
+    move-result v0
+
+    if-nez v0, :has_doppelganger_profile
+
+    return-void
+
+    :has_doppelganger_profile
+
     .line 1
     sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
 
@@ -14206,6 +14237,8 @@
 
     const/4 v1, 0x0
 
+    const/16 v13, 0xa
+
     .line 2
     :try_start_0
     invoke-interface {p1, v1}, Ljava/util/List;->get(I)Ljava/lang/Object;
@@ -14225,6 +14258,8 @@
     check-cast p0, Ljava/lang/Integer;
 
     invoke-virtual {p0}, Ljava/lang/Integer;->intValue()I
+
+    move-result v13
     :try_end_1
     .catch Ljava/lang/Exception; {:try_start_1 .. :try_end_1} :catch_0
 
@@ -14438,7 +14473,7 @@
 
     move-result-object p1
 
-    const/16 v3, 0xa
+    move v3, v13
 
     .line 24
     invoke-static {p0, v2, v3}, Lcom/smartisanos/launcher/e/s;->b(Landroid/content/Context;Ljava/lang/String;I)Ljava/util/List;
@@ -14553,24 +14588,8 @@
     move-result-object v9
 
     .line 42
-    invoke-static {v9, p1}, Lcom/smartisanos/launcher/Cb;->a(Landroid/graphics/drawable/Drawable;Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
+    move-object v11, v9
 
-    move-result-object v11
-
-    if-ne v9, v11, :cond_b
-
-    .line 43
-    sget-boolean v9, Lcom/smartisanos/launcher/va;->DBG:Z
-
-    if-eqz v9, :cond_b
-
-    sget-object v9, Lcom/smartisanos/launcher/data/A;->log:Lcom/smartisanos/launcher/va;
-
-    const-string v12, "icon == badgedIcon. this is wrong"
-
-    invoke-virtual {v9, v12}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
-
-    .line 44
     :cond_b
     iget-wide v12, v10, Lcom/smartisanos/launcher/data/ItemInfo;->id:J
 
@@ -14909,9 +14928,33 @@
 .end method
 
 .method private static j(Ljava/util/List;Ljava/util/List;)V
-    .locals 11
+    .locals 12
 
     const/4 p0, 0x0
+
+    const/16 v11, 0xa
+
+    :try_start_profile_user
+    const/4 v0, 0x1
+
+    invoke-interface {p1, v0}, Ljava/util/List;->get(I)Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Ljava/lang/Integer;
+
+    invoke-virtual {v0}, Ljava/lang/Integer;->intValue()I
+
+    move-result v11
+    :try_end_profile_user
+    .catch Ljava/lang/Exception; {:try_start_profile_user .. :try_end_profile_user} :catch_profile_user
+
+    goto :profile_user_ready
+
+    :catch_profile_user
+    move-exception v0
+
+    :profile_user_ready
 
     .line 1
     :try_start_0
@@ -14981,7 +15024,7 @@
 
     invoke-virtual {v0, v4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    const/16 v4, 0xa
+    move v4, v11
 
     invoke-virtual {v0, v4}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 

@@ -4,19 +4,19 @@
 
 
 # static fields
-.field public static final ACCESS_CALL_METHOD:Ljava/lang/String; = "com.smartisanos.launcher.ACCESS_CALL_METHOD"
+.field public static final ACCESS_CALL_METHOD:Ljava/lang/String; = "com.ranhf.smartisanlauncher.permission.ACCESS_CALL_METHOD"
 
-.field public static final DOWNLOAD_NOTIFICATION:Ljava/lang/String; = "android.permission.smartisanos.launcher.DOWNLOAD_NOTIFICATION"
+.field public static final DOWNLOAD_NOTIFICATION:Ljava/lang/String; = "com.ranhf.smartisanlauncher.permission.DOWNLOAD_NOTIFICATION"
 
-.field public static final FORCE_TOUCH:Ljava/lang/String; = "com.smartisanos.launcher.FORCE_TOUCH"
+.field public static final FORCE_TOUCH:Ljava/lang/String; = "com.ranhf.smartisanlauncher.permission.FORCE_TOUCH"
 
-.field public static final READ_DATABASE:Ljava/lang/String; = "com.smartisanos.launcher.READ_DATABASE"
+.field public static final READ_DATABASE:Ljava/lang/String; = "com.ranhf.smartisanlauncher.permission.READ_DATABASE"
 
-.field public static final WRITE_DATABASE:Ljava/lang/String; = "com.smartisanos.launcher.WRITE_DATABASE"
+.field public static final WRITE_DATABASE:Ljava/lang/String; = "com.ranhf.smartisanlauncher.permission.WRITE_DATABASE"
 
-.field public static final extra:Ljava/lang/String; = "com.smartisanos.launcher.extra"
+.field public static final extra:Ljava/lang/String; = "com.ranhf.smartisanlauncher.permission.EXTRA_PROVIDER"
 
-.field public static final preinstall_done:Ljava/lang/String; = "com.smartisanos.launcher.smt.action.preinstall_done"
+.field public static final preinstall_done:Ljava/lang/String; = "com.ranhf.smartisanlauncher.permission.PREINSTALL_DONE"
 
 
 # direct methods

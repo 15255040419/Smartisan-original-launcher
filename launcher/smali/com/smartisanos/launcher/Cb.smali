@@ -44,16 +44,7 @@
 .method public static a(Landroid/graphics/drawable/Drawable;Landroid/content/pm/PackageManager;)Landroid/graphics/drawable/Drawable;
     .locals 2
 
-    .line 1
-    new-instance v0, Landroid/os/UserHandle;
-
-    const/16 v1, 0xa
-
-    invoke-direct {v0, v1}, Landroid/os/UserHandle;-><init>(I)V
-
-    invoke-virtual {p1, p0, v0}, Landroid/content/pm/PackageManager;->getUserBadgedIcon(Landroid/graphics/drawable/Drawable;Landroid/os/UserHandle;)Landroid/graphics/drawable/Drawable;
-
-    move-result-object v0
+    const/4 v0, 0x0
 
     invoke-static {p0, p1, v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->doppelgangerBadgeDrawable(Landroid/graphics/drawable/Drawable;Landroid/content/pm/PackageManager;Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
 

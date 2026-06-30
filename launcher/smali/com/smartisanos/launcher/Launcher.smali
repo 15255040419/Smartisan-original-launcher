@@ -269,6 +269,8 @@
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->maybeRefreshLauncherWallpaper(Landroid/content/Context;)V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/badge/BadgeBridge;->replay(Landroid/content/Context;)V
+
     return-void
 .end method
 

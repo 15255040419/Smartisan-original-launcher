@@ -88,7 +88,7 @@
     <integer name="folder_preview_left_margin_3_3">57</integer>
     <integer name="folder_preview_top_margin_2_2">30</integer>
     <integer name="folder_preview_top_margin_3_3">29</integer>
-    <integer name="folder_text_font_size">29</integer>
+    <integer name="folder_text_font_size">30</integer>
     <integer name="folder_title_font_max_height">900</integer>
     <integer name="folder_title_font_max_width">768</integer>
     <integer name="folder_title_location_y">253</integer>
@@ -133,8 +133,8 @@
     <integer name="page_view_margin_top_trans">14</integer>
     <integer name="page_width_trans">1056</integer>
     <integer name="setting_button">134</integer>
-    <integer name="text_font_size">36</integer>
-    <integer name="text_font_size_folder">27</integer>
+    <integer name="text_font_size">37</integer>
+    <integer name="text_font_size_folder">28</integer>
     <integer name="title_page_spacing">2</integer>
     <integer name="trash_display_height">123</integer>
     <integer name="trash_float_up_height">75</integer>
