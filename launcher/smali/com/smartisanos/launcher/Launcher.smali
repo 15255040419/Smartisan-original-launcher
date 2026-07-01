@@ -273,7 +273,19 @@
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->maybeRefreshLauncherWallpaper(Landroid/content/Context;)V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/WeatherBridge;->onLauncherResume(Landroid/app/Activity;)V
+
     invoke-static {p0}, Lcom/smartisanos/launcher/badge/BadgeBridge;->replay(Landroid/content/Context;)V
+
+    return-void
+.end method
+
+.method public onRequestPermissionsResult(I[Ljava/lang/String;[I)V
+    .locals 0
+
+    invoke-super {p0, p1, p2, p3}, Landroid/app/Activity;->onRequestPermissionsResult(I[Ljava/lang/String;[I)V
+
+    invoke-static {p0, p1, p3}, Lcom/smartisanos/launcher/theme/WeatherBridge;->onRequestPermissionsResult(Landroid/app/Activity;I[I)V
 
     return-void
 .end method

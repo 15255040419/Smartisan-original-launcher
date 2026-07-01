@@ -656,4 +656,11 @@
     <string name="unlock_animation_title">Unlock Animation</string>
     <string name="unlock_animation_tips">Play scale animation after unlock</string>
     <string name="transparent_theme_title">Transparent Theme</string>
+    <string name="dynamic_weather_title">Dynamic weather</string>
+    <string name="dynamic_weather_calendar_switch">Dynamic weather and calendar</string>
+    <string name="dynamic_weather_auto_location">Automatic location</string>
+    <string name="dynamic_weather_manual_city">Choose city manually</string>
+    <string name="dynamic_weather_manual_city_subtitle">Search for a fixed weather location</string>
+    <string name="dynamic_weather_refresh">Refresh now</string>
+    <string name="dynamic_weather_tips">Weather data is provided by Open-Meteo. Automatic mode uses only coarse system location; manual city mode needs no location permission. Weather is normally checked hourly.</string>
 </resources>

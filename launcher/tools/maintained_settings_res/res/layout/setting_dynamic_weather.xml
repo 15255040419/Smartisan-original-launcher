@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:setting="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/background" android:fitsSystemWindows="true">
+    <com.smartisanos.home.widget.sys.Title android:id="@+id/view_title"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_alignParentTop="true" setting:title_titlex="@string/dynamic_weather_title" />
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent"
+        android:layout_below="@id/view_title" android:overScrollMode="always">
+        <LinearLayout android:orientation="vertical" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:paddingTop="12dp" android:paddingBottom="24dp">
+            <com.smartisanos.home.settings.SettingItemSwitch
+                android:id="@+id/weather_auto_location"
+                setting:setting_item_switch_title="@string/dynamic_weather_auto_location"
+                style="@style/SettingSubItemSingleStyle" />
+            <TextView android:id="@+id/weather_location_status" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:paddingLeft="@dimen/setting_item_text_left"
+                android:paddingRight="@dimen/setting_item_text_left" android:paddingTop="18dp"
+                android:paddingBottom="18dp" android:textSize="15sp"
+                android:textColor="#777777" />
+            <RelativeLayout android:id="@+id/weather_manual_city"
+                android:background="@drawable/selector_setting_sub_item_bg_top"
+                android:layout_width="match_parent" android:layout_height="@dimen/settings_item_height">
+                <LinearLayout android:orientation="vertical" android:gravity="center_vertical"
+                    android:layout_width="wrap_content" android:layout_height="match_parent"
+                    android:paddingLeft="@dimen/setting_item_text_left">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/dynamic_weather_manual_city" android:textSize="18sp"
+                        android:textColor="@drawable/more_item_color_bg" />
+                    <TextView android:id="@+id/weather_manual_city_subtitle"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp" android:text="@string/dynamic_weather_manual_city_subtitle"
+                        android:textSize="14sp" android:textColor="#888888" />
+                </LinearLayout>
+                <ImageView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:src="@drawable/setting_next"
+                    android:layout_alignParentRight="true" android:layout_centerVertical="true" />
+            </RelativeLayout>
+            <RelativeLayout android:id="@+id/weather_refresh" android:layout_width="match_parent"
+                android:layout_height="72dp" android:background="@drawable/selector_setting_sub_item_bg_bottom">
+                <TextView android:layout_width="match_parent" android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="@string/dynamic_weather_refresh" android:textSize="18sp"
+                    android:textColor="@drawable/more_item_color_bg" />
+            </RelativeLayout>
+            <TextView android:id="@+id/weather_update_status" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:paddingLeft="@dimen/setting_item_text_left"
+                android:paddingRight="@dimen/setting_item_text_left" android:paddingTop="18dp"
+                android:paddingBottom="18dp" android:textSize="15sp"
+                android:textColor="#777777" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:paddingLeft="@dimen/setting_item_text_left"
+                android:paddingRight="@dimen/setting_item_text_left" android:textSize="14sp"
+                android:textColor="#888888" android:text="@string/dynamic_weather_tips" />
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>

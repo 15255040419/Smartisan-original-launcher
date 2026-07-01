@@ -1350,12 +1350,7 @@
 
     if-nez v0, :cond_2
 
-    sget-object v0, Lcom/smartisanos/launcher/view/activeicon/H;->PACKAGE_NAME:Ljava/lang/String;
-
-    iget-object p0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
-
-    .line 3
-    invoke-virtual {v0, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/data/ItemInfo;->bf()Z
 
     move-result p0
 
@@ -1515,6 +1510,17 @@
     move-result-object v0
 
     :calendar_context_ready
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->dynamicWeatherCalendarEnabled(Landroid/content/Context;)Z
+
+    move-result p0
+
+    if-nez p0, :calendar_dynamic_enabled
+
+    const/4 p0, 0x0
+
+    return p0
+
+    :calendar_dynamic_enabled
     invoke-static {v0, v2}, Lcom/smartisanos/launcher/compat/CalendarAppDetector;->isCalendarPackage(Landroid/content/Context;Ljava/lang/String;)Z
 
     move-result p0
@@ -1723,11 +1729,7 @@
 
     if-nez v0, :cond_0
 
-    sget-object v0, Lcom/smartisanos/launcher/view/activeicon/H;->PACKAGE_NAME:Ljava/lang/String;
-
-    iget-object v1, p0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
-
-    invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/data/ItemInfo;->bf()Z
 
     move-result v0
 
@@ -1762,33 +1764,31 @@
 .end method
 
 .method public bf()Z
-    .locals 2
+    .locals 3
 
-    .line 1
-    iget-object p0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
+    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->dynamicWeatherCalendarEnabled()Z
 
-    const/4 v0, 0x0
+    move-result v0
 
-    if-nez p0, :cond_0
+    if-nez v0, :weather_dynamic_enabled
 
-    return v0
-
-    .line 2
-    :cond_0
-    sget-object v1, Lcom/smartisanos/launcher/view/activeicon/H;->PACKAGE_NAME:Ljava/lang/String;
-
-    invoke-virtual {v1, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
-
-    move-result p0
-
-    if-eqz p0, :cond_1
-
-    const/4 p0, 0x1
+    const/4 p0, 0x0
 
     return p0
 
-    :cond_1
-    return v0
+    :weather_dynamic_enabled
+
+    iget-object v0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
+
+    iget-object v1, p0, Lcom/smartisanos/launcher/data/ItemInfo;->componentName:Ljava/lang/String;
+
+    iget-object v2, p0, Lcom/smartisanos/launcher/data/ItemInfo;->title:Ljava/lang/String;
+
+    invoke-static {v0, v1, v2}, Lcom/smartisanos/launcher/theme/WeatherBridge;->isWeatherPackage(Ljava/lang/String;Ljava/lang/String;Ljava/lang/CharSequence;)Z
+
+    move-result p0
+
+    return p0
 .end method
 
 .method public cf()Ljava/lang/String;

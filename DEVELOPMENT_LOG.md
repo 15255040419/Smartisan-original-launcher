@@ -37,7 +37,8 @@
 - 应用图标页顶部“改进版图标”已改为复用首页同款 `SettingItemSwitch` / `SwitchEx`，不再手写开关；“图标包”行改用 maintained 卡片背景，与上方开关行组成一组。
 - 应用图标页新增“桌面图标大小”滑块，位置在“改进版图标”和“图标包”之间；支持 50% - 150% 连续调节，并可点击“小 / 中 / 大”快速跳到 50% / 100% / 150%；保存后回到桌面并完整重启 Launcher，让 12 / 20 宫格里的所有普通应用和桌面设置虚拟入口统一应用新尺寸。
 - 动态日历已完成普通 Android 厂商兼容：按 `CATEGORY_APP_CALENDAR` 查询系统日历并补充常见厂商包名回退，不再只认 `com.android.calendar`；纹理缓存键加入年月和年内日序，系统日期变化后不会继续复用旧日期纹理。
-- 活动日历的厂商识别、双层、错位和尺寸问题已收口到 `ItemInfo.Te()`、`view/a/g.1.smali` 与 `activeicon/m.smali`：厂商日历也创建原版活动层；静态图标路径由 `d([B)` / `o(Bitmap)` 直接输出单层完整动态日历，不再把锤子静态日历和活动层叠在一起；完整日历、实时节点和过渡动画统一使用 74% 归一化比例，并按图标尺寸的 4% 向上修正视觉中心。页面层继续保持 `3b973b589338b963d5b39a82e1937922577b3f4e` 的灰度链路。
+- 动态天气和日历保留锤子原版 activeicon 分层与切换回调：天气底框固定，只更新天气图形和右上角温度；日历底框固定，只更新日期层。普通 Android 厂商识别和 Open-Meteo 仅作为外围数据/包名桥接，不再改写原版动画节点。静止合成位图与实时场景根节点共同读取全局图标倍率；日期层使用基于各 mode `LayoutProperty` 的归一化宽高与偏移，不写死设备像素。
+- 桌面设置中的“动态天气”和“动态天气和日历”已合并为一个“动态天气和日历”组合项：点击文字区域进入天气位置与刷新设置，点击右侧开关控制天气/日历是否使用动态图标。关闭后两者回到普通图标链路，可被默认图标、改进版、自定义图标和图标包接管；开关变化会重建 Launcher 场景，使普通节点与 activeicon 节点立即互换。
 - 50%-150% 图标比例现在会在每个 Launcher 新进程从 XML 基准重新应用一次；修复杀进程、覆盖安装或系统回收后普通图标恢复 100%，导致日历和普通图标再次失配的问题。
 - 应用图标页单应用切换已改为行级刷新：选择左侧默认图标、右侧推荐图标或相册自定义图标后，当前页面和滚动位置保持不变；只有找不到当前行时才兜底重建并恢复滚动位置。
 - 应用图标页点击范围已收窄：只有左侧默认图标块和右侧推荐/加号图标块响应选择，右侧应用名称/说明文字区域不再弹出选择框。
@@ -70,7 +71,7 @@
   - [x] 紧贴屏幕横扫清除角标：key 为 `launcher_badge_swipe_clean`，已接入 maintained 风格设置页开关。
   - [x] 隐藏图标上的角标：key 为 `launcher_hide_badge`，已接入 maintained 风格设置页开关。
   - [x] 下滑搜索：已改为进入 launcher 内 `ThemeChooserActivity` 承载的自绘搜索页；当前不再依赖锤子独立搜索 APK，上滑入口已停用。
-  - [ ] 天气：当前保留天气权限、资源和旧 Smartisan 天气库，但旧天气接口可能不可用，后续建议按 maintained 的方向优先拉起系统 / 已安装天气应用。
+  - [x] 动态天气：识别 vivo/BBK、OPPO/Oplus、小米、华为/荣耀、三星等系统天气入口；点击仍打开厂商天气应用，桌面复用锤子原版动态天气、温度和昼夜动画。数据由 Open-Meteo 提供，设置页支持系统粗略定位或手动搜索城市，按一小时缓存刷新并可手动立即刷新。
   - [x] 日历：已支持系统 / 厂商日历识别、随系统日期刷新、静态层去重以及 50%-150% 图标尺寸联动；已在 VIVO Android 16 真机验证。
 - 提醒角标已接入通知监听兼容桥；其语义是有效活动通知数，不承诺等于第三方应用私有数据库中的真实未读消息数。应用未发通知、用户关闭通知、工作资料夹被系统策略隔离等情况无法由 Launcher 绕过。
 - 在线主题 APK 下载后仍依赖用户手动安装，普通应用没有静默安装能力。
@@ -81,7 +82,7 @@
 以下内容只保留作问题追溯，不得恢复到当前代码：
 
 - **日历强制隐藏静态前景**（2026-06-21）：会破坏桌面编辑页灰度；替代方案是日历类覆盖 `d([B)` / `o(Bitmap)`，输出单层完整动态日历。
-- **日历套用 84% 或固定 72% 比例**（2026-06-21、2026-07-01 较早记录）：会造成尺寸偏小或视觉中心偏下；当前统一为 74%，并按图标尺寸的 4% 向上修正。
+- **日历整体套用固定 84% / 74% / 72% 及固定中心偏移**（2026-06-21、2026-07-01 较早记录）：会造成静止合成图和实时场景尺寸分叉，或在翻页时先缩放再恢复；当前保留原版根节点/回调，只对最终图标倍率及日期子层使用 `LayoutProperty` 相对比例。
 - **按屏幕 density 使用两套日期高度和 Y 偏移**（2026-06-22）：会让实时节点与数据库 bitmap 分叉；当前三条渲染路径使用同一参数。
 - **文件夹打开时只跳过解锁播放**（2026-06-30）：锁屏准备仍会累积桌面宫格节点；当前在锁屏准备与解锁播放两端都跳过。
 - **分身刷新固定 `userId=10`**（原版限制，2026-07-01 修正）：非 10 profile 会丢弃更新；当前始终使用事件携带的实际 profile userId。
@@ -96,6 +97,107 @@
 4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
 
 ## 每日修复记录（倒序）
+
+### 2026-07-01：动态天气与日历开关、原版分层恢复和多屏尺寸收口
+
+新增与修复：
+
+- 动态功能开关：
+  - 新增 `launcher_dynamic_weather_calendar_enabled`，默认开启。
+  - `ItemInfo.Te()` 和 `ItemInfo.bf()` 在创建 CalendarView / WeatherView 前读取该开关。
+  - `Aa` 的动态图标底图替换入口同步受开关控制；关闭后日历和天气完整回到普通图标、图标包和单应用自定义图标链路。
+  - 开关变化后重启并重建 Launcher 场景，避免旧 activeicon 节点继续驻留而不能即时切换。
+- 设置页合并：
+  - 原先独立的“动态天气”入口与“动态天气和日历”开关合并为一个 `SettingItemSwitch` 行。
+  - 点击文字区域进入动态天气位置设置；右侧开关只负责启用/关闭天气和日历动态层。
+  - “手动选择城市”右箭头改为复用通用 `setting_next` 资源，与其他设置页面位置一致。
+- 原版绘制逻辑恢复：
+  - 以 `clean_launcher/smali/com/smartisanos/launcher/view/activeicon/` 为完整未改基线核对 `WeatherView`、`CalendarView` 和回调类；用户指定的 `build/decompiled_theme_check/com.smartisanos.launcher-3` 主要用于核对主题资源，本身不包含完整 activeicon 类。
+  - 恢复天气/日历原版双缓冲、底框节点和切换回调，撤销会导致天气闪出第二个框、天气更新后消失以及日历翻页缩放跳变的父节点重绘改写。
+  - Open-Meteo 继续通过原版 `com.smartisanos.weather.data.update` Bundle 协议提供 `weatherCode`、摄氏/华氏温度和日出日落；绘制层不感知数据来源。
+- 尺寸和日期位置：
+  - 普通图标默认使用移植版有效图标倍率，动态节点原版只使用旧 `icon_scale`。现在实时场景根节点与静止 `createComposedBitmap()` 都通过 `LauncherSettingBridge` 使用同一个有效倍率。
+  - 天气维持原版视觉比例：底框相对普通方形图标略大，温度位于天气图形右上角。截图量测中当前天气约 160px / 普通方形图标约 145px，参考原版约 166px / 146px，属于原版设计比例，不再强行缩成同宽。
+  - 日历日期层宽度取 mode 资源 `calendar_day_w` 的 90%，高度取 `calendar_day_h` 的 80%，纵向偏移取 `calendar_day_offsety` 的 76%，水平补偿为原日期宽度的 5%；静止合成图和实时翻页节点使用同一组比例。
+  - 上述日期参数基于每种密度和 MODE_9/12/16/20 的 `LayoutProperty` 计算，不使用某一台设备的固定 px/dp，后续仍需在不同分辨率和桌面宫格模式回归。
+
+问题追溯：
+
+- 曾在 `Aa.a(Bitmap, String, ...)` 的动态开关分支直接跳到旧方法中部，绕过 `v2` 初始化，导致 Android ART 报 `VerifyError` 并拒绝加载 `Aa`，表现为安装后 Launcher 无法打开。现已将共享寄存器在分支前初始化并通过真机启动验证。
+- 曾只放大实时 SceneNode，静止数据库合成位图没有同步，因此覆盖安装、强停或发送刷新广播后视觉上“没有变化”。现已同时覆盖实时根节点和最终合成位图两条路径。
+- 曾用 74% 整体缩放、4% 固定中心补偿及跳过 `uq()` 父重绘修补动画；这些方案会破坏原版分层或造成静止/动态状态不一致，已废弃。
+
+验证：
+
+- 多轮 `build.bat` 构建、签名通过，输出 `build\launcher-signed.apk`。
+- 使用 `D:\sdk\platform-tools\adb.exe install -r` 多次覆盖安装到 PDCM00 / Android 16 真机。
+- 清空 logcat、强停并启动 `com.smartisanos.launcher/.Launcher`，确认无 `FATAL EXCEPTION`、`VerifyError` 或进程死亡。
+- 通过 `com.smartisanos.launcher.update_icon` 广播刷新静止图标缓存；通过天气更新协议验证 Launcher 进程持续运行。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/maintained_settings_res/res/layout/setting_main.xml`
+- `launcher/tools/maintained_settings_res/res/layout/setting_dynamic_weather.xml`
+- `launcher/smali/com/smartisanos/launcher/Aa.smali`
+- `launcher/smali/com/smartisanos/launcher/data/ItemInfo.smali`
+- `launcher/smali/com/smartisanos/launcher/view/activeicon/H.smali`
+- `launcher/smali/com/smartisanos/launcher/view/activeicon/m.smali`
+
+### 2026-07-01：动态天气补丁导致 Launcher 启动 VerifyError
+
+- 真机日志确认桌面启动即退出不是设置页或网络异常，而是 `Aa.a(Bitmap, String, boolean, ColorInfo)` 在 Android 运行时校验阶段被拒绝：天气包识别分支跳转到普通图标路径时，寄存器 `v2` 尚未赋值。
+- 将该方法原有的 `v2 = 1` 初始化恢复到所有分支共同经过的位置，保留跨厂商天气识别，不再产生未定义寄存器。
+- 重新构建并通过 ADB 覆盖安装；OPPO PDCM00 冷启动成功，`com.smartisanos.launcher/.LauncherAlias` 保持前台、进程存活，日志中不再出现 `VerifyError` 或 `FATAL EXCEPTION`。
+
+### 2026-07-01：动态天气设置、自动定位与手动城市
+
+- 桌面设置首页新增“动态天气”入口，二级页显示当前天气位置、温度、最近更新时间，并提供“立即刷新”。
+- 默认使用系统粗略定位；打开自动定位但尚未授权时，从设置页发起 `ACCESS_COARSE_LOCATION` 请求。
+- 新增手动城市模式：输入中文或英文城市名后，通过 Open-Meteo Geocoding API 返回候选城市，用户选中后保存城市名和经纬度并立即刷新天气。手动模式不读取定位，也不需要定位权限。
+- 自动定位与手动城市使用同一套天气缓存和锤子原版动态天气广播；切回自动定位后恢复系统位置，正常刷新频率仍为一小时，手动“立即刷新”可绕过缓存。
+- 设置页只改变天气数据来源，不改变天气图标所绑定的系统天气 Activity；点击桌面天气仍打开手机自带天气应用。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/WeatherBridge.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/maintained_settings_res/res/layout/setting_main.xml`
+- `launcher/tools/maintained_settings_res/res/layout/setting_dynamic_weather.xml`
+- `launcher/tools/maintained_settings_res/res/values/strings.xml`
+- `launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml`
+
+验证：`build.bat` 完整通过并重新生成、签名 `build/launcher-signed.apk`；定位授权、城市搜索和动态图标刷新仍需连接真机验收。
+
+### 2026-07-01：普通 Android 动态天气恢复
+
+- **原版能力确认**：`activeicon/H.smali`、天气纹理、温度数字、昼夜素材、日出日落切换及更新动画均完整保留；失效点是原版只识别 `com.smartisanos.weather`，并依赖普通 Android 不存在的 `content://com.android.providers.weather_app`。
+- **系统天气入口**：新增厂商天气识别，覆盖 Smartisan、Android、vivo/BBK、OPPO/Oplus、MIUI、华为/荣耀和三星常见天气包。`ItemInfo.bf/Qe`、活动图标创建和静态底图生成统一使用识别结果；ItemInfo 的原包名和 Activity 不变，因此点击图标继续打开手机系统自带天气。
+- **现代天气数据源**：新增 `WeatherBridge`，使用 Open-Meteo Forecast API 的经纬度接口读取 `temperature_2m`、`weather_code`、`is_day`、`sunrise` 和 `sunset`。WMO 天气代码映射到锤子原版晴、云、阴、雾、雨、冻雨、雪和雷暴代码，再转换成原版 `com.smartisanos.weather.data.update` 广播。
+- **位置与权限**：最终 APK 增加 `ACCESS_COARSE_LOCATION`；仅当设备存在可识别的天气应用时请求粗略位置。优先使用 6 小时内的系统最近位置，无可用位置时请求一次网络定位；不申请精确定位。
+- **刷新与缓存**：天气缓存有效期为 60 分钟；Launcher 恢复、进程内每小时定时检查以及首次授权后均会尝试刷新。缓存有效时不联网，请求失败时保留上次天气，不清空图标。位置缓存有效期为 6 小时。
+- **原版协议兼容**：原 `CallExpandService.q(Context)` 改为读取桥接缓存并异步触发刷新，返回字段仍为 `weatherCode`、`temp`、`fahrenheitTemp` 和 `_1sunRiseAndSet`，因此没有重写 SMEngine 天气动画。
+- **权限清单**：文本 Manifest 与最终构建注入的二进制 Manifest 均包含粗略定位权限；新增 `tools/patch_weather_location_permission.py` 用于维护保留的 AXML 清单。
+- **数据服务说明**：Open-Meteo 非商业使用无需 API Key；发布时应保留来源说明，商业使用前需重新确认授权。接口文档：`https://open-meteo.com/en/docs`。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/WeatherBridge.java`
+- `launcher/smali/com/smartisanos/launcher/a/a.1.smali`
+- `launcher/smali/com/smartisanos/launcher/data/ItemInfo.smali`
+- `launcher/smali/com/smartisanos/launcher/view/a/g.1.smali`
+- `launcher/smali/com/smartisanos/launcher/Aa.smali`
+- `launcher/smali/com/smartisanos/launcher/Launcher.smali`
+- `launcher/AndroidManifest.xml`
+- `launcher/original/AndroidManifest.xml`
+- `tools/patch_weather_location_permission.py`
+
+验证：
+
+- `build.bat` 完整通过，输出 `build/launcher-signed.apk`。
+- `aapt2 dump permissions` 确认最终 APK 同时包含 `INTERNET` 和 `ACCESS_COARSE_LOCATION`。
+- 当前 ADB 未连接设备，定位授权、实际天气请求、厂商天气点击和图标动画仍需真机验收。
 
 ### 2026-07-01：动态日历尺寸与视觉中心统一
 
@@ -965,7 +1067,7 @@ ADB 结论：
 - 桌面隐藏虚拟键、检查更新、关闭电池优化和关于我们入口均已接入，不是 Toast 占位。
 - maintained 风格设置页已接入 `launcher_hide_badge` 和 `launcher_badge_swipe_clean`。
 - 下滑搜索：当前工程不再接入独立 QuickSearch APK，搜索入口统一进入 launcher 内 `ThemeChooserActivity` 自绘搜索页；原版上滑入口已停用，保留的旧 provider / call stub 只作为入口痕迹和兼容跳转参考，不再作为独立应用安装目标。
-- 天气：当前工程保留天气权限、天气资源、旧 Smartisan 天气库和旧天气接口痕迹；maintained 的兼容方向是不要依赖旧天气接口，天气图标优先作为入口拉起系统 / 已安装天气应用。后续建议按这个方向做，避免旧接口失效导致桌面入口不可用。
+- **[已完成，旧待办废弃]** 天气当时仅保留权限、资源和旧 Smartisan 接口，尚未适配普通 Android。该待办已由 2026-07-01“普通 Android 动态天气恢复”完成：点击系统天气，动态图标数据由粗略定位和 Open-Meteo 提供。
 - 日历：当前工程保留日历权限、日历名称和动态图标资源线索；后续要单独验证桌面日历图标是否能跟随日期刷新、点击是否能拉起系统 / 已安装日历应用，并处理没有日历应用时的兜底。
 - 提醒角标：当前工程已有 `launcher_hide_badge`、`launcher_badge_swipe_clean`、badge 读取 / 刷新和滑动清除痕迹；maintained 文档记录过多厂商 unread broadcast 兼容。后续要分两层做：先恢复旧 Smartisan / 厂商未读数广播显示，再评估是否接入现代 Android 通知监听或 badge 兼容桥，让普通应用通知也能稳定转成桌面角标。
 

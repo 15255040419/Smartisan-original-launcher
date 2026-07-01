@@ -175,6 +175,8 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_THEME_RELOAD_LOADING_MESSAGE = "launcher_theme_reload_loading_message";
     private static final String PREF_IMPROVED_ICON_ENABLED = "launcher_improved_icon_enabled";
     private static final String KEY_SEARCH_PAGE_ENABLED = "launcher_search_page_enabled";
+    private static final String KEY_DYNAMIC_WEATHER_CALENDAR =
+            "launcher_dynamic_weather_calendar_enabled";
     private static final String KEY_TRANSPARENT_THEME_ENABLED = "launcher_grid_theme";
     private static final String KEY_TRANSPARENT_WALLPAPER_BLUR = "original_launcher_wallpaper_blur_on";
     private static final String PREF_TRANSPARENT_PREVIOUS_THEME = "transparent_previous_theme";
@@ -956,6 +958,8 @@ public final class MaintainedLauncherSettingsHost {
         bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
         bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
         bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
+        bindSwitch(activity, resources, root, "setting_dynamic_weather",
+                KEY_DYNAMIC_WEATHER_CALENDAR, true);
         bindSwitch(activity, resources, root, "multi_block_fast_launch_app", "fast_launch_app_on", true);
         bindTransparentThemeSwitch(activity, resources, root);
 
@@ -1038,6 +1042,12 @@ public final class MaintainedLauncherSettingsHost {
             public void onClick(View v) {
                 sMainSettingsScrollY = currentScrollY(activity);
                 showOcdOptionsPage(activity);
+            }
+        });
+        click(activity, resources, root, "setting_dynamic_weather", new View.OnClickListener() {
+            public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
+                showDynamicWeatherPage(activity);
             }
         });
         click(activity, resources, root, "setting_switch_launcher", new View.OnClickListener() {
@@ -3894,6 +3904,19 @@ public final class MaintainedLauncherSettingsHost {
         }
         if ("launcher_hide_badge".equals(key)) {
             applyBadgeVisibility(context, next, true);
+        }
+        if (KEY_DYNAMIC_WEATHER_CALENDAR.equals(key)) {
+            postDatabaseRefreshEvent();
+            applyIconChange(context);
+            Toast.makeText(context, next
+                    ? "已启用动态天气和日历"
+                    : "已关闭动态图标，正在恢复普通图标",
+                    Toast.LENGTH_SHORT).show();
+            // CalendarView/WeatherView are different scene-node classes from a
+            // normal app icon. Bitmap cache invalidation cannot replace that
+            // node type in place, so rebuild the launcher scene immediately.
+            restartLauncher(context);
+            return;
         }
         if (next && "launcher_badge_swipe_clean".equals(key)
                 && !com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(context)) {
@@ -9526,6 +9549,238 @@ public final class MaintainedLauncherSettingsHost {
         View line = new View(context);
         line.setBackgroundColor(0xffeeeeee);
         parent.addView(line, new LinearLayout.LayoutParams(-1, 1));
+    }
+
+    private static void showDynamicWeatherPage(final Activity activity) {
+        try {
+            final SettingsResourceContext context = createSettingsContext(activity);
+            final Resources resources = context.getResources();
+            final View root = inflate(activity, context, "setting_dynamic_weather");
+            bindBackTitle(activity, resources, root, "view_title", "动态天气");
+            View automaticView = find(resources, root, "weather_auto_location");
+            final SettingItemSwitch automatic = automaticView instanceof SettingItemSwitch
+                    ? (SettingItemSwitch) automaticView : null;
+            if (automatic != null) {
+                automatic.setChecked(WeatherBridge.isAutomaticLocation(activity));
+                bindWeatherAutomaticSwitch(activity, resources, root, automatic);
+            }
+            View manual = find(resources, root, "weather_manual_city");
+            if (manual != null) manual.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    showCitySearchDialog(activity, resources, root, automatic);
+                }
+            });
+            View refresh = find(resources, root, "weather_refresh");
+            if (refresh != null) refresh.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    if (WeatherBridge.isAutomaticLocation(activity)
+                            && !WeatherBridge.hasLocationPermissionForSettings(activity)) {
+                        WeatherBridge.requestLocationPermission(activity);
+                        Toast.makeText(activity, "请允许粗略位置后再刷新", Toast.LENGTH_SHORT).show();
+                    } else {
+                        WeatherBridge.scheduleRefresh(activity, true);
+                        Toast.makeText(activity, "正在刷新天气", Toast.LENGTH_SHORT).show();
+                        root.postDelayed(new Runnable() { public void run() {
+                            updateDynamicWeatherStatus(activity, resources, root);
+                        }}, 1800L);
+                    }
+                }
+            });
+            updateDynamicWeatherStatus(activity, resources, root);
+            tuneScrollBars(root);
+            activity.setContentView(root);
+            WeatherBridge.scheduleCityResolution(activity);
+            root.postDelayed(new Runnable() { public void run() {
+                updateDynamicWeatherStatus(activity, resources, root);
+            }}, 3500L);
+            root.postDelayed(new Runnable() { public void run() {
+                updateDynamicWeatherStatus(activity, resources, root);
+            }}, 10000L);
+        } catch (Throwable failure) {
+            Log.w(LOG_TAG, "Unable to open dynamic weather settings", failure);
+            showInfoDialog(activity, "动态天气", "无法打开动态天气设置");
+        }
+    }
+
+    private static void bindWeatherAutomaticSwitch(final Activity activity,
+            final Resources resources, final View root, final SettingItemSwitch automatic) {
+        bindSwitchControlOnly(automatic, new View.OnClickListener() {
+            public void onClick(View button) {
+                boolean checked = !automatic.isChecked();
+                automatic.setCheckedAnimated(checked);
+                WeatherBridge.setAutomaticLocation(activity, checked);
+                if (checked && !WeatherBridge.hasLocationPermissionForSettings(activity)) {
+                    WeatherBridge.requestLocationPermission(activity);
+                }
+                updateDynamicWeatherStatus(activity, resources, root);
+            }
+        });
+    }
+
+    private static void updateDynamicWeatherStatus(Activity activity, Resources resources,
+            View root) {
+        TextView location = (TextView) find(resources, root, "weather_location_status");
+        if (location != null) location.setText("天气位置：" + WeatherBridge.getLocationLabel(activity));
+        WeatherBridge.scheduleCityResolution(activity);
+        TextView manualSubtitle = (TextView) find(resources, root,
+                "weather_manual_city_subtitle");
+        if (manualSubtitle != null) manualSubtitle.setText(
+                WeatherBridge.isAutomaticLocation(activity)
+                        ? "搜索城市并改用固定位置"
+                        : "当前：" + WeatherBridge.getLocationLabel(activity));
+        TextView update = (TextView) find(resources, root, "weather_update_status");
+        if (update != null) {
+            long time = WeatherBridge.getWeatherUpdatedAt(activity);
+            String when = time <= 0L ? "尚未更新"
+                    : new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                            .format(new Date(time));
+            update.setText("当前温度：" + WeatherBridge.getTemperatureLabel(activity)
+                    + "\n最近更新：" + when);
+        }
+    }
+
+    private static void showCitySearchDialog(final Activity activity, final Resources resources,
+            final View pageRoot, final SettingItemSwitch automatic) {
+        final Dialog dialog = new Dialog(activity);
+        LinearLayout panel = new LinearLayout(activity);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable panelBackground = new GradientDrawable();
+        panelBackground.setColor(0xfff7f7f7);
+        panelBackground.setCornerRadius(dp(activity, 6));
+        panelBackground.setStroke(1, 0xffcfcfcf);
+        panel.setBackgroundDrawable(panelBackground);
+
+        TextView title = text(activity, "手动选择城市", 17, 0xff555b68, false);
+        title.setGravity(Gravity.CENTER);
+        panel.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 58)));
+        panel.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(activity, 24), dp(activity, 20), dp(activity, 24), dp(activity, 22));
+        final EditText input = new EditText(activity);
+        input.setSingleLine(true);
+        input.setTextSize(16);
+        input.setTextColor(0xff454a55);
+        input.setHintTextColor(0xff9a9da3);
+        input.setHint("输入城市名称，例如北京、深圳");
+        input.setPadding(dp(activity, 14), 0, dp(activity, 14), 0);
+        GradientDrawable inputBackground = new GradientDrawable();
+        inputBackground.setColor(0xffffffff);
+        inputBackground.setCornerRadius(dp(activity, 4));
+        inputBackground.setStroke(1, 0xffc8c8c8);
+        input.setBackgroundDrawable(inputBackground);
+        content.addView(input, new LinearLayout.LayoutParams(-1, dp(activity, 48)));
+        TextView hint = text(activity, "可输入中文或英文城市名，下一步选择准确地区", 13,
+                0xff888888, false);
+        hint.setPadding(dp(activity, 2), dp(activity, 10), 0, 0);
+        content.addView(hint, new LinearLayout.LayoutParams(-1, dp(activity, 38)));
+        panel.addView(content, new LinearLayout.LayoutParams(-1, -2));
+        panel.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+        LinearLayout buttons = new LinearLayout(activity);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        TextView cancel = dialogButton(activity, "取消", 0xff62666e);
+        final TextView search = dialogButton(activity, "搜索", 0xff527fcb);
+        cancel.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { dialog.dismiss(); }
+        });
+        search.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                final String query = input.getText().toString().trim();
+                if (query.length() < 2) { input.setError("请输入至少两个字"); return; }
+                search.setEnabled(false);
+                search.setText("搜索中…");
+                WeatherBridge.searchCities(query, new WeatherBridge.CitySearchCallback() {
+                    public void onResult(final List<WeatherBridge.CityResult> cities,
+                            final String error) {
+                        activity.runOnUiThread(new Runnable() { public void run() {
+                            if (activity.isFinishing()) return;
+                            dialog.dismiss();
+                            if (error != null) Toast.makeText(activity, error,
+                                    Toast.LENGTH_LONG).show();
+                            else if (cities == null || cities.isEmpty()) Toast.makeText(activity,
+                                    "没有找到这个城市", Toast.LENGTH_SHORT).show();
+                            else showCityResultDialog(activity, resources, pageRoot,
+                                    automatic, cities);
+                        }});
+                    }
+                });
+            }
+        });
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 50), 1f));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 50)));
+        buttons.addView(search, new LinearLayout.LayoutParams(0, dp(activity, 50), 1f));
+        panel.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 50)));
+        dialog.setContentView(panel);
+        Window window = dialog.getWindow();
+        if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
+        dialog.show();
+        Window shown = dialog.getWindow();
+        if (shown != null) shown.setLayout(Math.min(dp(activity, 360),
+                activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 32)), -2);
+        input.requestFocus();
+        if (shown != null) shown.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+    }
+
+    private static void showCityResultDialog(final Activity activity, final Resources resources,
+            final View pageRoot, final SettingItemSwitch automatic,
+            final List<WeatherBridge.CityResult> cities) {
+        final Dialog dialog = new Dialog(activity);
+        LinearLayout panel = new LinearLayout(activity);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xfff7f7f7);
+        background.setCornerRadius(dp(activity, 6));
+        background.setStroke(1, 0xffcfcfcf);
+        panel.setBackgroundDrawable(background);
+        TextView title = text(activity, "选择准确地区", 17, 0xff555b68, false);
+        title.setGravity(Gravity.CENTER);
+        panel.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 58)));
+        panel.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+        LinearLayout rows = new LinearLayout(activity);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        int count = Math.min(cities.size(), 8);
+        for (int i = 0; i < count; i++) {
+            final int which = i;
+            TextView row = text(activity, cities.get(i).displayName(), 15, 0xff454a55, false);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(activity, 22), 0, dp(activity, 18), 0);
+            row.setBackgroundColor(0xfffafafa);
+            row.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    dialog.dismiss();
+                    WeatherBridge.setManualLocation(activity, cities.get(which));
+                    if (automatic != null) automatic.setCheckedAnimated(false);
+                    updateDynamicWeatherStatus(activity, resources, pageRoot);
+                    Toast.makeText(activity, "已切换到 " + cities.get(which).displayName(),
+                            Toast.LENGTH_SHORT).show();
+                    pageRoot.postDelayed(new Runnable() { public void run() {
+                        updateDynamicWeatherStatus(activity, resources, pageRoot);
+                    }}, 1800L);
+                }
+            });
+            rows.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+            if (i + 1 < count) rows.addView(smartisanDivider(activity),
+                    new LinearLayout.LayoutParams(-1, 1));
+        }
+        ScrollView scroll = new ScrollView(activity);
+        scroll.addView(rows, new ScrollView.LayoutParams(-1, -2));
+        panel.addView(scroll, new LinearLayout.LayoutParams(-1,
+                Math.min(dp(activity, count * 54), dp(activity, 360))));
+        panel.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+        TextView cancel = dialogButton(activity, "取消", 0xff62666e);
+        cancel.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { dialog.dismiss(); }
+        });
+        panel.addView(cancel, new LinearLayout.LayoutParams(-1, dp(activity, 50)));
+        dialog.setContentView(panel);
+        Window window = dialog.getWindow();
+        if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
+        dialog.show();
+        Window shown = dialog.getWindow();
+        if (shown != null) shown.setLayout(Math.min(dp(activity, 360),
+                activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 32)), -2);
     }
 
     private static void showOcdOptionsPage(final Activity activity) {

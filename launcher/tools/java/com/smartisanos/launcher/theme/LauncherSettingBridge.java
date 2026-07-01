@@ -1,6 +1,7 @@
 package com.smartisanos.launcher.theme;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.provider.Settings;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,8 @@ public final class LauncherSettingBridge {
     private static final String PREFS = "com.smartisanos.launcher_prefs";
     private static final String SETTINGS_PREFS = "launcher_settings";
     private static final String KEY_ICON_SIZE = "launcher_icon_size";
+    public static final String KEY_DYNAMIC_WEATHER_CALENDAR =
+            "launcher_dynamic_weather_calendar_enabled";
 
     private LauncherSettingBridge() {
     }
@@ -48,6 +51,26 @@ public final class LauncherSettingBridge {
         } catch (Throwable ignored) {
         }
         return defValue;
+    }
+
+    public static boolean dynamicWeatherCalendarEnabled(Context context) {
+        return readBool(context, KEY_DYNAMIC_WEATHER_CALENDAR, true);
+    }
+
+    /** Available to original smali call sites which do not carry a Context. */
+    public static boolean dynamicWeatherCalendarEnabled() {
+        try {
+            Class<?> proxy = Class.forName("com.smartisanos.launcher.ja");
+            Object instance = proxy.getMethod("getInstance").invoke(null);
+            if (instance != null) {
+                Object application = proxy.getMethod("getApplication").invoke(instance);
+                if (application instanceof Context) {
+                    return dynamicWeatherCalendarEnabled((Context) application);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return true;
     }
 
     public static boolean readTransparentMode(Context context) {
@@ -135,6 +158,39 @@ public final class LauncherSettingBridge {
 
     public static int readIconSizePercent(Context context) {
         return effectiveIconSizePercent(normalizeIconSizePercent(readInt(context, KEY_ICON_SIZE, 100)));
+    }
+
+    /** Keeps original active-icon scene roots aligned with ordinary icon sizing. */
+    public static float readActiveIconScaleFactor() {
+        try {
+            Class<?> proxy = Class.forName("com.smartisanos.launcher.ja");
+            Object instance = proxy.getMethod("getInstance").invoke(null);
+            if (instance != null) {
+                Object application = proxy.getMethod("getApplication").invoke(instance);
+                if (application instanceof Context) {
+                    return readIconSizePercent((Context) application) / 100.0f;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return 1.20f;
+    }
+
+    public static Bitmap scaleActiveIconBitmap(Bitmap source) {
+        if (source == null) {
+            return null;
+        }
+        float factor = readActiveIconScaleFactor();
+        if (Math.abs(factor - 1.0f) < 0.001f) {
+            return source;
+        }
+        int width = Math.max(1, Math.round(source.getWidth() * factor));
+        int height = Math.max(1, Math.round(source.getHeight() * factor));
+        Bitmap scaled = Bitmap.createScaledBitmap(source, width, height, true);
+        if (scaled != source) {
+            source.recycle();
+        }
+        return scaled;
     }
 
     public static void ensureTransparentThemeRegistered(Context context) {

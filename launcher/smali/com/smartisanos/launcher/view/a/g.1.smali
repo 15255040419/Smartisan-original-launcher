@@ -656,9 +656,9 @@
 
     .line 14
     :cond_2
-    sget-object v3, Lcom/smartisanos/launcher/view/activeicon/H;->PACKAGE_NAME:Ljava/lang/String;
+    iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
-    invoke-virtual {v0, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/data/ItemInfo;->bf()Z
 
     move-result v0
 
@@ -8135,11 +8135,7 @@
     .line 13
     iget-object v1, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
-    iget-object v1, v1, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
-
-    sget-object v3, Lcom/smartisanos/launcher/view/activeicon/H;->PACKAGE_NAME:Ljava/lang/String;
-
-    invoke-virtual {v1, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-virtual {v1}, Lcom/smartisanos/launcher/data/ItemInfo;->bf()Z
 
     move-result v1
 
@@ -11402,10 +11398,10 @@
 
     if-nez v1, :cond_3
 
-    sget-object v1, Lcom/smartisanos/launcher/view/activeicon/H;->PACKAGE_NAME:Ljava/lang/String;
+    iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
     .line 5
-    invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/data/ItemInfo;->bf()Z
 
     move-result v0
 

@@ -1901,14 +1901,52 @@
 
     .line 90
     :try_start_0
+    # The normal-icon path below also consumes v2 as the boolean true value.
+    # Initialize it before the dynamic-icon guard so either branch verifies.
+    const/4 v2, 0x1
+
+    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->dynamicWeatherCalendarEnabled()Z
+
+    move-result v1
+
+    if-nez v1, :cond_codex_dynamic_icons_enabled
+
+    const/4 v1, 0x0
+
+    invoke-static {p1, v1, v1}, Lcom/smartisanos/launcher/theme/WeatherBridge;->isWeatherPackage(Ljava/lang/String;Ljava/lang/String;Ljava/lang/CharSequence;)Z
+
+    move-result v1
+
+    if-nez v1, :cond_3
+
+    sget-object v1, Lcom/smartisanos/launcher/data/T;->CALENDAR:Lcom/smartisanos/launcher/data/S;
+
+    iget-object v1, v1, Lcom/smartisanos/launcher/data/S;->pkg:Ljava/lang/String;
+
+    invoke-virtual {p1, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v1
+
+    if-nez v1, :cond_3
+
+    :cond_codex_dynamic_icons_enabled
     invoke-static {p1}, Lcom/smartisanos/launcher/data/T;->Q(Ljava/lang/String;)Z
 
     move-result v1
 
     const/4 v2, 0x1
 
+    if-nez v1, :cond_codex_active_icon_package
+
+    const/4 v1, 0x0
+
+    invoke-static {p1, v1, v1}, Lcom/smartisanos/launcher/theme/WeatherBridge;->isWeatherPackage(Ljava/lang/String;Ljava/lang/String;Ljava/lang/CharSequence;)Z
+
+    move-result v1
+
     if-eqz v1, :cond_3
 
+    :cond_codex_active_icon_package
     const/4 v1, 0x0
 
     .line 91
@@ -1937,9 +1975,9 @@
 
     .line 93
     :cond_0
-    sget-object v3, Lcom/smartisanos/launcher/view/activeicon/H;->PACKAGE_NAME:Ljava/lang/String;
+    const/4 v3, 0x0
 
-    invoke-virtual {p1, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-static {p1, v3, v3}, Lcom/smartisanos/launcher/theme/WeatherBridge;->isWeatherPackage(Ljava/lang/String;Ljava/lang/String;Ljava/lang/CharSequence;)Z
 
     move-result v3
 
