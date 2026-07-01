@@ -5,27 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="295b82c4-8572-45f1-add8-3c13ec0468e1" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/tools/generate_icon_index.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tools/set_launcher_version.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/APK_INVENTORY.md" beforeDir="false" afterPath="$PROJECT_DIR$/APK_INVENTORY.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/BUILD_AND_VERSION_NOTES.md" beforeDir="false" afterPath="$PROJECT_DIR$/BUILD_AND_VERSION_NOTES.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-aligned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-aligned.apk" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-unsigned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-unsigned.apk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/icons/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/icons/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/original/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/original/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Launcher.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Launcher.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/ia.1.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/ia.1.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/ja.1.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/ja.1.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/a/g.1.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/a/g.1.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconPackManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconPackManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values/strings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values/strings.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

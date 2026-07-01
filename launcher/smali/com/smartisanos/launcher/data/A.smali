@@ -14891,9 +14891,7 @@
     invoke-virtual {v2, v1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     :cond_2
-    const/16 v1, 0xa
-
-    if-eq p0, v1, :cond_3
+    if-gtz p0, :cond_3
 
     .line 6
     sget-object p1, Lcom/smartisanos/launcher/data/A;->log:Lcom/smartisanos/launcher/va;
@@ -15427,7 +15425,17 @@
 
     invoke-virtual {v11, v7}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
 
-    const/16 v4, 0xa
+    const/4 v4, 0x1
+
+    invoke-interface {p1, v4}, Ljava/util/List;->get(I)Ljava/lang/Object;
+
+    move-result-object v4
+
+    check-cast v4, Ljava/lang/Integer;
+
+    invoke-virtual {v4}, Ljava/lang/Integer;->intValue()I
+
+    move-result v4
 
     invoke-virtual {v11, v4}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 

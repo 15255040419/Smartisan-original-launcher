@@ -1491,35 +1491,35 @@
 .end method
 
 .method public Te()Z
-    .locals 2
+    .locals 3
 
     .line 1
-    iget-object p0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
+    iget-object v2, p0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
 
     const/4 v0, 0x0
 
-    if-nez p0, :cond_0
+    if-nez v2, :cond_0
 
     return v0
 
     .line 2
     :cond_0
-    sget-object v1, Lcom/smartisanos/launcher/data/T;->CALENDAR:Lcom/smartisanos/launcher/data/S;
+    invoke-static {}, Lcom/smartisanos/launcher/ja;->getInstance()Lcom/smartisanos/launcher/ja;
 
-    iget-object v1, v1, Lcom/smartisanos/launcher/data/S;->pkg:Ljava/lang/String;
+    move-result-object v1
 
-    invoke-virtual {v1, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    if-eqz v1, :calendar_context_ready
+
+    invoke-virtual {v1}, Lcom/smartisanos/launcher/ja;->getApplication()Landroid/app/Application;
+
+    move-result-object v0
+
+    :calendar_context_ready
+    invoke-static {v0, v2}, Lcom/smartisanos/launcher/compat/CalendarAppDetector;->isCalendarPackage(Landroid/content/Context;Ljava/lang/String;)Z
 
     move-result p0
 
-    if-eqz p0, :cond_1
-
-    const/4 p0, 0x1
-
     return p0
-
-    :cond_1
-    return v0
 .end method
 
 .method public Ue()Z

@@ -142,6 +142,15 @@
 
     .line 13
     :cond_5
+    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->shouldSkipUnlockAnimation()Z
+
+    move-result p1
+
+    if-eqz p1, :cond_codex_prepare_unlock
+
+    return-void
+
+    :cond_codex_prepare_unlock
     invoke-static {}, Lcom/smartisanos/launcher/J;->Ua()Z
 
     move-result p1

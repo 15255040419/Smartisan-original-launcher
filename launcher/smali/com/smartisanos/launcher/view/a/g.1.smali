@@ -599,9 +599,9 @@
     move-result v2
 
     .line 4
-    sget-object v3, Lcom/smartisanos/launcher/view/activeicon/m;->PACKAGE_NAME:Ljava/lang/String;
+    iget-object v3, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
-    invoke-virtual {v0, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-virtual {v3}, Lcom/smartisanos/launcher/data/ItemInfo;->Te()Z
 
     move-result v3
 
@@ -11394,9 +11394,9 @@
 
     .line 4
     :cond_2
-    sget-object v1, Lcom/smartisanos/launcher/view/activeicon/m;->PACKAGE_NAME:Ljava/lang/String;
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
-    invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-virtual {v1}, Lcom/smartisanos/launcher/data/ItemInfo;->Te()Z
 
     move-result v1
 

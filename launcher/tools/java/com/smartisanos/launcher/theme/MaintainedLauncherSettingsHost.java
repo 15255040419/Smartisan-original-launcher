@@ -206,6 +206,7 @@ public final class MaintainedLauncherSettingsHost {
     private static boolean sSmartisanIconRefreshScheduled;
     private static long sSmartisanIconLastWriteUptime;
     private static boolean sDoppelgangerBootstrapScheduled;
+    private static boolean sDoppelgangerIconRefreshRunning;
     private static boolean sLauncherPausedForScreenOff;
     private static long sLastLifecycleUnlockUptime;
     private static long sLastOriginalUnlockUptime;
@@ -497,6 +498,9 @@ public final class MaintainedLauncherSettingsHost {
                         params.add(entry.packageName);
                         params.add(Integer.valueOf(entry.userId));
                         postDatabaseUserPackageAdded(params);
+                        // Existing clone rows keep their cached bitmap on ADDED.
+                        // CHANGED rebuilds it from the primary app's current icon.
+                        postDatabaseUserPackageChanged(params);
                     }
                 }
                 if (!packagesByUser.isEmpty()) {
@@ -758,6 +762,49 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void postDatabaseUserPackageChanged(ArrayList params) {
         postDatabaseUserPackageEvent("EVENT_USER_PACKAGE_CHANGED", params);
+    }
+
+    private static void refreshEnabledDoppelgangerIcons(final Context context) {
+        if (context == null) {
+            return;
+        }
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            if (sDoppelgangerIconRefreshRunning) {
+                return;
+            }
+            sDoppelgangerIconRefreshRunning = true;
+        }
+        final Context app = context.getApplicationContext() == null
+                ? context : context.getApplicationContext();
+        new Thread(new Runnable() {
+            public void run() {
+                boolean changed = false;
+                try {
+                    List<ProfileAppEntry> entries = discoverProfileApps(app, true);
+                    for (ProfileAppEntry entry : entries) {
+                        if (entry == null || !isProfileAppEnabled(app, entry)) {
+                            continue;
+                        }
+                        ArrayList params = new ArrayList();
+                        params.add(entry.packageName);
+                        params.add(Integer.valueOf(entry.userId));
+                        postDatabaseUserPackageChanged(params);
+                        changed = true;
+                    }
+                } finally {
+                    synchronized (MaintainedLauncherSettingsHost.class) {
+                        sDoppelgangerIconRefreshRunning = false;
+                    }
+                }
+                if (changed) {
+                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                        public void run() {
+                            postDatabaseRefreshEvent();
+                        }
+                    }, 450);
+                }
+            }
+        }, "DoppelgangerIconRefresh").start();
     }
 
     private static void postDatabaseUserPackageRemoved(ArrayList params) {
@@ -2275,8 +2322,8 @@ public final class MaintainedLauncherSettingsHost {
         canvas.drawBitmap(base, 0, 0, paint);
 
         float size = Math.max(13f, Math.min(width, height) * 0.19f);
-        float left = Math.max(1f, width * 0.110f);
-        float bottom = height - Math.max(1f, height * 0.135f);
+        float left = Math.max(1f, width * 0.125f);
+        float bottom = height - Math.max(1f, height * 0.155f);
         float top = bottom - size;
         RectF shield = new RectF(left, top, left + size, bottom);
         Path shieldPath = buildDoppelgangerBadgePath(shield);
@@ -2315,8 +2362,8 @@ public final class MaintainedLauncherSettingsHost {
     private static boolean hasDoppelgangerBadge(Bitmap bitmap, int width, int height) {
         try {
             float size = Math.max(13f, Math.min(width, height) * 0.19f);
-            float left = Math.max(1f, width * 0.110f);
-            float bottom = height - Math.max(1f, height * 0.135f);
+            float left = Math.max(1f, width * 0.125f);
+            float bottom = height - Math.max(1f, height * 0.155f);
             float top = bottom - size;
             int sampleX = clamp(Math.round(left + size * 0.5f), 0, width - 1);
             int sampleY = clamp(Math.round(top + size * 0.45f), 0, height - 1);
@@ -11200,6 +11247,7 @@ public final class MaintainedLauncherSettingsHost {
             context.sendBroadcast(intent);
         } catch (Throwable ignored) {
         }
+        refreshEnabledDoppelgangerIcons(context);
         reloadOriginalSettings(context);
     }
 
@@ -11244,6 +11292,7 @@ public final class MaintainedLauncherSettingsHost {
             context.sendBroadcast(intent);
         } catch (Throwable ignored) {
         }
+        refreshEnabledDoppelgangerIcons(context);
         reloadOriginalSettings(context);
     }
 

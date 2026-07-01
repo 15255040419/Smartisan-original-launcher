@@ -8421,6 +8421,16 @@
 
     const/4 v1, 0x0
 
+    # A non-default HOME activity may lose MainView.mContext while the GL
+    # thread still has a queued preparePowerOff event. The original Smartisan
+    # system service path did not expose this race; the public Android fallback
+    # below must not call getSystemService() on a released Activity context.
+    if-nez p0, :context_ready
+
+    return v1
+
+    :context_ready
+
     .line 1
     :try_start_0
     invoke-static {}, Landroid/app/ActivityManagerNative;->getDefault()Landroid/app/IActivityManager;
