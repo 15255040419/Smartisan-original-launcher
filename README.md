@@ -5,7 +5,7 @@
 <h1 align="center">Smartisan Launcher Original Port</h1>
 
 <p align="center">
-  <strong>天生骄傲</strong>
+  <strong>天  生  骄  傲</strong>
 </p>
 
 <p align="center">
@@ -28,11 +28,9 @@
 
 **Smartisan Launcher Original Port** 是一个基于原版 Smartisan Launcher 的兼容性移植项目。
 
-它不是重新做一个“像锤子”的桌面，而是在尽可能保留原版交互、视觉风格和使用习惯的基础上，让 Smartisan OS 经典桌面能够运行在普通 Android 设备与主流第三方 ROM 上。
+这个项目想做的，不只是让原版 Smartisan Launcher 重新运行起来，而是希望在今天越来越复杂、花哨的 Android 系统上，让人们重新看见 Smartisan OS 那套简洁、精致、统一，并始终认真对待细节的设计美学。
 
 项目保留了 12 / 20 宫格、Dock、主题、文件夹、翻页动画、桌面设置、动态图标、通知角标、解锁动画等核心体验，并针对现代 Android 系统补齐必要的系统接口、权限逻辑、图标适配、应用分身、多用户环境和在线资源更新能力。
-
-这是一份对 Smartisan OS 桌面体验的延续，也是一份面向现代 Android 环境的兼容性修复与重构记录。
 
 > 有些设计不会再流行，但它依然值得被重新点亮一次。
 
