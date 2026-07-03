@@ -163,7 +163,10 @@ public final class WeatherBridge {
     public static void setAutomaticLocation(Context context, boolean automatic) {
         if (context == null) return;
         prefs(context).edit().putBoolean("automatic_location", automatic)
-                .putLong("weather_updated_at", 0L).apply();
+                .remove("temperature_c").remove("temperature_actual_c")
+                .remove("temperature_apparent_c").remove("temperature_f")
+                .remove("weather_code").remove("weather_provider")
+                .remove("weather_last_error").putLong("weather_updated_at", 0L).apply();
         if (automatic) scheduleRefresh(context, true);
     }
 
@@ -176,6 +179,11 @@ public final class WeatherBridge {
                 .putString("manual_city", city.displayName())
                 .putLong("manual_latitude_bits", Double.doubleToLongBits(city.latitude))
                 .putLong("manual_longitude_bits", Double.doubleToLongBits(city.longitude))
+                .putString("manual_station_id", city.stationId)
+                .remove("temperature_c").remove("temperature_actual_c")
+                .remove("temperature_apparent_c").remove("temperature_f")
+                .remove("weather_code").remove("weather_provider")
+                .remove("weather_last_error")
                 .putLong("weather_updated_at", 0L).apply();
         scheduleRefresh(context, true);
         final Context target = app(context);
@@ -244,6 +252,14 @@ public final class WeatherBridge {
         return context == null ? 0L : prefs(context).getLong("weather_updated_at", 0L);
     }
 
+    public static String getWeatherProvider(Context context) {
+        return context == null ? "" : prefs(context).getString("weather_provider", "");
+    }
+
+    public static String getWeatherLastError(Context context) {
+        return context == null ? "" : prefs(context).getString("weather_last_error", "");
+    }
+
     public interface CitySearchCallback {
         void onResult(List<CityResult> cities, String error);
     }
@@ -256,9 +272,15 @@ public final class WeatherBridge {
         public final double longitude;
         public final long population;
         public final String featureCode;
+        public final String stationId;
 
         CityResult(String name, String admin, String country, double latitude, double longitude,
                 long population, String featureCode) {
+            this(name, admin, country, latitude, longitude, population, featureCode, "");
+        }
+
+        CityResult(String name, String admin, String country, double latitude, double longitude,
+                long population, String featureCode, String stationId) {
             this.name = name == null ? "" : name;
             this.admin = admin == null ? "" : admin;
             this.country = country == null ? "" : country;
@@ -266,6 +288,7 @@ public final class WeatherBridge {
             this.longitude = longitude;
             this.population = population;
             this.featureCode = featureCode == null ? "" : featureCode;
+            this.stationId = stationId == null ? "" : stationId;
         }
 
         public String displayName() {
@@ -285,9 +308,16 @@ public final class WeatherBridge {
         }
     }
 
-    public static void searchCities(final String query, final CitySearchCallback callback) {
+    public static void searchCities(final Context context, final String query,
+            final CitySearchCallback callback) {
         if (callback == null) return;
         final String normalizedQuery = query == null ? "" : query.trim();
+        List<CityResult> bundled = MaintainedLauncherSettingsHost.searchBundledCities(
+                context, normalizedQuery, 8);
+        if (!bundled.isEmpty()) {
+            callback.onResult(bundled, null);
+            return;
+        }
         synchronized (CITY_SEARCH_CACHE) {
             CitySearchCacheEntry cached = CITY_SEARCH_CACHE.get(
                     normalizedQuery.toLowerCase(Locale.ROOT));
@@ -302,12 +332,23 @@ public final class WeatherBridge {
                 String error = null;
                 HttpURLConnection connection = null;
                 try {
+                    cities = searchCitiesWithAndroidGeocoder(context, normalizedQuery);
+                    if (!cities.isEmpty()) {
+                        cities = normalizeCityResults(normalizedQuery, cities);
+                        synchronized (CITY_SEARCH_CACHE) {
+                            CITY_SEARCH_CACHE.put(normalizedQuery.toLowerCase(Locale.ROOT),
+                                    new CitySearchCacheEntry(System.currentTimeMillis(),
+                                            new ArrayList<CityResult>(cities)));
+                        }
+                        callback.onResult(cities, null);
+                        return;
+                    }
                     String endpoint = "https://geocoding-api.open-meteo.com/v1/search?name="
                             + URLEncoder.encode(normalizedQuery, "UTF-8")
                             + "&count=20&language=zh&format=json&countryCode=CN";
                     connection = (HttpURLConnection) new URL(endpoint).openConnection();
-                    connection.setConnectTimeout(4000);
-                    connection.setReadTimeout(6000);
+                    connection.setConnectTimeout(1800);
+                    connection.setReadTimeout(2800);
                     connection.setRequestProperty("User-Agent", "SmartisanLauncher/1.5");
                     if (connection.getResponseCode() != 200) throw new IllegalStateException("城市搜索失败");
                     JSONArray results = new JSONObject(readText(connection.getInputStream()))
@@ -333,6 +374,58 @@ public final class WeatherBridge {
                 callback.onResult(cities, error);
             }
         }, "OpenMeteoCitySearch").start();
+    }
+
+    private static List<CityResult> searchCitiesWithAndroidGeocoder(Context context,
+            String query) {
+        final ArrayList<CityResult> result = new ArrayList<CityResult>();
+        if (context == null || query == null || query.length() == 0 || !Geocoder.isPresent()) {
+            return result;
+        }
+        final Context target = app(context);
+        final String targetQuery = query;
+        Thread worker = new Thread(new Runnable() {
+            @Override public void run() {
+                List<CityResult> found = searchCitiesWithAndroidGeocoderBlocking(
+                        target, targetQuery);
+                synchronized (result) { result.addAll(found); }
+            }
+        }, "AndroidCityGeocoder");
+        worker.start();
+        try {
+            worker.join(1200L);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+        }
+        if (worker.isAlive()) return new ArrayList<CityResult>();
+        synchronized (result) { return new ArrayList<CityResult>(result); }
+    }
+
+    private static List<CityResult> searchCitiesWithAndroidGeocoderBlocking(Context context,
+            String query) {
+        ArrayList<CityResult> result = new ArrayList<CityResult>();
+        try {
+            Geocoder geocoder = new Geocoder(context, Locale.CHINA);
+            List<Address> addresses = geocoder.getFromLocationName(query, 8);
+            if (addresses == null) return result;
+            for (Address address : addresses) {
+                if (address == null || !address.hasLatitude() || !address.hasLongitude()) continue;
+                String name = firstNonEmpty(address.getLocality(), address.getSubAdminArea(),
+                        address.getAdminArea(), address.getFeatureName(), query);
+                result.add(new CityResult(name, address.getAdminArea(), address.getCountryName(),
+                        address.getLatitude(), address.getLongitude(), 0L, "PPLA"));
+            }
+        } catch (Throwable error) {
+            Log.w(TAG, "Android city geocoder failed", error);
+        }
+        return result;
+    }
+
+    private static String firstNonEmpty(String... values) {
+        if (values != null) for (String value : values) {
+            if (value != null && value.trim().length() > 0) return value.trim();
+        }
+        return "";
     }
 
     private static List<CityResult> normalizeCityResults(String query, List<CityResult> input) {
@@ -598,13 +691,133 @@ public final class WeatherBridge {
 
     private static void fetch(Context context, double latitude, double longitude)
             throws Exception {
+        String stationId = "";
+        if (!isAutomaticLocation(context)) {
+            stationId = prefs(context).getString("manual_station_id", "");
+        }
+        if (stationId.length() == 0) {
+            CityResult nearest = MaintainedLauncherSettingsHost.nearestBundledCity(
+                    context, latitude, longitude);
+            if (nearest != null) stationId = nearest.stationId;
+        }
+        if (stationId.length() > 0) {
+            try {
+                WeatherResult domestic = fetchChinaWeather(stationId);
+                storeWeather(context, latitude, longitude, domestic.smartisanCode,
+                        domestic.temperature, domestic.actualTemperature,
+                        domestic.apparentTemperature, domestic.sunrise, domestic.sunset,
+                        domestic.provider);
+                return;
+            } catch (Throwable error) {
+                Log.w(TAG, "China Weather failed; racing international sources", error);
+            }
+        }
+        final Object raceLock = new Object();
+        final WeatherResult[] winner = new WeatherResult[1];
+        final Throwable[] errors = new Throwable[2];
+        final double lat = latitude;
+        final double lon = longitude;
+        Runnable met = new Runnable() {
+            @Override public void run() {
+                try {
+                    WeatherResult result = fetchMetNorway(lat, lon);
+                    synchronized (raceLock) {
+                        if (winner[0] == null) winner[0] = result;
+                        raceLock.notifyAll();
+                    }
+                } catch (Throwable error) {
+                    synchronized (raceLock) { errors[0] = error; raceLock.notifyAll(); }
+                }
+            }
+        };
+        Runnable openMeteo = new Runnable() {
+            @Override public void run() {
+                try {
+                    WeatherResult result = fetchOpenMeteo(lat, lon);
+                    synchronized (raceLock) {
+                        if (winner[0] == null) winner[0] = result;
+                        raceLock.notifyAll();
+                    }
+                } catch (Throwable error) {
+                    synchronized (raceLock) { errors[1] = error; raceLock.notifyAll(); }
+                }
+            }
+        };
+        new Thread(met, "WeatherSource-MET").start();
+        new Thread(openMeteo, "WeatherSource-OpenMeteo").start();
+        long deadline = android.os.SystemClock.elapsedRealtime() + 6500L;
+        synchronized (raceLock) {
+            while (winner[0] == null && (errors[0] == null || errors[1] == null)) {
+                long remain = deadline - android.os.SystemClock.elapsedRealtime();
+                if (remain <= 0L) break;
+                raceLock.wait(remain);
+            }
+        }
+        if (winner[0] != null) {
+            WeatherResult result = winner[0];
+            storeWeather(context, latitude, longitude, result.smartisanCode,
+                    result.temperature, result.actualTemperature, result.apparentTemperature,
+                    result.sunrise, result.sunset, result.provider);
+            return;
+        }
+        String message = "MET: " + shortError(errors[0])
+                + "; Open-Meteo: " + shortError(errors[1]);
+        prefs(context).edit().putString("weather_last_error", message).apply();
+        throw new IllegalStateException(message);
+    }
+
+    private static WeatherResult fetchChinaWeather(String stationId) throws Exception {
+        String endpoint = "https://d1.weather.com.cn/sk_2d/" + stationId + ".html";
+        HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+        connection.setConnectTimeout(1500);
+        connection.setReadTimeout(2000);
+        connection.setRequestProperty("Referer", "https://www.weather.com.cn/");
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 SmartisanLauncher/1.5.3");
+        try {
+            int code = connection.getResponseCode();
+            if (code < 200 || code >= 300) {
+                throw new IllegalStateException("China Weather HTTP " + code);
+            }
+            String body = readText(connection.getInputStream());
+            int start = body.indexOf('{');
+            int end = body.lastIndexOf('}');
+            if (start < 0 || end <= start) throw new IllegalStateException("invalid response");
+            JSONObject data = new JSONObject(body.substring(start, end + 1));
+            double actual = data.getDouble("temp");
+            int temperature = (int) Math.round(actual);
+            String weather = data.optString("weather", "");
+            return new WeatherResult(mapChinaWeather(weather), temperature, temperature,
+                    temperature, "06:00", "18:00", "中国天气网");
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private static int mapChinaWeather(String weather) {
+        if (weather == null) return 99;
+        if (weather.contains("雷")) return 4;
+        if (weather.contains("暴雪") || weather.contains("大雪")) return 16;
+        if (weather.contains("雪")) return 15;
+        if (weather.contains("暴雨") || weather.contains("大雨")) return 9;
+        if (weather.contains("中雨")) return 8;
+        if (weather.contains("雨")) return 7;
+        if (weather.contains("雾") || weather.contains("霾")) return 18;
+        if (weather.contains("沙") || weather.contains("尘")) return 19;
+        if (weather.contains("阴")) return 2;
+        if (weather.contains("云")) return 1;
+        if (weather.contains("晴")) return 0;
+        return 99;
+    }
+
+    private static WeatherResult fetchOpenMeteo(double latitude, double longitude)
+            throws Exception {
         String endpoint = "https://api.open-meteo.com/v1/forecast?latitude="
                 + formatCoordinate(latitude) + "&longitude=" + formatCoordinate(longitude)
                 + "&current=temperature_2m,apparent_temperature,weather_code,is_day"
                 + "&daily=sunrise,sunset&timezone=auto&forecast_days=1";
         HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
-        connection.setConnectTimeout(8000);
-        connection.setReadTimeout(10000);
+        connection.setConnectTimeout(3500);
+        connection.setReadTimeout(5000);
         connection.setRequestProperty("Accept", "application/json");
         connection.setRequestProperty("User-Agent", "SmartisanLauncher/1.5");
         try {
@@ -628,29 +841,136 @@ public final class WeatherBridge {
                 sunrise = "06:00";
                 sunset = "18:00";
             }
-            int fahrenheit = Math.round(temperature * 9f / 5f + 32f);
-            SharedPreferences.Editor editor = prefs(context).edit()
-                    .putString("weather_code", String.valueOf(smartisanCode))
-                    .putString("temperature_c", String.valueOf(temperature))
-                    .putString("temperature_actual_c",
-                            String.valueOf((int) Math.round(actualTemperature)))
-                    .putString("temperature_apparent_c", String.valueOf(apparentTemperature))
-                    .putString("temperature_f", String.valueOf(fahrenheit))
-                    .putString("sunrise_sunset", sunrise + "|" + sunset)
-                    .putLong("weather_updated_at", System.currentTimeMillis())
-                    .putLong("latitude_bits", Double.doubleToLongBits(latitude))
-                    .putLong("longitude_bits", Double.doubleToLongBits(longitude));
-            if (isAutomaticLocation(context)) {
-                String city = resolveCityName(context, latitude, longitude);
-                if (city.length() > 0) editor.putString("automatic_city", city);
-            }
-            editor.apply();
-            broadcast(context, readBundle(context));
-            Log.i(TAG, "weather updated code=" + smartisanCode + " actual=" + temperature
-                    + " apparent=" + apparentTemperature);
+            return new WeatherResult(smartisanCode, temperature,
+                    (int) Math.round(actualTemperature), apparentTemperature,
+                    sunrise, sunset, "Open-Meteo");
         } finally {
             connection.disconnect();
         }
+    }
+
+    private static WeatherResult fetchMetNorway(double latitude, double longitude)
+            throws Exception {
+        String endpoint = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat="
+                + formatCoordinate(latitude) + "&lon=" + formatCoordinate(longitude);
+        HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+        connection.setConnectTimeout(3000);
+        connection.setReadTimeout(4500);
+        connection.setRequestProperty("Accept", "application/json");
+        connection.setRequestProperty("User-Agent",
+                "SmartisanLauncher/1.5.3 github.com/RANH-F/Smartisan-original-launcher");
+        try {
+            int code = connection.getResponseCode();
+            if (code < 200 || code >= 300) {
+                throw new IllegalStateException("MET Norway HTTP " + code);
+            }
+            JSONObject root = new JSONObject(readText(connection.getInputStream()));
+            JSONArray series = root.getJSONObject("properties").getJSONArray("timeseries");
+            if (series.length() == 0) throw new IllegalStateException("MET Norway empty result");
+            JSONObject data = series.getJSONObject(0).getJSONObject("data");
+            JSONObject details = data.getJSONObject("instant").getJSONObject("details");
+            double actual = details.getDouble("air_temperature");
+            double apparent = apparentTemperature(actual,
+                    details.optDouble("relative_humidity", 50.0),
+                    details.optDouble("wind_speed", 0.0));
+            String symbol = metSymbol(data);
+            int temperature = (int) Math.round(actual);
+            return new WeatherResult(mapMetSymbol(symbol), temperature,
+                    temperature, (int) Math.round(apparent), "06:00", "18:00", "MET Norway");
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private static final class WeatherResult {
+        final int smartisanCode;
+        final int temperature;
+        final int actualTemperature;
+        final int apparentTemperature;
+        final String sunrise;
+        final String sunset;
+        final String provider;
+
+        WeatherResult(int smartisanCode, int temperature, int actualTemperature,
+                int apparentTemperature, String sunrise, String sunset, String provider) {
+            this.smartisanCode = smartisanCode;
+            this.temperature = temperature;
+            this.actualTemperature = actualTemperature;
+            this.apparentTemperature = apparentTemperature;
+            this.sunrise = sunrise;
+            this.sunset = sunset;
+            this.provider = provider;
+        }
+    }
+
+    private static String metSymbol(JSONObject data) {
+        String[] periods = new String[]{"next_1_hours", "next_6_hours", "next_12_hours"};
+        for (String period : periods) {
+            JSONObject block = data.optJSONObject(period);
+            JSONObject summary = block == null ? null : block.optJSONObject("summary");
+            String symbol = summary == null ? "" : summary.optString("symbol_code", "");
+            if (symbol.length() > 0) return symbol;
+        }
+        return "cloudy";
+    }
+
+    private static int mapMetSymbol(String symbol) {
+        String value = symbol == null ? "" : symbol.toLowerCase(Locale.ROOT);
+        if (value.contains("thunder")) return 4;
+        if (value.contains("snow") || value.contains("sleet")) return 15;
+        if (value.contains("heavyrain")) return 9;
+        if (value.contains("rain")) return 8;
+        if (value.contains("fog")) return 18;
+        if (value.contains("partlycloudy")) return 1;
+        if (value.contains("cloudy")) return 2;
+        if (value.contains("clearsky") || value.contains("fair")) return 0;
+        return 99;
+    }
+
+    private static double apparentTemperature(double temperature, double humidity,
+            double windSpeed) {
+        if (temperature >= 27.0) {
+            return temperature + 0.05 * Math.max(0.0, humidity - 40.0);
+        }
+        if (temperature <= 10.0 && windSpeed > 1.3) {
+            return 13.12 + 0.6215 * temperature
+                    - 11.37 * Math.pow(windSpeed * 3.6, 0.16)
+                    + 0.3965 * temperature * Math.pow(windSpeed * 3.6, 0.16);
+        }
+        return temperature;
+    }
+
+    private static void storeWeather(Context context, double latitude, double longitude,
+            int smartisanCode, int temperature, int actualTemperature, int apparentTemperature,
+            String sunrise, String sunset, String provider) {
+        int fahrenheit = Math.round(temperature * 9f / 5f + 32f);
+        SharedPreferences.Editor editor = prefs(context).edit()
+                .putString("weather_code", String.valueOf(smartisanCode))
+                .putString("temperature_c", String.valueOf(temperature))
+                .putString("temperature_actual_c", String.valueOf(actualTemperature))
+                .putString("temperature_apparent_c", String.valueOf(apparentTemperature))
+                .putString("temperature_f", String.valueOf(fahrenheit))
+                .putString("sunrise_sunset", sunrise + "|" + sunset)
+                .putString("weather_provider", provider)
+                .remove("weather_last_error")
+                .putLong("weather_updated_at", System.currentTimeMillis())
+                .putLong("latitude_bits", Double.doubleToLongBits(latitude))
+                .putLong("longitude_bits", Double.doubleToLongBits(longitude));
+        if (isAutomaticLocation(context)) {
+            String city = resolveCityName(context, latitude, longitude);
+            if (city.length() > 0) editor.putString("automatic_city", city);
+        }
+        editor.apply();
+        broadcast(context, readBundle(context));
+        Log.i(TAG, "weather updated provider=" + provider + " code=" + smartisanCode
+                + " actual=" + temperature + " apparent=" + apparentTemperature);
+    }
+
+    private static String shortError(Throwable error) {
+        if (error == null) return "unknown";
+        String message = error.getMessage();
+        return error.getClass().getSimpleName()
+                + (message == null || message.length() == 0 ? "" : ": " + message);
     }
 
     private static int mapWeatherCode(int code) {

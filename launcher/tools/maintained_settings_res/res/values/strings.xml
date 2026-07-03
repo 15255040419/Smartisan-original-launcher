@@ -662,5 +662,5 @@
     <string name="dynamic_weather_manual_city">Choose city manually</string>
     <string name="dynamic_weather_manual_city_subtitle">Search for a fixed weather location</string>
     <string name="dynamic_weather_refresh">Refresh now</string>
-    <string name="dynamic_weather_tips">Weather data is provided by Open-Meteo. Automatic mode uses only coarse system location; manual city mode needs no location permission. Weather is normally checked hourly.</string>
+    <string name="dynamic_weather_tips">Chinese cities use the bundled city index and China Weather first; MET Norway and Open-Meteo provide fallback coverage. Automatic mode uses only coarse system location. Weather is normally checked hourly.</string>
 </resources>

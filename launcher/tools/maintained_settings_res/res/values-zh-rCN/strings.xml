@@ -519,5 +519,5 @@
     <string name="dynamic_weather_manual_city">手动选择城市</string>
     <string name="dynamic_weather_manual_city_subtitle">搜索城市并改用固定位置</string>
     <string name="dynamic_weather_refresh">立即刷新</string>
-    <string name="dynamic_weather_tips">天气数据来自 Open-Meteo。自动定位仅使用系统提供的粗略位置；手动城市模式不需要定位权限。天气正常情况下每小时检查一次。</string>
+    <string name="dynamic_weather_tips">国内城市优先使用本地城市表和中国天气网，其他地区由 MET Norway 与 Open-Meteo 备用。自动定位仅使用系统提供的粗略位置；天气正常情况下每小时检查一次。</string>
 </resources>

@@ -5,31 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="295b82c4-8572-45f1-add8-3c13ec0468e1" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/WeatherBridge.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/layout/setting_dynamic_weather.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tools/patch_weather_location_permission.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/DEVELOPMENT_LOG.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-aligned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-aligned.apk" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-unsigned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-unsigned.apk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build/launcher_log.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/original/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/original/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Aa.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Aa.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Launcher.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/Launcher.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/a.1.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/a.1.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/ItemInfo.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/ItemInfo.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/a/g.1.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/a/g.1.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/activeicon/H.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/activeicon/H.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/activeicon/m.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/view/activeicon/m.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/layout/setting_main.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/layout/setting_main.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values/strings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/maintained_settings_res/res/values/strings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/WeatherBridge.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/WeatherBridge.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

@@ -127,6 +127,7 @@ public final class MaintainedLauncherSettingsHost {
     private static android.os.Handler sThemePageHandler;
     private static Runnable sThemePageRunnable;
     private static Resources sSettingsResources;
+    private static List<WeatherBridge.CityResult> sBundledWeatherCities;
     private static File sSettingsApk;
     private static Bitmap sPendingThemeScreenshot;
     private static Dialog sLauncherReloadDialog;
@@ -1917,6 +1918,78 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    static List<WeatherBridge.CityResult> searchBundledCities(Context context, String query,
+            int limit) {
+        List<WeatherBridge.CityResult> all = bundledWeatherCities(context);
+        ArrayList<WeatherBridge.CityResult> exact = new ArrayList<WeatherBridge.CityResult>();
+        ArrayList<WeatherBridge.CityResult> partial = new ArrayList<WeatherBridge.CityResult>();
+        String wanted = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        if (wanted.length() == 0) return exact;
+        for (WeatherBridge.CityResult city : all) {
+            String name = city.name.toLowerCase(Locale.ROOT);
+            String admin = city.admin.toLowerCase(Locale.ROOT);
+            if (name.equals(wanted)) exact.add(city);
+            else if (name.contains(wanted) || admin.contains(wanted)) partial.add(city);
+        }
+        exact.addAll(partial);
+        if (exact.size() > limit) {
+            return new ArrayList<WeatherBridge.CityResult>(exact.subList(0, limit));
+        }
+        return exact;
+    }
+
+    static WeatherBridge.CityResult nearestBundledCity(Context context, double latitude,
+            double longitude) {
+        WeatherBridge.CityResult nearest = null;
+        double best = Double.MAX_VALUE;
+        for (WeatherBridge.CityResult city : bundledWeatherCities(context)) {
+            double dy = city.latitude - latitude;
+            double dx = (city.longitude - longitude)
+                    * Math.cos(Math.toRadians((city.latitude + latitude) * 0.5));
+            double distance = dx * dx + dy * dy;
+            if (distance < best) { best = distance; nearest = city; }
+        }
+        // Roughly 3 degrees keeps foreign coordinates out of the China station path.
+        return best <= 9.0 ? nearest : null;
+    }
+
+    private static synchronized List<WeatherBridge.CityResult> bundledWeatherCities(
+            Context context) {
+        if (sBundledWeatherCities != null) return sBundledWeatherCities;
+        ArrayList<WeatherBridge.CityResult> result = new ArrayList<WeatherBridge.CityResult>();
+        try {
+            Resources resources = settingsResources(context);
+            int namesId = resources.getIdentifier("city_cn", "array", SETTINGS_PKG);
+            int baseId = resources.getIdentifier("city_base", "array", SETTINGS_PKG);
+            String[] names = resources.getStringArray(namesId);
+            String[] bases = resources.getStringArray(baseId);
+            int count = Math.min(names.length, bases.length);
+            for (int i = 0; i < count; i++) {
+                List<String> nameFields = quotedFields(names[i]);
+                List<String> baseFields = quotedFields(bases[i]);
+                if (nameFields.size() < 6 || baseFields.size() < 4) continue;
+                double longitude = Double.parseDouble(baseFields.get(2));
+                double latitude = Double.parseDouble(baseFields.get(3));
+                result.add(new WeatherBridge.CityResult(nameFields.get(2), nameFields.get(4),
+                        nameFields.get(5), latitude, longitude, 0L, "PPLA",
+                        nameFields.get(1)));
+            }
+        } catch (Throwable error) {
+            Log.w(LOG_TAG, "Unable to load bundled weather cities", error);
+        }
+        sBundledWeatherCities = result;
+        return sBundledWeatherCities;
+    }
+
+    private static List<String> quotedFields(String row) {
+        ArrayList<String> fields = new ArrayList<String>();
+        if (row == null) return fields;
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("'([^']*)'")
+                .matcher(row);
+        while (matcher.find()) fields.add(matcher.group(1));
+        return fields;
+    }
+
     /**
      * ColorOS/OriginOS may skip USER_PRESENT for the selected HOME process.
      * Record a pause only after the display is really non-interactive, so an
@@ -1964,6 +2037,7 @@ public final class MaintainedLauncherSettingsHost {
                     android.util.Log.i(LOG_TAG, "lifecycle unlock fallback skipped: transient launcher UI state");
                     return;
                 }
+                clearStalePendingThemeBeforeUnlock();
                 android.util.Log.i(LOG_TAG, "dispatching lifecycle unlock fallback");
                 dispatchOriginalLockAction(activity, "action_keyguard_on");
                 dispatchOriginalLockAction(activity, Intent.ACTION_USER_PRESENT);
@@ -7107,10 +7181,12 @@ public final class MaintainedLauncherSettingsHost {
         // had been saved and tapping "Apply" appeared to do nothing.
         boolean stored = applyThemeViaOriginalStack(activity, id, pkg);
         storeThemeSelection(activity, id);
-        // The original stack already posts MESSAGE_CHANGE_THEME. Posting the
-        // same static message again leaves a duplicate in the launcher queue;
-        // if the screen is locked immediately, that duplicate runs on unlock.
-        boolean queued = !stored && queueThemeChangeForLauncher(id);
+        // X.ja()/O.a() only persist the selected theme. They do not enqueue
+        // MESSAGE_CHANGE_THEME. The original ThemeItemActivity always returns
+        // through its Handler afterwards, and Launcher consumes this pending
+        // message while coming to the foreground. Skipping it when persistence
+        // succeeded made the theme visible only after Launcher was reopened.
+        boolean queued = queueThemeChangeForLauncher(activity, id);
         logOperation(activity, "THEME", "persisted_before_dispatch id=" + id
                 + ", original=" + stored + ", queued=" + queued
                 + ", after=" + themeDiagnosticState(activity));
@@ -7123,6 +7199,11 @@ public final class MaintainedLauncherSettingsHost {
                         + ", launcher_ready=" + isLauncherReadyForThemeAnimation());
                 prepareThemeTransitionScreenshot(activity);
                 startLauncherFromForeground(activity);
+                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                    public void run() {
+                        dispatchPendingThemeChangeNow(activity, id);
+                    }
+                }, 180L);
             }
         }, 120);
     }
@@ -7177,7 +7258,7 @@ public final class MaintainedLauncherSettingsHost {
         return false;
     }
 
-    private static boolean queueThemeChangeForLauncher(String id) {
+    private static boolean queueThemeChangeForLauncher(Context context, String id) {
         try {
             android.os.Message message = android.os.Message.obtain();
             message.what = 0x12;
@@ -7185,9 +7266,50 @@ public final class MaintainedLauncherSettingsHost {
             message.arg1 = -5;
             Class<?> flow = Class.forName("com.smartisanos.launcher.a.r");
             flow.getField("sj").set(null, message);
+            logOperation(context, "THEME_DISPATCH", "pending_message_set id=" + id);
             return true;
         } catch (Throwable ignored) {
+            logOperation(context, "THEME_DISPATCH", "pending_message_failed id=" + id
+                    + ", error=" + shortError(ignored));
             return false;
+        }
+    }
+
+    private static void dispatchPendingThemeChangeNow(Context context, String requestedId) {
+        try {
+            Class<?> flow = Class.forName("com.smartisanos.launcher.a.r");
+            Object pending = flow.getField("sj").get(null);
+            if (!(pending instanceof android.os.Message)) {
+                logOperation(context, "THEME_DISPATCH", "no_pending_message id=" + requestedId);
+                return;
+            }
+            android.os.Message message = (android.os.Message) pending;
+            String pendingId = message.obj == null ? "" : String.valueOf(message.obj);
+            if (!requestedId.equals(pendingId)) {
+                logOperation(context, "THEME_DISPATCH", "pending_id_mismatch requested="
+                        + requestedId + ", pending=" + pendingId);
+                return;
+            }
+            flow.getMethod("a", android.os.Message.class).invoke(null, message);
+            logOperation(context, "THEME_DISPATCH", "pending_message_consumed id=" + requestedId);
+        } catch (Throwable error) {
+            logOperation(context, "THEME_DISPATCH", "consume_failed id=" + requestedId
+                    + ", error=" + shortError(error));
+        }
+    }
+
+    private static void clearStalePendingThemeBeforeUnlock() {
+        if (android.os.SystemClock.uptimeMillis() < sThemeChangeGuardUntilUptime) return;
+        try {
+            Class<?> flow = Class.forName("com.smartisanos.launcher.a.r");
+            Object pending = flow.getField("sj").get(null);
+            if (pending instanceof android.os.Message) {
+                Object id = ((android.os.Message) pending).obj;
+                flow.getField("sj").set(null, null);
+                android.util.Log.w(LOG_TAG, "cleared stale theme message before unlock id=" + id);
+            }
+        } catch (Throwable error) {
+            android.util.Log.w(LOG_TAG, "unable to clear stale theme message before unlock", error);
         }
     }
 
@@ -9748,8 +9870,12 @@ public final class MaintainedLauncherSettingsHost {
             String when = time <= 0L ? "尚未更新"
                     : new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
                             .format(new Date(time));
+            String provider = WeatherBridge.getWeatherProvider(activity);
+            String error = WeatherBridge.getWeatherLastError(activity);
             update.setText("当前温度：" + WeatherBridge.getTemperatureLabel(activity)
-                    + "\n最近更新：" + when);
+                    + "\n最近更新：" + when
+                    + (provider.length() == 0 ? "" : "\n数据源：" + provider)
+                    + (error.length() == 0 ? "" : "\n刷新失败：" + error));
         }
     }
 
@@ -9805,7 +9931,7 @@ public final class MaintainedLauncherSettingsHost {
                 if (query.length() < 2) { input.setError("请输入至少两个字"); return; }
                 search.setEnabled(false);
                 search.setText("搜索中…");
-                WeatherBridge.searchCities(query, new WeatherBridge.CitySearchCallback() {
+                WeatherBridge.searchCities(activity, query, new WeatherBridge.CitySearchCallback() {
                     public void onResult(final List<WeatherBridge.CityResult> cities,
                             final String error) {
                         activity.runOnUiThread(new Runnable() { public void run() {
@@ -9871,7 +9997,13 @@ public final class MaintainedLauncherSettingsHost {
                             Toast.LENGTH_SHORT).show();
                     pageRoot.postDelayed(new Runnable() { public void run() {
                         updateDynamicWeatherStatus(activity, resources, pageRoot);
-                    }}, 1800L);
+                    }}, 700L);
+                    pageRoot.postDelayed(new Runnable() { public void run() {
+                        updateDynamicWeatherStatus(activity, resources, pageRoot);
+                    }}, 2200L);
+                    pageRoot.postDelayed(new Runnable() { public void run() {
+                        updateDynamicWeatherStatus(activity, resources, pageRoot);
+                    }}, 5000L);
                 }
             });
             rows.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
