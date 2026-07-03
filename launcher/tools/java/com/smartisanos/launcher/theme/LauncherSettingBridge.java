@@ -2,11 +2,23 @@ package com.smartisanos.launcher.theme;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.provider.Settings;
 import java.util.List;
 import java.util.Map;
 
 public final class LauncherSettingBridge {
+    // Active weather/calendar artwork fills substantially more of its source
+    // canvas than normalized ordinary icons. Keep both cached and live frames
+    // on the same optical footprint as the surrounding desktop icons.
+    private static final float ACTIVE_ICON_OPTICAL_SCALE = 0.7332f;
+    private static final float ACTIVE_ICON_LIVE_SCALE = 0.94f;
+    // Optical correction is proportional to the standard icon canvas, never
+    // a device-pixel offset, so every density/mode keeps the same alignment.
+    // Original active-icon anchor: (icon_size_with_shadow - icon_size_origin) / 4.
+    // Portrait 3-column modes use 246/192 (and 205/160), both yielding this ratio.
+    private static final float ACTIVE_ICON_UP_OFFSET = 0.05487805f;
     private static final String PREFS = "com.smartisanos.launcher_prefs";
     private static final String SETTINGS_PREFS = "launcher_settings";
     private static final String KEY_ICON_SIZE = "launcher_icon_size";
@@ -160,7 +172,7 @@ public final class LauncherSettingBridge {
         return effectiveIconSizePercent(normalizeIconSizePercent(readInt(context, KEY_ICON_SIZE, 100)));
     }
 
-    /** Keeps original active-icon scene roots aligned with ordinary icon sizing. */
+    /** Keeps live weather/calendar roots on the same user-selected scale as ordinary icons. */
     public static float readActiveIconScaleFactor() {
         try {
             Class<?> proxy = Class.forName("com.smartisanos.launcher.ja");
@@ -168,29 +180,63 @@ public final class LauncherSettingBridge {
             if (instance != null) {
                 Object application = proxy.getMethod("getApplication").invoke(instance);
                 if (application instanceof Context) {
-                    return readIconSizePercent((Context) application) / 100.0f;
+                    return readIconSizePercent((Context) application) / 100.0f
+                            * ACTIVE_ICON_OPTICAL_SCALE;
                 }
             }
         } catch (Throwable ignored) {
         }
-        return 1.20f;
+        return 1.20f * ACTIVE_ICON_OPTICAL_SCALE;
     }
 
-    public static Bitmap scaleActiveIconBitmap(Bitmap source) {
-        if (source == null) {
-            return null;
-        }
-        float factor = readActiveIconScaleFactor();
-        if (Math.abs(factor - 1.0f) < 0.001f) {
-            return source;
-        }
-        int width = Math.max(1, Math.round(source.getWidth() * factor));
-        int height = Math.max(1, Math.round(source.getHeight() * factor));
-        Bitmap scaled = Bitmap.createScaledBitmap(source, width, height, true);
-        if (scaled != source) {
-            source.recycle();
-        }
-        return scaled;
+    /** Outer correction shared by live WeatherView and CalendarView roots. */
+    public static float activeIconLiveScale() {
+        return ACTIVE_ICON_LIVE_SCALE;
+    }
+
+    /** Static-frame optical correction; the live node keeps the original nc(vm) anchor. */
+    public static float activeIconUpOffset(float iconSize) {
+        return Math.max(0.0f, iconSize * ACTIVE_ICON_UP_OFFSET);
+    }
+
+    /** Places the complete active icon in the ordinary icon canvas. */
+    public static Bitmap composeActiveIconToBaseBounds(Bitmap base, Bitmap active) {
+        if (base == null) return active;
+        if (active == null) return base;
+        int width = base.getWidth();
+        int height = base.getHeight();
+        // The live SceneNode uses the complete weather_back_size/calendar_back_size
+        // canvas. Static frames must use that same full-canvas transform; fitting
+        // alpha bounds here creates a second optical scale and a visible jump.
+        float scale = Math.min(width / (float) Math.max(1, active.getWidth()),
+                height / (float) Math.max(1, active.getHeight())) * ACTIVE_ICON_OPTICAL_SCALE;
+        int dstLeft = Math.round((width - active.getWidth() * scale) * 0.5f);
+        int dstTop = Math.round((height - active.getHeight() * scale) * 0.5f
+                - activeIconUpOffset(Math.min(width, height)));
+        int dstRight = dstLeft + Math.round(active.getWidth() * scale);
+        int dstBottom = dstTop + Math.round(active.getHeight() * scale);
+        Bitmap result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        android.graphics.Rect src = new android.graphics.Rect(0, 0, active.getWidth(), active.getHeight());
+        android.graphics.Rect dst = new android.graphics.Rect(dstLeft, dstTop, dstRight, dstBottom);
+        canvas.drawBitmap(active, src, dst, paint);
+        base.recycle();
+        active.recycle();
+        return result;
+    }
+
+    public static boolean isDynamicIconPackage(String packageName) {
+        if (packageName == null) return false;
+        String value = packageName.toLowerCase(java.util.Locale.ROOT);
+        return WeatherBridge.isWeatherPackage(packageName, null, null)
+                || value.contains("calendar")
+                || "com.smartisanos.calendar".equals(value);
+    }
+
+    /** Dynamic/normal mode changes must bypass the launcher's APK-icon MD5 shortcut. */
+    public static boolean shouldForceDynamicIconDatabaseWrite(String packageName) {
+        return isDynamicIconPackage(packageName);
     }
 
     public static void ensureTransparentThemeRegistered(Context context) {
@@ -318,18 +364,6 @@ public final class LauncherSettingBridge {
             return 180;
         }
         return scaled;
-    }
-
-    public static float calendarLiveDayHeightFactor() {
-        int densityDpi = android.content.res.Resources.getSystem()
-                .getDisplayMetrics().densityDpi;
-        return densityDpi <= 320 ? 1.0f : 0.875f;
-    }
-
-    public static float calendarLiveDayYOffsetFactor() {
-        int densityDpi = android.content.res.Resources.getSystem()
-                .getDisplayMetrics().densityDpi;
-        return densityDpi <= 320 ? 0.80f : 0.72f;
     }
 
 }

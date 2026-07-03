@@ -789,6 +789,14 @@
     :cond_f
     invoke-interface {v9}, Ljava/util/List;->clear()V
 
+    const-string v10, "color_info"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/data/IconDatabaseCompat;->loadIcons(Ljava/util/Map;)Ljava/util/List;
+
+    move-result-object v9
+
+    goto :goto_a
+
     .line 46
     invoke-static {}, Lcom/smartisanos/launcher/data/a/h;->Ww()Landroid/database/Cursor;
 

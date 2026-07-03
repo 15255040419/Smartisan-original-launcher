@@ -132,6 +132,12 @@
 .method public a(Landroid/graphics/Bitmap;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
     .locals 10
 
+    invoke-static {p1, p2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->composeActiveIconToBaseBounds(Landroid/graphics/Bitmap;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+
+    move-result-object p0
+
+    return-object p0
+
     .line 1
     new-instance p0, Landroid/graphics/Paint;
 
@@ -167,63 +173,20 @@
 
     const/4 v2, 0x0
 
-    .line 6
-    invoke-virtual {v1, p1, v2, v2, p0}, Landroid/graphics/Canvas;->drawBitmap(Landroid/graphics/Bitmap;FFLandroid/graphics/Paint;)V
+    # The composed weather/calendar bitmap is already a complete icon. Draw it
+    # directly into the ordinary icon canvas instead of retaining a second base
+    # icon underneath. This also maps every user icon size through one canvas.
+    const/4 v2, 0x0
 
-    .line 7
     invoke-virtual {p1}, Landroid/graphics/Bitmap;->getWidth()I
-
-    move-result v2
-
-    invoke-virtual {p2}, Landroid/graphics/Bitmap;->getWidth()I
-
     move-result v3
-
-    sub-int/2addr v2, v3
-
-    div-int/lit8 v2, v2, 0x2
-
-    int-to-float v2, v2
-
-    .line 8
-    invoke-virtual {p2}, Landroid/graphics/Bitmap;->getWidth()I
-
-    move-result v3
-
     int-to-float v3, v3
 
-    add-float/2addr v3, v2
+    const/4 v5, 0x0
 
-    .line 9
-    invoke-static {}, Lcom/smartisanos/launcher/view/activeicon/a;->sq()F
-
-    move-result v4
-
-    .line 10
     invoke-virtual {p1}, Landroid/graphics/Bitmap;->getHeight()I
-
-    move-result v5
-
-    invoke-virtual {p2}, Landroid/graphics/Bitmap;->getHeight()I
-
-    move-result v6
-
-    sub-int/2addr v5, v6
-
-    div-int/lit8 v5, v5, 0x2
-
-    int-to-float v5, v5
-
-    sub-float/2addr v5, v4
-
-    .line 11
-    invoke-virtual {p2}, Landroid/graphics/Bitmap;->getHeight()I
-
     move-result v4
-
     int-to-float v4, v4
-
-    add-float/2addr v4, v5
 
     .line 12
     new-instance v6, Landroid/graphics/Rect;

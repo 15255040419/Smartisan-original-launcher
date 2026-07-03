@@ -267,12 +267,19 @@ if exist "%ROOT%launcher\tools\maintained_settings_res\res" (
   )
 
   mkdir "%ROOT%launcher\scratch\maintained_settings_res\flat"
+  mkdir "%ROOT%launcher\scratch\maintained_settings_res\res"
+
+  rem Bundle complete normal-mode weather/calendar icons into the maintained
+  rem resource APK so dynamic switching never waits for the network.
+  xcopy /e /i /q /y "%ROOT%launcher\tools\maintained_settings_res\res\*" "%ROOT%launcher\scratch\maintained_settings_res\res\" >nul
+  copy /y "%ROOT%icons\drawable\com.smartisanos.weather.png" "%ROOT%launcher\scratch\maintained_settings_res\res\drawable\static_icon_weather.png" >nul
+  copy /y "%ROOT%icons\drawable\com.android.calendar.png" "%ROOT%launcher\scratch\maintained_settings_res\res\drawable\static_icon_calendar.png" >nul
 
   if not exist "%ROOT%launcher\assets\settings_maintained" (
     mkdir "%ROOT%launcher\assets\settings_maintained"
   )
 
-  "%AAPT2%" compile --dir "%ROOT%launcher\tools\maintained_settings_res\res" -o "%ROOT%launcher\scratch\maintained_settings_res\flat\res.zip"
+  "%AAPT2%" compile --dir "%ROOT%launcher\scratch\maintained_settings_res\res" -o "%ROOT%launcher\scratch\maintained_settings_res\flat\res.zip"
   if errorlevel 1 (
     echo FAIL: aapt2 compile maintained settings resources failed.
     exit /b 1

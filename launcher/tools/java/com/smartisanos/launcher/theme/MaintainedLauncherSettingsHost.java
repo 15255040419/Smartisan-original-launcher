@@ -215,7 +215,9 @@ public final class MaintainedLauncherSettingsHost {
     private static long sThemeChangeGuardUntilUptime;
     private static final String SMARTISAN_ICON_CACHE_PREFS = "online_icon_cache_v3";
     private static final String SMARTISAN_ICON_CACHE_DIR = "online_icon_cache_v3";
-    private static final long SMARTISAN_ICON_MISS_RETRY_MS = 7L * 24L * 60L * 60L * 1000L;
+    // Mirrors can fail temporarily. A week-long miss cache made recognized
+    // system apps (notably vendor Gallery aliases) look permanently unknown.
+    private static final long SMARTISAN_ICON_MISS_RETRY_MS = 60L * 60L * 1000L;
     private static final java.util.concurrent.ExecutorService SMARTISAN_ICON_FETCH_EXECUTOR =
             // Launcher usually needs dozens of independent small PNG files on
             // first run. Two workers made later desktop rows wait behind slow
@@ -3322,7 +3324,11 @@ public final class MaintainedLauncherSettingsHost {
         final int restoreY = sRestoreIconPageScrollY;
         new Thread(new Runnable() {
             public void run() {
+                long started = android.os.SystemClock.elapsedRealtime();
+                logOperation(targetActivity, "ICON_LIST", "load_start");
                 final List<RedirectIconInfo> entries = AppIconAdapter.loadEntries(targetActivity);
+                logOperation(targetActivity, "ICON_LIST", "load_complete count=" + entries.size()
+                        + ", elapsed_ms=" + (android.os.SystemClock.elapsedRealtime() - started));
                 new Handler(Looper.getMainLooper()).post(new Runnable() {
                     public void run() {
                         try {
@@ -3341,6 +3347,7 @@ public final class MaintainedLauncherSettingsHost {
                                 });
                             }
                         } catch (Throwable ignored) {
+                            logOperation(targetActivity, "ICON_LIST", "render_failed " + shortError(ignored));
                             loading.setText("应用图标加载失败");
                         }
                     }
@@ -3906,16 +3913,11 @@ public final class MaintainedLauncherSettingsHost {
             applyBadgeVisibility(context, next, true);
         }
         if (KEY_DYNAMIC_WEATHER_CALENDAR.equals(key)) {
-            postDatabaseRefreshEvent();
-            applyIconChange(context);
             Toast.makeText(context, next
                     ? "已启用动态天气和日历"
                     : "已关闭动态图标，正在恢复普通图标",
                     Toast.LENGTH_SHORT).show();
-            // CalendarView/WeatherView are different scene-node classes from a
-            // normal app icon. Bitmap cache invalidation cannot replace that
-            // node type in place, so rebuild the launcher scene immediately.
-            restartLauncher(context);
+            refreshDynamicIconMode(context, next);
             return;
         }
         if (next && "launcher_badge_swipe_clean".equals(key)
@@ -4128,10 +4130,10 @@ public final class MaintainedLauncherSettingsHost {
         if (context == null || Build.VERSION.SDK_INT < 21) {
             return result;
         }
-        if (!hasEnabledProfileApps(context)) {
-            return result;
+        boolean includeProfileApps = hasEnabledProfileApps(context);
+        if (includeProfileApps) {
+            scheduleDoppelgangerBootstrap(context);
         }
-        scheduleDoppelgangerBootstrap(context);
 
         try {
             LauncherApps launcherApps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
@@ -4157,7 +4159,10 @@ public final class MaintainedLauncherSettingsHost {
                 if (profile == null) {
                     continue;
                 }
-                if (profile.equals(current) && !result.isEmpty()) {
+                // HyperOS may return a non-empty but incomplete PackageManager
+                // result. Always merge the current user's LauncherApps list;
+                // only secondary profiles remain controlled by the profile-app switch.
+                if (!profile.equals(current) && !includeProfileApps) {
                     continue;
                 }
                 List<LauncherActivityInfo> activities = launcherApps.getActivityList(packageFilter, profile);
@@ -5209,6 +5214,29 @@ public final class MaintainedLauncherSettingsHost {
         label.setIncludeFontPadding(false);
         label.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
         return label;
+    }
+
+    /**
+     * Dynamic/normal switching is a two-phase operation. Existing desktop rows
+     * already contain icon blobs. The complete normal icons are bundled, but
+     * replacing those existing blobs is still asynchronous; rebuild Launcher
+     * only after two database passes have had time to complete.
+     */
+    private static void refreshDynamicIconMode(final Context context, final boolean enabled) {
+        final Context app = context.getApplicationContext() == null
+                ? context : context.getApplicationContext();
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                applyDynamicIconChange(app);
+                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        restartLauncher(context);
+                    }
+                }, 600L);
+            }
+        });
     }
 
     private static void applyUnlockAnimationEnabled(boolean enabled) {
@@ -7048,7 +7076,9 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void applyTheme(Activity activity, String id, String pkg, String name) {
-        logOperation(activity, "ACTION", "apply_theme id=" + id + ", pkg=" + pkg + ", name=" + name);
+        logOperation(activity, "ACTION", "apply_theme id=" + id + ", pkg=" + pkg + ", name=" + name
+                + ", before=" + themeDiagnosticState(activity)
+                + ", package_installed=" + packageInstalled(activity, pkg));
         sThemeChangeGuardUntilUptime = android.os.SystemClock.uptimeMillis() + 4000L;
         pkg = normalizeThemePackage(activity, id, pkg);
         if ("smartisan_theme_trans".equals(id)) {
@@ -7082,11 +7112,15 @@ public final class MaintainedLauncherSettingsHost {
         // if the screen is locked immediately, that duplicate runs on unlock.
         boolean queued = !stored && queueThemeChangeForLauncher(id);
         logOperation(activity, "THEME", "persisted_before_dispatch id=" + id
-                + ", original=" + stored + ", queued=" + queued);
+                + ", original=" + stored + ", queued=" + queued
+                + ", after=" + themeDiagnosticState(activity));
         Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
         Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(new Runnable() {
             public void run() {
+                logOperation(activity, "THEME_VERIFY", "requested=" + id
+                        + ", state=" + themeDiagnosticState(activity)
+                        + ", launcher_ready=" + isLauncherReadyForThemeAnimation());
                 prepareThemeTransitionScreenshot(activity);
                 startLauncherFromForeground(activity);
             }
@@ -9232,6 +9266,13 @@ public final class MaintainedLauncherSettingsHost {
                 writeOperationLogLocked("INFO", "logcat_log=" + sOperationLogcatFile.getAbsolutePath());
                 startOperationLogcatThread();
                 pruneOperationLogs(context, 30);
+                final Context diagnosticContext = context.getApplicationContext() == null
+                        ? context : context.getApplicationContext();
+                new Thread(new Runnable() {
+                    public void run() {
+                        writeDiagnosticSnapshot(diagnosticContext, "recording_started");
+                    }
+                }, "LauncherDiagnosticSnapshot").start();
             } catch (Throwable t) {
                 closeQuietly(sOperationLogWriter);
                 sOperationLogWriter = null;
@@ -9600,6 +9641,79 @@ public final class MaintainedLauncherSettingsHost {
             Log.w(LOG_TAG, "Unable to open dynamic weather settings", failure);
             showInfoDialog(activity, "动态天气", "无法打开动态天气设置");
         }
+    }
+
+    private static void writeDiagnosticSnapshot(Context context, String reason) {
+        if (context == null) {
+            return;
+        }
+        logOperation(context, "DEVICE", "reason=" + reason
+                + ", manufacturer=" + Build.MANUFACTURER + ", brand=" + Build.BRAND
+                + ", model=" + Build.MODEL + ", device=" + Build.DEVICE
+                + ", sdk=" + Build.VERSION.SDK_INT + ", release=" + Build.VERSION.RELEASE);
+        try {
+            Intent home = new Intent(Intent.ACTION_MAIN);
+            home.addCategory(Intent.CATEGORY_HOME);
+            ResolveInfo resolvedHome = context.getPackageManager().resolveActivity(home, 0);
+            String component = resolvedHome == null || resolvedHome.activityInfo == null ? "null"
+                    : resolvedHome.activityInfo.packageName + "/" + resolvedHome.activityInfo.name;
+            logOperation(context, "HOME", "default_component=" + component);
+        } catch (Throwable t) {
+            logOperation(context, "HOME", "query_failed " + shortError(t));
+        }
+        logOperation(context, "THEME_STATE", themeDiagnosticState(context));
+        try {
+            Intent launcher = new Intent(Intent.ACTION_MAIN);
+            launcher.addCategory(Intent.CATEGORY_LAUNCHER);
+            List<ResolveInfo> packageManagerApps = context.getPackageManager()
+                    .queryIntentActivities(launcher, PackageManager.MATCH_DISABLED_COMPONENTS);
+            logOperation(context, "APP_ENUM", "package_manager_count="
+                    + (packageManagerApps == null ? 0 : packageManagerApps.size()));
+            if (Build.VERSION.SDK_INT >= 21) {
+                LauncherApps launcherApps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+                List<UserHandle> profiles = launcherApps == null ? null : launcherApps.getProfiles();
+                logOperation(context, "APP_ENUM", "profile_count=" + (profiles == null ? 0 : profiles.size()));
+                if (launcherApps != null && profiles != null) {
+                    for (UserHandle profile : profiles) {
+                        List<LauncherActivityInfo> activities = launcherApps.getActivityList(null, profile);
+                        logOperation(context, "APP_ENUM", "profile_user=" + userIdentifier(profile)
+                                + ", activity_count=" + (activities == null ? 0 : activities.size()));
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            logOperation(context, "APP_ENUM", "snapshot_failed " + shortError(t));
+        }
+    }
+
+    private static String themeDiagnosticState(Context context) {
+        if (context == null) {
+            return "context=null";
+        }
+        String primary = null;
+        String settings = null;
+        String system = null;
+        String global = null;
+        try {
+            primary = context.getSharedPreferences("com.smartisanos.launcher_prefs", 0)
+                    .getString("launcher_theme", null);
+        } catch (Throwable ignored) {
+        }
+        try {
+            settings = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .getString("launcher_theme", null);
+        } catch (Throwable ignored) {
+        }
+        try {
+            system = Settings.System.getString(context.getContentResolver(), "launcher_theme");
+        } catch (Throwable ignored) {
+        }
+        try {
+            global = Settings.Global.getString(context.getContentResolver(), "launcher_theme");
+        } catch (Throwable ignored) {
+        }
+        return "effective=" + currentTheme(context) + ", prefs=" + primary
+                + ", settings=" + settings + ", system=" + system + ", global=" + global;
     }
 
     private static void bindWeatherAutomaticSwitch(final Activity activity,
@@ -11137,7 +11251,6 @@ public final class MaintainedLauncherSettingsHost {
             // Every launcher process starts from the unscaled XML layout map.
             // Reapply the saved percentage once, regardless of the previous process.
             applyRuntimeIconSizePercent(100, newPercent);
-            applyIconChange(context);
             rebuildLauncherLayoutForIconSize();
         } catch (Throwable ignored) {
         }
@@ -11264,7 +11377,8 @@ public final class MaintainedLauncherSettingsHost {
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             int flags = Build.VERSION.SDK_INT >= 23 ? 0x00020000 : 0;
-            List<ResolveInfo> apps = context.getPackageManager().queryIntentActivities(intent, flags);
+            List<ResolveInfo> apps = queryLauncherActivitiesWithProfiles(
+                    context.getPackageManager(), intent, flags);
             Resources resources = settingsResources(context);
             for (int i = 0; i < apps.size(); i++) {
                 ResolveInfo info = apps.get(i);
@@ -11494,20 +11608,47 @@ public final class MaintainedLauncherSettingsHost {
             if (packages.length() > 0) {
                 intent.putExtra("extra_packagename", packages);
             }
-            try {
-                Class.forName("com.smartisanos.launcher.Aa")
-                        .getMethod("c", Intent.class).invoke(null, intent);
-            } catch (Throwable ignored) {
-            }
-            context.sendBroadcast(intent);
+            dispatchIconUpdate(context, intent);
         } catch (Throwable ignored) {
         }
         refreshEnabledDoppelgangerIcons(context);
         reloadOriginalSettings(context);
     }
 
+    /** Refresh only weather/calendar rows when switching active-icon mode. */
+    private static void applyDynamicIconChange(Context context) {
+        if (context == null) {
+            return;
+        }
+        try {
+            Intent query = new Intent(Intent.ACTION_MAIN);
+            query.addCategory(Intent.CATEGORY_LAUNCHER);
+            int flags = Build.VERSION.SDK_INT >= 23 ? 0x00020000 : 0;
+            List<ResolveInfo> apps = context.getPackageManager().queryIntentActivities(query, flags);
+            StringBuilder packages = new StringBuilder();
+            java.util.HashSet<String> seen = new java.util.HashSet<String>();
+            for (ResolveInfo info : apps) {
+                ActivityInfo ai = info == null ? null : info.activityInfo;
+                String pkg = ai == null ? null : ai.packageName;
+                if (!LauncherSettingBridge.isDynamicIconPackage(pkg) || !seen.add(pkg)) {
+                    continue;
+                }
+                if (packages.length() > 0) packages.append(',');
+                packages.append(pkg);
+            }
+            if (packages.length() > 0) {
+                Intent update = new Intent("com.smartisanos.launcher.update_icon");
+                update.putExtra("extra_packagename", packages.toString());
+                dispatchIconUpdate(context, update);
+            }
+        } catch (Throwable ignored) {
+        }
+        reloadOriginalSettings(context);
+    }
+
     private static String allLauncherPackages(Context context) {
         StringBuilder out = new StringBuilder();
+        java.util.HashSet<String> seen = new java.util.HashSet<String>();
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -11518,6 +11659,9 @@ public final class MaintainedLauncherSettingsHost {
                 if (info == null || info.activityInfo == null || info.activityInfo.packageName == null) {
                     continue;
                 }
+                if (!seen.add(info.activityInfo.packageName)) {
+                    continue;
+                }
                 if (out.length() > 0) {
                     out.append(',');
                 }
@@ -11526,6 +11670,23 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         return out.toString();
+    }
+
+    /** Avoid processing the same update once directly and once via our receiver. */
+    private static void dispatchIconUpdate(Context context, Intent intent) {
+        boolean handled = false;
+        try {
+            Class.forName("com.smartisanos.launcher.Aa")
+                    .getMethod("c", Intent.class).invoke(null, intent);
+            handled = true;
+        } catch (Throwable ignored) {
+        }
+        if (!handled) {
+            try {
+                context.sendBroadcast(intent);
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     private static void forceUpdateIcon(Context context, RedirectIconInfo info) {
@@ -11539,12 +11700,7 @@ public final class MaintainedLauncherSettingsHost {
             if (info != null && info.packageName != null) {
                 intent.putExtra("extra_packagename", info.packageName);
             }
-            try {
-                Class.forName("com.smartisanos.launcher.Aa")
-                        .getMethod("c", Intent.class).invoke(null, intent);
-            } catch (Throwable ignored) {
-            }
-            context.sendBroadcast(intent);
+            dispatchIconUpdate(context, intent);
         } catch (Throwable ignored) {
         }
         refreshEnabledDoppelgangerIcons(context);
@@ -12111,15 +12267,23 @@ public final class MaintainedLauncherSettingsHost {
 
         private static List<RedirectIconInfo> loadEntries(Activity activity, final IconManager iconManager) {
             final ArrayList<RedirectIconInfo> result = new ArrayList<RedirectIconInfo>();
+            long started = android.os.SystemClock.elapsedRealtime();
             try {
                 List<RedirectIconInfo> resolved = iconManager.getIconRedirectedApplications();
+                int filtered = 0;
                 for (int i = 0; i < resolved.size(); i++) {
                     RedirectIconInfo info = resolved.get(i);
                     ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
                     if (shouldShowIconEntry(resolveInfo)) {
                         result.add(info);
+                    } else {
+                        filtered++;
+                        logOperation(activity, "ICON_FILTER", "package=" + info.packageName
+                                + ", component=" + info.componentName + ", resolve=" + (resolveInfo != null));
                     }
                 }
+                logOperation(activity, "ICON_LIST", "redirected_count=" + resolved.size()
+                        + ", visible_count=" + result.size() + ", filtered_count=" + filtered);
                 final HashMap<String, String> labels = new HashMap<String, String>();
                 Collections.sort(result, new Comparator<RedirectIconInfo>() {
                     public int compare(RedirectIconInfo a, RedirectIconInfo b) {
@@ -12129,7 +12293,10 @@ public final class MaintainedLauncherSettingsHost {
                     }
                 });
             } catch (Throwable ignored) {
+                logOperation(activity, "ICON_LIST", "resolve_failed " + shortError(ignored));
             }
+            logOperation(activity, "ICON_LIST", "resolve_elapsed_ms="
+                    + (android.os.SystemClock.elapsedRealtime() - started));
             return result;
         }
 
@@ -12151,7 +12318,7 @@ public final class MaintainedLauncherSettingsHost {
         }
 
         public int getCount() {
-            return Math.min(apps.size(), 120);
+            return apps.size();
         }
 
         public Object getItem(int position) {
@@ -12409,18 +12576,18 @@ public final class MaintainedLauncherSettingsHost {
         boolean useImproved = redirect == null
                 ? isImprovedIconEnabled(context)
                 : redirect.useImprovedAppIcon && RedirectIconDB.MODE_AUTO.equals(mode);
-        // A vendor dialer may expose both the phone and contacts activities
-        // from one package. Resolve the activity category before a package-wide
-        // packed icon can turn both entries into the handset icon.
+        // Explicit icon-pack component mappings outrank improved icons. The
+        // pack manager separately blocks a dialer Activity from falling back
+        // to a contacts package-level mapping, so phone/contacts stay distinct.
+        Drawable packed = packedIcon(context, info);
+        if (packed != null) {
+            return packed;
+        }
         if (useImproved && smartisanSystemIconAlias(context, info) != null) {
             Drawable systemCategory = smartisanIconDrawable(context, info, resources);
             if (systemCategory != null) {
                 return systemCategory;
             }
-        }
-        Drawable packed = packedIcon(context, info);
-        if (packed != null) {
-            return packed;
         }
         if (redirect != null && redirect.useImprovedAppIcon && RedirectIconDB.MODE_AUTO.equals(mode)) {
             Drawable smartisan = smartisanIconDrawable(context, info, resources);
@@ -12460,12 +12627,23 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static Drawable smartisanIconDrawable(Context context, ResolveInfo info, Resources resources) {
+        ActivityInfo activityInfo = info == null ? null : info.activityInfo;
+        String packageName = activityInfo == null ? null : activityInfo.packageName;
         String systemAlias = smartisanSystemIconAlias(context, info);
         if (systemAlias != null) {
             Drawable onlineSystemIcon = smartisanNetworkIconDrawable(context, systemAlias);
             if (onlineSystemIcon != null) {
                 return onlineSystemIcon;
             }
+        }
+        // The bundled weather/calendar drawables are active-icon base frames,
+        // not complete normal icons. With dynamic mode off we still want the
+        // downloaded improved icon; only skip that incomplete local fallback.
+        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)
+                && LauncherSettingBridge.isDynamicIconPackage(packageName)) {
+            String resourceName = WeatherBridge.isWeatherPackage(packageName, null, null)
+                    ? "static_icon_weather" : "static_icon_calendar";
+            return maintainedResourceIcon(context, resources, resourceName);
         }
         Drawable local = maintainedResourceIcon(context, resources, smartisanIconNameFor(context, info));
         if (local != null) {
@@ -12871,6 +13049,7 @@ public final class MaintainedLauncherSettingsHost {
             return null;
         }
         Bitmap bitmap = null;
+        boolean allMirrorsNotFound = true;
         StrictMode.ThreadPolicy oldPolicy = null;
         try {
             oldPolicy = StrictMode.getThreadPolicy();
@@ -12888,9 +13067,14 @@ public final class MaintainedLauncherSettingsHost {
                     conn.setUseCaches(true);
                     conn.setRequestProperty("Accept", "image/png");
                     conn.setRequestProperty("User-Agent", "SmartisanLauncher-OnlineIcon/1");
-                    if (conn.getResponseCode() != 200) {
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode != 200) {
+                        if (responseCode != 404) {
+                            allMirrorsNotFound = false;
+                        }
                         continue;
                     }
+                    allMirrorsNotFound = false;
                     String contentType = conn.getContentType();
                     if (contentType != null && !contentType.toLowerCase().startsWith("image/")) {
                         continue;
@@ -12905,6 +13089,9 @@ public final class MaintainedLauncherSettingsHost {
                         break;
                     }
                 } catch (Throwable ignored) {
+                    // A timeout/DNS/TLS failure is not proof that the icon does
+                    // not exist. Do not poison the persistent miss cache.
+                    allMirrorsNotFound = false;
                 } finally {
                     if (in != null) {
                         try {
@@ -12930,9 +13117,15 @@ public final class MaintainedLauncherSettingsHost {
             }
         }
         synchronized (sSmartisanIconCache) {
-            sSmartisanIconCache.put(packageName, bitmap);
+            if (bitmap != null) {
+                sSmartisanIconCache.put(packageName, bitmap);
+            } else {
+                // A transient network miss must not become a process-lifetime
+                // negative cache after the retry window expires.
+                sSmartisanIconCache.remove(packageName);
+            }
         }
-        if (bitmap == null) {
+        if (bitmap == null && allMirrorsNotFound) {
             markSmartisanIconMiss(context, packageName);
         }
         return bitmap;
@@ -13060,8 +13253,19 @@ public final class MaintainedLauncherSettingsHost {
         if (context == null || packageName == null) {
             return null;
         }
-        return new File(new File(context.getCacheDir(), SMARTISAN_ICON_CACHE_DIR),
+        File persistent = new File(new File(context.getFilesDir(), SMARTISAN_ICON_CACHE_DIR),
                 Integer.toHexString(packageName.hashCode()) + ".png");
+        // Preserve icons downloaded by earlier builds that used cacheDir.
+        if (!persistent.exists()) {
+            File legacy = new File(new File(context.getCacheDir(), SMARTISAN_ICON_CACHE_DIR),
+                    persistent.getName());
+            if (legacy.exists()) {
+                File parent = persistent.getParentFile();
+                if (parent != null) parent.mkdirs();
+                legacy.renameTo(persistent);
+            }
+        }
+        return persistent;
     }
 
     private static byte[] readAllBytes(InputStream in, int maxBytes) throws java.io.IOException {

@@ -2126,18 +2126,8 @@
 .method public static Je()V
     .locals 14
 
-    sget v0, Landroid/os/Build$VERSION;->SDK_INT:I
-
-    const/16 v1, 0x1d
-
-    if-lt v0, v1, :cond_modern_doppelganger_check_ok
-
-    sget-object v0, Lcom/smartisanos/launcher/data/A;->log:Lcom/smartisanos/launcher/va;
-
-    const-string v1, "skip legacy doppelganger package scan on modern Android"
-
-    invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
-
+    # Third-party Android builds use LauncherApps/profile discovery instead.
+    # The original Smartisan package-wide doppelganger migration is obsolete.
     return-void
 
     :cond_modern_doppelganger_check_ok
@@ -11980,8 +11970,6 @@
 
     .line 121
     :cond_31
-    invoke-static {}, Lcom/smartisanos/launcher/data/A;->Je()V
-
     .line 122
     invoke-static {}, Lcom/smartisanos/launcher/d/j;->Pf()V
 

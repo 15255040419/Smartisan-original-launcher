@@ -5752,6 +5752,8 @@
 
     move-result v0
 
+    if-eqz v0, :cond_active_normal
+
     .line 9
     sget v0, Lcom/smartisanos/launcher/data/Constants;->icon_scale:F
 
@@ -5769,7 +5771,15 @@
 
     div-float/2addr v0, v3
 
-    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readActiveIconScaleFactor()F
+    goto :cond_active_apply
+
+    :cond_active_normal
+    const/high16 v0, 0x3f800000    # 1.0f
+
+    move v2, v0
+
+    :cond_active_apply
+    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->activeIconLiveScale()F
 
     move-result v3
 
@@ -6538,10 +6548,6 @@
 
     .line 63
     invoke-virtual {v7}, Landroid/graphics/Bitmap;->recycle()V
-
-    invoke-static {v3}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->scaleActiveIconBitmap(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
-
-    move-result-object v3
 
     return-object v3
 .end method

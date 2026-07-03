@@ -28,8 +28,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.List;
+import java.util.Map;
 
 /** Bridges public Android location/Open-Meteo data into the original weather icon protocol. */
 public final class WeatherBridge {
@@ -45,6 +50,10 @@ public final class WeatherBridge {
     private static boolean sPeriodicScheduled;
     private static boolean sCityResolving;
     private static long sCityAttemptAt;
+    private static boolean sPendingForcedRefresh;
+    private static final Map<String, CitySearchCacheEntry> CITY_SEARCH_CACHE =
+            new HashMap<String, CitySearchCacheEntry>();
+    private static final long CITY_SEARCH_CACHE_MS = 10L * 60L * 1000L;
 
     private WeatherBridge() {
     }
@@ -155,7 +164,7 @@ public final class WeatherBridge {
         if (context == null) return;
         prefs(context).edit().putBoolean("automatic_location", automatic)
                 .putLong("weather_updated_at", 0L).apply();
-        if (automatic && hasLocationPermission(context)) scheduleRefresh(context, true);
+        if (automatic) scheduleRefresh(context, true);
     }
 
     public static void setManualLocation(Context context, CityResult city) {
@@ -245,13 +254,18 @@ public final class WeatherBridge {
         public final String country;
         public final double latitude;
         public final double longitude;
+        public final long population;
+        public final String featureCode;
 
-        CityResult(String name, String admin, String country, double latitude, double longitude) {
+        CityResult(String name, String admin, String country, double latitude, double longitude,
+                long population, String featureCode) {
             this.name = name == null ? "" : name;
             this.admin = admin == null ? "" : admin;
             this.country = country == null ? "" : country;
             this.latitude = latitude;
             this.longitude = longitude;
+            this.population = population;
+            this.featureCode = featureCode == null ? "" : featureCode;
         }
 
         public String displayName() {
@@ -262,8 +276,26 @@ public final class WeatherBridge {
         }
     }
 
+    private static final class CitySearchCacheEntry {
+        final long time;
+        final List<CityResult> cities;
+        CitySearchCacheEntry(long time, List<CityResult> cities) {
+            this.time = time;
+            this.cities = cities;
+        }
+    }
+
     public static void searchCities(final String query, final CitySearchCallback callback) {
         if (callback == null) return;
+        final String normalizedQuery = query == null ? "" : query.trim();
+        synchronized (CITY_SEARCH_CACHE) {
+            CitySearchCacheEntry cached = CITY_SEARCH_CACHE.get(
+                    normalizedQuery.toLowerCase(Locale.ROOT));
+            if (cached != null && System.currentTimeMillis() - cached.time < CITY_SEARCH_CACHE_MS) {
+                callback.onResult(new ArrayList<CityResult>(cached.cities), null);
+                return;
+            }
+        }
         new Thread(new Runnable() {
             @Override public void run() {
                 List<CityResult> cities = new ArrayList<CityResult>();
@@ -271,11 +303,11 @@ public final class WeatherBridge {
                 HttpURLConnection connection = null;
                 try {
                     String endpoint = "https://geocoding-api.open-meteo.com/v1/search?name="
-                            + URLEncoder.encode(query == null ? "" : query.trim(), "UTF-8")
-                            + "&count=10&language=zh&format=json";
+                            + URLEncoder.encode(normalizedQuery, "UTF-8")
+                            + "&count=20&language=zh&format=json&countryCode=CN";
                     connection = (HttpURLConnection) new URL(endpoint).openConnection();
-                    connection.setConnectTimeout(8000);
-                    connection.setReadTimeout(10000);
+                    connection.setConnectTimeout(4000);
+                    connection.setReadTimeout(6000);
                     connection.setRequestProperty("User-Agent", "SmartisanLauncher/1.5");
                     if (connection.getResponseCode() != 200) throw new IllegalStateException("城市搜索失败");
                     JSONArray results = new JSONObject(readText(connection.getInputStream()))
@@ -284,7 +316,14 @@ public final class WeatherBridge {
                         JSONObject item = results.optJSONObject(i);
                         if (item != null) cities.add(new CityResult(item.optString("name"),
                                 item.optString("admin1"), item.optString("country"),
-                                item.optDouble("latitude"), item.optDouble("longitude")));
+                                item.optDouble("latitude"), item.optDouble("longitude"),
+                                item.optLong("population", 0L), item.optString("feature_code")));
+                    }
+                    cities = normalizeCityResults(normalizedQuery, cities);
+                    synchronized (CITY_SEARCH_CACHE) {
+                        CITY_SEARCH_CACHE.put(normalizedQuery.toLowerCase(Locale.ROOT),
+                                new CitySearchCacheEntry(System.currentTimeMillis(),
+                                        new ArrayList<CityResult>(cities)));
                     }
                 } catch (Throwable failure) {
                     error = failure.getMessage() == null ? "城市搜索失败，请检查网络" : failure.getMessage();
@@ -294,6 +333,53 @@ public final class WeatherBridge {
                 callback.onResult(cities, error);
             }
         }, "OpenMeteoCitySearch").start();
+    }
+
+    private static List<CityResult> normalizeCityResults(String query, List<CityResult> input) {
+        if (input == null || input.isEmpty()) return new ArrayList<CityResult>();
+        final String wanted = query == null ? "" : query.trim();
+        boolean hasExactAdministrativeCity = false;
+        for (CityResult city : input) {
+            if (wanted.equalsIgnoreCase(city.name) && isAdministrativeCity(city.featureCode)) {
+                hasExactAdministrativeCity = true;
+                break;
+            }
+        }
+        ArrayList<CityResult> filtered = new ArrayList<CityResult>();
+        for (CityResult city : input) {
+            if (city == null || !validCoordinate(city.latitude, city.longitude)) continue;
+            if (hasExactAdministrativeCity
+                    && (!wanted.equalsIgnoreCase(city.name)
+                    || !isAdministrativeCity(city.featureCode))) continue;
+            filtered.add(city);
+        }
+        Collections.sort(filtered, new Comparator<CityResult>() {
+            @Override public int compare(CityResult a, CityResult b) {
+                boolean ae = wanted.equalsIgnoreCase(a.name);
+                boolean be = wanted.equalsIgnoreCase(b.name);
+                if (ae != be) return ae ? -1 : 1;
+                boolean aa = isAdministrativeCity(a.featureCode);
+                boolean ba = isAdministrativeCity(b.featureCode);
+                if (aa != ba) return aa ? -1 : 1;
+                return a.population == b.population ? 0 : (a.population > b.population ? -1 : 1);
+            }
+        });
+        LinkedHashMap<String, CityResult> unique = new LinkedHashMap<String, CityResult>();
+        for (CityResult city : filtered) {
+            boolean exact = wanted.equalsIgnoreCase(city.name);
+            String key = exact ? city.name.toLowerCase(Locale.ROOT)
+                    : (city.name + "|" + city.admin + "|" + city.country)
+                            .toLowerCase(Locale.ROOT);
+            if (!unique.containsKey(key)) unique.put(key, city);
+            if (unique.size() >= 5) break;
+        }
+        return new ArrayList<CityResult>(unique.values());
+    }
+
+    private static boolean isAdministrativeCity(String featureCode) {
+        if (featureCode == null) return false;
+        String value = featureCode.toUpperCase(Locale.ROOT);
+        return "PPLC".equals(value) || value.startsWith("PPLA");
     }
 
     private static void schedulePeriodicRefresh(final Context context) {
@@ -367,6 +453,7 @@ public final class WeatherBridge {
         }
         synchronized (LOCK) {
             if (sRefreshing || sLocationRequesting) {
+                if (force) sPendingForcedRefresh = true;
                 return;
             }
         }
@@ -404,6 +491,12 @@ public final class WeatherBridge {
                 return;
             }
             LocationListener listener = new LocationListener() {
+                // Override every default method from the current Android SDK.
+                // The injected dex is not desugared together with the original
+                // launcher, so leaving one default method unresolved makes old
+                // vendor ROMs look for the non-existent LocationListener$-CC.
+                @Override public void onFlushComplete(int requestCode) {}
+
                 @Override
                 public void onLocationChanged(Location location) {
                     try {
@@ -412,8 +505,22 @@ public final class WeatherBridge {
                     }
                     finishLocationRequest();
                     if (location != null) {
-                        rememberLocation(context, location);
-                        fetchAsync(context, location.getLatitude(), location.getLongitude());
+                        if (isAutomaticLocation(context)) {
+                            rememberLocation(context, location);
+                            fetchAsync(context, location.getLatitude(), location.getLongitude());
+                        } else {
+                            synchronized (LOCK) {
+                                sPendingForcedRefresh = false;
+                            }
+                            scheduleRefresh(context, true);
+                        }
+                    }
+                }
+
+                @Override
+                public void onLocationChanged(List<Location> locations) {
+                    if (locations != null && !locations.isEmpty()) {
+                        onLocationChanged(locations.get(locations.size() - 1));
                     }
                 }
 
@@ -477,9 +584,13 @@ public final class WeatherBridge {
                 } catch (Throwable error) {
                     Log.w(TAG, "weather refresh failed", error);
                 } finally {
+                    boolean refreshAgain;
                     synchronized (LOCK) {
                         sRefreshing = false;
+                        refreshAgain = sPendingForcedRefresh;
+                        sPendingForcedRefresh = false;
                     }
+                    if (refreshAgain) scheduleRefresh(context, true);
                 }
             }
         }, "OpenMeteoWeather").start();

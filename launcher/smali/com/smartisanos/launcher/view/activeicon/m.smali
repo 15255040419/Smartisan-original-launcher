@@ -734,6 +734,7 @@
     invoke-virtual {v0, v1, v2, v3}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
 
     :cond_0
+
     return-void
 .end method
 
@@ -1075,16 +1076,6 @@
 
     iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_h:F
 
-    # Normalize the date artwork inside the fixed calendar frame. Ratios are
-    # applied to density/mode-specific LayoutProperty values, never raw pixels.
-    const v4, 0x3f666666    # 0.9f
-
-    mul-float/2addr v1, v4
-
-    const v4, 0x3f4ccccd    # 0.8f
-
-    mul-float/2addr v0, v4
-
     const/4 v2, 0x0
 
     const/4 v3, 0x1
@@ -1177,17 +1168,9 @@
 
     iget p1, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_offsety:F
 
-    const v4, 0x3f428f5c    # 0.76f
-
-    mul-float/2addr p1, v4
-
     neg-float p1, p1
 
     iget p2, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_h:F
-
-    const v4, 0x3f4ccccd    # 0.8f
-
-    mul-float/2addr p2, v4
 
     const/high16 v1, 0x40000000    # 2.0f
 
@@ -2999,6 +2982,8 @@
 
     move-result v0
 
+    if-eqz v0, :cond_active_normal
+
     .line 13
     sget v0, Lcom/smartisanos/launcher/data/Constants;->icon_scale:F
 
@@ -3016,7 +3001,15 @@
 
     div-float/2addr v0, v3
 
-    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readActiveIconScaleFactor()F
+    goto :cond_active_apply
+
+    :cond_active_normal
+    const/high16 v0, 0x3f800000    # 1.0f
+
+    move v2, v0
+
+    :cond_active_apply
+    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->activeIconLiveScale()F
 
     move-result v3
 
@@ -3029,11 +3022,12 @@
     invoke-virtual {p0, v2, v0, v1}, Lcom/smartisanos/smengine/SceneNode;->setScale(FFF)V
 
     :cond_0
+
     return-void
 .end method
 
 .method public createComposedBitmap()Landroid/graphics/Bitmap;
-    .locals 13
+    .locals 12
 
     const-string v0, "calendar/bg.png"
 
@@ -3216,27 +3210,9 @@
 
     iget v11, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_w:F
 
-    const v12, 0x3d4ccccd    # 0.05f
-
-    mul-float/2addr v12, v11
-
-    add-float/2addr v9, v12
-
-    const v12, 0x3f428f5c    # 0.76f
-
-    mul-float/2addr v10, v12
-
-    const v12, 0x3f666666    # 0.9f
-
-    mul-float/2addr v11, v12
-
     add-float/2addr v11, v9
 
     iget p0, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_day_h:F
-
-    const v12, 0x3f4ccccd    # 0.8f
-
-    mul-float/2addr p0, v12
 
     add-float/2addr p0, v10
 
@@ -3255,10 +3231,6 @@
 
     .line 21
     invoke-virtual {v3}, Landroid/graphics/Bitmap;->recycle()V
-
-    invoke-static {v4}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->scaleActiveIconBitmap(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
-
-    move-result-object v4
 
     return-object v4
 .end method

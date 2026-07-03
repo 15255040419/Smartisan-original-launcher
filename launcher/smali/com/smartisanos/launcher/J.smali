@@ -1045,7 +1045,9 @@
     sput-boolean p2, Lcom/smartisanos/launcher/data/Constants;->FIRST_USE_MENU_KEY_SWITCH_PAGE_MODE:Z
 
     .line 13
-    invoke-static {}, Lcom/smartisanos/launcher/pb;->Lc()V
+    # Resource validation is a debug-only full asset scan.  The production
+    # port resolves each asset lazily with fallback, so doing it here only
+    # adds cold-start I/O and reports optional paths as errors.
 
     .line 14
     invoke-direct {p0}, Lcom/smartisanos/launcher/J;->Gv()Z
@@ -1406,8 +1408,6 @@
 
     .line 52
     :cond_9
-    invoke-static {}, Lcom/smartisanos/launcher/service/LaunchpadService;->w()V
-
     .line 53
     invoke-direct {p0}, Lcom/smartisanos/launcher/J;->Iv()V
 
@@ -2132,7 +2132,7 @@
     sput-boolean p1, Lcom/smartisanos/launcher/data/Constants;->FIRST_USE_MENU_KEY_SWITCH_PAGE_MODE:Z
 
     .line 54
-    invoke-static {}, Lcom/smartisanos/launcher/pb;->Lc()V
+    # Skip debug-only full asset validation during configuration rebuilds.
 
     .line 55
     invoke-direct {p0}, Lcom/smartisanos/launcher/J;->Gv()Z

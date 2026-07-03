@@ -49,6 +49,10 @@
     move v0, v2
 
     :cond_0
+    # Shipping builds stay quiet even on vendor ROMs that incorrectly expose
+    # ro.debuggable=1.  Developers can still enable logging explicitly via kc().
+    const/4 v0, 0x0
+
     sput-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
 
     .line 2
@@ -673,7 +677,15 @@
 .end method
 
 .method public u(Ljava/lang/String;)V
-    .locals 0
+    .locals 1
+
+    sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
+
+    if-nez v0, :log_verbose_message
+
+    return-void
+
+    :log_verbose_message
 
     .line 1
     invoke-direct {p0, p1}, Lcom/smartisanos/launcher/va;->Ab(Ljava/lang/String;)Ljava/lang/String;

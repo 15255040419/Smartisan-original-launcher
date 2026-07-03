@@ -716,6 +716,10 @@
     .line 25
     :cond_4
     :goto_0
+    # Active icons are created after the ordinary icon node. Ensure the same
+    # standard Cell shadow node (sc[27]) is attached once its textures exist.
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->rl()V
+
     iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
 
     aget-object v0, v0, v5
@@ -3405,6 +3409,8 @@
     invoke-virtual {v1, v2, v2, v2}, Lcom/smartisanos/smengine/SceneNode;->setTranslate(FFF)V
 
     .line 22
+    # Keep the original mode-aware animation anchor. The cached composed bitmap
+    # is optically corrected to this position; the live node itself is not moved.
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->vm()Z
 
     move-result v1

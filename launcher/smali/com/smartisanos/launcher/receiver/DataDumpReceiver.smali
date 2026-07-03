@@ -506,9 +506,6 @@
 
     move-result-object v2
 
-    .line 6
-    invoke-static {v2}, Lcom/smartisanos/launcher/service/LaunchpadService;->b(Landroid/content/ContentResolver;)V
-
     .line 7
     :cond_2
     sget-boolean v2, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
@@ -528,9 +525,6 @@
     invoke-virtual/range {p1 .. p1}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
 
     move-result-object v2
-
-    .line 10
-    invoke-static {v2}, Lcom/smartisanos/launcher/service/LaunchpadService;->a(Landroid/content/ContentResolver;)V
 
     :cond_3
     const-string v2, "open_log"

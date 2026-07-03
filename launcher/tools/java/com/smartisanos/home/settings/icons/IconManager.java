@@ -10,6 +10,7 @@ import android.graphics.drawable.Drawable;
 
 import com.smartisanos.launcher.data.redirectIcon.RedirectIconDB;
 import com.smartisanos.launcher.data.redirectIcon.RedirectIconInfo;
+import com.smartisanos.launcher.theme.MaintainedLauncherSettingsHost;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -101,7 +102,8 @@ public class IconManager {
         try {
             PackageManager pm = mContext.getPackageManager();
             int flags = android.os.Build.VERSION.SDK_INT >= 23 ? 0x00020000 : 0;
-            List<ResolveInfo> infos = pm.queryIntentActivities(intent, flags);
+            List<ResolveInfo> infos = MaintainedLauncherSettingsHost
+                    .queryLauncherActivitiesWithProfiles(pm, intent, flags);
             for (int i = 0; i < infos.size(); i++) {
                 appendResolveInfo(infos.get(i));
             }

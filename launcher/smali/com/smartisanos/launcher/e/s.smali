@@ -10189,13 +10189,7 @@
 .method public static la(Landroid/content/Context;)V
     .locals 1
 
-    .line 1
-    new-instance v0, Lcom/smartisanos/launcher/e/f;
-
-    invoke-direct {v0, p0}, Lcom/smartisanos/launcher/e/f;-><init>(Landroid/content/Context;)V
-
-    invoke-static {v0}, Lcom/smartisanos/launcher/provider/DownloadManagerDelegate;->c(Ljava/lang/Runnable;)V
-
+    # Smartisan payment package integration is not part of this third-party port.
     return-void
 .end method
 

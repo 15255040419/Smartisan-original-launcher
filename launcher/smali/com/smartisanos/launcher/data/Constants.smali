@@ -312,8 +312,6 @@
 
 .field public static final PAGE_ROW_COL:[I
 
-.field public static final PAYMENT_PKG:Ljava/lang/String; = "com.smartisanos.payment"
-
 .field public static PHYSICAL_SCREEN_SIZE:[I = null
 
 .field public static final PKG_SEARCH:Ljava/lang/String; = "com.smartisanos.quicksearch"

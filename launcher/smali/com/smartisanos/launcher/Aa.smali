@@ -1379,6 +1379,12 @@
 
     const/4 v4, 0x1
 
+    invoke-static {p3}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->shouldForceDynamicIconDatabaseWrite(Ljava/lang/String;)Z
+
+    move-result v5
+
+    if-nez v5, :cond_c
+
     if-eqz v3, :cond_c
 
     if-nez p6, :cond_c
@@ -1911,19 +1917,7 @@
 
     if-nez v1, :cond_codex_dynamic_icons_enabled
 
-    const/4 v1, 0x0
-
-    invoke-static {p1, v1, v1}, Lcom/smartisanos/launcher/theme/WeatherBridge;->isWeatherPackage(Ljava/lang/String;Ljava/lang/String;Ljava/lang/CharSequence;)Z
-
-    move-result v1
-
-    if-nez v1, :cond_3
-
-    sget-object v1, Lcom/smartisanos/launcher/data/T;->CALENDAR:Lcom/smartisanos/launcher/data/S;
-
-    iget-object v1, v1, Lcom/smartisanos/launcher/data/S;->pkg:Ljava/lang/String;
-
-    invoke-virtual {p1, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+    invoke-static {p1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->isDynamicIconPackage(Ljava/lang/String;)Z
 
     move-result v1
 

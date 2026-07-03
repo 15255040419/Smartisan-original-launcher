@@ -306,6 +306,12 @@ public final class LayoutPropertyAdapter {
         if (name.startsWith("folder_preview_")) {
             return scale;
         }
+        // Active icons are fixed-aspect artwork. Keep their background, digits,
+        // weather glyphs and offsets in one uniform coordinate system instead
+        // of stretching Y independently on tall displays.
+        if (name.startsWith("weather_") || name.startsWith("calendar_")) {
+            return name.contains("angle") || name.contains("angenle") ? 1.0f : scale;
+        }
         if ("name_off_set_y".equals(name)
                 || "icon_offset_y".equals(name)
                 || "icon_offset_y_without_app_name".equals(name)) {
