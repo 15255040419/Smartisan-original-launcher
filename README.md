@@ -23,7 +23,13 @@
 </p>
 
 <p align="center">
-  <a href="https://b23.tv/ciGhPuQ"><strong>▶ 观看演示视频</strong></a>
+  <a href="https://b23.tv/ciGhPuQ">
+    <img src="docs/demo-cover.jpg" width="860" alt="Smartisan Launcher 演示视频">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://b23.tv/ciGhPuQ"><strong>▶ 观看完整演示视频</strong></a>
 </p>
 
 ---
