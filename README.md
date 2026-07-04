@@ -22,6 +22,10 @@
   <img alt="Status" src="https://img.shields.io/badge/status-active-success?style=flat-square">
 </p>
 
+<p align="center">
+  <a href="https://b23.tv/ciGhPuQ"><strong>▶ 观看演示视频</strong></a>
+</p>
+
 ---
 
 ## 项目简介
