@@ -7655,20 +7655,22 @@ public final class MaintainedLauncherSettingsHost {
             writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false);
             applyTransparentThemeRuntimeFlags(activity, false);
         }
-        // Persist first: the old implementation returned immediately when the
-        // in-process message was queued. If an OEM killed or recreated the
-        // process before Launcher consumed that static message, no theme ID
-        // had been saved and tapping "Apply" appeared to do nothing.
-        clearPendingThemeMessages();
+        // Keep the original theme flow authoritative. It normally owns
+        // MESSAGE_CHANGE_THEME; a fallback is needed only when that stack did
+        // not persist the selected theme at all.
         boolean stored = applyThemeViaOriginalStack(activity, id, pkg);
         storeThemeSelection(activity, id);
-        // Match ThemeItemActivity: submit the transition cover, return HOME,
-        // and let J.onResume consume MESSAGE_CHANGE_THEME on the GL-safe path.
-        returnToLauncherWithThemeTransition(activity, id);
+        boolean queued = !stored && queueThemeChangeForLauncher(activity, id);
         logOperation(activity, "THEME", "persisted_before_dispatch id=" + id
-                + ", original=" + stored
+                + ", original=" + stored + ", queued=" + queued
                 + ", after=" + themeDiagnosticState(activity));
         Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            public void run() {
+                submitThemeSnapshot(activity);
+                startLauncherFromForeground(activity);
+            }
+        }, 120L);
     }
 
     public static Bitmap normalizeNotificationBadgeBitmap(Bitmap source) {
@@ -7676,24 +7678,6 @@ public final class MaintainedLauncherSettingsHost {
         // one digit is a circle and only multi-digit values become capsules.
         // Scaling the finished bitmap makes the one-digit badge oval.
         return source;
-    }
-
-    private static void returnToLauncherWithThemeTransition(final Activity activity, final String id) {
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            public void run() {
-                if (!hasPendingThemeMessage(id)) {
-                    clearPendingThemeMessages();
-                    queueThemeChangeForLauncher(activity, id);
-                }
-                submitThemeSnapshot(activity);
-                try {
-                    activity.finish();
-                    activity.overridePendingTransition(0, 0);
-                } catch (Throwable ignored) {
-                }
-                startLauncherFromForeground(activity);
-            }
-        }, 100L);
     }
 
     private static void restartLauncherForColdSceneChange(Activity activity, String reason) {
@@ -7724,19 +7708,6 @@ public final class MaintainedLauncherSettingsHost {
             }
         } catch (Throwable ignored) {
         }
-    }
-
-    private static boolean hasPendingThemeMessage(String id) {
-        try {
-            Object pending = Class.forName("com.smartisanos.launcher.a.r")
-                    .getField("sj").get(null);
-            if (pending instanceof android.os.Message) {
-                Object target = ((android.os.Message) pending).obj;
-                return id != null && id.equals(String.valueOf(target));
-            }
-        } catch (Throwable ignored) {
-        }
-        return false;
     }
 
     private static void refreshThemeRuntime(final Context context, final String id) {
