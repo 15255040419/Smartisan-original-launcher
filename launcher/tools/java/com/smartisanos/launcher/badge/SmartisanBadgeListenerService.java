@@ -8,6 +8,8 @@ import android.os.Build;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 
+import com.smartisanos.launcher.install.SmartisanInstallManager;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,6 +27,7 @@ public final class SmartisanBadgeListenerService extends NotificationListenerSer
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
+        SmartisanInstallManager.onNotificationPosted(this, sbn);
         rebuild();
     }
 

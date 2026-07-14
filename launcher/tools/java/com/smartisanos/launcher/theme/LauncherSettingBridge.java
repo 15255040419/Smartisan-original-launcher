@@ -2,6 +2,7 @@ package com.smartisanos.launcher.theme;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.provider.Settings;
@@ -9,15 +10,10 @@ import java.util.List;
 import java.util.Map;
 
 public final class LauncherSettingBridge {
-    // Active weather/calendar artwork fills substantially more of its source
-    // canvas than normalized ordinary icons. Keep both cached and live frames
-    // on the same optical footprint as the surrounding desktop icons.
+    // Keep cached and live active-icon frames on the footprint verified in v1.5.3.
     private static final float ACTIVE_ICON_OPTICAL_SCALE = 0.7332f;
     private static final float ACTIVE_ICON_LIVE_SCALE = 0.94f;
-    // Optical correction is proportional to the standard icon canvas, never
-    // a device-pixel offset, so every density/mode keeps the same alignment.
     // Original active-icon anchor: (icon_size_with_shadow - icon_size_origin) / 4.
-    // Portrait 3-column modes use 246/192 (and 205/160), both yielding this ratio.
     private static final float ACTIVE_ICON_UP_OFFSET = 0.05487805f;
     private static final String PREFS = "com.smartisanos.launcher_prefs";
     private static final String SETTINGS_PREFS = "launcher_settings";
@@ -66,7 +62,7 @@ public final class LauncherSettingBridge {
     }
 
     public static boolean dynamicWeatherCalendarEnabled(Context context) {
-        return readBool(context, KEY_DYNAMIC_WEATHER_CALENDAR, true);
+        return readBool(context, KEY_DYNAMIC_WEATHER_CALENDAR, false);
     }
 
     /** Available to original smali call sites which do not carry a Context. */
@@ -82,7 +78,7 @@ public final class LauncherSettingBridge {
             }
         } catch (Throwable ignored) {
         }
-        return true;
+        return false;
     }
 
     public static boolean readTransparentMode(Context context) {
@@ -172,7 +168,7 @@ public final class LauncherSettingBridge {
         return effectiveIconSizePercent(normalizeIconSizePercent(readInt(context, KEY_ICON_SIZE, 100)));
     }
 
-    /** Keeps live weather/calendar roots on the same user-selected scale as ordinary icons. */
+    /** Keeps live weather/calendar roots on the same optical scale as v1.5.3. */
     public static float readActiveIconScaleFactor() {
         try {
             Class<?> proxy = Class.forName("com.smartisanos.launcher.ja");
@@ -199,15 +195,12 @@ public final class LauncherSettingBridge {
         return Math.max(0.0f, iconSize * ACTIVE_ICON_UP_OFFSET);
     }
 
-    /** Places the complete active icon in the ordinary icon canvas. */
+    /** Places active artwork and the original two-layer software shadow in the icon canvas. */
     public static Bitmap composeActiveIconToBaseBounds(Bitmap base, Bitmap active) {
         if (base == null) return active;
         if (active == null) return base;
         int width = base.getWidth();
         int height = base.getHeight();
-        // The live SceneNode uses the complete weather_back_size/calendar_back_size
-        // canvas. Static frames must use that same full-canvas transform; fitting
-        // alpha bounds here creates a second optical scale and a visible jump.
         float scale = Math.min(width / (float) Math.max(1, active.getWidth()),
                 height / (float) Math.max(1, active.getHeight())) * ACTIVE_ICON_OPTICAL_SCALE;
         int dstLeft = Math.round((width - active.getWidth() * scale) * 0.5f);
@@ -215,15 +208,55 @@ public final class LauncherSettingBridge {
                 - activeIconUpOffset(Math.min(width, height)));
         int dstRight = dstLeft + Math.round(active.getWidth() * scale);
         int dstBottom = dstTop + Math.round(active.getHeight() * scale);
-        Bitmap result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(result);
+        Bitmap artwork = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas artworkCanvas = new Canvas(artwork);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         android.graphics.Rect src = new android.graphics.Rect(0, 0, active.getWidth(), active.getHeight());
         android.graphics.Rect dst = new android.graphics.Rect(dstLeft, dstTop, dstRight, dstBottom);
-        canvas.drawBitmap(active, src, dst, paint);
+        artworkCanvas.drawBitmap(active, src, dst, paint);
+
+        Bitmap result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        int[][] shadowSpec = activeIconShadowSpec();
+        for (int i = 0; i < shadowSpec[0].length && i < shadowSpec[1].length; i++) {
+            int radius = shadowSpec[0][i];
+            if (radius <= 0) continue;
+            Paint blurPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            blurPaint.setMaskFilter(new BlurMaskFilter(radius, BlurMaskFilter.Blur.NORMAL));
+            int[] offset = new int[2];
+            Bitmap shadow = artwork.extractAlpha(blurPaint, offset);
+            Paint colorPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+            colorPaint.setColor(shadowSpec[1][i]);
+            canvas.drawBitmap(shadow, offset[0], offset[1] + Math.max(1, radius / 4), colorPaint);
+            shadow.recycle();
+        }
+        canvas.drawBitmap(artwork, 0.0f, 0.0f, paint);
+        artwork.recycle();
         base.recycle();
         active.recycle();
         return result;
+    }
+
+    private static int[][] activeIconShadowSpec() {
+        int[] radii = new int[]{9, 3};
+        int[] colors = new int[]{0x2f000000, 0x3f000000};
+        try {
+            Class<?> proxy = Class.forName("com.smartisanos.launcher.ja");
+            Object instance = proxy.getMethod("getInstance").invoke(null);
+            Object application = instance == null ? null : proxy.getMethod("getApplication").invoke(instance);
+            if (!(application instanceof Context)) return new int[][]{radii, colors};
+            Context context = (Context) application;
+            boolean transparent = Settings.System.getInt(
+                    context.getContentResolver(), "launcher_grid_theme", 0) == 1;
+            String radiusName = transparent ? "icon_shadow_radius_transparent" : "icon_shadow_radius";
+            String colorName = transparent ? "icon_shadow_color_transparent" : "icon_shadow_color";
+            int radiusId = context.getResources().getIdentifier(radiusName, "array", context.getPackageName());
+            int colorId = context.getResources().getIdentifier(colorName, "array", context.getPackageName());
+            if (radiusId != 0) radii = context.getResources().getIntArray(radiusId);
+            if (colorId != 0) colors = context.getResources().getIntArray(colorId);
+        } catch (Throwable ignored) {
+        }
+        return new int[][]{radii, colors};
     }
 
     public static boolean isDynamicIconPackage(String packageName) {

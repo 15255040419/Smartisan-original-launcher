@@ -13,6 +13,7 @@ import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -58,6 +59,7 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.style.RelativeSizeSpan;
 import android.util.Log;
+import android.util.LruCache;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -67,6 +69,7 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.BaseAdapter;
 import android.widget.AbsListView;
@@ -126,10 +129,10 @@ public final class MaintainedLauncherSettingsHost {
     private static final String LOG_TAG = "MaintainedSettings";
     private static android.os.Handler sThemePageHandler;
     private static Runnable sThemePageRunnable;
-    private static Resources sSettingsResources;
+    private static volatile Resources sSettingsResources;
+    private static boolean sSettingsResourcesWarmPending;
     private static List<WeatherBridge.CityResult> sBundledWeatherCities;
     private static File sSettingsApk;
-    private static Bitmap sPendingThemeScreenshot;
     private static Dialog sLauncherReloadDialog;
     private static final String SETTINGS_ASSET = "settings_maintained/maintained-settings-res.apk";
     private static final String OPERATION_LOG_PREFS = "launcher_operation_log_prefs";
@@ -183,6 +186,7 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_TRANSPARENT_PREVIOUS_THEME = "transparent_previous_theme";
     private static final String KEY_LAUNCHER_ICON_SIZE = "launcher_icon_size";
     private static final String TAG_ICON_SIZE_SUBTITLE = "launcher_icon_size_subtitle";
+    private static final String TAG_ICON_PACK_SUBTITLE = "launcher_icon_pack_subtitle";
     private static final String PREF_ICON_SIZE_RUNTIME_DIRTY = "launcher_icon_size_runtime_dirty";
     private static final String PREF_ICON_SIZE_RUNTIME_OLD = "launcher_icon_size_runtime_old";
     private static final String PREF_ICON_SIZE_RUNTIME_NEW = "launcher_icon_size_runtime_new";
@@ -190,21 +194,37 @@ public final class MaintainedLauncherSettingsHost {
     private static final String KEY_LOCKSCREEN_BACKGROUND = "lockscreen_background";
     private static final String PREF_PENDING_CUSTOM_ICON_KEY = "pending_custom_icon_key";
     private static final String PREF_PENDING_ICON_SCROLL_Y = "pending_icon_scroll_y";
+    private static final String PREF_PENDING_CUSTOM_ICON_RETURN_SCROLL_Y = "pending_custom_icon_return_scroll_y";
+    private static final String PREF_PENDING_CUSTOM_ICON_CHOICE_SCROLL_Y = "pending_custom_icon_choice_scroll_y";
+    private static final String PREF_PENDING_CUSTOM_ICON_RESTORE_CHOICE = "pending_custom_icon_restore_choice";
     private static final String EXTRA_PASSWORD_TARGET_PACKAGE = "launcher_password_target_package";
     private static final String EXTRA_PASSWORD_TARGET_CLASS = "launcher_password_target_class";
     private static final String EXTRA_PASSWORD_TARGET_USER = "launcher_password_target_user";
     private static final String EXTRA_PASSWORD_TARGET_SERIAL = "launcher_password_target_serial";
     private static final String EXTRA_PASSWORD_SET_MODE = "launcher_password_set_mode";
     private static final int REQUEST_PICK_CUSTOM_ICON = 53026;
-    private static final long SETTINGS_CLICK_GUARD_MS = 800L;
+    private static final long SETTINGS_CLICK_GUARD_MS = 90L;
     private static long sSettingsClickBlockedUntil;
     private static boolean sIconSizeAppliedThisProcess;
     private static int sRestoreIconPageScrollY = -1;
+    private static int sIconPageLoadGeneration;
+    private static IconPageData sIconPageDataCache;
+    private static long sIconPageDataCacheUptime;
+    private static final long ICON_PAGE_CACHE_FRESH_MS = 5L * 60L * 1000L;
     private static int sMainSettingsScrollY = -1;
     private static int sThemePageScrollY = -1;
     private static final Map<String, Bitmap> sThemePreviewCache = new HashMap<String, Bitmap>();
     private static final Map<String, Bitmap> sThemeLargePreviewCache = new HashMap<String, Bitmap>();
-    private static final Map<String, Bitmap> sSmartisanIconCache = new HashMap<String, Bitmap>();
+    private static final Map<String, Boolean> sThemePreviewFetchPending = new HashMap<String, Boolean>();
+    private static final java.util.concurrent.ExecutorService THEME_PREVIEW_FETCH_EXECUTOR =
+            java.util.concurrent.Executors.newFixedThreadPool(2);
+    private static final LruCache<String, Bitmap> sSmartisanIconCache =
+            new LruCache<String, Bitmap>(8 * 1024) {
+                protected int sizeOf(String key, Bitmap bitmap) {
+                    if (bitmap == null) return 0;
+                    return Math.max(1, bitmap.getRowBytes() * bitmap.getHeight() / 1024);
+                }
+            };
     private static final Map<String, Boolean> sSmartisanIconFetchPending = new HashMap<String, Boolean>();
     private static boolean sSmartisanIconRefreshScheduled;
     private static long sSmartisanIconLastWriteUptime;
@@ -216,6 +236,12 @@ public final class MaintainedLauncherSettingsHost {
     private static long sThemeChangeGuardUntilUptime;
     private static final String SMARTISAN_ICON_CACHE_PREFS = "online_icon_cache_v3";
     private static final String SMARTISAN_ICON_CACHE_DIR = "online_icon_cache_v3";
+    // Keep only the opaque artwork before the original launcher generates its
+    // dark/light/transparent shadow bitmaps. Low-alpha pixels in the online
+    // library are usually a baked legacy shadow and would otherwise double up.
+    private static final int UNIFORM_ICON_ART_ALPHA_CUTOFF = 128;
+    private static final float UNIFORM_ICON_VISIBLE_RATIO = 0.90f;
+    private static Map<String, List<String>> sIconVariants;
     // Mirrors can fail temporarily. A week-long miss cache made recognized
     // system apps (notably vendor Gallery aliases) look permanently unknown.
     private static final long SMARTISAN_ICON_MISS_RETRY_MS = 60L * 60L * 1000L;
@@ -285,10 +311,14 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static void show(Activity activity) {
-        show(activity, -1);
+        show(activity, -1, false);
     }
 
     private static void show(Activity activity, int restoreScrollY) {
+        show(activity, restoreScrollY, false);
+    }
+
+    private static void show(Activity activity, int restoreScrollY, boolean animateBack) {
         try {
             resumeOperationLogIfNeeded(activity);
             cancelScheduledLauncherRestart(activity);
@@ -323,7 +353,7 @@ public final class MaintainedLauncherSettingsHost {
             View root = inflate(activity, context, "setting_main");
             bindPage(activity, resources, root);
             tuneScrollBars(root);
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, !animateBack, animateBack);
             restoreScroll(root, restoreScrollY);
             scheduleInitialSettingsMigrationsIfIdle(activity);
         } catch (Throwable t) {
@@ -365,6 +395,10 @@ public final class MaintainedLauncherSettingsHost {
         if (prefs.getBoolean(key, false)) {
             return;
         }
+        if (!isImprovedIconEnabled(context)) {
+            prefs.edit().putBoolean(key, true).apply();
+            return;
+        }
         try {
             SettingsResourceContext settings = createSettingsContext(context);
             Resources resources = settings.getResources();
@@ -396,6 +430,10 @@ public final class MaintainedLauncherSettingsHost {
         final String key = "maintained_builtin_icon_defaults_v3";
         SharedPreferences prefs = context.getSharedPreferences(ICON_OVERRIDE_PREFS, Context.MODE_PRIVATE);
         if (prefs.getBoolean(key, false)) {
+            return;
+        }
+        if (!isImprovedIconEnabled(context)) {
+            prefs.edit().putBoolean(key, true).apply();
             return;
         }
         try {
@@ -454,11 +492,18 @@ public final class MaintainedLauncherSettingsHost {
             prefs.edit().putBoolean(key, true).apply();
         } catch (Throwable ignored) {
         }
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+        new Thread(new Runnable() {
+            @Override
             public void run() {
-                applyIconChange(app);
+                // Match the maintained launcher: enumerate installed icon packs
+                // and cache their mappings only. This never downloads icons.
+                try {
+                    Class.forName("com.smartisanos.home.settings.icons.IconPackManager")
+                            .getMethod("warmUpIconPackList", Context.class).invoke(null, app);
+                } catch (Throwable ignored) {
+                }
             }
-        }, 1200);
+        }, "IconPackWarmup").start();
     }
 
     public static void scheduleDoppelgangerBootstrap(Context context) {
@@ -958,11 +1003,11 @@ public final class MaintainedLauncherSettingsHost {
         bindGrid(activity, resources, root);
         bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
         bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
-        bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
-        bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
+        bindBadgeVisibilitySwitch(activity, resources, root);
+        bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", false);
         bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
         bindSwitch(activity, resources, root, "setting_dynamic_weather",
-                KEY_DYNAMIC_WEATHER_CALENDAR, true);
+                KEY_DYNAMIC_WEATHER_CALENDAR, false);
         bindSwitch(activity, resources, root, "multi_block_fast_launch_app", "fast_launch_app_on", true);
         bindTransparentThemeSwitch(activity, resources, root);
 
@@ -1113,6 +1158,10 @@ public final class MaintainedLauncherSettingsHost {
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             if (Build.VERSION.SDK_INT >= 21) {
                 window.setStatusBarColor(Color.TRANSPARENT);
+                // Keep both system bars on the same Launcher surface while a
+                // theme reload recreates the activity. Leaving navigation at
+                // the ROM default produced a visibly different bottom strip.
+                window.setNavigationBarColor(Color.TRANSPARENT);
             }
             if (Build.VERSION.SDK_INT >= 28) {
                 WindowManager.LayoutParams attrs = window.getAttributes();
@@ -1880,8 +1929,11 @@ public final class MaintainedLauncherSettingsHost {
             if (context == null || !shouldShowIconEntry(info)) {
                 return null;
             }
-            SettingsResourceContext settings = createSettingsContext(context);
-            Resources resources = settings.getResources();
+            Resources resources = sSettingsResources;
+            if (resources == null) {
+                scheduleSettingsResourcesWarm(context);
+                resources = context.getResources();
+            }
             CharSequence label = null;
             try {
                 label = info == null ? null : info.loadLabel(pm);
@@ -2017,7 +2069,10 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static void onLauncherResumedForUnlock(final Activity activity) {
-        if (activity == null || !sLauncherPausedForScreenOff) {
+        if (activity == null) {
+            return;
+        }
+        if (!sLauncherPausedForScreenOff) {
             return;
         }
         sLauncherPausedForScreenOff = false;
@@ -2127,7 +2182,10 @@ public final class MaintainedLauncherSettingsHost {
         if (context == null || TextUtils.isEmpty(packageName)) {
             return null;
         }
-        String normalizedTitle = title == null ? "" : title.trim().toLowerCase();
+        RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, packageName, className);
+        String identityTitle = redirect != null && !TextUtils.isEmpty(redirect.originalName)
+                ? redirect.originalName : title;
+        String normalizedTitle = identityTitle == null ? "" : identityTitle.trim().toLowerCase();
         try {
             SettingsResourceContext settings = createSettingsContext(context);
             Resources resources = settings.getResources();
@@ -2147,6 +2205,40 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         return loadIconForComponent(context, packageName, className);
+    }
+
+    /**
+     * Keeps the default desktop frame on the original PackageManager path.
+     * This predicate only reads persisted mode metadata; it never decodes an
+     * icon, parses appfilter or starts an online request.
+     */
+    public static boolean shouldUseManagedIcon(Context context, String packageName,
+                                               String className) {
+        if (context == null || TextUtils.isEmpty(packageName)) {
+            return false;
+        }
+        boolean iconPackEnabled = com.smartisanos.home.settings.icons.IconPackManager
+                .isIconPackSelectionEnabled(context);
+        if (isImprovedIconEnabled(context) || iconPackEnabled) {
+            if (iconPackEnabled) {
+                com.smartisanos.home.settings.icons.IconPackManager
+                        .preloadSelectedIconPackAsync(context);
+            }
+            return true;
+        }
+        return RedirectIconDB.hasManagedIconOverride(context, packageName, className);
+    }
+
+    public static void onSelectedIconPackPreloaded(final Context context) {
+        if (context == null) return;
+        final Context app = context.getApplicationContext() == null
+                ? context : context.getApplicationContext();
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            public void run() {
+                postDatabaseRefreshEvent();
+                applyIconChange(app);
+            }
+        });
     }
 
     private static ResolveInfo resolveLauncherActivity(PackageManager pm, String packageName, String className) {
@@ -2259,10 +2351,9 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     /**
-     * Normalize the alpha-visible artwork instead of only the drawable canvas.
-     * Android 16 applications commonly ship adaptive/legacy icons with very
-     * different transparent margins. Scaling both down and up to one target
-     * keeps original, improved and custom icons optically consistent.
+     * Normalizes icon artwork after removing a baked source shadow. The
+     * original launcher then generates its three theme-specific shadow bitmaps
+     * from this clean result; adding another shadow here would double them.
      */
     private static Drawable normalizeIconVisibleBounds(Drawable icon) {
         if (icon == null) {
@@ -2276,50 +2367,62 @@ public final class MaintainedLauncherSettingsHost {
                 return icon;
             }
 
+            Bitmap artwork = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             int left = width;
             int top = height;
             int right = -1;
             int bottom = -1;
             int[] row = new int[width];
+            int[] cleanedRow = new int[width];
             for (int y = 0; y < height; y++) {
                 source.getPixels(row, 0, width, 0, y, width, 1);
                 for (int x = 0; x < width; x++) {
-                    if ((row[x] >>> 24) > 8) {
+                    int pixel = row[x];
+                    int alpha = pixel >>> 24;
+                    // Strip the existing soft exterior shadow from online/icon-pack
+                    // artwork. The original HolographicOutlineHelper derives its
+                    // three shadows from the remaining body.
+                    if (alpha < UNIFORM_ICON_ART_ALPHA_CUTOFF) {
+                        cleanedRow[x] = 0;
+                        continue;
+                    }
+                    cleanedRow[x] = pixel;
+                    if (alpha >= UNIFORM_ICON_ART_ALPHA_CUTOFF) {
                         if (x < left) left = x;
                         if (x > right) right = x;
                         if (y < top) top = y;
                         if (y > bottom) bottom = y;
                     }
                 }
+                artwork.setPixels(cleanedRow, 0, width, 0, y, width, 1);
             }
             if (right < left || bottom < top) {
+                artwork.recycle();
+                source.recycle();
                 return icon;
             }
 
             float visible = Math.max(right - left + 1, bottom - top + 1);
-            float target = Math.min(width, height) * 0.90f;
+            float target = Math.min(width, height) * UNIFORM_ICON_VISIBLE_RATIO;
             float scale = target / visible;
-            // Avoid amplifying a tiny stray alpha pixel into a full-size icon.
             scale = Math.max(0.70f, Math.min(1.50f, scale));
-            if (scale >= 0.995f) {
-                if (scale <= 1.005f) {
-                    return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), source);
-                }
-            }
-
-            Bitmap output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(output);
+            Bitmap normalized = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(normalized);
             Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
             float cx = (left + right + 1) * 0.5f;
             float cy = (top + bottom + 1) * 0.5f;
             float targetCx = width * 0.5f;
             float targetCy = height * 0.5f;
+            canvas.save();
             canvas.translate(targetCx, targetCy);
             canvas.scale(scale, scale);
             canvas.translate(-cx, -cy);
-            canvas.drawBitmap(source, 0f, 0f, paint);
+            canvas.drawBitmap(artwork, 0f, 0f, paint);
+            canvas.restore();
+
+            artwork.recycle();
             source.recycle();
-            return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), output);
+            return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), normalized);
         } catch (Throwable ignored) {
             return icon;
         }
@@ -2514,8 +2617,8 @@ public final class MaintainedLauncherSettingsHost {
             Toast.makeText(activity, "未选择图片", Toast.LENGTH_SHORT).show();
             return true;
         }
-        String key = activity.getSharedPreferences(ICON_OVERRIDE_PREFS, Context.MODE_PRIVATE)
-                .getString(PREF_PENDING_CUSTOM_ICON_KEY, "");
+        SharedPreferences iconPrefs = activity.getSharedPreferences(ICON_OVERRIDE_PREFS, Context.MODE_PRIVATE);
+        String key = iconPrefs.getString(PREF_PENDING_CUSTOM_ICON_KEY, "");
         if (key.length() == 0) {
             Toast.makeText(activity, "没有找到要替换的应用", Toast.LENGTH_SHORT).show();
             return true;
@@ -2524,13 +2627,18 @@ public final class MaintainedLauncherSettingsHost {
             byte[] iconData = saveCustomIcon(activity, key, data.getData());
             String[] parts = splitIconKey(key);
             RedirectIconDB.updateCustomIcon(activity, parts[0], parts[1], iconData);
-            activity.getSharedPreferences(ICON_OVERRIDE_PREFS, Context.MODE_PRIVATE).edit()
-                    .remove(PREF_PENDING_CUSTOM_ICON_KEY).apply();
+            int returnScrollY = iconPrefs.getInt(PREF_PENDING_CUSTOM_ICON_RETURN_SCROLL_Y, 0);
+            int choiceScrollY = iconPrefs.getInt(PREF_PENDING_CUSTOM_ICON_CHOICE_SCROLL_Y, 0);
+            boolean restoreChoice = iconPrefs.getBoolean(PREF_PENDING_CUSTOM_ICON_RESTORE_CHOICE, false);
+            iconPrefs.edit().remove(PREF_PENDING_CUSTOM_ICON_KEY)
+                    .remove(PREF_PENDING_CUSTOM_ICON_RETURN_SCROLL_Y)
+                    .remove(PREF_PENDING_CUSTOM_ICON_CHOICE_SCROLL_Y)
+                    .remove(PREF_PENDING_CUSTOM_ICON_RESTORE_CHOICE).apply();
             applyIconChange(activity);
-            if (!refreshIconRowInCurrentPage(activity, parts[0], parts[1])) {
-                int scrollY = activity.getSharedPreferences(ICON_OVERRIDE_PREFS, Context.MODE_PRIVATE)
-                        .getInt(PREF_PENDING_ICON_SCROLL_Y, 0);
-                showIconPage(activity, scrollY);
+            if (restoreChoice) {
+                reopenIconChoicePage(activity, parts[0], parts[1], returnScrollY, choiceScrollY);
+            } else if (!refreshIconRowInCurrentPage(activity, parts[0], parts[1])) {
+                showIconPage(activity, returnScrollY);
             }
             Toast.makeText(activity, "已应用自定义图标", Toast.LENGTH_SHORT).show();
         } catch (Throwable t) {
@@ -2886,8 +2994,7 @@ public final class MaintainedLauncherSettingsHost {
         if (isTransparentThemeEnabled(context)) {
             return true;
         }
-        String id = currentTheme(context);
-        return "smartisan_theme_aero".equals(id);
+        return "smartisan_theme_aero".equals(currentTheme(context));
     }
 
     private static Bitmap decodeUriBitmap(Context context, Uri uri, int target) {
@@ -2995,82 +3102,118 @@ public final class MaintainedLauncherSettingsHost {
         showThemePage(activity, -1);
     }
 
+    public static String displayNameForDesktopItem(String packageName, String componentName,
+                                                    String fallback) {
+        try {
+            Context context = currentApplicationContext();
+            RedirectIconInfo info = RedirectIconDB.getRedirectIconInfo(context, packageName, componentName);
+            if (info != null && !TextUtils.isEmpty(info.displayName)) {
+                return info.displayName;
+            }
+        } catch (Throwable ignored) {
+        }
+        return fallback;
+    }
+
     private static void showThemePage(final Activity activity, final int restoreScrollY) {
+        showThemePage(activity, restoreScrollY, true);
+    }
+
+    private static void showThemePage(final Activity activity, final int restoreScrollY, boolean forward) {
         logOperation(activity, "PAGE", "show_theme, restoreScrollY=" + restoreScrollY);
         try {
             tuneWindow(activity);
             final SettingsResourceContext context = createSettingsContext(activity);
             final Resources resources = context.getResources();
-            View root = inflate(activity, context, "theme_preview_gridview");
+            final View root = inflate(activity, context, "theme_preview_gridview");
             bindBackTitle(activity, resources, root, "view_title", getString(resources, "launcher_theme_text", "桌面主题"));
-            GridView installed = asGrid(find(resources, root, "installed_list"));
-            final ThemePreviewAdapter installedAdapter;
+            final GridView installed = asGrid(find(resources, root, "installed_list"));
             if (installed != null) {
-                installedAdapter = new ThemePreviewAdapter(activity, context, resources, true);
-                installed.setAdapter(installedAdapter);
+                installed.setSelector(android.R.color.transparent);
                 installed.setNumColumns(2);
                 installed.setVerticalSpacing(0);
-                installed.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-                    public void onItemClick(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                        stopThemePagePolling();
-                        sThemePageScrollY = currentScrollY(activity);
-                        showThemeItemPage(activity, installedAdapter.entryAt(position));
-                    }
-                });
-            } else {
-                installedAdapter = null;
             }
-            GridView notInstalled = asGrid(find(resources, root, "not_installed_list"));
-            final ThemePreviewAdapter onlineAdapter;
+            final GridView notInstalled = asGrid(find(resources, root, "not_installed_list"));
             if (notInstalled != null) {
-                onlineAdapter = new ThemePreviewAdapter(activity, context, resources, false);
-                notInstalled.setAdapter(onlineAdapter);
+                notInstalled.setSelector(android.R.color.transparent);
                 notInstalled.setNumColumns(2);
                 notInstalled.setVerticalSpacing(0);
-                notInstalled.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-                    public void onItemClick(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                        stopThemePagePolling();
-                        sThemePageScrollY = currentScrollY(activity);
-                        showThemeItemPage(activity, onlineAdapter.entryAt(position));
-                    }
-                });
-            } else {
-                onlineAdapter = null;
             }
-
-            // Start dynamic progress polling
             stopThemePagePolling();
-            sThemePageHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-            sThemePageRunnable = new Runnable() {
-                public void run() {
-                    boolean hasActive = false;
-                    for (ThemeEntry entry : allThemeEntries()) {
-                        if (entry.local || packageInstalled(activity, entry.pkg)) continue;
-                        long downloadId = activity.getSharedPreferences(THEME_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
-                                .getLong(entry.pkg, -1);
-                        if (downloadId != -1) {
-                            int status = getDownloadStatus(activity, downloadId);
-                            if (status == DownloadManager.STATUS_RUNNING || status == DownloadManager.STATUS_PENDING) {
-                                hasActive = true;
-                            }
-                        }
-                    }
-                    if (installedAdapter != null) installedAdapter.notifyDataSetChanged();
-                    if (onlineAdapter != null) onlineAdapter.notifyDataSetChanged();
-
-                    if (hasActive && sThemePageHandler != null) {
-                        sThemePageHandler.postDelayed(this, 1000);
-                    }
-                }
-            };
-            sThemePageHandler.post(sThemePageRunnable);
-
             tuneScrollBars(root);
-            activity.setContentView(root);
-            restoreScroll(root, restoreScrollY);
+            // Follow the maintained ThemeChooserActivity ordering: attach the adapters and
+            // begin preview work immediately.  setSettingsContentView() waits for this root's
+            // first layout while it is off-screen, then starts the slide.
+            bindThemeGridContent(activity, context, resources, root, installed, notInstalled,
+                    restoreScrollY);
+            setSettingsContentView(activity, context, resources, root, forward);
         } catch (Throwable t) {
             showFailure(activity, t);
         }
+    }
+
+    private static void bindThemeGridContent(final Activity activity,
+                                             final SettingsResourceContext context,
+                                             final Resources resources,
+                                             final View root,
+                                             final GridView installed,
+                                             final GridView notInstalled,
+                                             final int restoreScrollY) {
+        final ThemePreviewAdapter installedAdapter = installed == null ? null
+                : new ThemePreviewAdapter(activity, context, resources, true);
+        final ThemePreviewAdapter onlineAdapter = notInstalled == null ? null
+                : new ThemePreviewAdapter(activity, context, resources, false);
+        if (installed != null) {
+            installed.setAdapter(installedAdapter);
+            installed.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+                public void onItemClick(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                    stopThemePagePolling();
+                    sThemePageScrollY = currentScrollY(activity);
+                    showThemeItemPage(activity, installedAdapter.entryAt(position));
+                }
+            });
+        }
+        if (notInstalled != null) {
+            notInstalled.setAdapter(onlineAdapter);
+            notInstalled.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+                public void onItemClick(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                    stopThemePagePolling();
+                    sThemePageScrollY = currentScrollY(activity);
+                    showThemeItemPage(activity, onlineAdapter.entryAt(position));
+                }
+            });
+        }
+        startThemePagePolling(activity, installedAdapter, onlineAdapter);
+        restoreScroll(root, restoreScrollY);
+    }
+
+    private static void startThemePagePolling(final Activity activity,
+                                              final ThemePreviewAdapter installedAdapter,
+                                              final ThemePreviewAdapter onlineAdapter) {
+        stopThemePagePolling();
+        sThemePageHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        sThemePageRunnable = new Runnable() {
+            public void run() {
+                boolean hasActive = false;
+                for (ThemeEntry entry : allThemeEntries()) {
+                    if (entry.local || packageInstalled(activity, entry.pkg)) continue;
+                    long downloadId = activity.getSharedPreferences(THEME_DOWNLOAD_PREFS, Context.MODE_PRIVATE)
+                            .getLong(entry.pkg, -1);
+                    if (downloadId != -1) {
+                        int status = getDownloadStatus(activity, downloadId);
+                        if (status == DownloadManager.STATUS_RUNNING || status == DownloadManager.STATUS_PENDING) {
+                            hasActive = true;
+                        }
+                    }
+                }
+                if (installedAdapter != null) installedAdapter.notifyDataSetChanged();
+                if (onlineAdapter != null) onlineAdapter.notifyDataSetChanged();
+                if (hasActive && sThemePageHandler != null) {
+                    sThemePageHandler.postDelayed(this, 1000);
+                }
+            }
+        };
+        sThemePageHandler.post(sThemePageRunnable);
     }
 
     private static void stopThemePagePolling() {
@@ -3100,7 +3243,7 @@ public final class MaintainedLauncherSettingsHost {
             if (btnBack != null) {
                 btnBack.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
-                        showThemePage(activity, sThemePageScrollY);
+                        showThemePage(activity, sThemePageScrollY, false);
                     }
                 });
             }
@@ -3113,7 +3256,7 @@ public final class MaintainedLauncherSettingsHost {
             updateThemeDetail(activity, resources, entries[selected[0]], previewImg, btnOk, btnDownload, statusIcon);
 
             tuneScrollBars(root);
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, true);
             fitThemeDetailPreview(activity, resources, root);
             centerThemeDetailPreview(resources, root);
         } catch (Throwable t) {
@@ -3226,7 +3369,7 @@ public final class MaintainedLauncherSettingsHost {
                 }
             }
             tuneScrollBars(root);
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
             showFailure(activity, t);
         }
@@ -3274,7 +3417,8 @@ public final class MaintainedLauncherSettingsHost {
                 grid.setNumColumns(2);
                 grid.setVerticalSpacing(0);
                 grid.setHorizontalSpacing(0);
-                grid.setPadding(dp(activity, 24), dp(activity, 50), dp(activity, 24), 0);
+                grid.setSelector(android.R.color.transparent);
+                grid.setPadding(dp(activity, 12), dp(activity, 42), dp(activity, 12), 0);
                 grid.setClipToPadding(false);
                 grid.setAdapter(adapter);
                 grid.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
@@ -3287,7 +3431,7 @@ public final class MaintainedLauncherSettingsHost {
                 });
             }
             tuneScrollBars(root);
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
             showFailure(activity, t);
         }
@@ -3298,8 +3442,17 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showIconPage(final Activity activity, int restoreScrollY) {
+        showIconPage(activity, restoreScrollY, true);
+    }
+
+    private static void showIconPage(final Activity activity, int restoreScrollY, boolean forward) {
         try {
             sRestoreIconPageScrollY = restoreScrollY;
+            try {
+                Class.forName("com.smartisanos.home.settings.icons.IconPackManager")
+                        .getMethod("warmUpIconPackList", Context.class).invoke(null, activity);
+            } catch (Throwable ignored) {
+            }
             tuneWindow(activity);
             SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
@@ -3312,7 +3465,7 @@ public final class MaintainedLauncherSettingsHost {
                 replaceIconListWithScroll(activity, context, resources, list);
             }
             tuneScrollBars(root);
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, forward);
             hideInputMethod(activity, root);
         } catch (Throwable t) {
             showFailure(activity, t);
@@ -3337,7 +3490,7 @@ public final class MaintainedLauncherSettingsHost {
         scroll.setFillViewport(false);
         scroll.setFocusable(false);
         scroll.setVerticalScrollBarEnabled(false);
-        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        scroll.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         for (int i = 0; i < adapter.getCount(); i++) {
@@ -3364,70 +3517,132 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void replaceIconListWithScroll(Activity activity, SettingsResourceContext context,
                                                   Resources resources, ListView list) {
-        ViewGroup parent = (ViewGroup) list.getParent();
-        if (parent == null) {
-            return;
-        }
-        int index = parent.indexOfChild(list);
-        ViewGroup.LayoutParams listLp = list.getLayoutParams();
-        int id = list.getId();
-        parent.removeView(list);
-
-        ScrollView scroll = new ScrollView(context);
-        scroll.setId(id);
-        scroll.setFillViewport(false);
-        scroll.setFocusable(false);
-        scroll.setFocusableInTouchMode(false);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setHorizontalScrollBarEnabled(false);
-        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-
-        LinearLayout content = new LinearLayout(context);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.addView(iconPageHeader(activity, context, resources));
+        final int generation = ++sIconPageLoadGeneration;
+        list.setDivider(null);
+        list.setDividerHeight(0);
+        list.setVerticalScrollBarEnabled(false);
+        list.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
+        list.addHeaderView(iconPageHeader(activity, context, resources), null, false);
+        final LinearLayout footer = new LinearLayout(context);
+        footer.setOrientation(LinearLayout.VERTICAL);
         final TextView loading = text(context, "正在加载应用图标...", 16, 0xff9d9fa6, false);
         loading.setGravity(Gravity.CENTER);
-        content.addView(loading, new LinearLayout.LayoutParams(-1, dp(context, 88)));
-        scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
-        parent.addView(scroll, index, listLp);
+        footer.addView(loading, new LinearLayout.LayoutParams(-1, dp(context, 88)));
+        list.addFooterView(footer, null, false);
         final Activity targetActivity = activity;
         final SettingsResourceContext targetContext = context;
         final Resources targetResources = resources;
-        final LinearLayout targetContent = content;
-        final ScrollView targetScroll = scroll;
+        final ListView targetList = list;
         final int restoreY = sRestoreIconPageScrollY;
+        final IconPageData cached = cachedIconPageData();
+        if (cached != null) {
+            // Do not show a loading-only page when the application list is already known.
+            renderIconPageList(targetActivity, targetContext, targetResources, targetList,
+                    footer, cached, restoreY);
+            if (!isIconPageDataFresh()) {
+                targetList.postDelayed(new Runnable() {
+                    public void run() {
+                        loadIconPageDataAsync(generation, targetActivity, targetContext,
+                                targetResources, targetList, footer, true, -1);
+                    }
+                }, 480L);
+            }
+            return;
+        }
+        list.setAdapter(new BaseAdapter() {
+            public int getCount() { return 0; }
+            public Object getItem(int position) { return null; }
+            public long getItemId(int position) { return position; }
+            public View getView(int position, View convertView, ViewGroup parent) { return new View(parent.getContext()); }
+        });
+        list.post(new Runnable() {
+            public void run() {
+                loadIconPageDataAsync(generation, targetActivity, targetContext,
+                        targetResources, targetList, footer, false, restoreY);
+            }
+        });
+    }
+
+    private static IconPageData cachedIconPageData() {
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            return sIconPageDataCache;
+        }
+    }
+
+    private static boolean isIconPageDataFresh() {
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            return sIconPageDataCache != null
+                    && android.os.SystemClock.uptimeMillis() - sIconPageDataCacheUptime
+                    < ICON_PAGE_CACHE_FRESH_MS;
+        }
+    }
+
+    private static void loadIconPageDataAsync(final int generation, final Activity activity,
+                                              final SettingsResourceContext context,
+                                              final Resources resources, final ListView list,
+                                              final LinearLayout footer, final boolean forceRefresh,
+                                              final int restorePosition) {
+        if (generation != sIconPageLoadGeneration || list.getWindowToken() == null) {
+            return;
+        }
         new Thread(new Runnable() {
             public void run() {
                 long started = android.os.SystemClock.elapsedRealtime();
-                logOperation(targetActivity, "ICON_LIST", "load_start");
-                final List<RedirectIconInfo> entries = AppIconAdapter.loadEntries(targetActivity);
-                logOperation(targetActivity, "ICON_LIST", "load_complete count=" + entries.size()
+                logOperation(activity, "ICON_LIST", forceRefresh ? "refresh_start" : "load_start");
+                final IconPageData data = loadIconPageData(activity, forceRefresh);
+                logOperation(activity, "ICON_LIST", "load_complete count=" + data.entries.size()
                         + ", elapsed_ms=" + (android.os.SystemClock.elapsedRealtime() - started));
                 new Handler(Looper.getMainLooper()).post(new Runnable() {
                     public void run() {
-                        try {
-                            AppIconAdapter adapter = new AppIconAdapter(targetActivity, targetContext, targetResources, entries);
-                            targetContent.removeView(loading);
-                            int count = adapter.getCount();
-                            for (int i = 0; i < count; i++) {
-                                targetContent.addView(adapter.getView(i, null, targetContent));
-                            }
-                            targetContent.addView(iconPageFooter(targetActivity, targetContext, targetResources));
-                            if (restoreY > 0) {
-                                targetScroll.post(new Runnable() {
-                                    public void run() {
-                                        targetScroll.scrollTo(0, restoreY);
-                                    }
-                                });
-                            }
-                        } catch (Throwable ignored) {
-                            logOperation(targetActivity, "ICON_LIST", "render_failed " + shortError(ignored));
-                            loading.setText("应用图标加载失败");
+                        if (generation != sIconPageLoadGeneration || list.getWindowToken() == null) {
+                            return;
                         }
+                        renderIconPageList(activity, context, resources, list, footer, data,
+                                forceRefresh ? list.getFirstVisiblePosition() : restorePosition);
                     }
                 });
             }
         }, "smartisan-icon-list-loader").start();
+    }
+
+    private static void renderIconPageList(Activity activity, SettingsResourceContext context,
+                                           Resources resources, ListView list, LinearLayout footer,
+                                           IconPageData data, int restorePosition) {
+        try {
+            AppIconAdapter adapter = new AppIconAdapter(activity, context, resources,
+                    data.entries, data.iconManager);
+            footer.removeAllViews();
+            footer.addView(iconPageFooter(activity, context, resources),
+                    new LinearLayout.LayoutParams(-1, -2));
+            list.setAdapter(adapter);
+            if (restorePosition > 0) {
+                list.setSelection(restorePosition);
+            }
+        } catch (Throwable ignored) {
+            logOperation(activity, "ICON_LIST", "render_failed " + shortError(ignored));
+            footer.removeAllViews();
+            TextView failure = text(context, "应用图标加载失败", 16, 0xff9d9fa6, false);
+            failure.setGravity(Gravity.CENTER);
+            footer.addView(failure, new LinearLayout.LayoutParams(-1, dp(context, 88)));
+        }
+    }
+
+    private static IconPageData loadIconPageData(Activity activity, boolean forceRefresh) {
+        long now = android.os.SystemClock.uptimeMillis();
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            if (!forceRefresh && sIconPageDataCache != null
+                    && now - sIconPageDataCacheUptime < ICON_PAGE_CACHE_FRESH_MS) {
+                return sIconPageDataCache;
+            }
+        }
+        IconManager manager = new IconManager(activity);
+        List<RedirectIconInfo> entries = AppIconAdapter.loadEntries(activity, manager);
+        IconPageData data = new IconPageData(manager, entries);
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            sIconPageDataCache = data;
+            sIconPageDataCacheUptime = android.os.SystemClock.uptimeMillis();
+        }
+        return data;
     }
 
     private static void bindBackTitle(final Activity activity, Resources resources, View root, String idName, String titleText) {
@@ -3436,7 +3651,7 @@ public final class MaintainedLauncherSettingsHost {
             btnBack.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
                     stopThemePagePolling();
-                    show(activity, sMainSettingsScrollY);
+                    show(activity, sMainSettingsScrollY, true);
                 }
             });
         }
@@ -3450,10 +3665,147 @@ public final class MaintainedLauncherSettingsHost {
             smartisanTitle.setTitle(titleText);
             smartisanTitle.setBackClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY);
+                    show(activity, sMainSettingsScrollY, true);
                 }
             });
         }
+    }
+
+    private static void scheduleSettingsResourcesWarm(Context context) {
+        if (context == null || sSettingsResources != null) {
+            return;
+        }
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            if (sSettingsResources != null || sSettingsResourcesWarmPending) {
+                return;
+            }
+            sSettingsResourcesWarmPending = true;
+        }
+        final Context app = context.getApplicationContext() == null
+                ? context : context.getApplicationContext();
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    settingsResources(app);
+                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                        public void run() {
+                            postDatabaseRefreshEvent();
+                        }
+                    }, 600L);
+                } catch (Throwable ignored) {
+                } finally {
+                    synchronized (MaintainedLauncherSettingsHost.class) {
+                        sSettingsResourcesWarmPending = false;
+                    }
+                }
+            }
+        }, "MaintainedSettingsResourcesWarm").start();
+    }
+
+    private static void setSettingsContentView(Activity activity, Context animContext,
+                                               Resources resources, View root, boolean forward) {
+        setSettingsContentView(activity, animContext, resources, root, forward, true);
+    }
+
+    private static void setSettingsContentView(Activity activity, Context animContext,
+                                               Resources resources, final View root,
+                                               boolean forward, boolean animate) {
+        tuneScrollBars(root);
+        if (activity == null || root == null || !animate) {
+            if (activity != null) {
+                activity.setContentView(root);
+            }
+            return;
+        }
+        ViewGroup content = null;
+        try {
+            content = (ViewGroup) activity.findViewById(android.R.id.content);
+        } catch (Throwable ignored) {
+        }
+        if (content == null || content.getChildCount() == 0) {
+            activity.setContentView(root);
+            return;
+        }
+
+        // Keep the previous page attached until the incoming page has covered it.  Calling
+        // setContentView() first exposes the window background for one frame on some ROMs.
+        final ViewGroup host = content;
+        // A rapid second navigation can arrive while the first pair is still attached.
+        // Collapse that pair to the newest page before starting the next transition.
+        while (host.getChildCount() > 1) {
+            View stale = host.getChildAt(0);
+            stale.animate().cancel();
+            host.removeViewAt(0);
+        }
+        final View previous = host.getChildAt(host.getChildCount() - 1);
+        try {
+            if (root.getParent() instanceof ViewGroup) {
+                ((ViewGroup) root.getParent()).removeView(root);
+            }
+            previous.animate().cancel();
+            root.animate().cancel();
+            previous.clearAnimation();
+            root.clearAnimation();
+        } catch (Throwable ignored) {
+        }
+
+        int width = host.getWidth();
+        if (width <= 0) {
+            width = activity.getResources().getDisplayMetrics().widthPixels;
+        }
+        if (width <= 0) {
+            activity.setContentView(root);
+            return;
+        }
+        final int direction = forward ? 1 : -1;
+        final float distance = width;
+        root.setTranslationX(direction * distance);
+        try {
+            root.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            previous.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        } catch (Throwable ignored) {
+        }
+        host.addView(root, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        final DecelerateInterpolator interpolator = new DecelerateInterpolator(1.35f);
+        final boolean[] transitionStarted = new boolean[]{false};
+        final Runnable startTransition = new Runnable() {
+            public void run() {
+                if (transitionStarted[0] || root.getParent() != host) {
+                    return;
+                }
+                transitionStarted[0] = true;
+                previous.animate()
+                        .translationX(-direction * distance * 0.12f)
+                        .setDuration(180L)
+                        .setInterpolator(interpolator)
+                        .start();
+                root.animate()
+                        .translationX(0f)
+                        .setDuration(180L)
+                        .setInterpolator(interpolator)
+                        .withEndAction(new Runnable() {
+                            public void run() {
+                                try {
+                                    previous.animate().cancel();
+                                    previous.setTranslationX(0f);
+                                    previous.setLayerType(View.LAYER_TYPE_NONE, null);
+                                    root.setLayerType(View.LAYER_TYPE_NONE, null);
+                                    if (previous.getParent() == host) {
+                                        host.removeView(previous);
+                                    }
+                                } catch (Throwable ignored) {
+                                }
+                            }
+                        })
+                        .start();
+            }
+        };
+        // Translation uses the known host width, so it can start on the next frame without
+        // waiting for a pre-draw callback. This also keeps rapid back/forward taps responsive.
+        root.postOnAnimation(startTransition);
     }
 
     private static GridView asGrid(View view) {
@@ -3501,7 +3853,9 @@ public final class MaintainedLauncherSettingsHost {
         }
         view.setVerticalScrollBarEnabled(false);
         view.setHorizontalScrollBarEnabled(false);
-        view.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        if (view instanceof ScrollView || view instanceof AbsListView) {
+            view.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
+        }
         if (view instanceof AbsListView) {
             AbsListView list = (AbsListView) view;
             list.setFastScrollEnabled(false);
@@ -3742,7 +4096,7 @@ public final class MaintainedLauncherSettingsHost {
         applyTransparentThemeRuntimeFlags(activity, transparent);
         Toast.makeText(activity, transparent ? "正在应用透明主题" : "正在恢复桌面主题", Toast.LENGTH_SHORT).show();
         if (animate) {
-            restartLauncher(activity);
+            restartLauncherForColdSceneChange(activity, "transparent_theme_process_rebirth");
         } else {
             reloadOriginalSettings(activity);
             rebuildLauncherLayoutForIconSize();
@@ -3768,8 +4122,6 @@ public final class MaintainedLauncherSettingsHost {
         notifyOriginalConfigChanged(KEY_TRANSPARENT_THEME_ENABLED);
         notifyOriginalConfigChanged(KEY_TRANSPARENT_WALLPAPER_BLUR);
         reloadOriginalSettings(context);
-        rebuildLauncherLayoutForIconSize();
-        applyIconChange(context);
     }
 
     private static void applyTransparentWallpaperBlur(Context context) {
@@ -3796,70 +4148,6 @@ public final class MaintainedLauncherSettingsHost {
                 refreshLauncherWallpaperSurface();
             }
         }, 160);
-    }
-
-    private static boolean applyThemeViaOriginalLoading(final Activity activity, boolean transparent) {
-        try {
-            ensureTransparentThemeRegistered(activity);
-            try {
-                Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
-                constants.getField("isTransparentTheme").setBoolean(null, transparent);
-                constants.getField("isTransWallpaperBlur").setBoolean(null,
-                        transparent && readSystemBool(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false));
-            } catch (Throwable ignored) {
-            }
-            reloadOriginalSettings(activity);
-            try {
-                Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
-                constants.getField("isTransparentTheme").setBoolean(null, transparent);
-                constants.getField("isTransWallpaperBlur").setBoolean(null,
-                        transparent && readSystemBool(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false));
-            } catch (Throwable ignored) {
-            }
-            Class<?> manager = Class.forName("com.smartisanos.launcher.theme.X");
-            Method currentThemeMethod = manager.getDeclaredMethod("va", Context.class);
-            currentThemeMethod.setAccessible(true);
-            Object theme = currentThemeMethod.invoke(null, activity);
-            if (theme == null) {
-                theme = manager.getMethod("eg").invoke(null);
-            }
-            if (theme == null) {
-                Log.w(LOG_TAG, "Original theme loading skipped: current theme is null");
-                return false;
-            }
-            Log.i(LOG_TAG, "Original theme loading target: " + describeTheme(theme)
-                    + ", transparent=" + transparent);
-            Object launcher = Class.forName("com.smartisanos.launcher.J")
-                    .getMethod("getInstance").invoke(null);
-            if (launcher == null) {
-                Log.w(LOG_TAG, "Original theme loading skipped: launcher instance is null");
-                return false;
-            }
-            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
-                    .getMethod("getInstance").invoke(null);
-            if (mainView == null) {
-                Log.w(LOG_TAG, "Original theme loading skipped: launcher view is null");
-                return false;
-            }
-            String message = getString(activity.getResources(), "theme_changing", "Loading");
-            Class<?> themeClass = Class.forName("com.smartisanos.launcher.theme.v");
-            launcher.getClass()
-                    .getMethod("a", themeClass, String.class)
-                    .invoke(launcher, theme, message);
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                public void run() {
-                    try {
-                        activity.finish();
-                        activity.overridePendingTransition(0, 0);
-                    } catch (Throwable ignored) {
-                    }
-                }
-            }, 120);
-            return true;
-        } catch (Throwable t) {
-            Log.w(LOG_TAG, "Original theme loading failed", t);
-            return false;
-        }
     }
 
     private static String describeTheme(Object theme) {
@@ -3977,6 +4265,13 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void toggleBoundSwitch(Context context, SettingItemSwitch item, String key) {
         boolean next = !item.isChecked();
+        if (next && "launcher_badge_swipe_clean".equals(key)
+                && !com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(context)) {
+            Toast.makeText(context, "请先授予锤子桌面通知使用权，以显示和横扫清除角标",
+                    Toast.LENGTH_LONG).show();
+            com.smartisanos.launcher.badge.BadgeBridge.openNotificationAccessSettings(context);
+            return;
+        }
         item.setCheckedAnimated(next);
         writeBoolSetting(context, key, next);
         applyLauncherSettingChange(context, key);
@@ -3993,11 +4288,6 @@ public final class MaintainedLauncherSettingsHost {
                     Toast.LENGTH_SHORT).show();
             refreshDynamicIconMode(context, next);
             return;
-        }
-        if (next && "launcher_badge_swipe_clean".equals(key)
-                && !com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(context)) {
-            Toast.makeText(context, "请授予锤子桌面通知使用权，以显示和横扫清除角标", Toast.LENGTH_LONG).show();
-            com.smartisanos.launcher.badge.BadgeBridge.openNotificationAccessSettings(context);
         }
     }
 
@@ -4537,6 +4827,76 @@ public final class MaintainedLauncherSettingsHost {
         return false;
     }
 
+    private static void bindBadgeVisibilitySwitch(final Activity activity, Resources resources, View root) {
+        View view = find(resources, root, "item_id_hide_badge");
+        if (!(view instanceof SettingItemSwitch)) {
+            return;
+        }
+        final SettingItemSwitch item = (SettingItemSwitch) view;
+        item.setTitle("显示图标上的角标");
+        item.setChecked(!readSystemBool(activity, "launcher_hide_badge", true));
+        bindSwitchControlOnly(item, new View.OnClickListener() {
+            public void onClick(View v) {
+                boolean show = !item.isChecked();
+                if (show && !com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity)) {
+                    Toast.makeText(activity, "请先授予锤子桌面通知使用权，以显示应用角标",
+                            Toast.LENGTH_LONG).show();
+                    com.smartisanos.launcher.badge.BadgeBridge.openNotificationAccessSettings(activity);
+                    return;
+                }
+                item.setCheckedAnimated(show);
+                boolean hidden = !show;
+                writeBoolSetting(activity, "launcher_hide_badge", hidden);
+                applyLauncherSettingChange(activity, "launcher_hide_badge");
+                applyBadgeVisibility(activity, hidden, true);
+            }
+        });
+    }
+
+    public static boolean hasEnabledProfilePackage(Context context, String packageName) {
+        if (context == null || TextUtils.isEmpty(packageName)) {
+            return false;
+        }
+        boolean enabledRecord = false;
+        try {
+            Map<String, ?> values = context.getSharedPreferences(
+                    PROFILE_APPS_PREFS, Context.MODE_PRIVATE).getAll();
+            String componentPrefix = packageName + "/";
+            for (Map.Entry<String, ?> value : values.entrySet()) {
+                if (value.getKey().startsWith(PROFILE_DISABLED_PREFIX)
+                        && value.getKey().contains(componentPrefix)
+                        && value.getValue() instanceof Boolean
+                        && !((Boolean) value.getValue()).booleanValue()) {
+                    enabledRecord = true;
+                    break;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        if (!enabledRecord || Build.VERSION.SDK_INT < 21) {
+            return false;
+        }
+        try {
+            LauncherApps launcherApps =
+                    (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            List<UserHandle> profiles = launcherApps == null ? null : launcherApps.getProfiles();
+            UserHandle current = Process.myUserHandle();
+            if (profiles != null) {
+                for (UserHandle profile : profiles) {
+                    if (profile == null || profile.equals(current)) {
+                        continue;
+                    }
+                    List<LauncherActivityInfo> activities = launcherApps.getActivityList(packageName, profile);
+                    if (activities != null && !activities.isEmpty()) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
     private static void setProfileAppEnabled(Context context, ProfileAppEntry entry, boolean enabled) {
         if (context == null || entry == null) {
             return;
@@ -5009,7 +5369,7 @@ public final class MaintainedLauncherSettingsHost {
                     onVerified.run();
                 }
             }
-        });
+        }, true, false);
     }
 
     private static void showSettingsPagePasswordSet(final Activity activity, boolean changing) {
@@ -5040,9 +5400,9 @@ public final class MaintainedLauncherSettingsHost {
                             showPrivacyPasswordPage(activity);
                         }
                     }
-                });
+                }, false, changing);
             }
-        });
+        }, true, changing);
     }
 
     private static void showProfileAppsPage(final Activity activity) {
@@ -5057,7 +5417,7 @@ public final class MaintainedLauncherSettingsHost {
             View title = inflate(activity, context, "title_layout");
             bindTitleBar(activity, resources, title, "应用分身", new View.OnClickListener() {
                 public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY);
+                    show(activity, sMainSettingsScrollY, true);
                 }
             });
             root.addView(title, new LinearLayout.LayoutParams(-1, -2));
@@ -5075,7 +5435,7 @@ public final class MaintainedLauncherSettingsHost {
             content.addView(status, new LinearLayout.LayoutParams(-1, dp(context, 96)));
             scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
             root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, true);
 
             final Context app = activity.getApplicationContext() == null
                     ? activity : activity.getApplicationContext();
@@ -5133,6 +5493,10 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showPrivacyPasswordPage(final Activity activity) {
+        showPrivacyPasswordPage(activity, true);
+    }
+
+    private static void showPrivacyPasswordPage(final Activity activity, boolean forward) {
         try {
             tuneWindow(activity);
             final SettingsResourceContext context = createSettingsContext(activity);
@@ -5145,7 +5509,7 @@ public final class MaintainedLauncherSettingsHost {
             View title = inflate(activity, context, "title_layout");
             bindTitleBar(activity, resources, title, "隐私密码", new View.OnClickListener() {
                 public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY);
+                    show(activity, sMainSettingsScrollY, true);
                 }
             });
             root.addView(title, new LinearLayout.LayoutParams(
@@ -5190,7 +5554,7 @@ public final class MaintainedLauncherSettingsHost {
             closeLp.rightMargin = dp(activity, 12);
             content.addView(close, closeLp);
 
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, forward);
         } catch (Throwable t) {
             t.printStackTrace();
             Toast.makeText(activity, "隐私密码页面加载失败", Toast.LENGTH_SHORT).show();
@@ -5209,7 +5573,7 @@ public final class MaintainedLauncherSettingsHost {
             View title = inflate(activity, context, "title_layout");
             bindTitleBar(activity, resources, title, "桌面板块锁", new View.OnClickListener() {
                 public void onClick(View v) {
-                    showPrivacyPasswordPage(activity);
+                    showPrivacyPasswordPage(activity, false);
                 }
             });
             root.addView(title, new LinearLayout.LayoutParams(-1, -2));
@@ -5237,9 +5601,9 @@ public final class MaintainedLauncherSettingsHost {
             descLp.rightMargin = dp(activity, 48);
             descLp.topMargin = dp(activity, 24);
             content.addView(desc, descLp);
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
-            showPrivacyPasswordPage(activity);
+            showPrivacyPasswordPage(activity, false);
         }
     }
 
@@ -5290,12 +5654,7 @@ public final class MaintainedLauncherSettingsHost {
         return label;
     }
 
-    /**
-     * Dynamic/normal switching is a two-phase operation. Existing desktop rows
-     * already contain icon blobs. The complete normal icons are bundled, but
-     * replacing those existing blobs is still asynchronous; rebuild Launcher
-     * only after two database passes have had time to complete.
-     */
+    /** Rebuild the scene after the weather/calendar database rows have changed. */
     private static void refreshDynamicIconMode(final Context context, final boolean enabled) {
         final Context app = context.getApplicationContext() == null
                 ? context : context.getApplicationContext();
@@ -5306,7 +5665,12 @@ public final class MaintainedLauncherSettingsHost {
                 new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
                     @Override
                     public void run() {
-                        restartLauncher(context);
+                        if (context instanceof Activity) {
+                            restartLauncherForColdSceneChange((Activity) context,
+                                    "dynamic_icon_mode_process_rebirth");
+                        } else {
+                            restartLauncher(context);
+                        }
                     }
                 }, 600L);
             }
@@ -5512,6 +5876,17 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void showSettingsPasswordPad(final Activity activity, String titleText,
             String promptText, final PasswordPadCallback callback) {
+        showSettingsPasswordPad(activity, titleText, promptText, callback, true, false);
+    }
+
+    private static void showSettingsPasswordPad(final Activity activity, String titleText,
+            String promptText, final PasswordPadCallback callback, boolean animate) {
+        showSettingsPasswordPad(activity, titleText, promptText, callback, animate, false);
+    }
+
+    private static void showSettingsPasswordPad(final Activity activity, String titleText,
+            String promptText, final PasswordPadCallback callback, boolean animate,
+            final boolean backToPrivacyPage) {
         try {
             tuneWindow(activity);
             final SettingsResourceContext context = createSettingsContext(activity);
@@ -5525,7 +5900,11 @@ public final class MaintainedLauncherSettingsHost {
             View title = inflate(activity, context, "title_layout");
             bindTitleBar(activity, resources, title, titleText, new View.OnClickListener() {
                 public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY);
+                    if (backToPrivacyPage) {
+                        showPrivacyPasswordPage(activity, false);
+                    } else {
+                        show(activity, sMainSettingsScrollY, true);
+                    }
                 }
             });
             page.addView(title, new LinearLayout.LayoutParams(-1, -2));
@@ -5568,7 +5947,7 @@ public final class MaintainedLauncherSettingsHost {
                     }
                 }
             });
-            activity.setContentView(page);
+            setSettingsContentView(activity, context, resources, page, true, animate);
         } catch (Throwable t) {
             t.printStackTrace();
             show(activity, sMainSettingsScrollY);
@@ -6212,8 +6591,17 @@ public final class MaintainedLauncherSettingsHost {
             Toast.makeText(activity, "当前已经是" + mode + "宫格", Toast.LENGTH_SHORT).show();
             return;
         }
+        String message;
+        if (current == 20 && mode == 12) {
+            message = "单个二十宫格（包括隐藏与加密板块）内的图标如果超过十二个，"
+                    + "切换到十二宫格后，会被自动按顺序放入两个十二宫格内，而之后再切换回"
+                    + "二十宫格时，这两个板块内的应用不会自动回到一个板块内。"
+                    + "更改此项设置需要重新载入桌面。";
+        } else {
+            message = "更改此项设置需要重新载入桌面。";
+        }
         showConfirmDialog(activity, "切换桌面宫格",
-                "切换为" + mode + "宫格后，需要重新启动桌面才能生效。",
+                message,
                 "取消",
                 "切换",
                 new View.OnClickListener() {
@@ -6224,10 +6612,13 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void saveLauncherMode(Context context, int mode) {
-        int pageMode = mode == 20 ? 9 : 12;
+        // The settings UI stores cell counts, whereas the original database
+        // migrator consumes base-page ids: PAGE_1_3X4 is 0x0c and
+        // PAGE_1_4X5 is 0x09. The latter still has 20 cells.
+        int oldPageMode = pageModeForLauncherCellCount(readLauncherMode(context));
+        int pageMode = pageModeForLauncherCellCount(mode);
         int multiBlockMode = mode == 20 ? 0x50 : 0x30;
         int maintainedMultiBlockMode = mode == 20 ? 0x40 : 0x24;
-        writeLauncherModePref(context, mode);
         try {
             Settings.Global.putInt(context.getContentResolver(), "launcher_mode", mode);
             Settings.Global.putInt(context.getContentResolver(), "launcher_multi_block_mode", multiBlockMode);
@@ -6236,14 +6627,92 @@ public final class MaintainedLauncherSettingsHost {
             Settings.Global.putInt(context.getContentResolver(), "launcher_grids_y", mode == 20 ? 5 : 4);
         } catch (Throwable ignored) {
         }
-        try {
-            Class<?> cls = Class.forName("com.smartisanos.launcher.data.N");
-            Object instance = cls.getMethod("getInstance").invoke(null);
-            cls.getMethod("d", Context.class, Integer.TYPE).invoke(instance, context, pageMode);
-        } catch (Throwable ignored) {
+        migrateLauncherModeAndRestart(context, oldPageMode, pageMode);
+    }
+
+    private static int pageModeForLauncherCellCount(int cellCount) {
+        return cellCount == 20 ? 9 : 12;
+    }
+
+    /**
+     * The stock launcher reads its base mode from Smartisan's privileged
+     * Settings.Global provider. Other ROMs expose no value there, and some
+     * devices leave a legacy 3 x 3 value behind. The port only offers 12 and
+     * 20 cells, so preserve those explicit choices locally and ignore every
+     * other system value.
+     */
+    public static int resolvePortLauncherMode(Context context, int systemMode) {
+        if (context != null) {
+            try {
+                int saved = context.getSharedPreferences("com.smartisanos.launcher_prefs",
+                        Context.MODE_PRIVATE).getInt("prefs_key_launcher_mode", -1);
+                if (saved == 12 || saved == 20) {
+                    return saved;
+                }
+            } catch (Throwable ignored) {
+            }
         }
-        writeLauncherModePref(context, mode);
-        reloadOriginalSettings(context);
+        return systemMode == 20 ? 20 : 12;
+    }
+
+    public static void migrateLauncherModeAndRestart(final Context context,
+                                                     final int oldPageMode,
+                                                     final int newPageMode) {
+        if (oldPageMode == newPageMode) {
+            restartLauncher(context);
+            return;
+        }
+        try {
+            Class<?> databaseHandler = Class.forName("com.smartisanos.launcher.data.A");
+            java.lang.reflect.Field workerField = databaseHandler.getDeclaredField("mWorker");
+            workerField.setAccessible(true);
+            Handler worker = (Handler) workerField.get(null);
+            if (worker == null) {
+                throw new IllegalStateException("DatabaseHandler worker is null");
+            }
+            boolean posted = worker.post(new Runnable() {
+                public void run() {
+                    try {
+                        Class<?> preferences = Class.forName("com.smartisanos.launcher.data.N");
+                        Object instance = preferences.getMethod("getInstance").invoke(null);
+                        preferences.getMethod("d", Context.class, Integer.TYPE)
+                                .invoke(instance, context, newPageMode);
+                        // Keep the original mode conversion intact.  On a
+                        // 12 -> 20 change F.i only refreshes page metadata;
+                        // it leaves every item in its existing board and cell.
+                        // On a 20 -> 12 change it performs the stock splitter.
+                        Class.forName("com.smartisanos.launcher.data.F")
+                                .getMethod("i", Integer.TYPE, Integer.TYPE)
+                                .invoke(null, oldPageMode, newPageMode);
+                        logOperation(context, "GRID_MIGRATION", "complete old=" + oldPageMode
+                                + ", new=" + newPageMode);
+                    } catch (Throwable t) {
+                        logOperation(context, "GRID_MIGRATION", "failed old=" + oldPageMode
+                                + ", new=" + newPageMode + ", error=" + shortError(t));
+                    }
+                    new Handler(Looper.getMainLooper()).post(new Runnable() {
+                        public void run() {
+                            restartLauncherAfterGridMigration(context);
+                        }
+                    });
+                }
+            });
+            if (!posted) {
+                throw new IllegalStateException("DatabaseHandler rejected migration");
+            }
+        } catch (Throwable t) {
+            logOperation(context, "GRID_MIGRATION", "schedule_failed old=" + oldPageMode
+                    + ", new=" + newPageMode + ", error=" + shortError(t));
+            restartLauncherAfterGridMigration(context);
+        }
+    }
+
+    /**
+     * A grid mode change only needs the launcher configuration to be read
+     * again. Recreate the home activity in-process so the loading surface
+     * remains visible; killing the process briefly exposes the system wallpaper.
+     */
+    private static void restartLauncherAfterGridMigration(Context context) {
         restartLauncher(context);
     }
 
@@ -6252,51 +6721,78 @@ public final class MaintainedLauncherSettingsHost {
         if (context instanceof Activity) {
             showRestartLoading((Activity) context);
         }
-        // Always arrange the relaunch before killing this process. Some OEM
-        // launchers (notably vivo/OriginOS) do not immediately start the HOME
-        // activity again after its process exits, even when the request came
-        // from a foreground settings activity.
+        if (recreateLauncherInPlace(context)) {
+            return;
+        }
+        // Last-resort path for devices where the active Launcher activity
+        // cannot be reached.  Normal settings changes use the in-process
+        // recreation above and never expose the underlying wallpaper.
         scheduleLauncherRestart(context);
         if (context instanceof Activity) {
             logOperation(context, "RESTART", "process_rebirth_for_launcher_reload");
-            finishSettingsTask((Activity) context);
         } else {
             logOperation(context, "RESTART", "scheduled_process_rebirth_for_launcher_reload");
         }
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Process.killProcess(Process.myPid());
+                } catch (Throwable ignored) {
+                    startLauncherFromForeground(context);
+                }
+            }
+        }, 0L);
+    }
+
+    /**
+     * The launcher lives below the settings task in the same process. Recreate
+     * that paused activity first, then dismiss settings once its first frame is
+     * ready. This is much cheaper than a process rebirth and keeps the desktop
+     * surface continuously covered.
+     */
+    private static boolean recreateLauncherInPlace(final Context context) {
         try {
-            Process.killProcess(Process.myPid());
-        } catch (Throwable ignored) {
-            startLauncherFromForeground(context);
+            Object launcher = Class.forName("com.smartisanos.launcher.J")
+                    .getMethod("getInstance").invoke(null);
+            if (launcher == null) {
+                return false;
+            }
+            Object candidate = launcher.getClass().getMethod("getActivity").invoke(launcher);
+            if (!(candidate instanceof Activity)) {
+                return false;
+            }
+            final Activity launcherActivity = (Activity) candidate;
+            if (launcherActivity.isFinishing()) {
+                return false;
+            }
+            reloadOriginalSettings(context);
+            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        launcherActivity.recreate();
+                        logOperation(context, "RESTART", "in_process_launcher_recreate");
+                    } catch (Throwable error) {
+                        Log.w(LOG_TAG, "In-process Launcher recreate failed", error);
+                    }
+                }
+            });
+            if (context instanceof Activity && context != launcherActivity) {
+                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        finishSettingsTask((Activity) context);
+                    }
+                }, 260L);
+            }
+            return true;
+        } catch (Throwable error) {
+            Log.w(LOG_TAG, "Unable to find active Launcher for in-process reload", error);
+            return false;
         }
     }
 
-    private static void restartLauncherByRecreate(final Activity activity) {
-        markThemeReloadLoadingPending(activity, "正在加载桌面...");
-        showRestartLoading(activity);
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                try {
-                    Intent intent = launcherActivityIntent(activity);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                            | Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                    activity.startActivity(intent);
-                    try {
-                        activity.overridePendingTransition(0, 0);
-                    } catch (Throwable ignored) {
-                    }
-                    activity.finish();
-                    try {
-                        activity.overridePendingTransition(0, 0);
-                    } catch (Throwable ignored) {
-                    }
-                } catch (Throwable ignored) {
-                    restartLauncher(activity);
-                }
-            }
-        }, 420);
-    }
 
     private static void markThemeReloadLoadingPending(Context context, String message) {
         if (context == null) {
@@ -6973,26 +7469,20 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void showConfirmDialog(final Activity activity, String title, String message, String negative, String positive, final View.OnClickListener positiveClick) {
         final Dialog dialog = new Dialog(activity);
-        final boolean updateStyle = title != null
-                && (title.contains("更新") || title.contains("版本"));
         LinearLayout root = new LinearLayout(activity);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(0, dp(activity, 18), 0, 0);
-        GradientDrawable dialogBackground = new GradientDrawable();
-        dialogBackground.setColor(0xfffbfbfb);
-        dialogBackground.setCornerRadius(dp(activity, 8));
-        root.setBackground(dialogBackground);
+        prepareSmartisanDialogRoot(activity, root);
 
         TextView titleView = text(activity, title, 18, 0xff333333, true);
         titleView.setGravity(Gravity.CENTER);
-        root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 40)));
+        root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
         TextView messageView = text(activity, message, 14, 0xff777777, false);
-        messageView.setGravity(updateStyle ? (Gravity.LEFT | Gravity.TOP) : Gravity.CENTER);
+        messageView.setGravity(Gravity.LEFT | Gravity.TOP);
         messageView.setLineSpacing(dp(activity, 4), 1.08f);
-        messageView.setPadding(dp(activity, updateStyle ? 26 : 30), dp(activity, 8),
-                dp(activity, updateStyle ? 26 : 30), dp(activity, 22));
-        boolean scrollMessage = updateStyle && message != null
+        messageView.setPadding(dp(activity, 26), dp(activity, 20), dp(activity, 26), dp(activity, 20));
+        boolean scrollMessage = message != null
                 && (message.length() > 420 || message.split("\\n", -1).length > 12);
         if (scrollMessage) {
             ScrollView messageScroll = new ScrollView(activity);
@@ -7007,31 +7497,27 @@ public final class MaintainedLauncherSettingsHost {
             root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
         }
 
-        View line = new View(activity);
-        line.setBackgroundColor(0xffeeeeee);
-        root.addView(line, new LinearLayout.LayoutParams(-1, 1));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
         LinearLayout buttons = new LinearLayout(activity);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
-        TextView cancel = dialogButton(activity, negative, 0xff555555);
+        TextView cancel = smartisanDialogActionButton(activity, negative, false, -1);
         cancel.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 dialog.dismiss();
             }
         });
-        TextView ok = dialogButton(activity, positive, 0xffd8504b);
+        TextView ok = smartisanDialogActionButton(activity, positive, true, 1);
         ok.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 dialog.dismiss();
                 positiveClick.onClick(v);
             }
         });
-        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 50), 1.0f));
-        View vLine = new View(activity);
-        vLine.setBackgroundColor(0xffeeeeee);
-        buttons.addView(vLine, new LinearLayout.LayoutParams(1, dp(activity, 50)));
-        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 50), 1.0f));
-        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 50)));
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 56), 1.0f));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 56)));
+        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 56), 1.0f));
+        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
 
         dialog.setContentView(root);
         Window window = dialog.getWindow();
@@ -7042,9 +7528,7 @@ public final class MaintainedLauncherSettingsHost {
         Window shown = dialog.getWindow();
         if (shown != null) {
             int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-            int width = updateStyle
-                    ? Math.min(dp(activity, 380), screenWidth - dp(activity, 32))
-                    : dp(activity, 294);
+            int width = Math.min(dp(activity, 380), screenWidth - dp(activity, 32));
             shown.setLayout(width, -2);
         }
     }
@@ -7164,98 +7648,167 @@ public final class MaintainedLauncherSettingsHost {
             writeTransparentModeSetting(activity, true);
             applyTransparentThemeRuntimeFlags(activity);
             Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                public void run() {
-                    restartLauncher(activity);
-                }
-            }, 120);
+            restartLauncherForColdSceneChange(activity, "transparent_theme_process_rebirth");
             return;
         } else {
             writeTransparentModeSetting(activity, false);
             writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false);
-            applyTransparentThemeRuntimeFlags(activity);
+            applyTransparentThemeRuntimeFlags(activity, false);
         }
         // Persist first: the old implementation returned immediately when the
         // in-process message was queued. If an OEM killed or recreated the
         // process before Launcher consumed that static message, no theme ID
         // had been saved and tapping "Apply" appeared to do nothing.
+        clearPendingThemeMessages();
         boolean stored = applyThemeViaOriginalStack(activity, id, pkg);
         storeThemeSelection(activity, id);
-        // X.ja()/O.a() only persist the selected theme. They do not enqueue
-        // MESSAGE_CHANGE_THEME. The original ThemeItemActivity always returns
-        // through its Handler afterwards, and Launcher consumes this pending
-        // message while coming to the foreground. Skipping it when persistence
-        // succeeded made the theme visible only after Launcher was reopened.
-        boolean queued = queueThemeChangeForLauncher(activity, id);
+        // Match ThemeItemActivity: submit the transition cover, return HOME,
+        // and let J.onResume consume MESSAGE_CHANGE_THEME on the GL-safe path.
+        returnToLauncherWithThemeTransition(activity, id);
         logOperation(activity, "THEME", "persisted_before_dispatch id=" + id
-                + ", original=" + stored + ", queued=" + queued
+                + ", original=" + stored
                 + ", after=" + themeDiagnosticState(activity));
         Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(new Runnable() {
+    }
+
+    public static Bitmap normalizeNotificationBadgeBitmap(Bitmap source) {
+        // The original renderer already sizes the badge from the rendered text:
+        // one digit is a circle and only multi-digit values become capsules.
+        // Scaling the finished bitmap makes the one-digit badge oval.
+        return source;
+    }
+
+    private static void returnToLauncherWithThemeTransition(final Activity activity, final String id) {
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             public void run() {
-                logOperation(activity, "THEME_VERIFY", "requested=" + id
-                        + ", state=" + themeDiagnosticState(activity)
-                        + ", launcher_ready=" + isLauncherReadyForThemeAnimation());
-                prepareThemeTransitionScreenshot(activity);
+                if (!hasPendingThemeMessage(id)) {
+                    clearPendingThemeMessages();
+                    queueThemeChangeForLauncher(activity, id);
+                }
+                submitThemeSnapshot(activity);
+                try {
+                    activity.finish();
+                    activity.overridePendingTransition(0, 0);
+                } catch (Throwable ignored) {
+                }
                 startLauncherFromForeground(activity);
-                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                    public void run() {
-                        dispatchPendingThemeChangeNow(activity, id);
-                    }
-                }, 180L);
             }
-        }, 120);
+        }, 100L);
     }
 
-    private static void prepareThemeTransitionScreenshot(Activity activity) {
-        Bitmap bitmap = captureActivityBitmap(activity);
-        if (bitmap != null) {
-            Bitmap old = sPendingThemeScreenshot;
-            sPendingThemeScreenshot = bitmap;
-            if (old != null && old != bitmap && !old.isRecycled()) {
-                old.recycle();
-            }
-        }
-    }
-
-    private static Bitmap captureActivityBitmap(Activity activity) {
+    private static void restartLauncherForColdSceneChange(Activity activity, String reason) {
+        clearPendingThemeMessages();
+        markThemeReloadLoadingPending(activity, "正在加载桌面...");
+        showRestartLoading(activity);
+        scheduleLauncherRestart(activity);
+        logOperation(activity, "RESTART", reason);
+        finishSettingsTask(activity);
         try {
-            View decor = activity.getWindow().getDecorView();
-            int width = decor.getWidth();
-            int height = decor.getHeight();
-            if (width <= 0 || height <= 0) {
-                return null;
-            }
-            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(bitmap);
-            decor.draw(canvas);
-            return bitmap;
+            Process.killProcess(Process.myPid());
         } catch (Throwable ignored) {
-            return null;
+            startLauncherFromForeground(activity);
         }
     }
 
-    public static void consumePendingThemeScreenshotIfAny() {
-        consumePendingThemeScreenshotForAnimation();
-    }
-
-    public static boolean consumePendingThemeScreenshotForAnimation() {
-        Bitmap bitmap = sPendingThemeScreenshot;
-        if (bitmap == null) {
-            return false;
+    private static void clearPendingThemeMessages() {
+        try {
+            Class<?> flow = Class.forName("com.smartisanos.launcher.a.r");
+            flow.getField("sj").set(null, null);
+        } catch (Throwable ignored) {
         }
         try {
-            Class<?> handler = Class.forName("com.smartisanos.launcher.theme.t");
-            Object instance = handler.getMethod("getInstance").invoke(null);
-            if (instance != null) {
-                handler.getMethod("f", Bitmap.class).invoke(instance, bitmap);
-                sPendingThemeScreenshot = null;
-                return true;
+            Object handler = Class.forName("com.smartisanos.launcher.Sa")
+                    .getMethod("getHandler").invoke(null);
+            if (handler instanceof Handler) {
+                ((Handler) handler).removeMessages(0x12);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static boolean hasPendingThemeMessage(String id) {
+        try {
+            Object pending = Class.forName("com.smartisanos.launcher.a.r")
+                    .getField("sj").get(null);
+            if (pending instanceof android.os.Message) {
+                Object target = ((android.os.Message) pending).obj;
+                return id != null && id.equals(String.valueOf(target));
             }
         } catch (Throwable ignored) {
         }
         return false;
+    }
+
+    private static void refreshThemeRuntime(final Context context, final String id) {
+        if (context == null) {
+            return;
+        }
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            constants.getMethod("initByTheme", Context.class).invoke(null, context);
+            if ("smartisan_theme_aero".equals(id)) {
+                constants.getField("isTransparentTheme").setBoolean(null, false);
+                constants.getField("isTransWallpaperBlur").setBoolean(null, false);
+            }
+        } catch (Throwable ignored) {
+        }
+        reloadOriginalSettings(context);
+        notifyOriginalConfigChanged("launcher_theme");
+        notifyOriginalConfigChanged("launcher_theme_preview_res");
+        notifyOriginalConfigChanged(KEY_TRANSPARENT_THEME_ENABLED);
+        notifyOriginalConfigChanged(KEY_TRANSPARENT_WALLPAPER_BLUR);
+        refreshLauncherThemeSurface(context);
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                try {
+                    Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+                    constants.getMethod("initByTheme", Context.class).invoke(null, context);
+                } catch (Throwable ignored) {
+                }
+                refreshLauncherThemeSurface(context);
+            }
+        }, 120L);
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                refreshLauncherThemeSurface(context);
+            }
+        }, 360L);
+    }
+
+    private static void refreshLauncherThemeSurface(Context context) {
+        try {
+            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
+                    .getMethod("getInstance").invoke(null);
+            if (mainView != null) {
+                try {
+                    mainView.getClass().getMethod("lh").invoke(mainView);
+                } catch (Throwable ignored) {
+                }
+                try {
+                    mainView.getClass().getMethod("Vh").invoke(mainView);
+                } catch (Throwable ignored) {
+                }
+                try {
+                    mainView.getClass().getMethod("oh").invoke(mainView);
+                } catch (Throwable ignored) {
+                }
+                try {
+                    mainView.getClass().getMethod("Z", Boolean.TYPE).invoke(mainView, Boolean.TRUE);
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            Object renderer = Class.forName("com.smartisanos.smengine.Ra")
+                    .getMethod("getInstance").invoke(null);
+            if (renderer != null) {
+                renderer.getClass().getMethod("wt").invoke(renderer);
+            }
+        } catch (Throwable ignored) {
+        }
+        refreshLauncherWallpaperSurface();
     }
 
     private static boolean queueThemeChangeForLauncher(Context context, String id) {
@@ -7272,29 +7825,6 @@ public final class MaintainedLauncherSettingsHost {
             logOperation(context, "THEME_DISPATCH", "pending_message_failed id=" + id
                     + ", error=" + shortError(ignored));
             return false;
-        }
-    }
-
-    private static void dispatchPendingThemeChangeNow(Context context, String requestedId) {
-        try {
-            Class<?> flow = Class.forName("com.smartisanos.launcher.a.r");
-            Object pending = flow.getField("sj").get(null);
-            if (!(pending instanceof android.os.Message)) {
-                logOperation(context, "THEME_DISPATCH", "no_pending_message id=" + requestedId);
-                return;
-            }
-            android.os.Message message = (android.os.Message) pending;
-            String pendingId = message.obj == null ? "" : String.valueOf(message.obj);
-            if (!requestedId.equals(pendingId)) {
-                logOperation(context, "THEME_DISPATCH", "pending_id_mismatch requested="
-                        + requestedId + ", pending=" + pendingId);
-                return;
-            }
-            flow.getMethod("a", android.os.Message.class).invoke(null, message);
-            logOperation(context, "THEME_DISPATCH", "pending_message_consumed id=" + requestedId);
-        } catch (Throwable error) {
-            logOperation(context, "THEME_DISPATCH", "consume_failed id=" + requestedId
-                    + ", error=" + shortError(error));
         }
     }
 
@@ -7946,7 +8476,7 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         int global = readGlobal(context, "launcher_mode", 12);
-        return global == 20 || global == 9 ? 20 : 12;
+        return global == 20 ? 20 : 12;
     }
 
     private static int readGlobal(Context context, String key, int def) {
@@ -8491,16 +9021,25 @@ public final class MaintainedLauncherSettingsHost {
     private static UpdateDownloadProgress showApkDownloadProgress(Activity activity, String title, String initialMessage) {
         final UpdateDownloadProgress ui = new UpdateDownloadProgress();
         try {
-            int padding = dp(activity, 22);
+            final Dialog dialog = new Dialog(activity);
+            LinearLayout root = new LinearLayout(activity);
+            prepareSmartisanDialogRoot(activity, root);
+
+            TextView titleView = text(activity, title, 18, 0xff333333, true);
+            titleView.setGravity(Gravity.CENTER);
+            root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+            root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+            int padding = dp(activity, 26);
             LinearLayout content = new LinearLayout(activity);
             content.setOrientation(LinearLayout.VERTICAL);
-            content.setPadding(padding, dp(activity, 12), padding, dp(activity, 4));
+            content.setPadding(padding, dp(activity, 20), padding, dp(activity, 20));
 
             TextView message = new TextView(activity);
             message.setText(initialMessage);
-            message.setTextSize(18);
-            message.setTextColor(Color.rgb(80, 86, 104));
-            message.setGravity(Gravity.CENTER_HORIZONTAL);
+            message.setTextSize(14);
+            message.setTextColor(0xff666666);
+            message.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
             content.addView(message, new LinearLayout.LayoutParams(-1, -2));
 
             ProgressBar progress = new ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal);
@@ -8509,13 +9048,25 @@ public final class MaintainedLauncherSettingsHost {
             LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(activity, 8));
             progressLp.topMargin = dp(activity, 18);
             content.addView(progress, progressLp);
+            root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+            root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
-            Dialog dialog = new AlertDialog.Builder(activity)
-                    .setTitle(title)
-                    .setView(content)
-                    .setNegativeButton("后台下载", null)
-                    .create();
+            TextView backgroundButton = smartisanDialogActionButton(activity, "后台下载", false, 0);
+            backgroundButton.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    dialog.dismiss();
+                }
+            });
+            root.addView(backgroundButton, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+            dialog.setContentView(root);
+            Window window = dialog.getWindow();
+            if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
             dialog.show();
+            Window shown = dialog.getWindow();
+            if (shown != null) {
+                int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+                shown.setLayout(Math.min(dp(activity, 380), screenWidth - dp(activity, 32)), -2);
+            }
             ui.dialog = dialog;
             ui.message = message;
             ui.progress = progress;
@@ -8608,7 +9159,7 @@ public final class MaintainedLauncherSettingsHost {
         disableLegacyTouchSizeSweepOnModernAndroid();
         applyLauncherNavigationBarSetting(activity);
         applyBadgeVisibility(activity,
-                readSystemBool(activity, "launcher_hide_badge", false), false);
+                readSystemBool(activity, "launcher_hide_badge", true), false);
         // Some ColorOS builds grant notification-listener access in the installer UI
         // but do not bind the service until the settings page is opened. Re-check and
         // request the binding whenever HOME becomes active, without requiring that detour.
@@ -9073,7 +9624,7 @@ public final class MaintainedLauncherSettingsHost {
             hide(resources, root, "setting_more_product");
             bindOperationLogSection(activity, root, resources);
             tuneScrollBars(root);
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
             showInfoDialog(activity, "关于我们",
                     "锤子桌面 original-port\n版本：" + appVersion(activity)
@@ -9751,7 +10302,7 @@ public final class MaintainedLauncherSettingsHost {
             });
             updateDynamicWeatherStatus(activity, resources, root);
             tuneScrollBars(root);
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, true);
             WeatherBridge.scheduleCityResolution(activity);
             root.postDelayed(new Runnable() { public void run() {
                 updateDynamicWeatherStatus(activity, resources, root);
@@ -10038,13 +10589,12 @@ public final class MaintainedLauncherSettingsHost {
                     getString(resources, "obsession_header_title", "OCD Settings"));
             bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
             bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
-            bindSwitch(activity, resources, root, "item_id_hide_badge", "launcher_hide_badge", false);
-            bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", true);
-            styleNotificationAccessLink(activity, resources, root);
+            bindBadgeVisibilitySwitch(activity, resources, root);
+            bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", false);
             bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
             bindSwitch(activity, resources, root, "item_id_search_page_enabled", KEY_SEARCH_PAGE_ENABLED, true);
             tuneScrollBars(root);
-            activity.setContentView(root);
+            setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
             showInfoDialog(activity, "OCD Settings", "Unable to open OCD settings");
         }
@@ -10087,31 +10637,21 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void showInfoDialog(final Activity activity, String title, String message) {
         final Dialog dialog = new Dialog(activity);
-        final boolean updateStyle = title != null && title.contains("更新");
         LinearLayout root = new LinearLayout(activity);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(0, 0, 0, 0);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xfffbfbfb);
-        bg.setCornerRadius(dp(activity, updateStyle ? 8 : 4));
-        root.setBackground(bg);
+        prepareSmartisanDialogRoot(activity, root);
 
         TextView titleView = text(activity, title, 18, 0xff333333, true);
         titleView.setGravity(Gravity.CENTER);
         root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
 
-        View line = new View(activity);
-        line.setBackgroundColor(0xffe5e5e5);
-        root.addView(line, new LinearLayout.LayoutParams(-1, 1));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
         final boolean longMessage = message != null
                 && (message.length() > 420 || message.split("\\n", -1).length > 12);
         TextView messageView = text(activity, message, longMessage ? 13 : 14, 0xff666666, false);
-        messageView.setGravity((longMessage || updateStyle)
-                ? (Gravity.LEFT | Gravity.TOP) : Gravity.CENTER);
-        messageView.setLineSpacing(dp(activity, updateStyle ? 4 : 2), updateStyle ? 1.08f : 1.0f);
-        messageView.setPadding(dp(activity, updateStyle ? 26 : 24), dp(activity, 20),
-                dp(activity, updateStyle ? 26 : 24), dp(activity, 20));
+        messageView.setGravity(Gravity.LEFT | Gravity.TOP);
+        messageView.setLineSpacing(dp(activity, 4), 1.08f);
+        messageView.setPadding(dp(activity, 26), dp(activity, 20), dp(activity, 26), dp(activity, 20));
         if (longMessage) {
             ScrollView messageScroll = new ScrollView(activity);
             messageScroll.setFillViewport(false);
@@ -10125,17 +10665,15 @@ public final class MaintainedLauncherSettingsHost {
             root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
         }
 
-        View footerLine = new View(activity);
-        footerLine.setBackgroundColor(0xffe5e5e5);
-        root.addView(footerLine, new LinearLayout.LayoutParams(-1, 1));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
-        TextView ok = dialogButton(activity, "确定", 0xff5f8fe8);
+        TextView ok = smartisanDialogActionButton(activity, "确定", true, 0);
         ok.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 dialog.dismiss();
             }
         });
-        root.addView(ok, new LinearLayout.LayoutParams(-1, dp(activity, 48)));
+        root.addView(ok, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
 
         dialog.setContentView(root);
         Window window = dialog.getWindow();
@@ -10146,9 +10684,7 @@ public final class MaintainedLauncherSettingsHost {
         Window shown = dialog.getWindow();
         if (shown != null) {
             int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-            int width = updateStyle
-                    ? Math.min(dp(activity, 380), screenWidth - dp(activity, 32))
-                    : dp(activity, 300);
+            int width = Math.min(dp(activity, 380), screenWidth - dp(activity, 32));
             shown.setLayout(width, -2);
         }
     }
@@ -10300,13 +10836,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static Bitmap themePreviewBitmap(Context context, String themeId) {
-        int mode = readLauncherMode(context);
-        String[] candidates = new String[]{
-                "theme_preview/" + themeId + "/" + mode + "/trident_S.jpg",
-                "theme_preview/" + themeId + "/12/trident_S.jpg",
-                "theme_preview/" + themeId + "/20/trident_S.jpg",
-                "theme_preview/" + themeId + "/" + mode + "/delta_L.jpg",
-        };
+        String[] candidates = themePreviewCandidates(context, themeId);
         for (int i = 0; i < candidates.length; i++) {
             Bitmap bitmap = sampledAssetBitmap(context, candidates[i], 180, 210);
             if (bitmap != null) {
@@ -10314,6 +10844,65 @@ public final class MaintainedLauncherSettingsHost {
             }
         }
         return null;
+    }
+
+    private static String[] themePreviewCandidates(Context context, String themeId) {
+        int mode = readLauncherMode(context);
+        return new String[]{
+                "theme_preview/" + themeId + "/" + mode + "/trident_S.jpg",
+                "theme_preview/" + themeId + "/12/trident_S.jpg",
+                "theme_preview/" + themeId + "/20/trident_S.jpg",
+                "theme_preview/" + themeId + "/" + mode + "/delta_L.jpg",
+        };
+    }
+
+    private static Bitmap cachedThemePreviewBitmap(Context context, String themeId) {
+        String[] candidates = themePreviewCandidates(context, themeId);
+        for (int i = 0; i < candidates.length; i++) {
+            String key = candidates[i] + "#180x210";
+            synchronized (sThemePreviewCache) {
+                Bitmap bitmap = sThemePreviewCache.get(key);
+                if (bitmap != null && !bitmap.isRecycled()) {
+                    return bitmap;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void requestThemePreview(final Context context, final String themeId,
+                                            final ThemePreviewAdapter adapter) {
+        if (context == null || TextUtils.isEmpty(themeId) || cachedThemePreviewBitmap(context, themeId) != null) {
+            return;
+        }
+        final String key = themeId + "#" + readLauncherMode(context);
+        synchronized (sThemePreviewFetchPending) {
+            if (sThemePreviewFetchPending.containsKey(key)) {
+                return;
+            }
+            sThemePreviewFetchPending.put(key, Boolean.TRUE);
+        }
+        final Context app = context.getApplicationContext() == null
+                ? context : context.getApplicationContext();
+        THEME_PREVIEW_FETCH_EXECUTOR.execute(new Runnable() {
+            public void run() {
+                try {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    themePreviewBitmap(app, themeId);
+                    new Handler(Looper.getMainLooper()).post(new Runnable() {
+                        public void run() {
+                            if (adapter != null) {
+                                adapter.notifyPreviewLoaded();
+                            }
+                        }
+                    });
+                } finally {
+                    synchronized (sThemePreviewFetchPending) {
+                        sThemePreviewFetchPending.remove(key);
+                    }
+                }
+            }
+        });
     }
 
     private static Bitmap thumbnailFramedPreviewBitmap(Resources resources, Bitmap source) {
@@ -10837,6 +11426,8 @@ public final class MaintainedLauncherSettingsHost {
             row.addView(subtitle, lp);
             if (iconSizeRow) {
                 subtitle.setTag(TAG_ICON_SIZE_SUBTITLE);
+            } else if (iconPackRow) {
+                subtitle.setTag(TAG_ICON_PACK_SUBTITLE);
             }
             subtitle.setContentDescription(subtitleText);
         }
@@ -10894,22 +11485,16 @@ public final class MaintainedLauncherSettingsHost {
         final int current = normalizeIconSizePercent(readIconSizePercent(activity));
         final Dialog dialog = new Dialog(activity);
         LinearLayout root = new LinearLayout(activity);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(0, 0, 0, 0);
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(0xfff5f5f5);
-        background.setCornerRadius(dp(activity, 5));
-        background.setStroke(1, 0xffd0d0d0);
-        root.setBackgroundDrawable(background);
+        prepareSmartisanDialogRoot(activity, root);
 
         TextView title = new TextView(activity);
         title.setGravity(Gravity.CENTER);
         title.setSingleLine(true);
         title.setText("桌面图标大小");
-        title.setTextColor(0xff5c5c5c);
-        title.setTextSize(17);
-        title.setTypeface(null, android.graphics.Typeface.NORMAL);
-        root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 60)));
+        title.setTextColor(0xff333333);
+        title.setTextSize(18);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
         LinearLayout content = new LinearLayout(activity);
@@ -10928,14 +11513,9 @@ public final class MaintainedLauncherSettingsHost {
 
         LinearLayout previewPanel = new LinearLayout(activity);
         previewPanel.setOrientation(LinearLayout.VERTICAL);
-        previewPanel.setPadding(dp(activity, 14), dp(activity, 16), dp(activity, 14), dp(activity, 12));
-        GradientDrawable previewBg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xffffffff, 0xfff3f3f3});
-        previewBg.setCornerRadius(dp(activity, 4));
-        previewBg.setStroke(1, 0xffdddddd);
-        previewPanel.setBackgroundDrawable(previewBg);
+        previewPanel.setPadding(0, dp(activity, 6), 0, 0);
         LinearLayout.LayoutParams previewPanelLp = new LinearLayout.LayoutParams(-1, -2);
-        previewPanelLp.topMargin = dp(activity, 14);
+        previewPanelLp.topMargin = dp(activity, 4);
         content.addView(previewPanel, previewPanelLp);
 
         LinearLayout preview = new LinearLayout(activity);
@@ -11036,11 +11616,9 @@ public final class MaintainedLauncherSettingsHost {
         dialog.show();
         window = dialog.getWindow();
         if (window != null) {
-            WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
-            lp.copyFrom(window.getAttributes());
-            lp.width = activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 64);
-            lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
-            window.setAttributes(lp);
+            int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+            window.setLayout(Math.min(dp(activity, 380), screenWidth - dp(activity, 32)),
+                    WindowManager.LayoutParams.WRAP_CONTENT);
         }
     }
 
@@ -11069,6 +11647,20 @@ public final class MaintainedLauncherSettingsHost {
         View view = new View(context);
         view.setBackgroundColor(0xffdfdfdf);
         return view;
+    }
+
+    private static void prepareSmartisanDialogRoot(Context context, LinearLayout root) {
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(0, 0, 0, 0);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(0xfffbfbfb);
+        background.setCornerRadius(dp(context, 8));
+        root.setBackgroundDrawable(background);
+        // The action row is a child view. Clip it to the shared panel outline
+        // so its pressed/normal backgrounds cannot square off the lower edge.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            root.setClipToOutline(true);
+        }
     }
 
     private static TextView smartisanDialogActionButton(Context context, String text, boolean primary, int side) {
@@ -11101,6 +11693,8 @@ public final class MaintainedLauncherSettingsHost {
             drawable.setCornerRadii(new float[]{0, 0, 0, 0, 0, 0, radius, radius});
         } else if (side > 0) {
             drawable.setCornerRadii(new float[]{0, 0, 0, 0, radius, radius, 0, 0});
+        } else {
+            drawable.setCornerRadii(new float[]{0, 0, 0, 0, radius, radius, radius, radius});
         }
         return drawable;
     }
@@ -11453,9 +12047,9 @@ public final class MaintainedLauncherSettingsHost {
     private static boolean isImprovedIconEnabled(Context context) {
         try {
             return context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
-                    .getBoolean(PREF_IMPROVED_ICON_ENABLED, true);
+                    .getBoolean(PREF_IMPROVED_ICON_ENABLED, false);
         } catch (Throwable ignored) {
-            return true;
+            return false;
         }
     }
 
@@ -11479,11 +12073,6 @@ public final class MaintainedLauncherSettingsHost {
         }
         applyGlobalImprovedSelection(context, enabled);
         reloadOriginalSettings(context);
-        postDatabaseRefreshEvent();
-        applyIconChange(context);
-        if (context instanceof Activity) {
-            refreshIconRowsInCurrentPage((Activity) context);
-        }
     }
 
     private static void toggleImprovedIcon(Context context, SwitchEx toggle) {
@@ -11494,43 +12083,67 @@ public final class MaintainedLauncherSettingsHost {
         }
         applyGlobalImprovedSelection(context, enabled);
         reloadOriginalSettings(context);
-        postDatabaseRefreshEvent();
-        applyIconChange(context);
-        if (context instanceof Activity) {
-            refreshIconRowsInCurrentPage((Activity) context);
-        }
     }
 
-    private static void applyGlobalImprovedSelection(Context context, boolean enabled) {
+    private static void applyGlobalImprovedSelection(final Context context, final boolean enabled) {
         if (context == null) {
             return;
         }
-        try {
-            Intent intent = new Intent(Intent.ACTION_MAIN);
-            intent.addCategory(Intent.CATEGORY_LAUNCHER);
-            int flags = Build.VERSION.SDK_INT >= 23 ? 0x00020000 : 0;
-            List<ResolveInfo> apps = queryLauncherActivitiesWithProfiles(
-                    context.getPackageManager(), intent, flags);
-            Resources resources = settingsResources(context);
-            for (int i = 0; i < apps.size(); i++) {
-                ResolveInfo info = apps.get(i);
-                ActivityInfo ai = info == null ? null : info.activityInfo;
-                if (ai == null || ai.packageName == null || ai.name == null || !shouldShowIconEntry(info)) {
-                    continue;
+        final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        final Activity host = context instanceof Activity ? (Activity) context : null;
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    // Parse installed packs off the UI thread. This is local APK resource work only.
+                    try {
+                        com.smartisanos.home.settings.icons.IconPackManager.warmUpIconPackList(app);
+                        com.smartisanos.home.settings.icons.IconPackManager.preloadSelectedIconPack(app);
+                    } catch (Throwable ignored) {
+                    }
+                    Intent intent = new Intent(Intent.ACTION_MAIN);
+                    intent.addCategory(Intent.CATEGORY_LAUNCHER);
+                    int flags = Build.VERSION.SDK_INT >= 23 ? 0x00020000 : 0;
+                    List<ResolveInfo> apps = queryLauncherActivitiesWithProfiles(app.getPackageManager(), intent, flags);
+                    Resources resources = settingsResources(app);
+                    for (int i = 0; i < apps.size(); i++) {
+                        ResolveInfo info = apps.get(i);
+                        ActivityInfo ai = info == null ? null : info.activityInfo;
+                        if (ai == null || ai.packageName == null || ai.name == null || !shouldShowIconEntry(info)) {
+                            continue;
+                        }
+                        RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(app, ai.packageName, ai.name);
+                        String mode = RedirectIconDB.modeOf(redirect);
+                        if (RedirectIconDB.MODE_CUSTOM.equals(mode) || RedirectIconDB.MODE_RESOURCE.equals(mode)
+                                || RedirectIconDB.MODE_PACK.equals(mode)) {
+                            continue;
+                        }
+                        if (enabled) {
+                            // Only cached/local artwork participates in the immediate refresh. Network
+                            // requests are queued below and never hold up this switch or the desktop.
+                            if (smartisanIconDrawableCachedOnly(app, info, resources) != null) {
+                                RedirectIconDB.updateAutoIcon(app, ai.packageName, ai.name);
+                            }
+                            scheduleSmartisanIconFetch(app, ai.packageName);
+                        } else if (packedIcon(app, info) != null) {
+                            RedirectIconDB.updateAutoIcon(app, ai.packageName, ai.name);
+                        } else {
+                            RedirectIconDB.resetIconToDefault(app, ai.packageName, ai.name);
+                        }
+                    }
+                } catch (Throwable ignored) {
                 }
-                RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, ai.packageName, ai.name);
-                String mode = RedirectIconDB.modeOf(redirect);
-                if (RedirectIconDB.MODE_CUSTOM.equals(mode) || RedirectIconDB.MODE_RESOURCE.equals(mode)) {
-                    continue;
-                }
-                if (enabled && smartisanIconDrawable(context, info, resources) != null) {
-                    RedirectIconDB.updateAutoIcon(context, ai.packageName, ai.name);
-                } else if (!enabled) {
-                    RedirectIconDB.resetIconToDefault(context, ai.packageName, ai.name);
-                }
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    public void run() {
+                        postDatabaseRefreshEvent();
+                        applyIconChange(app);
+                        if (host != null && !host.isFinishing()) {
+                            refreshIconRowsInCurrentPage(host);
+                        }
+                    }
+                });
             }
-        } catch (Throwable ignored) {
-        }
+        }, "ImprovedIconApply").start();
     }
 
     private static void refreshIconRowsInCurrentPage(Activity activity) {
@@ -11613,11 +12226,11 @@ public final class MaintainedLauncherSettingsHost {
         }
         ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
         Drawable official = iconManager.getOfficialIcon(info);
-        Drawable candidate = singleAppChoiceDrawable(activity, resolveInfo, resources);
+        Drawable candidate = selectedIconDrawable(activity, resolveInfo, null, resources);
         setImage(row, resources, "official_icon", official);
         setImage(row, resources, "unofficial_icon", candidate == null
                 ? safeDrawable(resources, drawable(resources, "ic_add_icon_plus")) : candidate);
-        boolean improved = isIconRowImprovedSelected(activity, info, candidate);
+        boolean improved = isIconRowImprovedSelected(activity, info, resolveInfo, candidate);
         View officialFrame = byId(row, resources, "official_icon_frame");
         View unofficialFrame = byId(row, resources, "unofficial_icon_frame");
         if (officialFrame != null) {
@@ -11640,18 +12253,21 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static boolean isIconRowImprovedSelected(Context context, RedirectIconInfo info, Drawable candidate) {
+    private static boolean isIconRowImprovedSelected(Context context, RedirectIconInfo info,
+                                                     ResolveInfo resolveInfo, Drawable candidate) {
         if (info == null || candidate == null) {
             return false;
         }
         String mode = RedirectIconDB.modeOf(info);
-        if (RedirectIconDB.MODE_CUSTOM.equals(mode) || RedirectIconDB.MODE_RESOURCE.equals(mode)) {
+        if (RedirectIconDB.MODE_CUSTOM.equals(mode) || RedirectIconDB.MODE_RESOURCE.equals(mode)
+                || RedirectIconDB.MODE_PACK.equals(mode)) {
             return true;
         }
-        if (isImprovedIconEnabled(context)) {
-            return true;
+        if (RedirectIconDB.MODE_ORIGINAL.equals(mode) || !info.useImprovedAppIcon) {
+            return false;
         }
-        return !RedirectIconDB.MODE_ORIGINAL.equals(mode) && info.useImprovedAppIcon;
+        if (packedIcon(context, resolveInfo) != null) return true;
+        return isImprovedIconEnabled(context);
     }
 
     private static String iconPackHeaderText(Context context) {
@@ -11708,32 +12324,94 @@ public final class MaintainedLauncherSettingsHost {
                 labels[i + 2] = (String) cls.getMethod("getIconPackLabel", Context.class, String.class)
                         .invoke(null, activity, packs.get(i));
             }
-            new AlertDialog.Builder(activity)
-                    .setTitle("选择图标包")
-                    .setItems(labels, new android.content.DialogInterface.OnClickListener() {
-                        public void onClick(android.content.DialogInterface dialog, int which) {
-                            try {
-                                String value = which == 0 ? "" : (which == 1 ? "__disabled__" : packs.get(which - 2));
-                                cls.getMethod("setSelectedIconPackPackage", Context.class, String.class)
-                                        .invoke(null, activity, value);
-                            } catch (Throwable ignored) {
-                            }
-                            applyIconChange(activity);
-                            Toast.makeText(activity, "已切换图标包，正在刷新桌面", Toast.LENGTH_SHORT).show();
+            final String selected = (String) cls.getMethod("getSelectedIconPackPackage", Context.class)
+                    .invoke(null, activity);
+            final Dialog dialog = new Dialog(activity);
+            LinearLayout root = new LinearLayout(activity);
+            prepareSmartisanDialogRoot(activity, root);
+
+            TextView title = new TextView(activity);
+            title.setGravity(Gravity.CENTER);
+            title.setSingleLine(true);
+            title.setText("选择图标包");
+            title.setTextColor(0xff333333);
+            title.setTextSize(18);
+            title.setTypeface(null, Typeface.BOLD);
+            root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+            root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+            LinearLayout list = new LinearLayout(activity);
+            list.setOrientation(LinearLayout.VERTICAL);
+            list.setBackgroundColor(0xfffafafa);
+            for (int i = 0; i < labels.length; i++) {
+                final int which = i;
+                final String value = which == 0 ? "" :
+                        (which == 1 ? "__disabled__" : packs.get(which - 2));
+                boolean current = value.equals(selected == null ? "" : selected);
+                TextView row = new TextView(activity);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setSingleLine(true);
+                row.setEllipsize(TextUtils.TruncateAt.END);
+                row.setPadding(dp(activity, 24), 0, dp(activity, 24), 0);
+                row.setText(labels[i] + (current ? "    当前" : ""));
+                row.setTextColor(current ? 0xff4f8fe8 : 0xff333333);
+                row.setTextSize(16);
+                row.setBackgroundDrawable(smartisanDialogListRowBackground());
+                row.setOnClickListener(new View.OnClickListener() {
+                    public void onClick(View v) {
+                        try {
+                            cls.getMethod("setSelectedIconPackPackage", Context.class, String.class)
+                                    .invoke(null, activity, value);
+                        } catch (Throwable ignored) {
                         }
-                    })
-                    .show();
+                        dialog.dismiss();
+                        refreshIconPackSubtitle(activity);
+                        warmAndApplyIconPack(activity);
+                        Toast.makeText(activity, "已切换图标包，正在刷新桌面", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                list.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 52)));
+                if (i < labels.length - 1) {
+                    LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, 1);
+                    dividerLp.leftMargin = dp(activity, 24);
+                    list.addView(smartisanDivider(activity), dividerLp);
+                }
+            }
+
+            ScrollView scroll = new ScrollView(activity);
+            scroll.setFillViewport(false);
+            scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+            scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
+            int maxListHeight = Math.min(dp(activity, 312),
+                    activity.getResources().getDisplayMetrics().heightPixels - dp(activity, 300));
+            root.addView(scroll, new LinearLayout.LayoutParams(-1,
+                    Math.min(maxListHeight, dp(activity, labels.length * 52))));
+            root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+            TextView cancel = smartisanDialogActionButton(activity, "取消", false, 0);
+            cancel.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    dialog.dismiss();
+                }
+            });
+            root.addView(cancel, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+
+            dialog.setContentView(root);
+            Window window = dialog.getWindow();
+            if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
+            dialog.show();
+            window = dialog.getWindow();
+            if (window != null) {
+                int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+                window.setLayout(Math.min(dp(activity, 380), screenWidth - dp(activity, 32)),
+                        WindowManager.LayoutParams.WRAP_CONTENT);
+            }
         } catch (Throwable t) {
             Toast.makeText(activity, "未发现可用图标包", Toast.LENGTH_SHORT).show();
         }
     }
 
     private static void applyIconChange(Context context) {
-        try {
-            Class.forName("com.smartisanos.home.settings.icons.IconPackManager")
-                    .getMethod("resetCache").invoke(null);
-        } catch (Throwable ignored) {
-        }
         try {
             Intent intent = new Intent("com.smartisanos.launcher.update_icon");
             String packages = allLauncherPackages(context);
@@ -11745,6 +12423,68 @@ public final class MaintainedLauncherSettingsHost {
         }
         refreshEnabledDoppelgangerIcons(context);
         reloadOriginalSettings(context);
+    }
+
+    private static void applyIconChange(Context context, String packageName) {
+        if (context == null || TextUtils.isEmpty(packageName)) {
+            applyIconChange(context);
+            return;
+        }
+        try {
+            Intent intent = new Intent("com.smartisanos.launcher.update_icon");
+            intent.putExtra("extra_packagename", packageName);
+            dispatchIconUpdate(context, intent);
+        } catch (Throwable ignored) {
+        }
+        reloadOriginalSettings(context);
+    }
+
+    private static void warmAndApplyIconPack(final Activity activity) {
+        if (activity == null) return;
+        final Context app = activity.getApplicationContext() == null ? activity : activity.getApplicationContext();
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    Class.forName("com.smartisanos.home.settings.icons.IconPackManager")
+                            .getMethod("preloadSelectedIconPack", Context.class).invoke(null, app);
+                } catch (Throwable ignored) {
+                }
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    public void run() {
+                        refreshIconRowsInCurrentPage(activity);
+                        applyIconChange(activity);
+                    }
+                });
+            }
+        }, "IconPackWarmApply").start();
+    }
+
+    private static void refreshIconPackSubtitle(Activity activity) {
+        if (activity == null) return;
+        refreshTaggedText(activity.getWindow().getDecorView(), TAG_ICON_PACK_SUBTITLE,
+                iconPackSubtitle(activity));
+    }
+
+    private static Drawable smartisanDialogListRowBackground() {
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[]{android.R.attr.state_pressed},
+                new android.graphics.drawable.ColorDrawable(0xffedf2fb));
+        states.addState(new int[]{},
+                new android.graphics.drawable.ColorDrawable(0xfffafafa));
+        return states;
+    }
+
+    private static void refreshTaggedText(View view, String tag, String value) {
+        if (view == null) return;
+        if (view instanceof TextView && tag.equals(view.getTag())) {
+            ((TextView) view).setText(value);
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                refreshTaggedText(group.getChildAt(i), tag, value);
+            }
+        }
     }
 
     /** Refresh only weather/calendar rows when switching active-icon mode. */
@@ -11823,11 +12563,6 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void forceUpdateIcon(Context context, RedirectIconInfo info) {
         try {
-            Class.forName("com.smartisanos.home.settings.icons.IconPackManager")
-                    .getMethod("resetCache").invoke(null);
-        } catch (Throwable ignored) {
-        }
-        try {
             Intent intent = new Intent("com.smartisanos.launcher.update_icon");
             if (info != null && info.packageName != null) {
                 intent.putExtra("extra_packagename", info.packageName);
@@ -11840,11 +12575,6 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void beginPickCustomIcon(Activity activity) {
-        try {
-            activity.getSharedPreferences(ICON_OVERRIDE_PREFS, Context.MODE_PRIVATE).edit()
-                    .putInt(PREF_PENDING_ICON_SCROLL_Y, currentScrollY(activity)).apply();
-        } catch (Throwable ignored) {
-        }
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("image/*");
@@ -11870,6 +12600,169 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
             return 0;
         }
+    }
+
+    private static void reopenIconChoicePage(Activity activity, String packageName,
+                                             String componentName, int returnScrollY,
+                                             final int choiceScrollY) {
+        try {
+            SettingsResourceContext context = createSettingsContext(activity);
+            RedirectIconInfo info = RedirectIconDB.getRedirectIconInfo(activity, packageName, componentName);
+            if (info == null) {
+                return;
+            }
+            new AppIconAdapter(activity, context, context.getResources())
+                    .showIconChoicePage(new View(activity), info, returnScrollY);
+            activity.getWindow().getDecorView().post(new Runnable() {
+                public void run() {
+                    ScrollView scroll = firstScrollView(activity.getWindow().getDecorView());
+                    if (scroll != null) {
+                        scroll.scrollTo(0, Math.max(0, choiceScrollY));
+                    }
+                }
+            });
+        } catch (Throwable ignored) {
+            showIconPage(activity, returnScrollY);
+        }
+    }
+
+    private static void updateDesktopItemTitle(Context context, String packageName,
+                                               String componentName, String displayName) {
+        if (context == null || TextUtils.isEmpty(packageName)
+                || TextUtils.isEmpty(componentName) || TextUtils.isEmpty(displayName)) {
+            return;
+        }
+        try {
+            final Context app = context.getApplicationContext() == null
+                    ? context : context.getApplicationContext();
+            final String pkg = packageName;
+            final String component = componentName;
+            final String title = displayName;
+            Class<?> databaseHandler = Class.forName("com.smartisanos.launcher.data.A");
+            java.lang.reflect.Field workerField = databaseHandler.getDeclaredField("mWorker");
+            workerField.setAccessible(true);
+            Handler worker = (Handler) workerField.get(null);
+            if (worker == null) {
+                throw new IllegalStateException("DatabaseHandler worker is null");
+            }
+            if (!worker.post(new Runnable() {
+                public void run() {
+                    try {
+                        ContentValues values = new ContentValues();
+                        values.put("title", title);
+                        String where = "packageName='" + pkg.replace("'", "''")
+                                + "' AND componentName='" + component.replace("'", "''") + "'";
+                        Class.forName("com.smartisanos.launcher.data.a.l")
+                                .getMethod("a", ContentValues.class, String.class)
+                                .invoke(null, values, where);
+                        updateDesktopItemTitleInMemory(pkg, component, title);
+                    } catch (Throwable t) {
+                        logOperation(app, "APP_RENAME", "database_update_failed " + shortError(t));
+                    }
+                    new Handler(Looper.getMainLooper()).post(new Runnable() {
+                        public void run() {
+                            refreshDesktopItemTitleScene(pkg, component, title);
+                            postDatabaseRefreshEvent();
+                            applyIconChange(app, pkg);
+                            requestLauncherFrameFromContext(app);
+                        }
+                    });
+                }
+            })) {
+                throw new IllegalStateException("DatabaseHandler rejected title update");
+            }
+        } catch (Throwable ignored) {
+            logOperation(context, "APP_RENAME", "database_schedule_failed " + shortError(ignored));
+        }
+    }
+
+    private static void updateDesktopItemTitleInMemory(String packageName, String componentName,
+                                                        String displayName) {
+        try {
+            Class<?> model = Class.forName("com.smartisanos.launcher.Aa");
+            java.util.HashMap items = (java.util.HashMap) model.getMethod("qc").invoke(null);
+            if (items == null) return;
+            for (Object item : items.values()) {
+                if (item == null) continue;
+                Class<?> itemClass = item.getClass();
+                java.lang.reflect.Field pkgField = itemClass.getField("packageName");
+                java.lang.reflect.Field componentField = itemClass.getField("componentName");
+                Object pkg = pkgField.get(item);
+                Object component = componentField.get(item);
+                if (packageName.equals(pkg) && componentName.equals(component)) {
+                    itemClass.getField("title").set(item, displayName);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void refreshDesktopItemTitleScene(String packageName, String componentName,
+                                                     String displayName) {
+        try {
+            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
+                    .getMethod("getInstance").invoke(null);
+            if (mainView == null) return;
+            refreshDesktopItemTitleSceneNode(mainView.getClass().getMethod("Ih").invoke(mainView),
+                    packageName, componentName, displayName);
+            refreshDesktopItemTitleSceneNode(mainView.getClass().getMethod("zh").invoke(mainView),
+                    packageName, componentName, displayName);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void refreshDesktopItemTitleSceneNode(Object node, String packageName,
+                                                         String componentName, String displayName) {
+        if (node == null) return;
+        try {
+            if ("com.smartisanos.launcher.view.a.g".equals(node.getClass().getName())) {
+                Object item = node.getClass().getMethod("Rl").invoke(node);
+                if (item != null) {
+                    Class<?> type = item.getClass();
+                    Object pkg = type.getField("packageName").get(item);
+                    Object component = type.getField("componentName").get(item);
+                    if (packageName.equals(pkg) && componentName.equals(component)) {
+                        type.getField("title").set(item, displayName);
+                        node.getClass().getMethod("Na", String.class).invoke(node, displayName);
+                        node.getClass().getMethod("setNeedDisplay").invoke(node);
+                    }
+                }
+            }
+            java.lang.reflect.Method countMethod = node.getClass().getMethod("getChildCount");
+            java.lang.reflect.Method childMethod = node.getClass().getMethod("getChildAt", Integer.TYPE);
+            int count = ((Integer) countMethod.invoke(node)).intValue();
+            for (int i = 0; i < count; i++) {
+                refreshDesktopItemTitleSceneNode(childMethod.invoke(node, i), packageName,
+                        componentName, displayName);
+            }
+        } catch (NoSuchMethodException ignored) {
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static int currentIconListPosition(Activity activity) {
+        try {
+            ListView list = firstListView(activity.getWindow().getDecorView());
+            return list == null ? 0 : list.getFirstVisiblePosition();
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
+    private static ListView firstListView(View view) {
+        if (view instanceof ListView) {
+            return (ListView) view;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                ListView found = firstListView(group.getChildAt(i));
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
     }
 
     private static ScrollView firstScrollView(View view) {
@@ -11999,6 +12892,23 @@ public final class MaintainedLauncherSettingsHost {
         return tv;
     }
 
+    private static TextView settingsSectionHeader(Context context, Resources resources, String value) {
+        TextView header = text(context, value, 15, 0x80000000, false);
+        int left = dp(context, 30);
+        try {
+            int id = resources == null ? 0 : resources.getIdentifier("theme_chooser_text_padding_left",
+                    "dimen", SETTINGS_PKG);
+            if (id != 0) {
+                left = resources.getDimensionPixelSize(id);
+            }
+        } catch (Throwable ignored) {
+        }
+        header.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        header.setPadding(left, dp(context, 11), 0, dp(context, 1));
+        header.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
+        return header;
+    }
+
     private static int dp(Context context, int value) {
         return (int) (value * context.getResources().getDisplayMetrics().density + 0.5f);
     }
@@ -12109,7 +13019,7 @@ public final class MaintainedLauncherSettingsHost {
             if (current != null) {
                 current.setVisibility(position == selected ? View.VISIBLE : View.GONE);
             }
-            int bg = drawable(resources, gridCellBackground(position, getCount()));
+            int bg = drawable(resources, gridChooserCellBackground(position, getCount()));
             if (bg != 0) {
                 convertView.setBackgroundResource(bg);
             }
@@ -12159,6 +13069,7 @@ public final class MaintainedLauncherSettingsHost {
         private final boolean local;
         private final ArrayList<ThemeEntry> entries;
         private String currentThemeId;
+        private boolean previewRefreshPending;
 
         ThemePreviewAdapter(Activity activity, SettingsResourceContext context, Resources resources, boolean local) {
             this.activity = activity;
@@ -12190,6 +13101,19 @@ public final class MaintainedLauncherSettingsHost {
             super.notifyDataSetChanged();
         }
 
+        void notifyPreviewLoaded() {
+            if (previewRefreshPending) {
+                return;
+            }
+            previewRefreshPending = true;
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                public void run() {
+                    previewRefreshPending = false;
+                    notifyDataSetChanged();
+                }
+            }, 120L);
+        }
+
         public View getView(int position, View convertView, android.view.ViewGroup parent) {
             if (convertView == null) {
                 int layoutId = resources.getIdentifier("theme_preview_block", "layout", SETTINGS_PKG);
@@ -12204,7 +13128,7 @@ public final class MaintainedLauncherSettingsHost {
             TextView downloading = (TextView) byId(convertView, resources, "theme_downloading_text");
             View progress = byId(convertView, resources, "theme_block_downloading_progress");
             if (preview != null) {
-                Bitmap bitmap = themePreviewBitmap(activity, entry.id);
+                Bitmap bitmap = cachedThemePreviewBitmap(activity, entry.id);
                 if (bitmap != null) {
                     preview.setImageBitmap(bitmap);
                 } else {
@@ -12212,6 +13136,7 @@ public final class MaintainedLauncherSettingsHost {
                     if (fallback != 0) {
                         preview.setImageResource(fallback);
                     }
+                    requestThemePreview(activity, entry.id, this);
                 }
             }
             if (name != null) {
@@ -12311,6 +13236,23 @@ public final class MaintainedLauncherSettingsHost {
         return "selector_theme_list_item_mid_" + side;
     }
 
+    private static String gridChooserCellBackground(int position, int count) {
+        boolean left = (position % 2) == 0;
+        int rows = (count + 1) / 2;
+        int row = position / 2;
+        String side = left ? "left" : "right";
+        if (rows <= 1) {
+            return "selector_grid_bg_single_" + side;
+        }
+        if (row == 0) {
+            return "selector_grid_bg_top_" + side;
+        }
+        if (row == rows - 1) {
+            return "selector_grid_bg_bottom_" + side;
+        }
+        return "selector_grid_bg_middle_" + side;
+    }
+
     private static final class SimpleTextAdapter extends BaseAdapter {
         private final Context context;
         private final Resources resources;
@@ -12364,6 +13306,97 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    private static final class IconChoice {
+        static final int TYPE_ORIGINAL = 0;
+        static final int TYPE_LIBRARY = 1;
+        static final int TYPE_CUSTOM = 2;
+        static final int TYPE_PACKED = 3;
+
+        final int type;
+        final String name;
+        final String label;
+
+        IconChoice(int type, String name, String label) {
+            this.type = type;
+            this.name = name;
+            this.label = label;
+        }
+    }
+
+    private static List<String> iconVariantNames(Context context, String packageName) {
+        if (TextUtils.isEmpty(packageName)) {
+            return Collections.emptyList();
+        }
+        Map<String, List<String>> map = loadIconVariantMap(context);
+        List<String> exact = map == null ? null : map.get(packageName);
+        if (exact != null && !exact.isEmpty()) {
+            return exact;
+        }
+        return Collections.emptyList();
+    }
+
+    private static Map<String, List<String>> loadIconVariantMap(Context context) {
+        if (sIconVariants != null) {
+            return sIconVariants;
+        }
+        HashMap<String, List<String>> out = new HashMap<String, List<String>>();
+        InputStream in = null;
+        try {
+            AssetManager assets = context == null ? null : context.getAssets();
+            if (assets == null) {
+                sIconVariants = out;
+                return out;
+            }
+            in = assets.open("icons/variants.json");
+            String json = new String(readAllBytes(in, 1024 * 1024), "UTF-8");
+            JSONObject root = new JSONObject(json);
+            JSONObject variants = root.optJSONObject("variants");
+            if (variants != null) {
+                JSONArray names = variants.names();
+                if (names != null) {
+                    for (int i = 0; i < names.length(); i++) {
+                        String pkg = names.optString(i, null);
+                        JSONArray arr = pkg == null ? null : variants.optJSONArray(pkg);
+                        if (pkg == null || arr == null) {
+                            continue;
+                        }
+                        ArrayList<String> list = new ArrayList<String>();
+                        for (int j = 0; j < arr.length(); j++) {
+                            String value = stripPng(arr.optString(j, null));
+                            if (!TextUtils.isEmpty(value) && !list.contains(value)) {
+                                list.add(value);
+                            }
+                        }
+                        if (!list.isEmpty()) {
+                            out.put(pkg, list);
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        sIconVariants = out;
+        return out;
+    }
+
+    private static String stripPng(String value) {
+        if (value == null) {
+            return null;
+        }
+        String out = value.trim();
+        if (out.toLowerCase(Locale.US).endsWith(".png")) {
+            out = out.substring(0, out.length() - 4);
+        }
+        return out;
+    }
+
     private static final class AppIconAdapter extends BaseAdapter {
         private final Activity activity;
         private final SettingsResourceContext context;
@@ -12383,11 +13416,16 @@ public final class MaintainedLauncherSettingsHost {
 
         AppIconAdapter(Activity activity, SettingsResourceContext context, Resources resources,
                        List<RedirectIconInfo> entries) {
+            this(activity, context, resources, entries, new IconManager(activity));
+        }
+
+        AppIconAdapter(Activity activity, SettingsResourceContext context, Resources resources,
+                       List<RedirectIconInfo> entries, IconManager iconManager) {
             this.activity = activity;
             this.context = context;
             this.resources = resources;
             this.inflater = LayoutInflater.from(activity).cloneInContext(context);
-            this.iconManager = new IconManager(activity);
+            this.iconManager = iconManager == null ? new IconManager(activity) : iconManager;
             if (entries != null) {
                 this.apps.addAll(entries);
             }
@@ -12397,7 +13435,7 @@ public final class MaintainedLauncherSettingsHost {
             return loadEntries(activity, new IconManager(activity));
         }
 
-        private static List<RedirectIconInfo> loadEntries(Activity activity, final IconManager iconManager) {
+        static List<RedirectIconInfo> loadEntries(Activity activity, final IconManager iconManager) {
             final ArrayList<RedirectIconInfo> result = new ArrayList<RedirectIconInfo>();
             long started = android.os.SystemClock.elapsedRealtime();
             try {
@@ -12470,7 +13508,7 @@ public final class MaintainedLauncherSettingsHost {
             convertView.setTag(info);
             ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
             Drawable official = iconManager.getOfficialIcon(info);
-            Drawable candidate = singleAppChoiceDrawable(activity, resolveInfo, resources);
+            Drawable candidate = selectedIconDrawable(activity, resolveInfo, null, resources);
             setIcon(convertView, resources, "official_icon", official);
             setIcon(convertView, resources, "unofficial_icon", candidate == null ? plusIcon(resources) : candidate);
 
@@ -12491,11 +13529,15 @@ public final class MaintainedLauncherSettingsHost {
             });
             bindIconClick(convertView, info, "unofficial_icon_layout", new View.OnClickListener() {
                 public void onClick(View v) {
-                    selectImprovedOrPick(rowView, info);
+                    showIconChoiceDialog(rowView, info);
                 }
             });
-            convertView.setClickable(false);
-            convertView.setOnClickListener(null);
+            convertView.setClickable(true);
+            convertView.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    showIconChoiceDialog(rowView, info);
+                }
+            });
             TextView name = (TextView) byId(convertView, resources, "app_name");
             TextView author = (TextView) byId(convertView, resources, "icon_author_name");
             if (name != null) {
@@ -12519,6 +13561,28 @@ public final class MaintainedLauncherSettingsHost {
             }
             if (unofficialFrame != null) {
                 unofficialFrame.setVisibility(View.INVISIBLE);
+            }
+            if (row instanceof RelativeLayout) {
+                RelativeLayout relative = (RelativeLayout) row;
+                ImageView arrow = new ImageView(context);
+                arrow.setId(View.generateViewId());
+                int arrowId = resources.getIdentifier("setting_next", "drawable", SETTINGS_PKG);
+                if (arrowId != 0) {
+                    arrow.setImageDrawable(resources.getDrawable(arrowId));
+                }
+                arrow.setScaleType(ImageView.ScaleType.CENTER);
+                RelativeLayout.LayoutParams arrowLp = new RelativeLayout.LayoutParams(dp(activity, 38), -1);
+                arrowLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+                arrowLp.addRule(RelativeLayout.CENTER_VERTICAL);
+                arrowLp.rightMargin = dp(activity, 10);
+                relative.addView(arrow, arrowLp);
+                View author = byId(row, resources, "author_info_layout");
+                if (author != null && author.getLayoutParams() instanceof RelativeLayout.LayoutParams) {
+                    RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams) author.getLayoutParams();
+                    lp.addRule(RelativeLayout.LEFT_OF, arrow.getId());
+                    lp.rightMargin = dp(activity, 8);
+                    author.setLayoutParams(lp);
+                }
             }
             return row;
         }
@@ -12560,38 +13624,545 @@ public final class MaintainedLauncherSettingsHost {
             if (info == null) {
                 return;
             }
-            ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
-            Drawable candidate = singleAppChoiceDrawable(activity, resolveInfo, resources);
-            if (candidate == null) {
-                pickCustomIcon(info);
-                return;
-            }
             showIconChoiceDialog(row, info);
         }
 
         private void showIconChoiceDialog(final View row, final RedirectIconInfo info) {
-            ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
-            final Drawable candidate = singleAppChoiceDrawable(activity, resolveInfo, resources);
-            final String[] labels = candidate == null
-                    ? new String[]{"从相册选择图片"}
-                    : new String[]{"使用推荐图标", "从相册选择图片"};
-            new AlertDialog.Builder(activity)
-                    .setTitle(iconManager.getLableForPackage(info.packageName, info.componentName))
-                    .setItems(labels, new android.content.DialogInterface.OnClickListener() {
-                        public void onClick(android.content.DialogInterface dialog, int which) {
-                            if (candidate != null && which == 0) {
-                                useImprovedIcon(row, info);
-                            } else {
-                                pickCustomIcon(info);
-                            }
-                        }
-                    })
-                    .show();
+            if (info == null) {
+                return;
+            }
+            showIconChoicePage(row, info, currentIconListPosition(activity));
         }
 
-        private void pickCustomIcon(RedirectIconInfo info) {
+        private void showIconChoicePage(final View row, final RedirectIconInfo info, final int returnScrollY) {
+            final ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
+            try {
+                tuneWindow(activity);
+                final View page = inflate(activity, context, "app_icon_settings_layout");
+                bindBackTitle(activity, resources, page, "view_title", "替换图标");
+                TextView back = (TextView) find(resources, page, "btn_back");
+                if (back != null) {
+                    back.setOnClickListener(new View.OnClickListener() {
+                        public void onClick(View v) {
+                            showIconPage(activity, returnScrollY, false);
+                        }
+                    });
+                }
+                ListView list = asList(find(resources, page, "icons_list_view"));
+                if (list != null && list.getParent() instanceof ViewGroup) {
+                    ViewGroup parent = (ViewGroup) list.getParent();
+                    int index = parent.indexOfChild(list);
+                    ViewGroup.LayoutParams lp = list.getLayoutParams();
+                    int id = list.getId();
+                    parent.removeView(list);
+                    ScrollView scroll = new ScrollView(context);
+                    scroll.setId(id);
+                    scroll.setFillViewport(false);
+                    scroll.setFocusable(false);
+                    scroll.setVerticalScrollBarEnabled(false);
+                    scroll.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
+                    LinearLayout content = new LinearLayout(context);
+                    content.setOrientation(LinearLayout.VERTICAL);
+                    content.setPadding(0, dp(activity, 16), 0, dp(activity, 20));
+                    content.addView(createChoiceAppCard(info, resolveInfo));
+                    content.addView(settingsSectionHeader(activity, resources, "可选图标"));
+                    content.addView(createChoiceGridCard(row, info, null, returnScrollY));
+                    prefetchChoiceLibraryIcons(content, row, info, returnScrollY);
+                    scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+                    parent.addView(scroll, index, lp);
+                    tuneScrollBars(scroll);
+                }
+                setSettingsContentView(activity, context, resources, page, true);
+            } catch (Throwable t) {
+                Toast.makeText(activity, "打开图标选择失败", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        private View createChoiceGridCard(final View row, final RedirectIconInfo info,
+                                          final AlertDialog dialog, final int returnScrollY) {
+            LinearLayout card = new LinearLayout(activity);
+            card.setOrientation(LinearLayout.VERTICAL);
+            setBackground(card, resources, "selector_setting_sub_item_bg_single");
+            card.setPadding(dp(activity, 36), dp(activity, 18), dp(activity, 36), dp(activity, 18));
+
+            GridLayout grid = new GridLayout(activity);
+            grid.setColumnCount(3);
+            LinearLayout.LayoutParams gridLp = new LinearLayout.LayoutParams(-1, -2);
+            card.addView(grid, gridLp);
+
+            List<IconChoice> choices = iconChoicesFor(info);
+            for (int i = 0; i < choices.size(); i++) {
+                addChoiceCell(grid, row, info, choices.get(i), dialog, returnScrollY, i);
+            }
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+            card.setLayoutParams(cardLp);
+            return card;
+        }
+
+        private void prefetchChoiceLibraryIcons(final LinearLayout content, final View row,
+                                                final RedirectIconInfo info, final int returnScrollY) {
+            if (content == null || info == null) return;
+            ArrayList<String> names = new ArrayList<String>();
+            String alias = smartisanSystemIconAlias(activity,
+                    iconManager.getResolveInfo(info.packageName, info.componentName));
+            if (!TextUtils.isEmpty(alias)) names.add(alias);
+            if (!TextUtils.isEmpty(info.packageName) && !names.contains(info.packageName)) {
+                names.add(info.packageName);
+            }
+            List<String> variants = iconVariantNames(activity, info.packageName);
+            for (int i = 0; variants != null && i < variants.size(); i++) {
+                String name = stripPng(variants.get(i));
+                if (!TextUtils.isEmpty(name) && !names.contains(name)) names.add(name);
+            }
+            boolean pending = false;
+            for (int i = 0; i < names.size(); i++) {
+                String name = names.get(i);
+                if (!libraryIconStored(activity, resources, name)
+                        && !shouldSkipSmartisanIconFetch(activity, name)) {
+                    pending = true;
+                    scheduleSmartisanIconFetch(activity, name);
+                }
+            }
+            if (!pending) return;
+            // Keep cached candidates visible immediately. Once the background fetch finishes,
+            // replace only this grid; do not recreate the page or reset its scroll position.
+            refreshChoiceGridLater(content, row, info, returnScrollY, 900L);
+            refreshChoiceGridLater(content, row, info, returnScrollY, 2600L);
+            // One candidate can try two mirrors and then wait behind the shared
+            // fetch pool. Keep this page's grid eligible for the completed
+            // disk-cache result instead of leaving a permanent empty slot.
+            refreshChoiceGridLater(content, row, info, returnScrollY, 6500L);
+            refreshChoiceGridLater(content, row, info, returnScrollY, 11000L);
+        }
+
+        private void refreshChoiceGridLater(final LinearLayout content, final View row,
+                                            final RedirectIconInfo info, final int returnScrollY,
+                                            long delayMillis) {
+            content.postDelayed(new Runnable() {
+                public void run() {
+                    if (content.getWindowToken() == null || content.getChildCount() < 3) return;
+                    View previous = content.getChildAt(2);
+                    content.removeViewAt(2);
+                    content.addView(createChoiceGridCard(row, info, null, returnScrollY), 2,
+                            previous == null ? new LinearLayout.LayoutParams(-1, -2)
+                                    : previous.getLayoutParams());
+                }
+            }, delayMillis);
+        }
+
+        private void finishChoice(AlertDialog dialog, int returnScrollY) {
+            if (dialog != null) {
+                dialog.dismiss();
+            } else {
+                showIconPage(activity, returnScrollY, false);
+            }
+        }
+
+        private View createChoiceAppCard(RedirectIconInfo info, ResolveInfo resolveInfo) {
+            LinearLayout card = new LinearLayout(activity);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setGravity(Gravity.CENTER_HORIZONTAL);
+            setBackground(card, resources, "selector_setting_sub_item_bg_single");
+            card.setPadding(dp(activity, 18), dp(activity, 34), dp(activity, 18), dp(activity, 30));
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(-1, -2);
+            card.setLayoutParams(cardLp);
+
+            ImageView icon = new ImageView(activity);
+            icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            Drawable official = iconManager.getOfficialIcon(info);
+            if (official != null) {
+                icon.setImageDrawable(official);
+            }
+            card.addView(icon, new LinearLayout.LayoutParams(dp(activity, 58), dp(activity, 58)));
+
+            TextView title = text(activity, iconManager.getLableForPackage(info.packageName, info.componentName),
+                    20, 0xff333333, false);
+            title.setGravity(Gravity.CENTER);
+            title.setClickable(true);
+            title.setPadding(dp(activity, 14), dp(activity, 5), dp(activity, 14), dp(activity, 5));
+            // Keep the editable label visually close to the settings controls without changing the card layout.
+            title.setBackgroundDrawable(roundedDrawable(0x03ffffff, 0x22000000, dp(activity, 5)));
+            title.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    showRenameIconDialog(info, resolveInfo, title);
+                }
+            });
+            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-2, -2);
+            titleLp.topMargin = dp(activity, 14);
+            titleLp.gravity = Gravity.CENTER_HORIZONTAL;
+            card.addView(title, titleLp);
+
+            TextView subtitle = text(activity, versionSubtitle(resolveInfo), 13, 0xff9a9a9a, false);
+            subtitle.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
+            subLp.topMargin = dp(activity, 6);
+            card.addView(subtitle, subLp);
+
+            TextView hint = text(activity, "可选用精心设计过的图标替换应用默认图标", 13, 0xff999999, false);
+            hint.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+            hintLp.topMargin = dp(activity, 10);
+            card.addView(hint, hintLp);
+            return card;
+        }
+
+        private void showRenameIconDialog(final RedirectIconInfo info,
+                                          final ResolveInfo resolveInfo,
+                                          final TextView titleView) {
+            if (info == null) return;
+            final Dialog dialog = new Dialog(activity);
+            LinearLayout root = new LinearLayout(activity);
+            prepareSmartisanDialogRoot(activity, root);
+
+            TextView heading = text(activity, "修改应用名称", 18, 0xff333333, true);
+            heading.setGravity(Gravity.CENTER);
+            root.addView(heading, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+
+            LinearLayout content = new LinearLayout(activity);
+            content.setOrientation(LinearLayout.VERTICAL);
+            content.setPadding(dp(activity, 24), dp(activity, 20), dp(activity, 24), dp(activity, 20));
+            final EditText input = new EditText(activity);
+            input.setSingleLine(true);
+            input.setSelectAllOnFocus(true);
+            input.setTextSize(17);
+            input.setTextColor(0xff454545);
+            input.setText(iconManager.getLableForPackage(info.packageName, info.componentName));
+            input.setSelection(input.length());
+            input.setPadding(dp(activity, 14), 0, dp(activity, 14), 0);
+            input.setBackgroundDrawable(roundedDrawable(0xffffffff, 0xffc8c8c8, dp(activity, 4)));
+            content.addView(input, new LinearLayout.LayoutParams(-1, dp(activity, 48)));
+            root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+
+            root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+            LinearLayout buttons = new LinearLayout(activity);
+            buttons.setOrientation(LinearLayout.HORIZONTAL);
+            TextView cancel = smartisanDialogActionButton(activity, "取消", false, -1);
+            cancel.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    dialog.dismiss();
+                }
+            });
+            TextView confirm = smartisanDialogActionButton(activity, "确定", true, 1);
+            confirm.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    String displayName = input.getText() == null ? ""
+                            : input.getText().toString().trim();
+                    if (displayName.length() == 0) {
+                        input.setError("名称不能为空");
+                        return;
+                    }
+                    String originalName = info.originalName;
+                    if (TextUtils.isEmpty(originalName) && resolveInfo != null) {
+                        try {
+                            CharSequence label = resolveInfo.loadLabel(activity.getPackageManager());
+                            originalName = label == null ? "" : label.toString();
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                    RedirectIconDB.updateDisplayName(activity, info.packageName,
+                            info.componentName, displayName, originalName);
+                    updateDesktopItemTitle(activity, info.packageName, info.componentName, displayName);
+                    titleView.setText(displayName);
+                    dialog.dismiss();
+                    Toast.makeText(activity, "应用名称已修改", Toast.LENGTH_SHORT).show();
+                }
+            });
+            buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 56), 1.0f));
+            buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 56)));
+            buttons.addView(confirm, new LinearLayout.LayoutParams(0, dp(activity, 56), 1.0f));
+            root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+
+            dialog.setContentView(root);
+            dialog.show();
+            Window shown = dialog.getWindow();
+            if (shown != null) {
+                shown.setBackgroundDrawableResource(android.R.color.transparent);
+                int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+                shown.setLayout(Math.min(dp(activity, 360), screenWidth - dp(activity, 32)), -2);
+                shown.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                        | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            }
+            input.requestFocus();
+        }
+
+        private void addChoiceCell(final GridLayout grid, final View row, final RedirectIconInfo info,
+                                   final IconChoice choice, final AlertDialog dialog,
+                                   final int returnScrollY, int index) {
+            final SquareFrameLayout cell = new SquareFrameLayout(activity);
+            cell.setPadding(dp(activity, 5), dp(activity, 5), dp(activity, 5), dp(activity, 5));
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams(
+                    GridLayout.spec(GridLayout.UNDEFINED, 1f),
+                    GridLayout.spec(GridLayout.UNDEFINED, 1f));
+            lp.width = 0;
+            lp.height = -2;
+            lp.setMargins(0, 0, 0, 0);
+            cell.setLayoutParams(lp);
+
+            FrameLayout box = new FrameLayout(activity);
+            box.setBackground(choiceIconBackground(activity, false));
+            FrameLayout.LayoutParams boxLp = new FrameLayout.LayoutParams(-1, -1);
+            cell.addView(box, boxLp);
+
+            FrameLayout iconHolder = new FrameLayout(activity);
+            FrameLayout.LayoutParams holderLp = new FrameLayout.LayoutParams(
+                    dp(activity, 62), dp(activity, 62), Gravity.CENTER);
+            box.addView(iconHolder, holderLp);
+
+            final ImageView icon = new ImageView(activity);
+            icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(activity, 48), dp(activity, 48), Gravity.CENTER);
+            iconHolder.addView(icon, iconLp);
+
+            final ProgressBar progress = new ProgressBar(activity);
+            FrameLayout.LayoutParams progressLp = new FrameLayout.LayoutParams(dp(activity, 24), dp(activity, 24), Gravity.CENTER);
+            iconHolder.addView(progress, progressLp);
+
+            ImageView check = new ImageView(activity);
+            check.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            check.setImageDrawable(safeDrawable(resources,
+                    drawable(resources, "preview_picture_selected")));
+            FrameLayout.LayoutParams checkLp = new FrameLayout.LayoutParams(dp(activity, 24), dp(activity, 24),
+                    Gravity.RIGHT | Gravity.TOP);
+            check.setVisibility(isChoiceSelected(info, choice) ? View.VISIBLE : View.GONE);
+            iconHolder.addView(check, checkLp);
+
+            bindChoiceIcon(icon, progress, check, info, choice);
+            cell.setClickable(true);
+            cell.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    applyChoice(row, info, choice, returnScrollY);
+                    if (choice != null && choice.type == IconChoice.TYPE_CUSTOM) {
+                        if (dialog != null) {
+                            dialog.dismiss();
+                        }
+                    } else {
+                        finishChoice(dialog, returnScrollY);
+                    }
+                }
+            });
+            grid.addView(cell);
+        }
+
+        private void bindChoiceIcon(final ImageView icon, final ProgressBar progress,
+                                    final ImageView check,
+                                    final RedirectIconInfo info, final IconChoice choice) {
+            Drawable drawable = iconDrawableForChoice(info, choice);
+            if (drawable != null) {
+                progress.setVisibility(View.GONE);
+                icon.setImageDrawable(drawable);
+                icon.setVisibility(View.VISIBLE);
+                check.setVisibility(isChoiceSelected(info, choice) ? View.VISIBLE : View.GONE);
+                return;
+            }
+            progress.setVisibility(choice.type == IconChoice.TYPE_LIBRARY ? View.VISIBLE : View.GONE);
+            icon.setVisibility(View.VISIBLE);
+            if (choice.type == IconChoice.TYPE_CUSTOM) {
+                icon.setImageDrawable(plusIcon(resources));
+            }
+            if (choice.type == IconChoice.TYPE_LIBRARY) {
+                retryBindChoiceIcon(icon, progress, check, info, choice, 0);
+            }
+        }
+
+        private void retryBindChoiceIcon(final ImageView icon, final ProgressBar progress,
+                                         final ImageView check,
+                                         final RedirectIconInfo info, final IconChoice choice,
+                                         final int attempt) {
+            final long[] delays = new long[]{80L, 180L, 320L, 600L, 1000L, 1600L};
+            if (attempt >= delays.length) {
+                progress.setVisibility(View.GONE);
+                icon.setVisibility(View.INVISIBLE);
+                return;
+            }
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                public void run() {
+                    Drawable retry = iconDrawableForChoice(info, choice);
+                    if (retry != null) {
+                        progress.setVisibility(View.GONE);
+                        icon.setImageDrawable(retry);
+                        icon.setVisibility(View.VISIBLE);
+                        check.setVisibility(isChoiceSelected(info, choice) ? View.VISIBLE : View.GONE);
+                    } else {
+                        retryBindChoiceIcon(icon, progress, check, info, choice, attempt + 1);
+                    }
+                }
+            }, delays[attempt]);
+        }
+
+        private Drawable iconDrawableForChoice(RedirectIconInfo info, IconChoice choice) {
+            if (choice == null) {
+                return null;
+            }
+            if (choice.type == IconChoice.TYPE_ORIGINAL) {
+                return iconManager.getOfficialIcon(info);
+            }
+            if (choice.type == IconChoice.TYPE_LIBRARY) {
+                return libraryIconDrawableNonBlocking(activity, resources, choice.name);
+            }
+            if (choice.type == IconChoice.TYPE_PACKED) {
+                return packedIconFromPackage(activity, choice.name, iconManager.getResolveInfo(info.packageName, info.componentName));
+            }
+            if (choice.type == IconChoice.TYPE_CUSTOM) {
+                byte[] iconData = RedirectIconDB.getRedirectIcon(activity,
+                        info.packageName, info.componentName);
+                if (iconData != null) {
+                    Bitmap bitmap = BitmapFactory.decodeByteArray(iconData, 0, iconData.length);
+                    if (bitmap != null) {
+                        return new BitmapDrawable(activity.getResources(), bitmap);
+                    }
+                }
+                return plusIcon(resources);
+            }
+            return null;
+        }
+
+        private List<IconChoice> iconChoicesFor(RedirectIconInfo info) {
+            ArrayList<IconChoice> out = new ArrayList<IconChoice>();
+            ArrayList<String> names = new ArrayList<String>();
+            List<String> variants = iconVariantNames(activity, info.packageName);
+            if (variants != null) {
+                names.addAll(variants);
+            }
+            String baseName = info.packageName;
+            if (!names.contains(baseName)) {
+                names.add(0, baseName);
+            }
+            String alias = smartisanSystemIconAlias(activity, iconManager.getResolveInfo(info.packageName, info.componentName));
+            if (alias != null && !names.contains(alias)) {
+                names.add(0, alias);
+            }
+            HashMap<String, Boolean> seen = new HashMap<String, Boolean>();
+            for (int i = 0; i < names.size(); i++) {
+                String name = stripPng(names.get(i));
+                if (name == null || name.length() == 0 || seen.containsKey(name)
+                        || !libraryIconStored(activity, resources, name)) {
+                    continue;
+                }
+                seen.put(name, Boolean.TRUE);
+                out.add(new IconChoice(IconChoice.TYPE_LIBRARY, name, "图标库"));
+            }
+            ResolveInfo resolve = iconManager.getResolveInfo(info.packageName, info.componentName);
+            try {
+                ArrayList<String> packs = com.smartisanos.home.settings.icons.IconPackManager.getIconPackPackages(activity);
+                for (int i = 0; i < packs.size(); i++) {
+                    String pack = packs.get(i);
+                    if (packedIconFromPackage(activity, pack, resolve) != null) {
+                        out.add(new IconChoice(IconChoice.TYPE_PACKED, pack,
+                                com.smartisanos.home.settings.icons.IconPackManager.getIconPackLabel(activity, pack)));
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            out.add(new IconChoice(IconChoice.TYPE_CUSTOM, null, "+"));
+            return out;
+        }
+
+        private boolean isChoiceSelected(RedirectIconInfo info, IconChoice choice) {
+            if (info == null || choice == null) {
+                return false;
+            }
+            RedirectIconInfo latest = RedirectIconDB.getRedirectIconInfo(activity, info.packageName, info.componentName);
+            String mode = RedirectIconDB.modeOf(latest);
+            if (choice.type == IconChoice.TYPE_ORIGINAL) {
+                return RedirectIconDB.MODE_ORIGINAL.equals(mode) || (latest != null && !latest.useImprovedAppIcon);
+            }
+            if (choice.type == IconChoice.TYPE_LIBRARY) {
+                if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
+                    return choice.name.equals(RedirectIconDB.resourceNameOf(latest));
+                }
+                return isAutomaticImprovedChoice(latest, info)
+                        && packedIcon(activity, iconManager.getResolveInfo(
+                                info.packageName, info.componentName)) == null
+                        && choice.name.equals(automaticLibraryChoiceName(info));
+            }
+            if (choice.type == IconChoice.TYPE_PACKED) {
+                return RedirectIconDB.MODE_PACK.equals(mode)
+                        && choice.name.equals(RedirectIconDB.packNameOf(latest));
+            }
+            if (choice.type == IconChoice.TYPE_CUSTOM) {
+                return RedirectIconDB.MODE_CUSTOM.equals(mode);
+            }
+            return false;
+        }
+
+        private boolean isAutomaticImprovedChoice(RedirectIconInfo latest, RedirectIconInfo info) {
+            if (latest == null) {
+                return isImprovedIconEnabled(activity);
+            }
+            return latest.useImprovedAppIcon
+                    && RedirectIconDB.MODE_AUTO.equals(RedirectIconDB.modeOf(latest));
+        }
+
+        private String automaticLibraryChoiceName(RedirectIconInfo info) {
+            ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
+            String alias = smartisanSystemIconAlias(activity, resolveInfo);
+            if (alias != null && libraryIconStored(activity, resources, alias)) {
+                return alias;
+            }
+            if (libraryIconStored(activity, resources, info.packageName)) {
+                return info.packageName;
+            }
+            return null;
+        }
+
+        private void applyChoice(View row, RedirectIconInfo info, IconChoice choice, int returnScrollY) {
+            if (choice == null || info == null) {
+                return;
+            }
+            if (choice.type == IconChoice.TYPE_ORIGINAL) {
+                selectOriginal(row, info);
+                return;
+            }
+            if (choice.type == IconChoice.TYPE_CUSTOM) {
+                pickCustomIcon(info, returnScrollY);
+                return;
+            }
+            if (choice.type == IconChoice.TYPE_LIBRARY) {
+                info.useImprovedAppIcon = true;
+                info.drawableName = RedirectIconDB.MODE_RESOURCE + ":" + choice.name;
+                info.iconData = null;
+                RedirectIconDB.updateResourceIcon(activity, info.packageName, info.componentName, choice.name);
+                forceUpdateIcon(activity, info);
+                refreshIconRow(row, info, iconManager, activity, resources);
+            }
+            if (choice.type == IconChoice.TYPE_PACKED) {
+                info.useImprovedAppIcon = true;
+                info.drawableName = RedirectIconDB.MODE_PACK + ":" + choice.name;
+                info.iconData = null;
+                RedirectIconDB.updatePackIcon(activity, info.packageName, info.componentName, choice.name);
+                forceUpdateIcon(activity, info);
+                refreshIconRow(row, info, iconManager, activity, resources);
+            }
+        }
+
+        private String versionSubtitle(ResolveInfo resolveInfo) {
+            try {
+                ActivityInfo ai = resolveInfo == null ? null : resolveInfo.activityInfo;
+                if (ai == null || ai.packageName == null) {
+                    return "";
+                }
+                PackageInfo pkg = activity.getPackageManager().getPackageInfo(ai.packageName, 0);
+                return pkg == null || pkg.versionName == null ? "" : pkg.versionName;
+            } catch (Throwable ignored) {
+                return "";
+            }
+        }
+
+        private GradientDrawable choiceIconBackground(Context context, boolean selected) {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(Color.TRANSPARENT);
+            bg.setCornerRadius(dp(context, 5));
+            bg.setStroke(1, 0x18000000);
+            return bg;
+        }
+
+        private void pickCustomIcon(RedirectIconInfo info, int returnScrollY) {
             activity.getSharedPreferences(ICON_OVERRIDE_PREFS, Context.MODE_PRIVATE).edit()
-                    .putString(PREF_PENDING_CUSTOM_ICON_KEY, info.getPrimaryId()).apply();
+                    .putString(PREF_PENDING_CUSTOM_ICON_KEY, info.getPrimaryId())
+                    .putInt(PREF_PENDING_CUSTOM_ICON_RETURN_SCROLL_Y, returnScrollY)
+                    .putInt(PREF_PENDING_CUSTOM_ICON_CHOICE_SCROLL_Y, currentScrollY(activity))
+                    .putBoolean(PREF_PENDING_CUSTOM_ICON_RESTORE_CHOICE, true).apply();
             beginPickCustomIcon(activity);
         }
 
@@ -12608,21 +14179,24 @@ public final class MaintainedLauncherSettingsHost {
             if (info == null || candidate == null) {
                 return false;
             }
-            String mode = RedirectIconDB.modeOf(info);
-            if (RedirectIconDB.MODE_CUSTOM.equals(mode) || RedirectIconDB.MODE_RESOURCE.equals(mode)) {
+            // The adapter keeps its list for smooth scrolling. Resolve the latest persisted
+            // state here because the global switch updates rows asynchronously in the background.
+            RedirectIconInfo latest = RedirectIconDB.getRedirectIconInfo(activity,
+                    info.packageName, info.componentName);
+            if (latest == null) {
+                latest = info;
+            }
+            String mode = RedirectIconDB.modeOf(latest);
+            if (RedirectIconDB.MODE_CUSTOM.equals(mode) || RedirectIconDB.MODE_RESOURCE.equals(mode)
+                    || RedirectIconDB.MODE_PACK.equals(mode)) {
                 return true;
             }
-            if (isImprovedIconEnabled(activity)) {
-                return true;
-            }
-            if (RedirectIconDB.MODE_ORIGINAL.equals(mode) || !info.useImprovedAppIcon) {
+            if (RedirectIconDB.MODE_ORIGINAL.equals(mode) || !latest.useImprovedAppIcon) {
                 return false;
             }
-            if (info.useImprovedAppIcon) {
-                return true;
-            }
-            return RedirectIconDB.getRedirectIconInfo(activity, info.packageName, info.componentName) == null
-                    && isImprovedIconEnabled(activity);
+            ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
+            if (packedIcon(activity, resolveInfo) != null) return true;
+            return isImprovedIconEnabled(activity);
         }
 
         private Drawable packedIcon(Context context, ResolveInfo info) {
@@ -12632,8 +14206,8 @@ public final class MaintainedLauncherSettingsHost {
                     return null;
                 }
                 Class<?> cls = Class.forName("com.smartisanos.home.settings.icons.IconPackManager");
-                Object icon = cls.getMethod("getPackedIcon", Context.class, String.class)
-                        .invoke(null, context, ai.packageName);
+                Object icon = cls.getMethod("getPackedIcon", Context.class, String.class, String.class)
+                        .invoke(null, context, ai.packageName, ai.name);
                 return icon instanceof Drawable ? (Drawable) icon : null;
             } catch (Throwable ignored) {
                 return null;
@@ -12690,6 +14264,7 @@ public final class MaintainedLauncherSettingsHost {
         if (context == null || info == null || info.activityInfo == null) {
             return null;
         }
+
         ActivityInfo ai = info.activityInfo;
         RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, ai.packageName, ai.name);
         String mode = RedirectIconDB.modeOf(redirect);
@@ -12700,10 +14275,15 @@ public final class MaintainedLauncherSettingsHost {
             }
         }
         if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
-            Drawable custom = safeDrawable(resources, drawable(resources, RedirectIconDB.resourceNameOf(redirect)));
+            Drawable custom = libraryIconDrawable(context, resources, RedirectIconDB.resourceNameOf(redirect));
             if (custom != null) {
                 return custom;
             }
+        }
+        if (RedirectIconDB.MODE_PACK.equals(mode)) {
+            String pack = RedirectIconDB.packNameOf(redirect);
+            return pack == null ? null : com.smartisanos.home.settings.icons.IconPackManager
+                    .getPackedIcon(context, pack, ai.packageName, ai.name);
         }
         boolean useImproved = redirect == null
                 ? isImprovedIconEnabled(context)
@@ -12736,6 +14316,43 @@ public final class MaintainedLauncherSettingsHost {
         return null;
     }
 
+    private static Drawable packedIconFromPackage(Context context, String pack, ResolveInfo info) {
+        ActivityInfo ai = info == null ? null : info.activityInfo;
+        return ai == null ? null : com.smartisanos.home.settings.icons.IconPackManager
+                .getPackedIcon(context, pack, ai.packageName, ai.name);
+    }
+
+    public static Drawable currentLauncherIconDrawable(Context context, String packageName) {
+        if (context == null || TextUtils.isEmpty(packageName)) {
+            return null;
+        }
+        try {
+            Drawable cachedImproved = smartisanNetworkIconDrawable(context, packageName);
+            if (cachedImproved != null) {
+                return cachedImproved;
+            }
+            PackageManager pm = context.getPackageManager();
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setPackage(packageName);
+            java.util.List<ResolveInfo> activities = pm.queryIntentActivities(intent, 0);
+            if (activities == null || activities.isEmpty()) {
+                return null;
+            }
+            ResolveInfo best = activities.get(0);
+            for (ResolveInfo item : activities) {
+                if (item != null && item.activityInfo != null
+                        && item.activityInfo.enabled && item.activityInfo.exported) {
+                    best = item;
+                    break;
+                }
+            }
+            return normalizeLauncherIcon(candidateIconDrawable(context, best, context.getResources()));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     private static Drawable singleAppChoiceDrawable(Context context, ResolveInfo info, Resources resources) {
         if (context == null || info == null || info.activityInfo == null) {
             return null;
@@ -12750,12 +14367,12 @@ public final class MaintainedLauncherSettingsHost {
             }
         }
         if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
-            Drawable custom = safeDrawable(resources, drawable(resources, RedirectIconDB.resourceNameOf(redirect)));
+            Drawable custom = libraryIconDrawable(context, resources, RedirectIconDB.resourceNameOf(redirect));
             if (custom != null) {
                 return custom;
             }
         }
-        return smartisanIconDrawable(context, info, resources);
+        return selectedIconDrawable(context, info, null, resources);
     }
 
     private static Drawable smartisanIconDrawable(Context context, ResolveInfo info, Resources resources) {
@@ -12782,6 +14399,93 @@ public final class MaintainedLauncherSettingsHost {
             return local;
         }
         return smartisanNetworkIconDrawable(context, info);
+    }
+
+    /** Same resolution order as the normal icon path, but never schedules HTTP work. */
+    private static Drawable smartisanIconDrawableCachedOnly(Context context, ResolveInfo info,
+                                                            Resources resources) {
+        ActivityInfo activityInfo = info == null ? null : info.activityInfo;
+        String packageName = activityInfo == null ? null : activityInfo.packageName;
+        String systemAlias = smartisanSystemIconAlias(context, info);
+        if (systemAlias != null) {
+            Drawable alias = libraryIconDrawableNonBlocking(context, resources, systemAlias);
+            if (alias != null) return alias;
+        }
+        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)
+                && LauncherSettingBridge.isDynamicIconPackage(packageName)) {
+            String resourceName = WeatherBridge.isWeatherPackage(packageName, null, null)
+                    ? "static_icon_weather" : "static_icon_calendar";
+            Drawable dynamicFallback = maintainedResourceIcon(context, resources, resourceName);
+            if (dynamicFallback != null) return dynamicFallback;
+        }
+        Drawable local = maintainedResourceIcon(context, resources, smartisanIconNameFor(context, info));
+        if (local != null) return local;
+        return libraryIconDrawableNonBlocking(context, resources,
+                activityInfo == null ? null : activityInfo.packageName);
+    }
+
+    private static Drawable libraryIconDrawable(Context context, Resources resources, String name) {
+        if (name == null || name.length() == 0) {
+            return null;
+        }
+        Drawable local = maintainedResourceIcon(context, resources, name);
+        if (local != null) {
+            return local;
+        }
+        return smartisanNetworkIconDrawable(context, name);
+    }
+
+    private static Drawable libraryIconDrawableNonBlocking(Context context, Resources resources, String name) {
+        if (name == null || name.length() == 0) {
+            return null;
+        }
+        Drawable local = maintainedResourceIcon(context, resources, name);
+        if (local != null) {
+            return local;
+        }
+        Bitmap cached = null;
+        synchronized (sSmartisanIconCache) {
+            cached = sSmartisanIconCache.get(name);
+        }
+        if (cached != null) {
+            return new android.graphics.drawable.BitmapDrawable(context.getResources(), cached);
+        }
+        // The choice grid is built from libraryIconStored(), which also sees
+        // the persistent cache. Reload that local PNG here after a process
+        // restart so a valid disk entry cannot become an empty grid cell just
+        // because the in-memory bitmap map has not been warmed yet.
+        Bitmap diskCached = readCachedSmartisanIcon(context, name);
+        if (diskCached != null) {
+            synchronized (sSmartisanIconCache) {
+                sSmartisanIconCache.put(name, diskCached);
+            }
+            return new android.graphics.drawable.BitmapDrawable(context.getResources(), diskCached);
+        }
+        return null;
+    }
+
+    private static boolean libraryIconAvailable(Context context, Resources resources, String name) {
+        if (name == null || name.length() == 0) {
+            return false;
+        }
+        if (maintainedResourceIcon(context, resources, name) != null) {
+            return true;
+        }
+        return readCachedSmartisanIcon(context, name) != null;
+    }
+
+    private static boolean libraryIconStored(Context context, Resources resources, String name) {
+        if (name == null || name.length() == 0) {
+            return false;
+        }
+        if (drawable(resources, name) != 0) {
+            return true;
+        }
+        synchronized (sSmartisanIconCache) {
+            if (sSmartisanIconCache.get(name) != null) return true;
+        }
+        File file = smartisanIconCacheFile(context, name);
+        return file != null && file.exists() && file.length() > 0;
     }
 
     /**
@@ -12813,6 +14517,26 @@ public final class MaintainedLauncherSettingsHost {
         }
         if (isContactsActivity(info, label)) {
             return "com.android.contacts";
+        }
+
+        // File managers often use an Activity containing "browser".  Check the
+        // visible file-management identity before the broad browser rule.
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"filemanager", "fileexplorer", "file.manager", "file_manager", "documentsui"},
+                new String[]{"文件管理", "文件管理器", "文件浏览器", "files"})) {
+            return "com.smartisanos.filemanager";
+        }
+        // Use the cross-ROM video category asset for vendor system video
+        // players. The original Smartisan player artwork remains selectable
+        // through the category's variants.json entry.
+        if (isSystemIconCategory(key, label, allowPackageMatch,
+                new String[]{"videoplayer", "video.player", "video", "movie"},
+                new String[]{"视频", "视频播放器", "video", "movies"})) {
+            return "com.android.VideoPlayer";
+        }
+        // Do not force a category icon onto vendor device-search activities.
+        if ("设备搜索".equals(label) || "device search".equals(label)) {
+            return null;
         }
 
         if (isSystemIconCategory(key, label, allowPackageMatch,
@@ -12866,11 +14590,6 @@ public final class MaintainedLauncherSettingsHost {
             return "com.smartisanos.calculator";
         }
         if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"filemanager", "fileexplorer", "file.manager", "file_manager"},
-                new String[]{"文件管理", "文件管理器", "文件", "files"})) {
-            return "com.smartisanos.filemanager";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
                 new String[]{"compass"},
                 new String[]{"指南针", "compass"})) {
             return "com.smartisanos.compass";
@@ -12884,11 +14603,6 @@ public final class MaintainedLauncherSettingsHost {
                 new String[]{"music", "audio.player"},
                 new String[]{"音乐", "music"})) {
             return "com.smartisanos.music";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"video", "videoplayer"},
-                new String[]{"视频", "视频播放器", "video"})) {
-            return "com.smartisanos.videoplayerproject";
         }
         if (isSystemIconCategory(key, label, allowPackageMatch,
                 new String[]{"weather"},
@@ -13159,9 +14873,8 @@ public final class MaintainedLauncherSettingsHost {
             return null;
         }
         synchronized (sSmartisanIconCache) {
-            if (sSmartisanIconCache.containsKey(packageName)) {
-                return sSmartisanIconCache.get(packageName);
-            }
+            Bitmap memoryCached = sSmartisanIconCache.get(packageName);
+            if (memoryCached != null) return memoryCached;
         }
         Bitmap cached = readCachedSmartisanIcon(context, packageName);
         if (cached != null) {
@@ -13277,7 +14990,11 @@ public final class MaintainedLauncherSettingsHost {
         SMARTISAN_ICON_FETCH_EXECUTOR.execute(new Runnable() {
             public void run() {
                 try {
-                    smartisanNetworkIconBitmap(appContext, packageName, true);
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    Bitmap downloaded = smartisanNetworkIconBitmap(appContext, packageName, true);
+                    if (downloaded != null && isImprovedIconEnabled(appContext)) {
+                        promoteDownloadedImprovedIcon(appContext, packageName);
+                    }
                 } finally {
                     synchronized (sSmartisanIconFetchPending) {
                         sSmartisanIconFetchPending.remove(packageName);
@@ -13285,6 +15002,27 @@ public final class MaintainedLauncherSettingsHost {
                 }
             }
         });
+    }
+
+    private static void promoteDownloadedImprovedIcon(Context context, String packageName) {
+        if (context == null || TextUtils.isEmpty(packageName) || packageName.indexOf('_') >= 0) return;
+        try {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setPackage(packageName);
+            List<ResolveInfo> matches = context.getPackageManager().queryIntentActivities(intent, 0);
+            for (int i = 0; matches != null && i < matches.size(); i++) {
+                ActivityInfo ai = matches.get(i) == null ? null : matches.get(i).activityInfo;
+                if (ai == null || !packageName.equals(ai.packageName)) continue;
+                RedirectIconInfo stored = RedirectIconDB.getRedirectIconInfo(context, ai.packageName, ai.name);
+                String mode = RedirectIconDB.modeOf(stored);
+                if (stored == null || RedirectIconDB.MODE_ORIGINAL.equals(mode)
+                        || RedirectIconDB.MODE_AUTO.equals(mode)) {
+                    RedirectIconDB.updateAutoIcon(context, ai.packageName, ai.name);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static Bitmap readCachedSmartisanIcon(Context context, String packageName) {
@@ -13435,18 +15173,8 @@ public final class MaintainedLauncherSettingsHost {
             if (ai == null || ai.packageName == null) {
                 return null;
             }
-            Class<?> cls = Class.forName("com.smartisanos.home.settings.icons.IconPackManager");
-            try {
-                Object icon = cls.getMethod("getPackedIcon", Context.class, String.class, String.class)
-                        .invoke(null, context, ai.packageName, ai.name);
-                if (icon instanceof Drawable) {
-                    return (Drawable) icon;
-                }
-            } catch (NoSuchMethodException ignored) {
-            }
-            Object icon = cls.getMethod("getPackedIcon", Context.class, String.class)
-                    .invoke(null, context, ai.packageName);
-            return icon instanceof Drawable ? (Drawable) icon : null;
+            return com.smartisanos.home.settings.icons.IconPackManager
+                    .getPackedIconNonBlocking(context, ai.packageName, ai.name);
         } catch (Throwable ignored) {
             return null;
         }
@@ -13810,6 +15538,29 @@ public final class MaintainedLauncherSettingsHost {
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             int expandSpec = View.MeasureSpec.makeMeasureSpec(Integer.MAX_VALUE >> 2, View.MeasureSpec.AT_MOST);
             super.onMeasure(widthMeasureSpec, expandSpec);
+        }
+    }
+
+    private static final class SquareFrameLayout extends FrameLayout {
+        SquareFrameLayout(Context context) {
+            super(context);
+        }
+
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            int size = View.MeasureSpec.getSize(widthMeasureSpec);
+            int exact = View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY);
+            super.onMeasure(exact, exact);
+        }
+    }
+
+    private static final class IconPageData {
+        final IconManager iconManager;
+        final List<RedirectIconInfo> entries;
+
+        IconPageData(IconManager iconManager, List<RedirectIconInfo> entries) {
+            this.iconManager = iconManager;
+            this.entries = entries == null
+                    ? new ArrayList<RedirectIconInfo>() : entries;
         }
     }
 

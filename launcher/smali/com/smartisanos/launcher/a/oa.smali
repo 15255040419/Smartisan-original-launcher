@@ -559,32 +559,10 @@
 .method public static fd()V
     .locals 2
 
-    .line 1
-    sget-object v0, Lcom/smartisanos/launcher/a/oa;->jk:Landroid/app/AlertDialog;
-
-    if-nez v0, :cond_1
-
-    .line 2
-    sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
-
-    if-eqz v0, :cond_0
-
-    sget-object v0, Lcom/smartisanos/launcher/a/oa;->log:Lcom/smartisanos/launcher/va;
-
-    const-string v1, "cancelUninstallWithoutAnim nothing to do by mUninstallDialog is null"
-
-    invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/va;->info(Ljava/lang/String;)V
-
-    :cond_0
-    return-void
-
-    :cond_1
     const/4 v0, 0x1
 
-    .line 3
     sput-boolean v0, Lcom/smartisanos/launcher/a/oa;->kk:Z
 
-    .line 4
     new-instance v0, Lcom/smartisanos/launcher/a/T;
 
     const/16 v1, 0x64
@@ -593,7 +571,6 @@
 
     const/4 v1, 0x0
 
-    .line 5
     invoke-virtual {v0, v1}, Lcom/smartisanos/smengine/n;->q(F)V
 
     return-void

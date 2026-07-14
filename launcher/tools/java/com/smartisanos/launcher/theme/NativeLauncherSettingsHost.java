@@ -368,9 +368,11 @@ public final class NativeLauncherSettingsHost {
     }
 
     private static void saveLauncherMode(Context context, int mode) {
+        // The preference stores 20, but the original base-page id for a
+        // 4 x 5 board is PAGE_1_4X5_MODE (9).
+        int oldPageMode = readLauncherMode(context) == 20 ? 9 : 12;
         int pageMode = mode == 20 ? 9 : 12;
         int multiBlockMode = mode == 20 ? 0x50 : 0x30;
-        writeLauncherModePref(context, mode);
         try {
             Settings.Global.putInt(context.getContentResolver(), "launcher_mode", mode);
             Settings.Global.putInt(context.getContentResolver(), "launcher_multi_block_mode", multiBlockMode);
@@ -378,23 +380,8 @@ public final class NativeLauncherSettingsHost {
             Settings.Global.putInt(context.getContentResolver(), "launcher_grids_y", mode == 20 ? 5 : 4);
         } catch (Throwable ignored) {
         }
-        try {
-            Class<?> cls = Class.forName("com.smartisanos.launcher.data.N");
-            Object instance = cls.getMethod("getInstance").invoke(null);
-            cls.getMethod("d", Context.class, Integer.TYPE).invoke(instance, context, pageMode);
-        } catch (Throwable ignored) {
-        }
-        restartLauncher(context);
-    }
-
-    private static void writeLauncherModePref(Context context, int mode) {
-        try {
-            context.getSharedPreferences("com.smartisanos.launcher_prefs", 0)
-                    .edit()
-                    .putInt("prefs_key_launcher_mode", mode)
-                    .commit();
-        } catch (Throwable ignored) {
-        }
+        MaintainedLauncherSettingsHost.migrateLauncherModeAndRestart(
+                context, oldPageMode, pageMode);
     }
 
     private static void restartLauncher(final Context context) {

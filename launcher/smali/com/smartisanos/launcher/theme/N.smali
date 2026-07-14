@@ -121,7 +121,7 @@
     if-lez v1, :cond_3
 
     .line 7
-    invoke-virtual {p1, v0}, Landroid/content/pm/ApplicationManager;->unInstallPackage(Ljava/lang/String;)V
+    invoke-static {v0}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstall(Ljava/lang/String;)V
 
     .line 8
     :cond_3

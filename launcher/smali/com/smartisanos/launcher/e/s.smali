@@ -9626,6 +9626,10 @@
 
     invoke-virtual {v1, v2, v0}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
+    invoke-static/range {v18 .. v18}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->normalizeNotificationBadgeBitmap(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+
+    move-result-object v18
+
     return-object v18
 .end method
 

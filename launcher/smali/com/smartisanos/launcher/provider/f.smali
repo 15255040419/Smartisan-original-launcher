@@ -383,6 +383,26 @@
 
     move-result-object v1
 
+    invoke-static {}, Lcom/smartisanos/launcher/ja;->getInstance()Lcom/smartisanos/launcher/ja;
+
+    move-result-object v6
+
+    invoke-virtual {v6}, Lcom/smartisanos/launcher/ja;->getApplication()Landroid/app/Application;
+
+    move-result-object v6
+
+    iget-object v7, p0, Lcom/smartisanos/launcher/provider/f;->val$pkg:Ljava/lang/String;
+
+    invoke-static {v6, v7}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->loadPendingIconDrawable(Landroid/content/Context;Ljava/lang/String;)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v7
+
+    if-eqz v7, :cond_install_icon_keep_default
+
+    move-object v1, v7
+
+    :cond_install_icon_keep_default
+
     .line 37
     invoke-static {v1}, Lcom/smartisanos/launcher/e/s;->b(Landroid/graphics/drawable/Drawable;)[B
 

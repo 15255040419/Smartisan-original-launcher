@@ -295,6 +295,10 @@
 .method public unInstallPackage(Ljava/lang/String;)V
     .locals 7
 
+    invoke-static {p1}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstall(Ljava/lang/String;)V
+
+    return-void
+
     if-eqz p1, :cond_5
 
     const-string v0, ""
@@ -532,6 +536,10 @@
 .method public unInstallPackageWithAppGlobals(Lcom/smartisanos/launcher/data/ItemInfo;)V
     .locals 3
 
+    invoke-static {p1}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstallItem(Ljava/lang/Object;)V
+
+    return-void
+
     .line 1
     iget-object v0, p1, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
 
@@ -629,6 +637,10 @@
 
 .method public unInstallPackageWithAppGlobals(Ljava/lang/String;)V
     .locals 12
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstall(Ljava/lang/String;)V
+
+    return-void
 
     if-eqz p1, :cond_5
 

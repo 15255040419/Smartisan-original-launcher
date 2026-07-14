@@ -173,20 +173,66 @@
 
     const/4 v2, 0x0
 
-    # The composed weather/calendar bitmap is already a complete icon. Draw it
-    # directly into the ordinary icon canvas instead of retaining a second base
-    # icon underneath. This also maps every user icon size through one canvas.
-    const/4 v2, 0x0
+    # On the port, p1 is the complete static application icon rather than the
+    # shadow-only base used by the original Smartisan package. Drawing it here
+    # duplicates the weather/calendar artwork underneath the live frame. The
+    # ordinary Cell shadow is attached separately by g.rl(), so p1 only defines
+    # the output canvas bounds.
 
+    .line 7
     invoke-virtual {p1}, Landroid/graphics/Bitmap;->getWidth()I
+
+    move-result v2
+
+    invoke-virtual {p2}, Landroid/graphics/Bitmap;->getWidth()I
+
     move-result v3
+
+    sub-int/2addr v2, v3
+
+    div-int/lit8 v2, v2, 0x2
+
+    int-to-float v2, v2
+
+    .line 8
+    invoke-virtual {p2}, Landroid/graphics/Bitmap;->getWidth()I
+
+    move-result v3
+
     int-to-float v3, v3
 
-    const/4 v5, 0x0
+    add-float/2addr v3, v2
 
-    invoke-virtual {p1}, Landroid/graphics/Bitmap;->getHeight()I
+    .line 9
+    invoke-static {}, Lcom/smartisanos/launcher/view/activeicon/a;->sq()F
+
     move-result v4
+
+    .line 10
+    invoke-virtual {p1}, Landroid/graphics/Bitmap;->getHeight()I
+
+    move-result v5
+
+    invoke-virtual {p2}, Landroid/graphics/Bitmap;->getHeight()I
+
+    move-result v6
+
+    sub-int/2addr v5, v6
+
+    div-int/lit8 v5, v5, 0x2
+
+    int-to-float v5, v5
+
+    sub-float/2addr v5, v4
+
+    .line 11
+    invoke-virtual {p2}, Landroid/graphics/Bitmap;->getHeight()I
+
+    move-result v4
+
     int-to-float v4, v4
+
+    add-float/2addr v4, v5
 
     .line 12
     new-instance v6, Landroid/graphics/Rect;

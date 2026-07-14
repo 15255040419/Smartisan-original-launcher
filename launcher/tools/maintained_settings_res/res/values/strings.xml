@@ -163,7 +163,7 @@
     <string name="obsession_badge_notification_access">Notification access is required for badges. Tap to configure.</string>
     <string name="obsession_badge_notification_access_action">Tap to configure</string>
     <string name="obsession_header_title">OCD Settings</string>
-    <string name="obsession_hide_badge">Hide Icon Badge</string>
+    <string name="obsession_hide_badge">Show Icon Badges</string>
     <string name="obsession_hide_lable">Hide Icon Labels</string>
     <string name="hide_navigation_bar_label">Hide Navigation Bar On Home Screen</string>
     <string name="ocd_setting">OCD Settings</string>
@@ -610,7 +610,7 @@
     <string name="hello_world">Hello world!</string>
     <string name="launcher_color_sort_sub_text">Sort App Icon By Color</string>
     <string name="launcher_color_sort_text">Launcher Color Sort</string>
-    <string name="more_current_version_txt">1.5.3</string>
+    <string name="more_current_version_txt">1.5.4</string>
     <string name="os_update_dlg_cancel_btn">稍后更新</string>
     <string name="os_update_dlg_msg">检测到系统版本过低，为保证您个人信息安全，正常使用手机完整功能，请 Smartisan 用户尽快升级到最新系统版本！</string>
     <string name="os_update_dlg_ok_btn">现在更新</string>

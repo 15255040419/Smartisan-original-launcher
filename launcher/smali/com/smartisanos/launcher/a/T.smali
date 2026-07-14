@@ -43,42 +43,6 @@
 
     .line 3
     :cond_1
-    invoke-static {}, Lcom/smartisanos/launcher/view/Eb;->getInstance()Lcom/smartisanos/launcher/view/Eb;
-
-    move-result-object p0
-
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/Eb;->zh()Lcom/smartisanos/launcher/view/V;
-
-    move-result-object p0
-
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/V;->Xo()Lcom/smartisanos/launcher/view/Sc;
-
-    move-result-object p0
-
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/Sc;->mq()Z
-
-    move-result p0
-
-    if-eqz p0, :cond_3
-
-    .line 4
-    sget-boolean p0, Lcom/smartisanos/launcher/va;->DBG:Z
-
-    if-eqz p0, :cond_2
-
-    invoke-static {}, Lcom/smartisanos/launcher/a/oa;->access$000()Lcom/smartisanos/launcher/va;
-
-    move-result-object p0
-
-    const-string v0, "trash animation is running, so return !"
-
-    invoke-virtual {p0, v0}, Lcom/smartisanos/launcher/va;->info(Ljava/lang/String;)V
-
-    :cond_2
-    return-void
-
-    .line 5
-    :cond_3
     invoke-static {}, Lcom/smartisanos/launcher/a/oa;->hd()V
 
     return-void

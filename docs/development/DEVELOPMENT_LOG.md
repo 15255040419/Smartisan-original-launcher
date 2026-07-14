@@ -1,0 +1,1376 @@
+# 开发与修复记录
+
+## 本文档职责
+
+本文档负责记录 BUG 根因、修复方式、验证过程、回归注意和历史决策。每次修 BUG、改行为、推翻旧方案、做 ADB / 真机验证后，都要在这里新增倒序日期记录，并同步维护顶部“当前状态总览”。
+
+每日记录固定使用两级结构：`### YYYY-MM-DD` 表示日期，`#### 事项标题` 表示当天的具体修改；同一天的新内容追加在该日期下方，不得重复创建日期标题。被推翻的事项在标题前标记 `【已废弃】`，只保留标题，不保留可能误导后续修改的旧正文。
+
+本文档和其他文档的边界：
+
+- README 只放当前安装方式、当前能力、版本 / 兼容基线和关键防回归规则；不要把本文档的每日流水复制进 README。
+- `docs/architecture/APK_STRUCTURE.md` 负责原始 APK、反编译目录、主题包身份和 Release 资产筛选规则；本文档只在修复过程需要时引用结论。
+- `docs/build/BUILD_GUIDE.md` 负责构建工具、PATH、签名、版本号写入点和二进制 Manifest 修改；本文档不重复这些脚本细节。
+- 如果本文档历史小节和顶部“当前状态总览”冲突，以顶部“当前状态总览”和最近日期记录为准。
+
+注意：本文档正文只保留当前可信结论和倒序每日修复记录。被真机验证推翻的整节方案只保留日期与标题，并统一标记为“【已废弃】”；正文已清空，不得根据标题猜测或恢复旧实现。如果其他文档与顶部“当前状态总览”冲突，以当前状态总览和最近日期记录为准。
+
+构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
+
+## 当前状态总览（2026-07-14）
+
+- 构建产物为 `build\launcher-signed.apk`；构建、zipalign、v1/v2/v3 签名和 ADB 覆盖安装均已验证。
+- 普通 Android 不存在锤子专用全局键 `sm_launcher_left_screen_state` 时，负一屏默认关闭；首页向右拖动继续执行原版 `PageView.updateScroll()` 的阻尼位移，松手回弹到第一页。不得再次把缺失的系统键默认解释为已开启负一屏，也不得删除原版边界回弹算法。
+- 设置页一级、二级和三级页面的 `ScrollView`、`ListView`、`GridView` 统一保持 `OVER_SCROLL_ALWAYS`；到达顶部或底部继续拖动时使用现代 Android 的系统拉伸效果并在松手后回弹。不得再在 Java 公共调校中递归写入 `OVER_SCROLL_NEVER` 覆盖 maintained 资源。
+- 宫格遵循原版：12 -> 20 只切换运行布局，保留同一板块全部图标、顺序与格子位置；20 -> 12 仅在单板块超过 12 个时按原顺序拆到后续板块。
+- 单应用替换支持系统原图、已安装图标包、已缓存的改进版图标和相册自定义图标；展示名称只影响桌面文案，图标匹配始终按包名/组件名进行。
+- 首次安装默认关闭改进版图标、动态天气和日历、图标角标、紧贴屏幕横扫清除角标；图标包预热仅扫描本地已安装 APK 资源，不下载在线图片。
+- 普通应用首帧已恢复原版快速路径：未启用改进版、未选图标包且没有单应用覆盖时直接调用 `PackageManager.getApplicationIcon()`；自定义/图标包/改进版才进入兼容图标链。在线图片只在后台下载并持久缓存，图标包 `appfilter` 只在后台预热，在线 Bitmap 内存缓存限制为 8 MiB。
+- 设置页面切换和桌面重载仍需持续真机回归。任何宫格切换不得再自行重排、按 9 宫格解释 20 宫格，或绕过原版数据库线程调用迁移。
+- 普通主题和毛玻璃主题必须等待原版消息生成、提交过渡截图、退出设置页并返回 HOME，再由 `J.onResume()` 消费 `a.r.sj` 中唯一的主题消息；maintained 设置宿主不得在前台直接调用 `a.r.a(Message)` 或 `a.r.b(Message)`。透明主题只写 `launcher_grid_theme`，不生成普通主题消息，也不得走 `J.a(theme, message)` 热加载；透明覆盖通过独立 Launcher 冷启动初始化。Launcher 状态栏和导航栏保持透明。
+- 设置弹窗统一复用同一锤子风格根容器；应用改名、图标包选择和图标大小弹窗均使用统一宽度、圆角、标题、分隔线和按钮容器。动态天气/日历继续使用原版 ActiveIcon 数据更新与恢复链路，不在每次桌面翻页时触发定位或联网；当前移植版的完整静态应用图标不得作为 ActiveIcon 底板再次绘制。动态缓存帧使用原版 `icon_shadow_radius` / `icon_shadow_color` 两层软件阴影参数合成，不能强制启用在现代 Android 上会崩溃的私有 `sc[27]` GL 阴影链。
+- 在线图标库保留完整文件索引；同一应用的多版本 PNG 只通过 `icons/variants.json` 归组。不得以 `_2/_3` 后缀为由批量删除或重命名；系统视频跨 ROM 使用 `com.android.VideoPlayer` 类别图，原锤子视频图仍作为可选候选保留。
+## 阅读顺序
+
+建议按下面顺序接手，不要从文件中间的旧计划直接开始：
+
+1. 先读本节“当前状态总览”，确认哪些已经完成、哪些还待验证。
+2. 再读“每日修复记录（倒序）”，按日期倒序查最近改动。
+3. 旧错误实验只保留日期和标题，并标记为“【已废弃】”；不得按标题猜测实现。
+4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
+
+## 每日修复记录（倒序）
+
+### 2026-07-13
+
+#### 恢复所有设置页面的顶部/底部拉伸回弹
+
+- 用户现象：当前设置页滚动到顶部或底部后继续拖动没有任何反馈；maintained 参考项目会随手势产生带阻力的边缘拉伸，松手后回弹。
+- 根因：maintained 的 `setting_main.xml`、`app_icon_settings_layout.xml`、`launcher_anim_chooser_layout.xml` 等滚动容器原本统一声明 `android:overScrollMode="always"`，当前资源也保留了这些属性；但 `MaintainedLauncherSettingsHost.tuneScrollBars()` 在页面绑定后递归把每个 View 改成 `OVER_SCROLL_NEVER`，程序化创建的应用图标列表和单应用替换图标页也显式禁用了 overscroll，因此 XML 行为被 Java 覆盖。
+- 修复：沿用 maintained 的系统实现，不新增自绘动画。公共调校只对真正可纵向滚动的 `ScrollView` 和 `AbsListView`（包含 `ListView` / `GridView`）设置 `OVER_SCROLL_ALWAYS`，并在统一 `setSettingsContentView()` 页面装载入口执行，覆盖一级、二级和三级设置页；三个程序化滚动容器同步移除 `OVER_SCROLL_NEVER`。普通 View 不参与 overscroll，弹窗内部仅在正文过长时滚动的区域继续保持原逻辑。
+- 回归注意：隐藏滚动条、关闭快速滚动和关闭文本筛选等原设置页调校保持不变；不得为此引入逐页自绘弹簧动画。Android 12+ 使用系统 stretch，较旧系统可能呈现平台原生边缘反馈。
+
+验证：`build.bat` 已完成 maintained 设置资源构建、apktool 回编译、Java 兼容宿主编译、dex 合并、zipalign 和签名；`aapt2 dump badging` 确认为 `com.smartisanos.launcher v1.5.3 (28)`，`apksigner verify` 确认 v1/v2/v3 签名有效。本次 ADB 设备列表为空，边缘拉伸幅度和所有三级页面的真机触感仍待设备连接后确认。
+
+#### 修复首页向右拖动无反馈，恢复原版边界回弹
+
+- 用户现象：首页向左可以正常进入第二页，但在第一页向右拖动完全没有位移，视觉上像触摸失效；maintained 参考项目会产生带阻力的越界位移，并在松手后回到第一页。
+- 根因：当前 `PageView.updateScroll()` 和 `PageScrollAnimation.updateScroll()` 本身保留了原版 `SCROLL_PARA_TABLE` 阻尼曲线，但原版会在 `Constants.sLeftScreenEnabled=true` 时把首页正向位移钳制为 `0`，将手势交给锤子系统负一屏。原版锤子系统始终提供全局键 `sm_launcher_left_screen_state`，而普通 Android 没有该键；`ua.f(Context)` 却使用 `1` 作为缺省值，导致移植环境误判负一屏已开启并吃掉回弹。
+- 修复：保留原版分页、阻尼和松手回弹实现，仅将缺失全局键时的默认值由开启改为关闭；读取到真实键值 `1` 时仍按原版启用负一屏。这样普通 Android 首页向右拖动会显示原版弹簧阻力，松手仍停在第一页，首页向左翻页不受影响。
+- 对照：`clean_launcher` 与当前 APK 均包含负一屏钳制；maintained 已移除负一屏依赖，因此不会触发该钳制。此次修改修正的是移植环境的系统设置缺省语义，不是重写触摸或动画。
+
+验证：`build.bat` 已完成 apktool Smali 回编译、maintained 设置资源构建、Java 兼容宿主编译、dex 合并、zipalign 和签名；`aapt2 dump badging` 确认为 `com.smartisanos.launcher v1.5.3 (28)`。本次 ADB 设备列表为空，首页右拖阻尼距离和松手回弹仍待设备连接后真机确认。
+
+#### 动态天气/日历阴影根因修复与图标设置弹窗统一
+
+- 动态阴影根因：当前 `ActiveIconView.a(base, active)` 已转到 `LauncherSettingBridge.composeActiveIconToBaseBounds()`；该方法为避免双层图标只把动态主体画进新的透明 Bitmap，却完全没有生成阴影。此前在 ActiveIcon 节点创建后补调 `g.rl()` 只影响私有 3D 阴影节点，不能进入最终缓存 Bitmap，而且该 `sc[27] + MutiTexMaterial` 链在现代 Android 上存在已验证崩溃风险，因此视觉上始终没有稳定阴影。
+- 最终修复：保持 v1.5.3 已验证的 `73.32%` 动态主体比例和纵向锚点不变；先把动态主体绘制到普通图标画布，再读取原版资源中的 `icon_shadow_radius` / `icon_shadow_color`（透明主题使用对应 transparent 数组），按照原版 `data/L` 的 `extractAlpha + BlurMaskFilter` 思路生成两层软件阴影，最后覆盖动态主体。完整静态天气/日历图标仍不参与绘制，不会重新出现双层图案。
+- 删除 ActiveIcon 创建尾部无效的 `rl()` 补丁，避免重复创建私有 GL 阴影节点和恢复已废弃崩溃链。
+- 图标包选择不再使用系统 `AlertDialog.Builder.setItems()`；改为复用 `prepareSmartisanDialogRoot()`、统一标题/分隔线/列表按压态/底部取消按钮，并标明当前选择。选择、后台预热和桌面刷新逻辑保持不变。
+- 桌面图标大小弹窗宽度统一为 `min(380dp, screenWidth - 32dp)`；移除预览区额外的渐变背景、描边和圆角框，只保留当前百分比、大小预览、滑杆与刻度，底部按钮继续复用统一组件。
+
+验证：`build.bat` 已完成 maintained 设置资源构建、apktool 回编译、Java 兼容层编译、dex 合并、zipalign 和签名；`aapt2 dump badging` 确认为 `com.smartisanos.launcher v1.5.3 (28)`。本次 ADB 服务可启动，但设备列表为空，动态阴影视觉和三个弹窗的真机尺寸仍待设备连接后确认。
+
+#### 桌面图标首帧恢复原版快速路径与分层缓存
+
+- 根因：当前 `view/a/g.1.smali::vl()` 对所有普通应用无条件调用 `MaintainedLauncherSettingsHost.loadIconForDesktopItem()`；该兼容链会解析组件、查询 `RedirectIconDB`、检查图标包和在线缓存，返回后 Smali 又调用一次 `normalizeLauncherIcon()`。即使首次安装已经默认关闭改进版图标，普通应用仍承担完整兼容调度和重复归一化，因此首屏进入速度没有恢复到原版。
+- 原版对照：`clean_launcher_raw` 的同一 `vl()` 在普通用户分支直接调用 `PackageManager.getApplicationIcon(packageName)`，然后转 Bitmap 并按 `icon_size_with_shadow` 缩放，不经过 Java 图标调度器。
+- 修复：新增只读元数据、不解码自定义 PNG 的轻量覆盖判定。仅当全局改进版开启、图标包模式启用，或该组件存在 `AUTO/RESOURCE/PACK/CUSTOM` 覆盖时才进入现有兼容链；其余应用直接恢复原版 `getApplicationIcon()`。兼容链内部已经统一归一化，Smali 的第二次归一化已删除。
+- 图标包：新增无扫描的持久模式判断和非阻塞读取。冷启动尚未解析所选图标包时，桌面先显示系统原图，只启动一个后台线程解析 `appfilter`；完成后统一触发数据库/桌面图标刷新。不得再在 Launcher 模型线程同步解析整份图标包 XML。
+- 在线图标：继续保持“内存 -> `files/online_icon_cache_v3` -> 后台双镜像下载”的顺序；首帧未命中时立即回退系统原图，HTTP 只允许在专用执行器中运行，下载完成落盘后再刷新对应桌面图标。进程内 Bitmap 缓存由无上限 `HashMap` 改为按像素占用计费的 8 MiB `LruCache`，磁盘持久缓存不变。
+- 回归约束：单应用改名只有展示名时不能误判为图标覆盖；自定义相册图标仍只在真正命中该组件时读取磁盘字节；图标包和在线资源未就绪时必须显示原图，不能阻塞首帧或留下空白占位。
+
+验证：`build.bat` 已完成 apktool 重打包、Java 兼容宿主编译、dex 合并、zipalign 和签名；`aapt2 dump badging` 确认为 `com.smartisanos.launcher v1.5.3 (28)`，`apksigner verify` 确认 v1/v2/v3 均为 true。本次 ADB 设备列表为空，尚未完成真机冷启动耗时、图标包后台回填和在线图标下载后刷新验证。
+
+#### 修复动态天气和日历双层图标
+
+- 根因：原版 `ActiveIconView.a(base, active)` 假定 `base` 是原版包提供的底板/阴影，但当前移植链路传入的是完整静态天气或日历图标。恢复原版“先画 base、再画 active”后，两份完整图案被同时绘制，真机表现为大小不同的双边框、双层日历。
+- 修复：合成缓存图时仅使用静态图标确定输出画布尺寸，不再把完整静态图标绘入画布，最终只显示一份动态天气或日历本体。
+- 回归：不得再次在 ActiveIcon 合成结果下方绘制完整应用图标，也不能恢复已废弃的人工 `_shadow` 资源方案。
+
+#### 恢复 v1.5.3 已验证的动态天气和日历尺寸链
+
+- 回归根因：处理双层图标时，不仅移除了错误的完整静态底板，还误删了 `v1.5.3` 已真机确认的动态几何链。实时 `WeatherView` / `CalendarView` 不再乘 `94%` 外层修正，动画结束后的缓存帧也绕过了 `composeActiveIconToBaseBounds()` 的 `73.32%` 画布比例与原版纵向校正，导致天气和日历同时缩小、结束帧和实时帧职责再次混乱。
+- 修复：精确恢复 `release v1.5.3` 的几何实现：实时节点继续保留原版 `useSmallActiveIcon(mode)` 与 `nc(vm)` 分支，并乘 `0.94`；缓存帧继续按普通图标画布的 `0.7332` 比例和 `0.05487805` 纵向校正合成，最终位置仍由原版 `sq()` 负责。合成时只画动态前景，不画传入的完整静态应用图标，因此不会重新出现双层。
+- 阴影结论：普通静态图标的安全软件阴影在图标数据库 Bitmap 生成阶段完成，实时 ActiveIcon 是独立 SceneNode，不能直接共享完整静态图标 Bitmap。原版 `sc[27] + MutiTexMaterial` 是另一条私有 GL 阴影链，已在 Android 16 真机验证会崩溃；当前继续使用原版 ActiveIcon 底图保留的低 alpha 柔和投影，不恢复私有 GL 阴影或人工 `_shadow` 资源。
+- 验证：已完成 `build.bat` 全量重打包、Java 兼容宿主编译、dex 合并、zipalign 与签名。当前 ADB 设备列表为空，尺寸和阴影视觉仍需设备重新连接后做真机对比；回归基准为 `v1.5.3` 的尺寸正常状态，而不是后续缩小或双层状态。
+
+#### 应用改名弹窗接入统一锤子风格容器
+
+- 根因：应用名称修改页仍单独使用 `smt_dialog_bg_full`、`smt_dialog_header`、`smt_dialog_footer` 与独立按钮背景，和已统一的确认、信息、检查更新、图标大小弹窗不是同一条构建链路，导致标题颜色、底部圆角、按钮高度和键盘弹出后的视觉均不一致。
+- 修复：`showRenameIconDialog()` 改为复用 `prepareSmartisanDialogRoot()`、`smartisanDivider()` 和 `smartisanDialogActionButton()`；标题、面板圆角、`clipToOutline`、分隔线与双按钮的 `56dp` 高度完全沿用已验证的统一组件。改名输入框与即时写入/刷新逻辑保持不变。
+
+#### 【已废弃】动态天气和日历的专用阴影资源选择修复（生成主题专用阴影会抹掉原版半透明边缘）
+
+- 此方案只修复了前景路径误改问题，但将完整底框改到人工生成的 `_shadow*` 文件，并在生成时裁掉了原版 PNG 中 alpha 小于 `128` 的柔和边缘；因此透明主题下天气和日历仍明显比普通图标淡。保留本标题作为历史，不再使用该资源选择方式。
+
+#### 【已废弃】动态天气和日历复用原版底图阴影（只恢复 PNG 不足以恢复完整合成阴影）
+
+#### 【已废弃】动态天气和日历恢复原版 ActiveIcon 合成与实时缩放（完整静态图标被误当作底板，造成双层）
+
+#### 通知使用权未授权时角标开关保持关闭
+
+- 开启“显示图标上的角标”或“紧贴屏幕横扫清除角标”时，若尚未授予通知使用权，只提示并跳转系统授权页，不写入开关状态、不触发桌面角标逻辑；用户授权后需要再次手动开启。
+
+#### 天气定位、更新与原版动态刷新链路核对
+
+- 对照 `smartisan-launcher-maintained`：它优先读取 `LocationManager` 的最后位置，再用本地 `CityDatabaseHelper`/NMC 城市索引匹配站点，最后通过后台 `WeatherForceSyncTask` 请求中国气象数据并回写天气对象。因此“快”主要来自已有位置和本地城市匹配，不是每次打开页面都重新定位。
+- 当前 `WeatherBridge` 已采用同类策略：优先使用 network/passive/GPS 的最近位置、六小时位置缓存和本地城市站点；天气数据正常一小时 TTL，只有过期、手动刷新、城市/定位模式变更时才后台联网。保持该策略，避免桌面翻页把定位和网络请求压到 UI 体验上。
+- 对照原版 `clean_launcher`：天气更新由 `weather_data_changed`/`WeatherView.g(Intent)` 协议分发；CalendarView 在 Launcher 的 `onResume()` 中检查日期变化并触发原版翻页动画，WeatherView 同样在原版 ActiveIcon 恢复链路中恢复。原版没有“每次桌面翻页都重新定位或联网”的实现，因此本次不引入会破坏原版节奏和耗电的页面切换刷新。
+
+验证：源码逐像素核对确认恢复后的天气与日历底图和 `clean_launcher_raw` 原版一致，低 alpha 边缘像素已恢复；`build.bat` 已完成重打包、签名，`aapt2 dump badging build\\launcher-signed.apk` 确认为 `com.smartisanos.launcher v1.5.3 (28)`，APK 内容已确认包含原始 `calendar/bg.png` 与 `weather/weather_bg_sunny.png`。本次 ADB `devices` 返回空列表，尚未完成覆盖安装和真机视觉回归；设备重新连接后需验证透明主题下动态天气/日历的阴影与普通图标一致性，以及天气前景动画。
+
+### 2026-07-12
+
+#### 单应用替换图标页的持久缓存回填与在线候选刷新
+
+- 对照 `smartisan-launcher-maintained`：其应用图标设置主要使用本地 `IconDB`、应用原图和已安装图标包的本地资源，并不在单应用候选页临时联网下载 PNG。当前移植版新增在线图库后，必须额外保证磁盘缓存可直接渲染。
+- 根因：候选列表用 `libraryIconStored()` 判断时会识别 `files/online_icon_cache_v3/` 下的 PNG；但 `libraryIconDrawableNonBlocking()` 之前只查进程内 `sSmartisanIconCache`。应用/进程重启后磁盘文件仍在、内存位图为空，候选会被加入网格却没有图片；预取又因“文件已存在”跳过下载，形成永久空白卡片。
+- 修复：候选绑定未命中内存时立即解码本地持久缓存并回填内存，再渲染对应图标；在线候选页的局部网格刷新从 `0.9s/2.6s` 延伸到 `6.5s/11s`，覆盖双镜像超时和共享下载线程排队后的完成时机，且只替换网格、不重建页面或丢失滚动位置。
+- 缓存语义：已下载图标不会在每次打开时重新下载；顺序为内存缓存 -> `files/online_icon_cache_v3` 持久缓存 -> 后台镜像下载。只有磁盘和内存均未命中、且未处于失败重试冷却期时才联网。
+
+#### 设置页锤子风格弹窗容器与按钮栏统一
+
+- 根因：宫格确认、检查更新信息、图标大小和下载进度各自创建 `Dialog` 根容器；双按钮确认框的按钮本体为 `50dp`、按钮栏却为 `56dp`，形成按钮下方留白；单按钮传入 `side=0` 时没有设置下圆角；根容器未裁剪子 View，按钮背景会覆盖面板底部圆角。
+- 修复：在 `MaintainedLauncherSettingsHost` 复用 `prepareSmartisanDialogRoot()`，统一面板颜色、`8dp` 圆角和 `clipToOutline` 裁剪；统一单按钮下侧双圆角、双按钮左右下圆角，以及 `56dp` 按钮栏的实际子项高度。宫格确认、检查更新、图标大小和下载进度均已接入。
+- 视觉约束：标题保持居中；说明正文保持左对齐；按钮栏紧贴正文分隔线，底部无额外留白，面板上下圆角一致。
+
+#### 系统卸载取消后的回收站状态复位与设置弹窗统一
+
+- 普通 Android 卸载使用 `ACTION_UNINSTALL_PACKAGE`。此前原版确认按钮在启动系统卸载页后仍继续执行私有 `deletePackage` 对应的“移入回收站 + 数据库删除”动画；用户取消或返回时没有真实包移除广播收尾，桌面会永久停在卸载动画状态。现在普通应用在确认按钮处提前分流：只启动系统卸载页、关闭原版确认框并复位原版卸载标志，不再预删图标或启动回收站动画。真正卸载成功后仍由系统包移除事件驱动桌面更新。
+- 对照 maintained 的 `UninstallApp.cancelUninstallWithoutAnim()` 后确认：它的正确点是通过 SM/GL 事件队列收尾，而不是在 Android 生命周期线程直接改桌面场景。当前原版等价入口是 `oa.fd()`，但其原始实现要求私有 `mUninstallDialog` 仍存在；普通 Android 的系统卸载页会替代并关闭该弹窗，导致 `fd()` 提前返回，取消或返回时没有任何回收站收尾。
+- 最终修复：`Launcher.onPause()` 调用原版 `oa.fd()`；兼容分支仅移除 `fd()` 对已关闭私有弹窗的短路，并让其原有 `a/T` SM 事件在 GL 线程无条件执行 `oa.hd()`。`hd()` 继续复用原版逻辑，强制完成时间线、把等待卸载图标送回原父容器、关闭回收站动画并退出卸载场景。这样系统卸载页取消、返回或完成卸载都不会遗留卸载动画。
+- 真机日志确认：直接从 `Launcher.onPause()` 调用 `oa.hd()` 会因 `ThreadVerify` 抛出 `current env is not GL thread` 而闪退；因此绝不能把 `hd()` 直接接到 Activity 生命周期。通过 `a/T.q()` 进入原版 SM/GL 队列后，用户真机复测已确认正常。
+- 【已废弃】在 `Launcher.onPause()` 直接调用 `oa.hd()`：这是 GL 线程方法，会导致 `current env is not GL thread` 崩溃。
+- 【已废弃】使用 `Activity.recreate()` 重建 Launcher 场景：原版 GL 场景在 Activity 重建时可能触发 `PageView` 空节点崩溃，不能作为系统卸载返回的恢复方案。
+- 设置页的确认、信息、检查更新下载进度和桌面图标大小弹窗统一使用现有锤子风格的圆角面板、居中标题、分隔线和底部操作按钮；说明正文统一左对齐。图标大小仅保留自身滑块/预览内容，不再拥有一套不同的标题和按钮外观。
+
+#### 12 / 20 宫格切换按原版逻辑最终修复
+
+- 根因不是图标数据丢失，而是兼容设置层把外部的“20 宫格”直接当作原版内部页面模式使用。原版 `Constants.getPageModeFromMode(20)` 实际映射为内部 `MODE_9 (0x9)`；这个值是原版 4 x 5 宫格的运行模式标识，不是九宫格布局。此前绕过这层映射、传入 `20` 或自行保存/恢复页面，都会让旧页面坐标被错误解释，表现为每个板块只留下 9 个图标。
+- 最终实现严格复用原版：设置层先通过 `Constants.getPageModeFromMode()` 获得内部模式，再在原版 `DatabaseHandler.mWorker` 线程调用 `data/F.i(oldPageMode, newPageMode)`，随后重载桌面。不得把数据库迁移放到 UI 线程，也不得按包名、安装时间或当前可见图标重新排序。
+- 行为与原版保持一致：`12 -> 20` 只切换运行布局，`F.i()` 不改写板块成员、顺序或格子位置，因此同一板块原有 12 个图标会完整保留；`20 -> 12` 仅当单板块超过 12 个图标时，按原有顺序拆出后续 12 宫格板块。拆分后的板块在切回 20 宫格时不会自动合并，这是原版既定语义。
+- 对照依据：`build/decompiled_theme_check/com.smartisanos.launcher-3` 中的 `Constants.smali`、`data/F.smali` 和原版模式切换调用链。已通过 ADB 安装与真机往返验证：12 -> 20 保留同板块 12 项，20 -> 12 只在溢出时拆分。
+
+#### 首次安装默认项与应用图标候选加载优化
+
+- 首次安装默认关闭“改进版图标”“动态天气和日历”“显示图标上的角标”“紧贴屏幕横扫清除角标”，避免桌面首帧触发额外图标替换、动态纹理和通知监听处理。
+- 图标包预热对齐 maintained 的 `IconPackManager.warmUpIconPackList()`：后台扫描已安装图标包的包名、`appfilter` 与 drawable 映射，填充内存/本地缓存；它不下载在线图标，也不会因为改进版图标默认关闭而进行网络请求。
+- 单应用替换页候选读取改为内存缓存、磁盘缓存和已安装图标包的本地资源。没有实际候选图标时不再留下空白默认占位格；页面绑定阶段不触发联网下载，避免首次进入出现空白后再闪烁补图。
+- 已缓存的改进版图标可在用户之后开启功能或单独选择时直接复用；在线图标仍只在明确需要且本地没有缓存时才请求。
+
+#### 【已废弃】直接重建桌面场景以消除切换闪屏
+
+### 2026-07-11
+
+#### 应用改名即时刷新、设置页转场与角标开关修复
+
+- 单应用改名保存后会同步更新 redirect 展示名、桌面条目的 `title` 和当前场景的文字纹理，并在数据库提交完成后补发目标应用刷新事件；不需要退出或重开桌面。
+- 设置页一级、二级、三级改为在同一容器内完成左右平移；连续进入/返回会清理上一轮转场遗留视图，避免防点击状态残留造成“点了没反应”。
+- 强迫症选项中的角标开关改为正向语义“显示图标上的角标”；开启时若未授予通知使用权，直接跳转系统授权页。旧的提示链接已移除，横扫清除角标的授权行为保持不变。
+
+#### 【已废弃】通知角标数字比例与宫格顺序迁移修复
+
+### 2026-07-10
+
+#### 文件夹拖动/长按释放后图标行距漂移修复
+
+- 现象：文件夹刚打开时三层书架图标对齐正常；只要长按后松手，或拖动图标重新排列，第一行会偏上、第三行会偏下，中间行保持正常。关闭文件夹再打开又恢复正常。
+- 根因：初次布局走过文件夹页的可见书架行高适配，但拖拽、回弹、换位动画会重新调用容器级 `fa.ir()`，直接取全局 `Constants.pageCellCenterPoints`。这组全局点是普通桌面网格坐标，行距比打开文件夹书架大，所以动画/释放阶段把上下两行重新拉开；旧方案只改 `M.smali` 的局部 `setTranslate()`，后续动画再次取 `ir()` 时仍会覆盖。
+- 修复：在 `fa.ir()` 源头调用 `FolderCellPositionAdapter.adaptPositions(owner, positions)`。当 owner 是文件夹容器 `com.smartisanos.launcher.view.b.t` 时，返回克隆后的点数组，以中间行为锚点、按 `window_width * 358 / 1080` 计算三层书架行距；非文件夹容器直接返回原全局数组。
+- 防回归点：不得直接修改 `Constants.pageCellCenterPoints`，否则普通桌面冷启动网格会被文件夹行距污染；也不要只在某个动画类里补偏移，因为拖拽链路有多处会重新读取 `fa.ir()`。
+- 验证：`build.bat` 完整构建、zipalign、签名通过；最终 APK 中 `classes.dex` 的 `fa.ir()` 已包含 `FolderCellPositionAdapter.adaptPositions(...)` 调用，`classes2.dex` 已包含 `adaptPositions` 方法。用户真机复测确认问题已解决。
+
+涉及文件：
+
+- `launcher/smali/com/smartisanos/launcher/view/b/fa.smali`
+- `launcher/tools/java/com/smartisanos/launcher/data/FolderCellPositionAdapter.java`
+
+#### 应用图标选择页与默认图标状态修复
+
+- 应用图标页新增单应用“替换图标”二级页，展示当前应用信息和可选图标网格；候选来源包括图标库包名、系统应用别名、`assets/icons/variants.json` 中的同应用变体、当前图标包命中图标和相册自定义入口。
+- 选择图标库候选时写入 `RedirectIconDB.MODE_RESOURCE:<name>`，选择图标包候选时回到自动改进版/图标包链路，选择相册图标时沿用已有自定义图片流程；切换后刷新当前行并保持应用图标页滚动位置。
+- 修复默认图标选择状态：切回默认图标会写回 `MODE_ORIGINAL`、清空自定义 icon blob、刷新桌面图标和当前行状态；右侧箭头只进入选择页，不再让默认图标选择状态停留在右侧候选图标上。
+- 新增 `icons/variants.json` 与 APK 内 `launcher/assets/icons/variants.json`，用于记录同一包名的多个候选 PNG；生成图标索引后需要同步该文件，供应用图标选择页读取。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/java/com/smartisanos/launcher/data/redirectIcon/RedirectIconDB.java`
+- `icons/variants.json`
+- `launcher/assets/icons/variants.json`
+
+### 2026-07-03
+
+#### 主题保存成功但必须重开桌面才生效
+
+- 客户 v1.5.3 日志显示主题四路状态已从格子正确保存为经典蓝、再保存为毛玻璃，`launcher_ready=true`，但两次均为 `original=true, queued=false`；因此不是主题包、持久化或机型识别问题，而是当前场景缺少切换消息。
+- 根因是兼容层错误地把 `X.ja()` / `O.a()` 的保存成功返回值当成“原版已经发送 `MESSAGE_CHANGE_THEME`”，只在保存失败时才设置 `a.r.sj`。原版 `ThemeItemActivity` 实际是在保存后继续通过 Handler 返回桌面，由 Launcher 消费该消息。
+- 修复为主题持久化后始终只设置一次待消费的 `MESSAGE_CHANGE_THEME`，再执行截图与返回桌面；新增 `THEME_DISPATCH pending_message_set/failed` 日志。切换不再依赖用户关闭并重新打开桌面。
+- ADB 在 ColorOS 真机稳定复现解锁时出现 `dispatching lifecycle unlock fallback`，确认解锁兜底本身正确进入原版 `action_keyguard_on + USER_PRESENT`；异常主题动画来自 `a.r.sj` 中未及时消费的静态主题消息。
+- 返回桌面 180ms 后现主动调用原版 `a.r.a(Message)` 消费并清空本次主题消息，日志记录 `pending_message_consumed`；超过主题保护期仍残留的陈旧消息会在解锁动画前清除，避免主题切换动画劫持下一次解锁。
+
+#### 天气多数据源容错与失败状态修复
+
+- 第二轮真机反馈确认，单纯增加 MET Norway/Open-Meteo 仍会在部分中国大陆网络同时不可达，并且系统 Geocoder 等待会让城市搜索比旧版更慢。最终方案不再把境外服务作为中国城市的首选。
+- maintained 资源包原本已内置 `city_base` 与 `city_cn`，包含三千余个中国站点的名称、省市、经纬度和中国天气网站点 ID。手动城市搜索现直接查询本地数组，命中时零网络、立即返回；自动定位按经纬度选择最近国内站点，逻辑不判断手机品牌或 ROM。
+- 国内站点天气优先使用中国天气网 `d1.weather.com.cn/sk_2d/{stationId}.html`，实测蚌埠站约 0.05 秒返回；连接/读取超时为 1.5/2 秒。只有国内站失败或坐标不在国内城市表覆盖范围时，才并发竞速 MET Norway/Open-Meteo。
+- 根因确认：天气此前只依赖 Open-Meteo；接口 TLS/连接超时后不会写入 `weather_updated_at`，设置页只能显示“尚未更新”，动态图标则可能继续呈现旧城市温度或原版占位内容。
+- 天气改为 MET Norway Locationforecast 与 Open-Meteo 并发竞速，使用首个有效结果；不再等待主源超时后才串行请求备用源，整体等待上限收口为 6.5 秒。
+- 城市搜索优先使用手机系统 `Geocoder`（澎湃 OS 可走系统地理服务），无结果时才回退 Open-Meteo；在线回退连接/读取超时缩短为 1.8/2.8 秒，已搜索结果继续使用十分钟内存缓存。
+- 城市或自动/手动模式改变时清除旧地点的温度、天气代码和数据源，避免把上一城市的 25℃误认为新城市结果。
+- 成功刷新保存实际数据源；双源均失败时保存精确错误，动态天气设置页显示数据源或失败原因，方便客户日志分析。
+
+#### 客户诊断日志增强与应用图标列表完整性修复
+
+- 修复“应用图标”设置页最多只显示 120 项的问题：移除硬编码上限，已解析且符合显示条件的应用现在全部展示。
+- 修复澎湃 OS 返回“非空但不完整”应用列表时无法补全的问题：当前用户始终合并 `PackageManager` 与 `LauncherApps` 的桌面 Activity 并按组件去重；分身/工作资料应用仍受相应功能开关控制。设置页枚举和全局改进版图标切换统一使用该结果，应用数量不再影响是否参与图标匹配。
+- 开启操作日志时新增设备厂商/型号/Android 版本、默认桌面组件、主题四路持久化值、PackageManager 应用数量、用户配置与 LauncherApps 活动数量快照。
+- 应用图标页新增加载耗时、原始数量、显示数量、过滤数量以及被过滤组件日志，便于直接定位具体缺失应用。
+- 主题切换新增切换前状态、主题包安装状态、原版调用结果、消息入队结果、切换后四路持久化值和桌面动画就绪状态。
+- Android 普通应用仍只能读取本进程/系统允许范围内的 logcat；完整系统日志仍需电脑 ADB，这是系统权限边界而非记录器遗漏。
+- 客户截图中的日志自报版本为 `v1.4.9`（SDK 33），不能作为 1.5.1 或当前版本已经运行的证据。
+
+#### 文件夹、检查更新与图标系统历史记录清理
+
+- 文件夹记录只保留当前有效实现：关闭预览由 `LayoutPropertyAdapter.centerFolderPreview()` 根据可见行列中心生成 2×2/3×3 参数；展开页使用原版固定三列并按书架实际行高适配；主题背景从 `assets/folder_theme_bg/` 读取。固定像素、整组缩放、错误页面坐标旁路等失败过程已删除。
+- 检查更新记录只保留当前 `DownloadManager`、Gitee launcher Release 筛选、备用资产地址、下载状态复用和授权 URI 安装链路；自建安装 Session、`file://` 等废弃过程已删除。
+- 图标记录只保留当前优先级与行为：单应用自定义 > 图标包 component/appfilter > 改进版映射 > 系统原图；首帧和刷新使用组件级识别，在线图标持久缓存并按需联网。被后续推翻的分身角标和旧待办描述已删除。
+- 所有此前已经清空正文的错误实验标题统一改为 `【已废弃】日期：标题`，不再使用删除线或无标记空标题。
+
+#### 完整功能清单与后续状态重新盘点
+
+- 按当前代码重新核对原版交互入口，确认四指横滑切换主题和双指捏合缩放并非待移植功能：四指手势由 `view/Da -> a/a/c (FourFingerSlide)` 调用主题切换栈；双指手势由 `smengine/Ba` 根据 `pinch_scale_threshold` 分发 `onZoomOut/onZoomIn`，切换单页桌面与多页总览/编辑状态。
+- 顶部“已完成”已补齐手势、多页管理、页面隐藏/锁定、文件夹、翻页动画、主题、搜索、角标、设置入口、动态图标、应用分身与多用户等现有能力；README 的核心特性同步加入四指和双指手势。
+- 删除原“未完成 / 待处理”中全部 `[x]` 已完成项目。当前没有明确缺失的核心桌面功能；剩余内容改为“已完成但需要继续回归”和“已知限制”，避免把跨机型测试、通知系统边界、用户确认安装等平台限制误写成开发未完成。
+
+#### 动态天气/日历最终对齐、兼容阴影与 Android 16 闪退修复
+
+- 用户真机确认天气数据、动态天气显示及桌面运行已经恢复正常。实时 WeatherView / CalendarView 保留原版 `nc(vm)`；结束后的静态 Bitmap 使用原版 `sq()` 公式 `(icon_size_with_shadow - icon_size_origin) / 4` 对齐。三列布局为画布的 5.487805%，不再使用近似 5% 或固定像素，因此动画与结束帧不会残留约 1px 跳动。
+- 原版阴影来自 Cell `sc[27]`、八张运行时阴影纹理和 `MutiTexMaterial`，依赖 Smartisan `Settings.Global`、已移除的 `android.graphics.BlurImageFilter` 以及旧 shader 的 `uShadowRadius`。普通 Android/Android 16 不得强制开启该链路；真机出现的 GLThread 闪退已通过 ADB 明确定位并完整撤销。
+- 【已废弃】早期兼容方案曾将动态底图裁为无阴影主体并生成 `_shadow.png` / `_shadow_transparent.png`。后续真机对比确认该处理会去掉原版纹理中的低 alpha 投影，透明主题下视觉过淡；当前已恢复原版底图并由动态节点直接加载。
+- 保留的原版安全路径是 `data/L.smali` 的 `extractAlpha + BlurMaskFilter` 三 Bitmap 合成；依赖 Smartisan 私有 GL/`sc[27]` 的 activeicon 运行时 shadow map 仍保持关闭，两者不能混为一条链路。
+
+### 2026-07-02
+
+#### 动态图标真机定版、关闭动态后的标准图标映射与在线识别修复
+
+- 实时动画使用原版 `nc(vm)` 纵向坐标；结束后的静态 Bitmap 以动画为基准，使用原版 `sq()` 几何差校正。两条路径职责不同，但最终可见外框必须重合。
+- 关闭动态后不再下载天气/日历图标。构建时直接把图标库中完整的 `com.smartisanos.weather.png` 和 `com.android.calendar.png` 编入 maintained 资源 APK，运行时分别以 `static_icon_weather` / `static_icon_calendar` 读取；所有已识别厂商天气、日历均直接命中这两个本地资源，离线和非首次进入桌面也可立即取得完整静态图标。
+- `Aa.smali` 关闭动态时原先只排除原版固定日历包名，厂商日历仍可能进入 activeicon 底框替换。现在统一调用 `LauncherSettingBridge.isDynamicIconPackage()`，关闭后所有已识别天气/日历都禁止注入 `weather_bg.png` / `calendar/bg.png`。
+- 在线图标过去把超时、DNS/TLS 错误和 HTTP 404 全部记录成一小时“图标不存在”，造成网络偶发失败后长时间识别不到。现在只有所有镜像明确返回 404 才写 miss 缓存；网络故障不再污染不存在缓存，后续加载可自动重试。
+- 用户继续真机验证确认，关闭动态后仍显示旧图并非天气/日历包识别失败，而是**已有数据库记录的异步切换竞态**：旧代码发出一次刷新后固定 800ms 杀死 Launcher，数据库 icon blob 可能尚未写回；首次进入桌面会完整建库，因此反而不容易复现。现在静态图标已经内置，并对已有记录执行两阶段刷新，最后等待写回后重建 Launcher；不再把“刷新事件已发送”当成“数据库刷新已完成”。
+- 拨号/电话本的组件和标题优先分流未改动；本次标准包映射只作用于关闭动态后的天气和日历。
+- 关闭动态只决定“是否走普通图标链路”，不决定普通图标来源。普通链路优先级固定为：单应用自定义/明确选择 > 图标包组件映射 > 已启用的改进版图标（天气/日历使用 APK 内置完整资源）> 应用系统原图。改进版总开关关闭时不会强制使用内置天气/日历；选中图标包时也不会被改进版别名抢占。拨号 Activity 禁止回退到联系人包级映射的保护继续保留。
+- 性能日志确认此前一次图标操作会执行数百次 PNG 压缩和网络连接。优化后：动态天气/日历开关只向数据库提交已安装天气、日历包，不再两次全量刷新全部应用；图标大小重启后只重建 LayoutProperty/SceneNode，不再重新匹配、压缩或下载图标；图标更新从“反射直调 + 本应用广播”两次执行改为直调成功即结束、广播仅作失败兜底；全量包列表按包名去重。全局改进版/整包切换仍允许更新全部实际受影响应用。
+- 动态开关的天气/日历图标已经内置且定向刷新，切换为一轮两包刷新，600ms 后重建 Launcher。静态合成画布使用 73.32%，实时根节点在原版 mode 分支基础上乘 94%；实时动画保留 `nc(vm)`，静态 Bitmap 使用精确 `sq()` 比例校正。内部天气图形、温度、日期和动画参数不动。
+- 普通 Android 的普通应用图标继续使用原版 `data/L.smali` 软件生成的 dark/light/transparent 三张 Bitmap；动态天气和日历因使用独立 activeicon 节点，直接加载原版 ActiveIcon 完整底图，依赖 Smartisan framework 的 activeicon `sc[27]` GL 阴影链路继续禁用。
+- 【已废弃】曾为 256px 动态底框引入画布裁切补偿的双层生成阴影。该方案不能等价于原版纹理阴影，且会覆盖原版半透明边缘，因此不再使用。
+- 在线改进版图标成功下载后持久保存到 `filesDir/online_icon_cache_v3`，跨进程重启和覆盖安装复用；读取顺序为内存缓存 → 持久文件 → 必要时联网。天气数据保存在 SharedPreferences，正常 TTL 为一小时，位置 TTL 为六小时；只有缓存过期、用户手动刷新或位置模式改变才联网。
+
+涉及文件：
+
+- `launcher/smali/com/smartisanos/launcher/Aa.smali`
+- `launcher/smali/com/smartisanos/launcher/view/a/g.1.smali`
+- `launcher/smali/com/smartisanos/launcher/view/activeicon/H.smali`
+- `launcher/smali/com/smartisanos/launcher/view/activeicon/m.smali`
+- `launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+
+#### 跨机型冷启动、图标数据库与 Smartisan 框架兼容收口
+
+日志根因：
+
+- DRA-AL00 冷启动时，原版图标数据库一次查询全部 PNG blob，38 个图标已经填满系统固定的 2MB `CursorWindow`，后续行无法装入；这会表现为相册等图标偶发未识别、缓存明明存在却仍重新生成，并增加首次进入桌面的阻塞时间。
+- Android 9 及以下会进入原版 `checkDoppelganger`，遍历设备全部安装包。该逻辑只服务 Smartisan 旧分身实现，普通厂商 ROM 已由 LauncherApps/profile 兼容层覆盖。
+- Launcher 引用了 Smartisan framework 提供的 `TabletWallpaperHelper` 及内部监听器；普通 Android 没有该类，部分平板/横屏分支会在 verifier 阶段报缺类。
+- 冷启动还重复执行完整纹理字段反射/资产校验，并探测不存在的 Smartisan Launchpad 和支付包。这些失败可回退，但会制造主线程 I/O、异常对象和无意义日志。
+
+修复内容：
+
+- 新增 `IconDatabaseCompat`：只查询当前桌面 owner，按 12 条一批读取 `owner/color_info/icon_blob`，每批及时关闭 Cursor；不再依赖扩大厂商私有 CursorWindow，也不会随应用数量增长再次触发 2MB 上限。
+- 原版旧分身全包扫描入口已直接停用，不再保留品牌判断；第三方 Android 统一使用现有 LauncherApps 多用户/工作资料夹链路。
+- 新增 `smartisanos.app.wallpaper.TabletWallpaperHelper` 兼容类和同名嵌套监听接口，使用 `ACTION_WALLPAPER_CHANGED` 与 Launcher 私有壁纸 URI 兜底；Smartisan 原系统仍可按 framework 优先加载原生实现。
+- 从文本与最终二进制 Manifest 删除 Launchpad 服务和 Smartisan 支付权限，删除对应 Service/Runnable 实现及所有调用入口；同时移除启动和布局重建阶段的调试型全资源扫描。
+- 发布构建默认关闭原版大量 `Log.e` 调试输出，避免部分厂商 ROM 错误设置 `ro.debuggable=1` 后在首屏解析阶段同步刷日志；仍可通过原 `LOG.kc()` 显式启用。
+
+验证：
+
+- `build.bat` 完整构建和签名通过，覆盖安装 DRA-AL00 成功。
+- 强停后冷启动未再出现 `CursorWindow is full`、`TabletWallpaperHelper` 缺类、`Textures/1080p/12/12`、支付包异常和逐包 `checkDoppelganger` 日志；进程保持存活，无 FATAL EXCEPTION / ANR。
+- 同一设备最终冷启动首屏 `Skipped frames` 从修改前 38 帧降到 31 帧；这 31 帧来自进程首次创建原版 3D 场景的一次性集中渲染。进程保活后返回桌面复测无 `Skipped frames`，日常返回/切换不是持续性卡顿。不要为消除这一条一次性系统提示而把图标数据库或 SceneNode 更新并发写入渲染线程。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/data/IconDatabaseCompat.java`
+- `tools/remove_smartisan_runtime_components.py`
+- `launcher/tools/java/smartisanos/app/wallpaper/TabletWallpaperHelper.java`
+- `launcher/smali/com/smartisanos/launcher/data/a/h.smali`
+- `launcher/smali/com/smartisanos/launcher/data/A.smali`
+- `launcher/smali/com/smartisanos/launcher/service/LaunchpadService.smali`（已删除）
+- `launcher/smali/com/smartisanos/launcher/e/f.smali`
+- `launcher/smali/com/smartisanos/launcher/J.smali`
+- `launcher/smali/com/smartisanos/launcher/va.1.smali`
+
+#### 日期变更崩溃、动态图切换缓存与在线图标持久化
+
+日志根因：
+
+- `build/launcher_log.txt` 在手动修改系统日期后记录了连续的 Launcher 崩溃，唯一明确的 `am_crash` 为 `ClassNotFoundException: android.location.LocationListener$-CC`。日期变化会促使天气重新定位，真正崩溃点是新 SDK 编译的 `LocationListener` 默认接口桥没有随注入 dex 完成 desugar，而旧厂商系统不存在 `$-CC` 伴生类。
+- 日志同时记录 `com.smartisanos.launcher.update_icon` 后台广播被系统拦截，以及天气/日历行因 APK 图标 MD5 相同而跳过写库。两者共同造成关闭动态模式后偶尔继续使用旧的空天气底框。
+- `WRITE_SETTINGS` / `WRITE_SECURE_SETTINGS` 拒绝、缺少 `TabletWallpaperHelper$WallpaperChangeListener` 等日志均被原兼容代码捕获，不是本次进程崩溃堆栈；设置值已有 Launcher 私有 prefs 兜底。
+
+修复内容：
+
+- `WeatherBridge` 的一次定位监听显式实现当前 SDK 的全部接口方法，包括批量位置回调和 `onFlushComplete`，最终 dex 不再引用 `LocationListener$-CC`。
+- 天气/日历图标数据库写入不再受“APK Bitmap MD5 未变化”短路影响；动态开关两种方向都强制重建这两个包的图标数据。
+- 关闭动态天气和日历后，普通图标选择链路不再把 `app_icon_weather` / calendar 动态底框当成完整推荐图标；恢复为自定义图标、图标包或应用系统原图。
+- 在线改进版图标从可被系统随时清理的 `cacheDir/online_icon_cache_v3` 迁移到 `filesDir/online_icon_cache_v3`，并自动迁移旧缓存。关闭再打开改进版图标会直接复用已下载文件，不重复下载。
+- 网络下载失败不再向进程内 Map 永久写入 `null`；远端 miss 重试窗口从 7 天缩短到 1 小时。系统“相册”仍通过厂商包名/Activity/可见标签映射到 `com.android.gallery3d`，临时镜像失败后可以自动恢复识别。
+
+验证：
+
+- `build.bat` 完整构建、签名通过；最终 dex 搜索不到 `LocationListener$-CC`。
+- `adb install -r -d` 覆盖安装到 DRA-AL00 成功，冷启动 PID `9960` 保持存活；清空日志后未发现 `FATAL EXCEPTION`、`am_crash`、`VerifyError` 或新的定位监听异常。
+- 真机当前页可正常显示日历与天气完整图标。动态更新前后尺寸仍需用户用原视频场景做最终肉眼回归。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/WeatherBridge.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/smali/com/smartisanos/launcher/Aa.smali`
+- `launcher/smali/com/smartisanos/launcher/view/activeicon/a.1.smali`
+
+#### 天气位置即时刷新与城市搜索收口
+
+- 自动定位开启和手动城市切换继续把 `weather_updated_at` 清零并强制刷新；新增强制刷新排队：如果切换位置时上一笔天气或定位请求仍在运行，不再丢弃新请求，而是在当前请求结束后按最新自动/手动位置立即补刷一次。
+- 定位回调到达时重新检查当前模式；用户已切到手动城市则不再用迟到的自动定位坐标覆盖天气，而是按最新手动城市刷新。
+- 城市搜索：
+  - Open-Meteo 请求增加 `countryCode=CN`，减少国外同名地点；
+  - 连接/读取超时缩短为 4s/6s，结果增加 10 分钟内存缓存；
+  - 精确名称优先，优先 `PPLC/PPLA*` 行政城市，再按人口排序；
+  - 精确同名城市只保留最高优先级结果，例如“三亚”不再同时显示海南、广西多个同名地点；
+  - 普通结果按名称/省份/国家去重，最多显示 5 条。
+- `build.bat` 构建成功，安装 DRA-AL00 成功，Launcher PID `2729`。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/WeatherBridge.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java`
+
+#### 【已废弃】动态图标视觉边界、日期高屏偏移与关闭缓存修复（尺寸方案错误）
+#### 【已废弃】动态图标改为单层画布映射，消除任意尺寸双框（错误）
+#### 【已废弃】动态图标两层按同一用户倍率对称缩放（错误）
+#### 【已废弃】动态天气/日历绘制层完整回归原版基线（整层回退结论不完整）
+#### 【已废弃】动态天气/日历中心锚点统一与错误坐标缩放回滚
+#### 【已废弃】撤销动态天气/日历 120% 二次放大
+
+### 2026-07-01
+
+#### 【已废弃】动态天气与日历开关、原版分层恢复和多屏尺寸收口
+#### 动态天气补丁导致 Launcher 启动 VerifyError
+
+- 真机日志确认桌面启动即退出不是设置页或网络异常，而是 `Aa.a(Bitmap, String, boolean, ColorInfo)` 在 Android 运行时校验阶段被拒绝：天气包识别分支跳转到普通图标路径时，寄存器 `v2` 尚未赋值。
+- 将该方法原有的 `v2 = 1` 初始化恢复到所有分支共同经过的位置，保留跨厂商天气识别，不再产生未定义寄存器。
+- 重新构建并通过 ADB 覆盖安装；OPPO PDCM00 冷启动成功，`com.smartisanos.launcher/.LauncherAlias` 保持前台、进程存活，日志中不再出现 `VerifyError` 或 `FATAL EXCEPTION`。
+
+#### 动态天气设置、自动定位与手动城市
+
+- 桌面设置首页新增“动态天气”入口，二级页显示当前天气位置、温度、最近更新时间，并提供“立即刷新”。
+- 默认使用系统粗略定位；打开自动定位但尚未授权时，从设置页发起 `ACCESS_COARSE_LOCATION` 请求。
+- 新增手动城市模式：输入中文或英文城市名后，通过 Open-Meteo Geocoding API 返回候选城市，用户选中后保存城市名和经纬度并立即刷新天气。手动模式不读取定位，也不需要定位权限。
+- 自动定位与手动城市使用同一套天气缓存和锤子原版动态天气广播；切回自动定位后恢复系统位置，正常刷新频率仍为一小时，手动“立即刷新”可绕过缓存。
+- 设置页只改变天气数据来源，不改变天气图标所绑定的系统天气 Activity；点击桌面天气仍打开手机自带天气应用。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/WeatherBridge.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/maintained_settings_res/res/layout/setting_main.xml`
+- `launcher/tools/maintained_settings_res/res/layout/setting_dynamic_weather.xml`
+- `launcher/tools/maintained_settings_res/res/values/strings.xml`
+- `launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml`
+
+验证：`build.bat` 完整通过并重新生成、签名 `build/launcher-signed.apk`；定位授权、城市搜索和动态图标刷新仍需连接真机验收。
+
+#### 普通 Android 动态天气恢复
+
+- **原版能力确认**：`activeicon/H.smali`、天气纹理、温度数字、昼夜素材、日出日落切换及更新动画均完整保留；失效点是原版只识别 `com.smartisanos.weather`，并依赖普通 Android 不存在的 `content://com.android.providers.weather_app`。
+- **系统天气入口**：新增厂商天气识别，覆盖 Smartisan、Android、vivo/BBK、OPPO/Oplus、MIUI、华为/荣耀和三星常见天气包。`ItemInfo.bf/Qe`、活动图标创建和静态底图生成统一使用识别结果；ItemInfo 的原包名和 Activity 不变，因此点击图标继续打开手机系统自带天气。
+- **现代天气数据源**：新增 `WeatherBridge`，使用 Open-Meteo Forecast API 的经纬度接口读取 `temperature_2m`、`weather_code`、`is_day`、`sunrise` 和 `sunset`。WMO 天气代码映射到锤子原版晴、云、阴、雾、雨、冻雨、雪和雷暴代码，再转换成原版 `com.smartisanos.weather.data.update` 广播。
+- **位置与权限**：最终 APK 增加 `ACCESS_COARSE_LOCATION`；仅当设备存在可识别的天气应用时请求粗略位置。优先使用 6 小时内的系统最近位置，无可用位置时请求一次网络定位；不申请精确定位。
+- **刷新与缓存**：天气缓存有效期为 60 分钟；Launcher 恢复、进程内每小时定时检查以及首次授权后均会尝试刷新。缓存有效时不联网，请求失败时保留上次天气，不清空图标。位置缓存有效期为 6 小时。
+- **原版协议兼容**：原 `CallExpandService.q(Context)` 改为读取桥接缓存并异步触发刷新，返回字段仍为 `weatherCode`、`temp`、`fahrenheitTemp` 和 `_1sunRiseAndSet`，因此没有重写 SMEngine 天气动画。
+- **权限清单**：文本 Manifest 与最终构建注入的二进制 Manifest 均包含粗略定位权限；新增 `tools/patch_weather_location_permission.py` 用于维护保留的 AXML 清单。
+- **数据服务说明**：Open-Meteo 非商业使用无需 API Key；发布时应保留来源说明，商业使用前需重新确认授权。接口文档：`https://open-meteo.com/en/docs`。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/WeatherBridge.java`
+- `launcher/smali/com/smartisanos/launcher/a/a.1.smali`
+- `launcher/smali/com/smartisanos/launcher/data/ItemInfo.smali`
+- `launcher/smali/com/smartisanos/launcher/view/a/g.1.smali`
+- `launcher/smali/com/smartisanos/launcher/Aa.smali`
+- `launcher/smali/com/smartisanos/launcher/Launcher.smali`
+- `launcher/AndroidManifest.xml`
+- `launcher/original/AndroidManifest.xml`
+- `tools/patch_weather_location_permission.py`
+
+验证：
+
+- `build.bat` 完整通过，输出 `build/launcher-signed.apk`。
+- `aapt2 dump permissions` 确认最终 APK 同时包含 `INTERNET` 和 `ACCESS_COARSE_LOCATION`。
+- 当前 ADB 未连接设备，定位授权、实际天气请求、厂商天气点击和图标动画仍需真机验收。
+
+#### 【已废弃】动态日历尺寸与视觉中心统一
+#### 文件夹打开时反复锁屏出现桌面宫格残影
+
+日志确认每次锁屏收到 `ACTION_KEYGUARD_ON` 后，原版都会执行 `createInitUnlockAnimationEvent`，向 GL 场景准备一组桌面宫格节点；解锁阶段虽然检测到文件夹仍打开并跳过动画，但此前创建的准备节点没有被消费。多次锁屏后会积累多组节点，SurfaceView 重建时短暂覆盖在文件夹上，随后由应急解锁恢复清除。
+
+修复：在 `ACTION_KEYGUARD_ON` 的动画准备入口同样执行文件夹/临时界面状态检查；文件夹打开时直接跳过初始化，不再创建待播放的桌面宫格节点。解锁阶段原有跳过保护继续保留。
+
+涉及文件：
+
+- `launcher/smali/com/smartisanos/launcher/ia.1.smali`
+
+#### 应用分身图标跟随全局图标变化
+
+问题：已开启的应用分身会继续显示数据库缓存的旧图标；切换改进版图标、图标包或图标大小后，只有主用户应用刷新。关闭再开启分身会删除并重建记录，所以此前只有这样才能更新。
+
+修复：
+
+- 全局图标刷新时枚举所有已启用的分身应用，并为对应 profile 用户发送原生 `EVENT_USER_PACKAGE_CHANGED`。
+- 由原生更新链路重新读取主应用当前图标、合成分身面具并更新数据库，然后刷新桌面。
+- Launcher 启动时在原有 `EVENT_USER_PACKAGE_ADDED` 后补发 `EVENT_USER_PACKAGE_CHANGED`，确保图标大小调整导致进程重启后，已有分身也会重建缓存，无需关闭再开启。
+- 增加并发保护，避免启动阶段多次 bootstrap 并行刷新。
+- 修复原版 `EVENT_USER_PACKAGE_CHANGED` 只接受并查询固定 `userId=10` 的限制；更新时改用事件携带的实际 profile userId，兼容 vivo 等设备动态分配的分身用户编号。此前事件在非 10 用户上会被直接丢弃，正是关闭改进版图标后分身仍保留旧图的根因。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/smali/com/smartisanos/launcher/data/A.smali`
+
+#### 【已废弃】跨厂商动态日历恢复、单层尺寸统一与分身面具微调
+
+### 2026-06-30
+
+#### 文件夹背景打包链路改为 assets 直读
+
+问题与根因：
+
+- 之前为普通主题文件夹背景补入了 `wallpaper_preview_*` / `wallpaper_light_gold` 图片文件，但当前主桌面工程是 `apktool + resources.arsc` 的半反编译结构，不是完整的 Android 源码资源工程。
+- `build.bat` 构建主桌面时使用的是 `apktool b launcher`。这条链路会保留已有资源表，但不会像完整 `aapt2 link` 那样自动为后补的 drawable 生成稳定资源表项。
+- 结果是：代码里主题 ID 到 `wallpaper_preview_*` 的名字映射存在，最终 APK 里也能看到这些字符串，但 `res/*wallpaper_preview_*` 实际图片并没有被打进主 APK 资源表。运行时 `Resources.getIdentifier(drawable)` 对透明主题还能命中老资源 `t_blur_background_folder`，普通主题却始终找不到，只能回退成默认黑色文件夹背景。
+
+修复：
+
+- 不再继续依赖主 APK 的 drawable 资源表补录文件夹背景，而是新增稳定资产目录 `launcher/assets/folder_theme_bg/`。
+- 将普通主题所需的 `wallpaper_preview_*`、`wallpaper_light_gold` 文件复制到该 assets 目录中，由 APK 作为普通资产直接打包。
+- 修改 `launcher/smali/com/smartisanos/launcher/e/s.smali`：
+  - 新增私有方法 `th(String)`，优先从 `assets/folder_theme_bg/<imageName>.jpg/.png` 直接解码 bitmap。
+  - `ug()` 保留原来的主题资源 / 本包资源 / 外部包资源查询顺序，但在本包 drawable 查询失败后，先走新的 assets 解码链路，再回落原版默认背景。
+- 这样主桌面 APK 即使仍然不把新增 `wallpaper_preview_*` 注册进资源表，也不会影响普通主题文件夹背景跟随主题变化。
+
+验证：
+
+- `build.bat` 完整通过，新的 `build/launcher-signed.apk` 成功生成。
+- 解包检查确认：最终 APK 中已包含 `assets/folder_theme_bg/wallpaper_preview_*.jpg/.png` 与 `assets/folder_theme_bg/wallpaper_light_gold.jpg`；同时 `res/*wallpaper_preview*` 仍为空，说明运行时已切换到新的 assets 读取链路，而不是继续误依赖资源表。
+- 实机复测确认：文件夹背景现已随主题正常变化，不再只在透明主题正常、其他主题回退默认黑底。
+
+防回归规则：
+
+- 后续如果再补新的普通主题文件夹背景，不要只往 `launcher/res/drawable-*` 里塞图，然后假设 `Resources.getIdentifier()` 一定能取到。
+- 这类“新增但原始资源表里没有登记”的背景图，应该优先视作运行时资产，补到 `assets/folder_theme_bg/`，并沿用 `s.ug() -> th()` 的读取链路。
+- 若以后把主桌面切换成完整 `aapt2` 资源工程，再评估是否回归标准 drawable 资源表；在那之前，`assets/folder_theme_bg/` 是当前可信基线。
+
+涉及文件：
+
+- `launcher/smali/com/smartisanos/launcher/e/s.smali`
+- `launcher/assets/folder_theme_bg/*`
+- `build.bat`
+
+#### v1.5.2 桌面显示、搜索手势与在线图标收口
+
+> [!WARNING]
+> **文件夹锁屏结论有一处历史遗漏。** 本节当时只在解锁阶段跳过动画，虽然解决了空 Context 崩溃，却没有阻止锁屏阶段反复创建待播放的桌面宫格节点。该遗漏已由 2026-07-01“文件夹打开时反复锁屏出现桌面宫格残影”修复：文件夹打开时，锁屏准备和解锁播放两端都必须跳过。
+
+本轮在文件夹主题背景修复之外，完成以下调整并统一发布版本为 `v1.5.2 / 27`：
+
+- **应用分身图标**：清理厂商 `getUserBadgedIcon`、旧微信专用角标和 Launcher 自绘面具可能重复叠加的路径。当前以主用户原始应用图标为底图，只绘制一层锤子风格面具，并调整面具轮廓、尺寸和位置；应用分身设置入口恢复使用原来的设置图标。
+- **桌面与文件夹文字**：桌面标签略微增大，文件夹内标签保持更小的层级；两处使用一致的字体绘制基线。文件夹内标签显式清除阴影，修复文字重影和模糊。
+- **图标视觉尺寸**：系统图标、主题图标、redirect、自定义图标和在线图标统一经过 alpha 可见区归一化，再应用用户的 50%–150% 尺寸比例。首帧直接读取 `PackageManager` 的路径也执行同样归一化，修复冷启动时图标先大小不一、稍后才跳成一致的问题。
+- **搜索手势**：自绘搜索页采用完整 `DOWN / MOVE / UP` 位移、方向、时长和阈值判断，缩短有效下滑的触发距离；同时停用 SMEngine 中遗留的上滑搜索入口。当前只有明确的桌面下滑手势可以打开搜索页，上滑、点击和轻微抖动不应触发。
+- **在线图标库**：取消旧锤子图标服务器依赖，按应用包名访问 `icons/drawable/<package>.png`。优先使用 Gitee 下载镜像，失败后回退 GitHub；下载在后台执行并写入应用私有缓存，包含失败缓存、文件大小与图片尺寸校验。仓库现有 2209 个图标及索引，在线资源不会增加 APK 体积。
+- **跨品牌系统图标**：新增受系统应用身份约束的类别映射。不同厂商的相机、相册、浏览器、联系人、短信、邮件、计算器、文件管理、指南针、录音、音乐、视频、天气、便签、设置、安装器和 SIM 工具包可映射到统一的锤子在线图标；日历和时钟保留动态实现，第三方同名应用不参与映射。
+- **系统图标识别补充**：部分厂商预装应用实际位于 data 分区，不能只依赖 `FLAG_SYSTEM`。现改为精确显示名称优先，并允许 Android、OPPO/realme、一加、小米、vivo、华为/荣耀和三星系统命名空间参与包名/Activity 识别；补齐软件商店、云服务、手机管家、钱包和语音助手。电话本/联系人优先于拨号包名判断，避免共用 `com.android.dialer` 一类包时被套成电话图标。缓存升级到 v3，清除旧的未命中结果。
+- **在线图标自动刷新**：缓存写入采用 2 秒静默期合并刷新；刷新完成后不会永久锁死，后续下载批次仍可再次通知桌面，因此不再要求用户切换主题或重开“改进版图标”。刷新始终不阻塞首次桌面初始化。
+- **跨 ROM 主题切换**：普通主题不再只把切换消息保存在进程静态字段后提前返回，而是先将主题 ID 写入 Launcher 两套私有配置并调用原版主题栈，再发送动画消息。这样 vivo/OriginOS 即使回收旧进程，新 Launcher 也能从持久化主题恢复。正常切换不再无条件追加第二次进程重建，避免连续播放两轮加载动画；透明主题等确实需要重启的路径仍会先安排精确 HOME PendingIntent，再结束旧进程。
+- **电话本图标优先级**：厂商拨号器可能使用同一包提供拨号和电话本两个 Activity。联系人类别识别已提前到 package-wide packed icon 之前，显式自定义图标仍保持最高优先级；“电话本 / 联系人 / 通讯录”会直接使用联系人图标，不再被整包电话图标抢先覆盖。
+- **首帧与刷新图标统一**：桌面首帧不再调用 package-wide `PackageManager.getApplicationIcon()`，而是使用 `ItemInfo.packageName + componentName` 精确还原 Launcher Activity，并直接进入与后续刷新相同的改进版图标链路。拨号与电话本即使同包也保持独立，其他已缓存或本地可识别图标首次进入桌面即可生效。在线图标下载完成后会触发数据库与图标刷新，不再要求切换主题或手动重开“改进版图标”。
+- **电话/联系人最终渲染分流**：对照 maintained `97ff218`，图标包的三参数匹配禁止拨号 Activity 回退到联系人包级映射；桌面节点刷新同时传入 `ItemInfo.title`，按“桌面标题 > Activity > 包名”识别电话、拨号、电话本、联系人和通讯录，阻止异步刷新再次把电话本覆盖成电话。
+- **原版解锁动画跨 ROM 触发**：确认动画控制器、9/12/16/20 宫格颜色资源和 `USER_PRESENT` 播放链路均属于 Launcher 主 APK。动态接收器按 maintained 项目的成熟方案监听标准 `SCREEN_OFF`，映射到原版 `action_keyguard_on` 完成锁定预初始化。实机确认部分 ColorOS 在本应用成为默认 HOME 后会跳过该动态接收器，因此增加 Activity 生命周期兜底：`onPause` 延迟确认屏幕确实不再交互，下一次 `onResume` 才补发准备和播放事件；边缘返回、应用跳转、设置页及主题重载因屏幕仍亮不会触发。原版 `USER_PRESENT` 成功处理时会记录握手时间，生命周期兜底随即取消，从而避免非默认桌面状态下播放两次。
+- **解锁动画与临时桌面状态隔离**：修复更换主题后立即锁屏，解锁时再次执行主题切换动画的问题。主题应用原先同时通过原版主题栈和额外静态消息各派发一次 `MESSAGE_CHANGE_THEME`，第二条消息可能滞留到解锁后；现仅在原版主题栈失败时使用额外消息兜底，并在主题过渡保护期内跳过解锁场景重建。修复文件夹打开状态锁屏后解锁导致 GL 线程空上下文崩溃、Launcher 进程重启的问题；解锁前检测当前 FolderController，文件夹打开时保留现有场景，不初始化解锁动画。ADB 实测主题场景无重复 `MESSAGE_CHANGE_THEME`，文件夹场景 PID 不变且无 `FATAL EXCEPTION`，普通桌面锁屏仍正常播放解锁动画。
+- **软件更新版本判断与弹窗排版**：更新检测由“版本字符串只要不相等就提示更新”改为语义版本比较，线上版本必须严格高于本地版本才显示下载提示，避免 v1.5.2 错误提示降级到 1.5.1。更新说明不再截断为 120 字；短内容弹窗按内容收紧，中等内容随正文增高，超过安全高度后正文进入可滚动区域。
+- **首帧桥接闪退修正**：首次接入组件级加载时误把 `J`（ActivityProxy普通对象）直接作为 `Context` 传给Java桥，Smali可编译但ART会在运行时触发类型校验失败。现先调用 `J.getContext()` 获取真实Context后再调用 `loadIconForComponent()`。
+- **改进版开关时序**：先更新所有应用的改进版选择状态并重载配置，再发送数据库与图标刷新，修复旧顺序先刷新、后写状态造成第一次开关仍显示旧图标的问题。
+- **初始化阻塞与下载速度修复**：所有图标加载路径只同步读取内存和磁盘缓存，网络请求统一提交到 6 个有限并发任务的独立线程池；连接与读取超时缩短，单个镜像不可达时快速尝试备用地址。Launcher 模型线程不再等待网络超时。
+- **版本维护**：新增 `tools/set_launcher_version.py`，用于同步文本 Manifest、设置页版本字符串和保留的二进制 Manifest，避免构建末尾注入旧清单导致最终 APK 版本回退。
+
+文档核对结果：
+
+- 旧记录中的“下滑 / 上滑搜索”是阶段性描述，已纠正为“下滑搜索”；当前上滑入口已明确禁用。
+- 应用分身应以 2026-06-29 的“主用户原始图标 + 单层 Launcher 面具”为可信基线；更早关于 `getUserBadgedIcon` 或 QuickLaunchItem 主方案的记录仅代表历史尝试。
+- 文件夹普通主题背景不是新增 drawable 资源表项，而是从 `assets/folder_theme_bg/` 直接读取；透明主题继续使用原版模糊背景链路。
+
+验证要求：
+
+- `build.bat` 完整构建后，使用 `aapt2 dump badging` 确认 `versionName='v1.5.2'`、`versionCode='27'`。
+- 冷启动检查首帧图标尺寸；分别验证桌面下滑、上滑、点击和短距离抖动；检查普通主题与透明主题文件夹背景、文件夹标签清晰度及应用分身单面具显示。
+
+### 2026-06-29
+
+#### 应用分身落桌面与通知角标生命周期修复
+
+问题与根因：
+
+- 应用分身设置页能发现并开启微信分身，但原版 `EVENT_USER_PACKAGE_ADDED` 处理器读取参数中的真实 userId 后没有保存结果，后续仍把查询、`ItemInfo.userId` 和启动目标硬编码为 user 10。小米等使用 user 999/其他 profile 的分身因此不会写入桌面。
+- 横扫清除只保存 suppressed 通知 key，没有把 `COUNTS` 中的持久化数字改为 0。Launcher 进程或桌面场景重建时，`BadgeBridge.replay()` 会重新广播旧数字。
+- 企业微信等应用会复用同一个通知 key 更新内容。只按 key 抑制会把后续新通知永久当作旧通知，出现第一次显示、以后不再刷新的现象。
+- 打开应用后，如果应用自身没有撤销通知，监听器仍会把活动通知重新统计出来；原版桌面期望从桌面点击应用时先清除该应用当前角标。
+
+修复：
+
+- 分身数据库事件完整保留设置页发现的真实 userId，查询对应用户、写入 `ItemInfo.userId` 并通过 `LauncherApps.startMainActivity(component, realUserHandle, ...)` 启动；反射 `startActivityAsUser` 只保留为旧 ROM 兜底。
+- OPPO Android 12 复测表明，仅修正原版 `EVENT_USER_PACKAGE_ADDED` 的 userId 仍不可靠：该事件需要再次按目标用户查询 `ResolveInfo`，部分 OEM 对第三方 Launcher 返回空结果，因此开关已开启但桌面没有新增项。
+- 对照 `rianlu/smartisan-launcher-maintained` 的 `ProfileAppsSettingsActivity` 后，分身开关改为直接安装/卸载 profile 快捷方式：快捷方式目标是 Launcher 内 `StartActivityForSearch`，URI 保存 `package / activity / profileSerial`，点击时再由 `LauncherApps` 启动真实 profile。该路径不依赖第二次 Launcher 数据扫描。
+- 当前 v26 基线的快捷方式处理器原本只允许微信/支付宝等少量包且只把 user 10 写入 `ItemInfo`；已调整为接受设置页明确创建的 profile 快捷方式，并从 `extra_uid` 还原任意正数 userId。已启用分身在 Launcher 启动同步时也会补发快捷方式安装，升级 APK 后无需先关闭再开启开关。
+- 所有 `userId > 0` 的分身图标继续统一经过 `doppelgangerIconBytes()`，叠加同一套原版面具标记，不限定微信或 user 10。
+- 通知抑制标识改成 `notification key + postTime`，只屏蔽被清除的那一轮通知；同 key 的后续新发布/更新会重新计数。
+- 横扫和应用点击清除时同步保存 `COUNTS=0` 并立即广播 0，Launcher 重建后不会重放旧数字。
+- 桌面/搜索启动第三方应用前调用 `BadgeBridge.onPackageLaunched()` 清除该应用当前角标；通知真正移除或后续新通知到达时，监听器继续按实时状态刷新。
+- `BadgeBridge.replay()` 在已有通知使用权时主动请求重新绑定监听服务，改善强行停止、覆盖安装或 ROM 后台限制解除后监听器没有及时恢复的问题。
+
+验证与限制：
+
+- `build.bat` 完整通过，BlackBerry 用户 0 真机覆盖安装与 Launcher 冷启动成功，无 `FATAL EXCEPTION` / `VerifyError`。
+- 当前连接设备没有第二 profile，微信分身写入、面具显示和正确 profile 启动仍需在原问题手机复测。
+- BlackBerry 日志显示该 ROM 在应用处于 restricted/force-stop 状态时会拒绝绑定通知监听；启动 Launcher 后通过主动 rebind 恢复。其他 ROM 仍需确保已授予通知使用权，并避免系统长期冻结 Launcher。
+
+涉及文件：
+
+- `launcher/smali/com/smartisanos/launcher/data/A.smali`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/java/com/smartisanos/launcher/badge/BadgeBridge.java`
+- `launcher/tools/java/com/smartisanos/launcher/badge/SmartisanBadgeListenerService.java`
+
+#### 应用分身诊断日志与角标隐藏开关修复
+
+文档校对补充（当前可信结论）：
+
+- 本仓库当前关于“应用分身”的可信修复基线，应以 `2026-06-28：通用应用分身管理、首次加载和搜索启动` 与本节为准；更早的 `2026-06-06` 记录只可作为历史背景，不可再直接当成当前实现说明。
+- 历史记录里曾出现过“分身开关改为直接安装 / 卸载 profile 快捷方式”的阶段性方案，但该方案随后已被本节上方记录明确撤销；当前正式链路仍是恢复并修正原版 `EVENT_USER_PACKAGE_ADDED / REMOVED` 应用项数据库路径，而不是长期依赖 `QuickLaunchItem` 模拟分身。
+- 历史记录里还写过“分身图标会走 `PackageManager.getUserBadgedIcon` 和当前工程的面具绘制兜底”。这在当时是阶段性描述，但对 OPPO / ColorOS 等 ROM 会产生厂商角标 + 锤子面具叠加、甚至与旧微信专用 `wechat_shortcut` 叠加的双面具问题。当前可信规则是：优先读取主用户原始 Activity / Application 图标，只叠加一层锤子风格面具，不再把 `getUserBadgedIcon` 当作当前标准链路说明。
+- 防回归时必须同时检查三条链路是否只保留一套面具来源：`LauncherApps/桌面应用项生成`、`ItemInfo.iconData -> doppelgangerIconBytes()`、`快捷方式/搜索图标生成`。如果其中两条以上同时叠加面具，就会再次出现双面具或厂商角标混入。
+
+- 根据 OPPO user 999 诊断日志撤销“用 QuickLaunchItem 模拟分身”的主方案：日志显示快捷方式安装/卸载调用虽然返回成功，但点击从未进入 `PROFILE_LAUNCH`，且旧条目因 package/user/shortcutId 不同无法被新版删除。恢复原版 `EVENT_USER_PACKAGE_ADDED/REMOVED` 应用项链路，只在用户明确启用或已启用项的轻量恢复阶段触发，不恢复首次启动全量扫描。
+- 原版新增分身处理器已支持从事件参数读取动态 userId；本轮继续将删除处理器从固定 user 10 改为读取事件中的 userId，因此 OPPO 999、小米/工作资料等其他 profile 均按真实用户删除。
+- 启用/关闭分身前会清理历史版本创建的 `com.tencent.mm`/Launcher 包名、user -1/0/真实 profile user 下的无效快捷方式；随后创建的是 `itemType=应用`、真实 userId 的桌面项。图标走普通 user 0 的锤子主题图标链路后叠加面具，点击走 `LauncherApps.startMainActivity(component, profile)` 启动系统现有分身。
+- 对照 `rianlu/smartisan-launcher-maintained`：其设置页通过 `LauncherApps.getProfiles/getActivityList` 发现分身，并以 `componentName#profileSerial`/profile serial 区分身份；当前移植保留相同的动态 profile 发现思想，但复用本版本已经存在的原版 user-package 应用项数据库链路，以匹配当前 `QuickLaunchItem`/DatabaseUpdater 数据结构。
+- 修复“隐藏图标上的角标”仍显示：原版 `data.O` 仍直接读取 `Settings.System.launcher_hide_badge`，普通 APK 无系统设置写权限，重新加载时会把隐藏状态覆盖为 false。两个原版读取点均改用 `LauncherSettingBridge.readBool`，统一读取应用内持久化设置；切换后同时调用 `Eb.ii()` 更新已有 SceneNode，并在图标刷新结束后再次同步，确保现有角标立即消失而非只影响新建图标。
+- OPPO 实机截图进一步确认：旧快捷方式错误地把桌面自身的中转 Activity 标记为 user 999，导致系统尝试在未安装 Launcher 的分身用户中启动中转页，点击无响应。现改为快捷方式归属 user 0，由中转页再通过 `LauncherApps.startMainActivity` 启动真实 user 999 应用，并增加 `startActivityAsUser` 反射兜底及启动结果日志。
+- 分身图标不再使用 ColorOS 已经套过圆框和厂商分身角标的 `LauncherActivityInfo` 图标；优先读取 user 0 的原始 Activity/Application 图标，只叠加锤子面具角标。安装正确快捷方式前会先清理旧版无效条目。
+- OPPO ADB 日志显示通知监听授权后曾发生 `binding died`，打开系统设置只是间接触发重新绑定。Launcher 每次恢复时现主动检查授权、请求 `NotificationListenerService.requestRebind` 并重放角标，无需再次点击“前往设置”。
+- “关于手机/关于桌面”的操作日志新增“发送”按钮：结束记录后，可将结构化操作日志与配套的本应用 logcat 合并为文字，通过系统分享发送。界面明确提示受 Android 权限限制，应用内日志不能替代电脑 ADB 的全系统日志。
+- 分身诊断新增 profile 数量、userId、serial、LauncherActivityInfo 数量、组件名、开关状态、快捷方式 URI、直接处理/广播兜底结果及异常记录。
+- 分身快捷方式安装/删除优先在桌面进程内反射调用原版 `com.smartisanos.launcher.a.L` 处理器，避免 OPPO 等系统拦截或延迟自发快捷方式广播；直接调用失败时仍保留定向广播兜底。
+- “隐藏图标上的角标”不再只保存设置值：切换时直接同步 `Constants.SHOW_MESSAGE_FLAG = !hidden` 并刷新桌面，Launcher 每次恢复前也重新应用持久化值，避免进程重建后失效。
+- 验证：`build.bat` 完整通过，输出 `build/launcher-signed.apk`；当前没有连接 ADB 设备，OPPO 分身和角标交互需真机验证。
+
+### 2026-06-28
+
+#### 普通 Android 通知角标与横扫清除
+
+- 原版机制确认：Smartisan 系统通过 `com.smartisanos.launcher.new_message` 携带包名、组件、UID 和计数，Launcher 将其写入 `ItemInfo.messagesNumber`，再由 `g.qb(count)` 生成数字纹理；文件夹汇总和横扫动画均属于 Launcher 内部能力，并不依赖 Smartisan ROM。
+- 新增 `SmartisanBadgeListenerService`，使用 Android 公共 `NotificationListenerService` API 监听通知新增、更新和移除，并在连接时通过 `getActiveNotifications()` 全量恢复。按 `packageName + uid` 隔离主用户/分身，按通知 key 去重，过滤 Launcher 自身、ongoing 通知、禁用 badge 的通知渠道和有子通知时的 group summary。
+- 计数优先使用通知提供的 `Notification.number`，否则每条有效通知计 1，最高限制 999；结果转换为原版 `new_message` 广播，因此原版绘制、数据库、文件夹汇总和隐藏角标开关无需重写。
+- 角标快照写入 Launcher 私有偏好，Launcher `onResume()` 会重放，解决通知监听服务已常驻但桌面动态广播接收器稍后才注册造成的计数丢失。
+- 强迫症选项在“隐藏图标上的角标”下新增“紧贴屏幕横扫清除角标”开关，并增加“通知使用权”入口；首次开启横扫且尚未授权时也会跳转系统授权页。通知使用权必须由用户手动授予，应用不能静默获取。
+- 横扫继续执行原版 `Yh() -> wx()` 动画和本地数据库归零，同时记录当时存在的通知 key。旧通知继续留在通知栏也不会马上把角标顶回来；只有出现新的通知 key 才重新计数。横扫不会擅自删除系统通知。
+- 文本 Manifest 和最终注入 APK 的二进制 Manifest 均注册通知监听服务；新增 `tools/patch_badge_service_manifest.py` 用于向保留的 AXML 清单安全追加服务节点，避免只改文本 Manifest 导致最终 APK 丢失服务。
+
+验证：
+
+- `build.bat` 完整通过，Java 监听服务编译进 `classes2.dex`，APK 使用 v1/v2/v3 签名。
+- `aapt2 dump xmltree build/launcher-signed.apk --file AndroidManifest.xml` 确认最终二进制清单包含 `SmartisanBadgeListenerService`、`BIND_NOTIFICATION_LISTENER_SERVICE` 和正确的 service action。
+- 当前连接设备覆盖安装成功；`dumpsys package` 确认系统识别通知监听 service intent filter；真机进入“强迫症选项”确认“隐藏图标上的角标”下方显示“紧贴屏幕横扫清除角标”。
+- 仍需用户在目标机手动授予通知使用权后，用微信、短信等实际通知完成数字变化、通知移除、文件夹汇总和横扫后新通知恢复四项动态验收。
+
+#### Moto G100 Android 16 启动兼容、页面锁搜索刷新与 v1.5.1
+
+问题与根因：
+
+- Moto G100 升级 Android 16 后 Launcher 无法正常启动。`ja` 构造阶段会实例化继承隐藏接口 `android.app.IActivityObserver$Stub` 的观察器；该 Smartisan 私有系统接口在普通 Android 16 ROM 上不可用，应用会在初始化阶段失败。
+- 搜索启动此前在无法从 favorites 数据库确认 App 所属页面时直接按“已锁定”处理。取消页面锁后页面映射可能暂时查不到，因此搜索打开仍错误弹出密码页。
+- 文本 Manifest 已写 `v1.5.1 / 26`，但构建末尾注入的二进制 Manifest 和设置页版本仍停留在 `v1.4.9 / 24`，导致最终 APK 版本被覆盖。
+
+修复：
+
+- 在 `launcher`、`clean_launcher`、`clean_launcher_raw` 三份 `ja.1.smali` 中不再创建 `IActivityObserver` 实例，将 `nh` 初始化为 `null`，避开 Android 16 对已移除/不可访问隐藏接口的初始化失败；保留其余广播与桌面初始化流程。
+- 搜索启动不再依赖 favorites 查询失败后的“默认锁定”兜底，而是从原版页面容器 `fa.Ua(packageName)` 实时取得 App 单元格，经 `g.Af()` 找到所属页面，再用原版 `M.On()` 判断页面当前是否锁定。原版状态中 `M.Nn()` 是隐藏页（`yI == 1`），`M.On()` 才是锁定页（`yI == 2`）；原版页面点击也只有 `On()` 分支会调用 `Zp()` 验证密码。只有明确处在锁定页面时进入密码页，解除页面锁后下一次搜索启动会直接读取新状态并放行。
+- 版本三个写入点统一为 `v1.5.1 / 26`，并在构建后通过 `aapt2 dump badging` 核对最终 APK。
+- `.gitignore` 放行根目录 `build` 和本次新增的 maintained 彩色隐私密码锁图标、黑色键盘图片，确保这些产物可以提交到 GitHub，同时避免把其余历史图片资源全部误列为新文件。
+
+验证：
+
+- `build.bat` 完整构建、资源编译和签名通过。
+- `aapt2 dump badging build\launcher-signed.apk` 确认 `versionCode='26'`、`versionName='v1.5.1'`、`compileSdkVersion='36'`、`targetSdkVersion='28'`。
+- 2026-06-28 用户安装到真机后完成最终回归：锁住板块时，从自绘搜索结果点击该板块内 App 会进入数字密码页；解除板块锁后，再从搜索点击同一 App 会直接启动，不再误弹密码。两条路径均确认正常。
+
+防回归规则：
+
+- 不要把 `M.Nn()` 当作页面锁状态；它表示隐藏页。页面锁必须检查 `M.On()`。
+- 不要恢复“找不到 App 页面就默认要求密码”的逻辑，否则解除锁、数据库尚未同步或桌面未完全初始化时会误拦普通搜索启动。
+- 不要让搜索结果缓存一个独立的 `locked` 布尔值。每次点击搜索结果时都应重新执行 `fa.Ua(packageName) -> g.Af() -> M.On()`，以当前桌面页面对象为准。
+- 不要在 `ConfirmPasswordActivity` 中判断 App 是否属于锁定页面；该 Activity 只负责密码输入和验证，是否需要进入它由搜索启动入口决定。
+- 修改这段链路后必须同时回归两种状态：`锁住板块 -> 搜索打开 -> 必须验证密码`，以及 `解除板块锁 -> 搜索打开 -> 必须直接启动`。
+
+涉及文件：
+
+- `launcher/smali/com/smartisanos/launcher/ja.1.smali`
+- `clean_launcher/smali/com/smartisanos/launcher/ja.1.smali`
+- `clean_launcher_raw/smali/com/smartisanos/launcher/ja.1.smali`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/AndroidManifest.xml`
+- `launcher/original/AndroidManifest.xml`
+- `launcher/tools/maintained_settings_res/res/values/strings.xml`
+- `.gitignore`
+
+#### 通用应用分身管理、首次加载和搜索启动
+
+问题与根因：
+
+- 工程原先已有零散的 `userId`、分身角标和 `LauncherApps` 兼容代码，但补录任务首次延迟 12 秒，而且没有稳定参与桌面模型第一次扫描。首轮桌面加载完成后才把分身写入数据库，因此微信分身通常要完全退出 Launcher、第二次启动才显示。
+- 旧实现混用 `UserManager.getUserProfiles()`、常见用户 ID 猜测和反射构造 `UserHandle(id)`；搜索又把 `LauncherActivityInfo` 转成 `ResolveInfo` 后从 UID 反推用户。不同 ROM 的分身用户 ID 并不固定，容易只对微信或某个厂商的 user 10/999 偶然有效。
+- 原版搜索 URI 只保存包名和组件名，主应用与分身组件相同时无法表达目标 profile；直接 `startActivity()` 会打开主应用。
+
+实现：
+
+- 统一通过 `LauncherApps.getProfiles()` 获取系统实际暴露的 profile，再对每个非当前用户调用 `LauncherApps.getActivityList(null, userHandle)`。没有写死微信、淘宝、京东、拼多多、支付宝或 QQ 包名，系统暴露的所有 Launcher Activity 都可进入同一逻辑。
+- 分身记录同时保留 `ComponentName`、真实 `UserHandle`、Launcher 数据库使用的 `userId` 和 `UserManager.getSerialNumberForUser()` 返回的 profile serial。设置偏好和搜索历史键使用 `serial + component`，主应用与分身不会因包名/组件名相同而覆盖。
+- 分身改为默认全部关闭。没有任何分身被用户启用时，桌面模型直接返回普通应用列表，不调用 `LauncherApps.getProfiles()`，避免为默认隐藏的功能增加冷启动等待。只有进入“应用分身”设置页时才枚举系统 profile。
+- 桌面设置新增“应用分身”入口。页面异步列出所有 profile 应用并提供默认关闭的开关；打开时保存 `serial + component` 状态，发送原版用户包新增/变更事件并刷新桌面。启用过分身后，后续桌面启动才会参与 profile 枚举，并保留立即、2 秒、8 秒重试。关闭时发送 `EVENT_USER_PACKAGE_REMOVED` 并刷新数据库、桌面和搜索。没有额外 profile 或接口不可用时显示正常提示。
+- 当前自绘搜索直接从 profile 枚举追加分身结果，不依赖桌面数据库是否已完成首轮补录。分身搜索项保存真实 `UserHandle` 和 serial，点击后使用 `LauncherApps.startMainActivity(componentName, userHandle, null, null)`；普通应用仍使用原来的 `Activity.startActivity()`。
+- 原版 `SearchProvider` 生成分身结果 URI 时，根据 `ItemInfo.userId` 找到对应 profile 并追加第三段 serial；`StartActivityForSearch` 优先解析第三段，通过 `UserManager.getUserForSerialNumber()` 还原 `UserHandle` 后调用 `LauncherApps.startMainActivity()`。两段 URI 的普通应用保持原启动方式。
+- 页面锁搜索判断继续按 `ItemInfo.userId` 区分同包主应用和分身。分身位于锁定板块时，密码验证完成后也使用保存的 profile serial 启动真正的分身，不会落回主应用。
+
+防回归规则：
+
+- 不得按 `packageName + componentName` 单独去重分身，唯一键必须包含 profile serial 或真实用户标识。
+- 不得用固定 user 10/999/888 列表代替 `LauncherApps.getProfiles()`；固定 ID 只能作为旧 ROM 兼容兜底，不能作为主发现路径。
+- 分身启动必须使用 `LauncherApps.startMainActivity()` 和发现时保存的 `UserHandle`。不要用普通 `startActivity()`，也不要只依赖反射构造 `UserHandle`。
+- 不得让默认关闭状态在桌面冷启动时扫描 profile；只有至少一个 `serial + component` 被明确启用后，桌面模型才允许枚举和短延时重试。
+- 设置开关、桌面数据库、当前自绘搜索和旧 SearchProvider URI 必须使用同一份启用状态；关闭分身后不能只隐藏设置行或只删除桌面图标。
+- 修改页面锁链路时必须分别验证主应用和同包分身，不能因为包名相同而共用错误的页面锁状态。
+
+验证：
+
+- `build.bat` 完整通过，包括 maintained 设置资源、apktool smali、Java/classes2.dex、zipalign 和签名。
+- 当前连接的 BlackBerry 设备覆盖安装成功；该设备只有用户 0，可确认无 profile 调用不会导致安装或 Launcher 启动崩溃。
+- 初版 SearchProvider serial 补丁曾错误复用仍保存 `ResolveInfo` 的 `v10`，导致 Android Verifier 报 `VerifyError`，Launcher 在安装 ContentProvider 阶段无法启动。已改用后续会被重新赋值的 `v12` 暂存 `userId`，保留 `v10` 的引用类型；此类 smali 修改必须通过真机冷启动验证，不能只以 apktool 构建成功作为验收。
+- 修正后通过 ADB 覆盖安装并执行 `am force-stop` 后冷启动 `.Launcher`：Activity 启动成功、Launcher 进程持续存活且保持前台，logcat 中无 `FATAL EXCEPTION`、`VerifyError` 或 Launcher 崩溃记录。
+- Android 16 多 profile 真机仍需完成最终动态验收：微信、淘宝、京东、拼多多首次发现，设置开关即时增删，搜索命中并打开正确分身，以及主应用/分身共存。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/smali/com/smartisanos/launcher/data/SearchProvider.smali`
+- `launcher/smali/com/smartisanos/launcher/StartActivityForSearch.smali`
+- `launcher/tools/maintained_settings_res/res/layout/setting_main.xml`
+- `launcher/tools/maintained_settings_res/res/values/strings.xml`
+- `launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml`
+
+#### 跨 ROM 安装、首次启动与下滑搜索性能收口
+
+问题与根因：
+
+- 小米 / HyperOS 安装返回 `-112 (INSTALL_FAILED_DUPLICATE_PERMISSION)`。二进制 Manifest 仍声明 7 个原版锤子私有权限，其中一个错误占用 `android.permission.*` 命名空间；手机上存在同名权限但签名不同时会在安装阶段直接拒绝 APK。
+- 新安装没有保存过 `ro.build.date.utc`，原版逻辑把空值与当前系统构建时间不一致误判为 OTA。首次建库生成图标后，OTA 路径立即删除全部图标和阴影缓存并再次生成，造成重复 I/O、解码和数据库写入。
+- 原版固定 user 10 的分身事件路径会在未启用任何分身时逐包查询第二用户，普通 ROM 上查询全部失败却仍消耗十几秒。
+- 自绘搜索页此前在 `setContentView()` 前同步枚举所有 Launcher Activity 并读取全部名称、图标和 profile，导致页面本身延迟数秒；改为异步后，常用图标仍要等待完整索引完成才一起显示。
+
+修复：
+
+- 7 个应用内部 signature 权限统一迁移到 `com.ranhf.smartisanlauncher.permission.*`，同步文本 Manifest、保留的二进制 Manifest、Provider 权限引用、Smali 常量和预装完成广播权限。新增 `tools/patch_manifest_internal_permissions.py`，避免以后重新处理二进制清单时恢复冲突权限。
+- 首次建库与 OTA 刷新设为互斥：首次安装只生成一次图标；已有数据库且系统构建时间确实变化时仍执行 OTA 缓存刷新。
+- 原版分身包事件增加已启用记录与真实第二 profile 双重门禁；没有用户明确启用的分身时不枚举 profile，也不进入固定 user 10 的逐包处理。
+- 搜索页先绘制搜索框并弹出键盘，完整应用索引在 `launcher-search-loader` 后台线程生成。
+- 最终取消搜索框下方的常用应用图标区，避免搜索页首帧后再补图标造成明显的二次跳变；完整应用、历史和已启用分身索引仍在后台生成，用户输入搜索时继续覆盖全部应用。
+- 强迫症选项里的通知使用权提示把中文“前往设置”/英文“Tap to configure”单独改为蓝色下划线链接样式，并把跳转范围严格限制在链接文字本身。
+- 通知使用权提示移动到“隐藏图标上的角标”开关正下方；底部上扫说明继续跟随“紧贴屏幕横扫清除角标”开关，避免权限说明与手势说明归属混淆。
+- 设置页交互按控件类型收口：所有 `SettingItemSwitch` 行（含动态创建的透明主题、壁纸模糊、应用分身和改进版图标）取消整行点击，只触摸右侧 `SwitchEx` 滑块才切换；通知权限只点击蓝色下划线“前往设置”文字才跳转；“图标包”“桌面图标大小”等带右箭头的导航标签保持整行任意位置可点击。
+- 安装兼容静态审计补齐 5 个旧组件的显式 `android:exported="true"`：Launcher、PinShortcutActivity、LauncherReceiver、DataSyncReceiver、DataDumpReceiver。文本与二进制 Manifest 已同步，避免部分 HyperOS / OriginOS / Android 16 安装器把缺省 exported 判为 `MANIFEST_MALFORMED`。
+- “检查更新”结果与新版本确认弹窗改为接近屏幕可用宽度的锤子式圆角卡片：标题居中，版本信息和更新说明统一左对齐，正文增加左右留白与行距，底部继续使用细分割线和分栏按钮；普通确认弹窗保持原尺寸与对齐方式。
+
+验证：
+
+- `build.bat` 完整通过；APK 的 v1/v2/v3 签名和 16KB zipalign 检查通过。
+- BlackBerry 真机覆盖安装成功；冷启动 Activity 显示约 `1.284s`，含进程拉起总计约 `2.235s`，无分身全包扫描和 `FATAL EXCEPTION`。
+- 自绘搜索 Activity 冷启动显示约 `254ms`；完整索引继续后台加载，不阻塞搜索页首帧。
+- 最终 APK 确认 `minSdk=23 / targetSdk=28 / compileSdk=36`，包含 arm64-v8a、armeabi-v7a、armeabi、x86、x86_64；自定义权限已使用独有命名空间，带 intent-filter 的旧组件已显式 exported。目前静态审计未发现新的通用安装阻断项。
+- 小米 17 的 `-112` 修复需在对应设备重新安装最终 APK 完成最终确认；若仍失败，应使用 `adb install` 保存 PackageManager 返回的冲突权限或冲突包名。
+
+涉及文件：
+
+- `launcher/AndroidManifest.xml`
+- `launcher/original/AndroidManifest.xml`
+- `launcher/smali/com/smartisanos/launcher/data/A.smali`
+- `launcher/smali/com/smartisanos/launcher/ja.1.smali`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `tools/patch_manifest_internal_permissions.py`
+- `tools/patch_manifest_exported_components.py`
+
+### 2026-06-26
+
+#### 隐私密码页宽度、黑色键盘和搜索解锁链路
+
+- 隐私密码页改为复用主设置项的全宽九宫格背景尺度，“修改密码”不再额外套左右内容边距；底部“关闭密码”保持红色操作按钮，但按主设置卡片可见边缘对齐，并继续和“修改密码”同屏显示。
+- 对照 maintained 版搜索页 T9 键盘确认原版按下反馈由 action-down 状态触发并重绘。内置数字键盘现在在 `ACTION_DOWN` 立即 `setPressed(true)`、输入数字、播放点击音和触感反馈，在 `ACTION_UP/CANCEL` 清除 pressed，避免之前触摸事件被消费后 selector 没有按下态。
+- 浅色隐私密码验证页继续使用 maintained 设置资源里的 `btn_0_classic_normal` 到 `btn_9_classic_normal`、删除和收起按钮资源；黑色板块锁页因没有对应黑色数字键资源，改为同一套键位逻辑的黑底白字按钮，并提供更明显的按下亮态。
+- 搜索结果启动锁定板块内 App 时先进入 Launcher 内置黑色数字密码页，验证成功后再启动目标 App；直接点锁定板块的 requestCode 21 也统一走同一套黑色密码页，取消后会结束本次验证状态，避免再次点击无反应。
+- 追加修正：首次设置页面密码的 requestCode 20 也改为启动 `ConfirmPasswordActivity` 的全屏黑色数字键盘，不再弹旧 AlertDialog；黑色键盘资源由白色锤子 `btn_*_classic_normal.9.png` 保留九宫格边框后反色生成 `btn_*_classic_dark.9.png`；由于按下视觉态在当前兼容层里观感仍不够跟手，黑白键盘均取消视觉 pressed 变色，只保留按下即输入、点击音和触感反馈。
+- 追加修正：隐私密码页的分组标题和“修改密码”文字左边距统一回 maintained 设置页 `setting_item_text_left` 的 30dp 体系；“关闭密码”按钮高度改为 72dp，左右边缘按设置项可见边缘重新对齐。设置首页“隐私密码”图标由通用齿轮改为基于页面锁动画素材制作的灰银锁图标 `privacy_password_lock_icon.png`，保持锤子设置页的拟物灰度风格。
+- 追加修正：主设置页 Java 绑定层此前仍把“隐私密码”入口图标覆盖为 `launcher_settings`，现同步改为 `privacy_password_lock_icon`；“关闭密码”按钮高度从 72dp 收回 64dp，使可见高度更接近上方“修改密码”项。新增 `docs/development/CLEANUP.md`，记录可删除/需谨慎处理的构建产物、反编译目录和被 `.gitignore` 忽略的新 PNG 资源。
+- 追加修正：`privacy_password_lock_icon.png` 从灰银系统感图标改为蓝绿色底座、金色锁体、红色提示点的彩色拟物锁图标，更贴近设置首页其他锤子风格彩色图标。角标链路对照：当前 original-port 仍有旧版 `com.smartisanos.launcher.P` 广播接收 `com.smartisanos.launcher.new_message` 并读取 `extra_packagename / extra_componentname / extra_uid / extra_message_count`，再调用 `Aa.a(..., count)` 更新 `ItemInfo.messagesNumber`；maintained 原版 `LauncherModel` 额外兼容 `badge_count_*`、HTC、Sony 等第三方角标字段，`ApplicationProxy` 还注册 `launcher_hide_badge / launcher_badge_swipe_clean` 观察者，通过 `LauncherPreferences` 刷新 `Constants.SHOW_MESSAGE_FLAG / ENABLE_SWEEP_MESSAGE_FLAG`，`Cell.updateFlagMessageNumber()` 根据计数创建或清除 `mFlagMessageRect`。本轮只记录差异，未改角标逻辑。
+- 验证：`build.bat` 已通过 maintained 设置资源构建、apktool smali、Java 兼容层编译和签名，输出 `build\launcher-signed.apk`。
+
+### 2026-06-25
+
+#### 日历编辑页灰度最终回归记录
+
+- 可工作的灰度基线是 `3b973b589338b963d5b39a82e1937922577b3f4e`。该版本进入桌面编辑页后，点击底部 Dock 左下齿轮进入“已选择 [0/12] 个应用程序”页，日历会和其他图标一样走静态图层灰度。
+- 后续尝试在 `view/a/g.1.smali` 新增 `showCalendarActiveIconOnly()`、或在静态纹理绑定后按 `ItemInfo.Te()` 隐藏日历静态前景，会破坏这条灰度链路：灰度静态层被隐藏，彩色活动日历层留在最上面，导致设置页日历始终红白彩色。
+- 最终方案：`view/a/g.1.smali`、`ItemInfo.smali` 的日历图层状态回到 `3b973b5` 行为；只在 `view/activeicon/m.smali` 覆盖 `d([B)` / `o(Bitmap)`，把静态图标替换为合成日历 bitmap，并同步日期矩形比例。这样普通桌面没有双层错位，编辑设置页仍能正常变灰。
+- 本轮核对：文件夹对齐相关 `LayoutPropertyAdapter.centerFolderPreview()`、`folder_icon_center_offset_*`、打开文件夹只作用文件夹页的规则未被修改；图标大小相关 `normalizeLauncherIcon()`、`normalizeImprovedIcon()`、`maybeApplyLauncherIconSize()`、50%-150% 保存后完整重启 Launcher 的链路仍保留。日历回退时误带出的 `e/s.smali` 图标 override normalize 调用已补回。
+- 毛玻璃主题已改为只保留 `smartisan_theme_aero` 作为透明壁纸主题，移除白雾主题入口和资源引用；毛玻璃桌面与编辑页文字已恢复为原版风格白色文字效果。
+- 透明主题切换已从自定义运行时旁路改回原版方向：透明模式写入 `launcher_grid_theme` 的 0/1，普通主题 ID 只写入 `launcher_theme`；透明主题包只用于资源注册，不再把 `smartisan_theme_trans` 当普通主题写入或送入普通主题切换队列，避免关闭透明主题后无法恢复上一主题。
+- 透明主题安装包使用 `build\theme-trans-signed.apk`，安装后包名为 `com.smartisanos.launcher.theme.trans`，`minSdkVersion=23`、`targetSdkVersion=28`，最终 APK 元数据已更新为 `compileSdkVersion=36`、`platformBuildVersionName=16`，用于普通 Android / Android 15 / Android 16 安装；`original_apks\com.smartisanos.launcher.theme.trans.apk` 是原始参考包，`targetSdkVersion=17`，不要作为新系统安装包。
+- 透明主题开启后只能使用默认翻页动画：主设置页隐藏“桌面翻页动画”入口，翻页动画读写被钳制为 `0`，避免透明主题资源链路和非默认翻页动画混用。
+- 普通不透明主题下主设置页不再显示“桌面壁纸”入口；只有毛玻璃主题 `smartisan_theme_aero` 或开启透明主题时才显示。透明主题仍隐藏“桌面主题”和“桌面翻页动画”，只保留“桌面壁纸”和“应用图标”，避免普通主题误进入只对壁纸主题生效的设置。
+- 透明主题开关状态读取改为私有 prefs 优先、系统 Settings 兜底，解决普通 Android 上系统 Settings 旧值覆盖设置页开关，导致返回设置页仍显示关闭的问题。
+- 修复透明主题开启后仍排队 `MESSAGE_CHANGE_THEME smartisan_theme_black` 的问题；开启透明主题只写透明覆盖状态并重启 / 刷新桌面，关闭透明主题时才恢复上一普通主题。
+- 修复原版主题管理器 `X.ca()` 清空主题表后 `smartisan_theme_trans` 丢失的问题：在 `X.da()` 选择当前主题前重新注册透明主题包，避免透明状态回落到黑主题导致黑底、黑宫格或 Dock 混用。
+- 透明主题开关和主题列表透明主题入口统一改为写入透明状态后重新触发桌面初始化，让 `O.V()`、`Constants.isTransparentTheme` 和 `X.va()` 重新选择资源，避免设置页开关状态正确但桌面仍停留在上一套主题资源。
+- 透明主题开关确认必须完整重启 Launcher 才能稳定生效：普通 `J.a(theme, theme_changing)` 能拿到 `smartisan_theme_trans`，但不会完整重建透明桌面的壁纸 / 网格层；当前改为显示加载动画后重启桌面，避免仅退出设置页导致黑主题资源残留。
+- 透明主题重启链路新增跨进程 loading pending 标记：设置页写入标记后杀进程重启，新 Launcher 进程在 `onCreate`、`J.b()` 初始化前显示加载层，等桌面渲染帧稳定后再关闭，避免切换时裸露黑屏 / 壁纸中间态。
+- 透明主题壁纸取图改回原版优先系统壁纸 drawable；当 `WallpaperManagerSmt` / `WallpaperManager.getDrawable()` 在普通 Android 返回 null 时，再依次尝试 `peekDrawable()`、`getFastDrawable()`，最后才使用本地壁纸副本按屏幕比例中心裁剪，避免整图拉伸导致壁纸看起来被压缩。
+- “桌面壁纸模糊效果”改回原版刷新方式：写入 `original_launcher_wallpaper_blur_on` 的 0/1，更新 `Constants.isTransWallpaperBlur` 后调用 `Eb.lh()` 重建 `t_blur_background`，不再走完整透明主题重载，修复打开模糊开关后背景变黑的问题。
+- `ua.i(context)` 已加入普通 Android 兼容读取，优先从 launcher 私有 prefs 读取 `original_launcher_wallpaper_blur_on`，避免无 `WRITE_SECURE_SETTINGS` 时原版只读 `Settings.Global` 导致状态丢失。
+- 对照原版确认：毛玻璃 / 透明壁纸主题下应用文字颜色由壁纸明暗决定，原版通过 `Constants.initGaussianDarkLight()` 在普通资源和 `_light` 后缀资源之间切换，不是按时间变化。
+- 透明主题 / 毛玻璃主题下，状态栏文字和桌面应用文字已恢复为按壁纸明暗自动切换：
+  - 根因一：`Constants.initByTheme()` 调用 `initGaussianDarkLight()` 后已经根据壁纸算出 `sGaussianResSuffix="_light"`，但后续又把 `sGaussianResSuffix` 清空为 `""`，导致浅色壁纸无法继续加载原版 `_light` 应用文字资源，应用名仍显示白字。
+  - 根因二：状态栏颜色虽然已经通过原版 `status_bar_icon_color(_light)` 资源传给 `ua.setSystemUiDecoration()`，但普通 Android / Android 6+ 还需要同步 `View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR`，否则系统状态栏文字可能仍按旧颜色显示。
+  - 修复方式：保留 `initGaussianDarkLight()` 算出的 `sGaussianResSuffix`，让 `Mc.o(theme)` / `Constants.initGaussianTheme()` 正常进入 `_light` 资源分支；同时在 `launcher/smali/com/smartisanos/launcher/e/g.smali` 中根据最终解析出的 `status_bar_icon_color` 设置或清除 `LIGHT_STATUS_BAR`。
+  - 回归注意：只允许透明主题 `smartisan_theme_trans`、毛玻璃主题 `smartisan_theme_aero` 这类高斯 / 壁纸主题跟随壁纸明暗；普通不透明主题应继续使用主题自身文字资源和状态栏资源，不要改成跟随壁纸。
+- 壁纸显示 / 模糊链路当前保持原版方向，不要再次改成手动模糊 bitmap 或把 `background.png` / `t_blur_background` 互相替换：
+  - 透明主题壁纸显示正常的关键是 `s.n(context, uri)` / `decodeLauncherWallpaperSurfaceBitmap()` 按屏幕中心裁剪取壁纸，`background.png` 作为桌面背景纹理。
+  - “桌面壁纸模糊效果”正常的关键是写入 `original_launcher_wallpaper_blur_on`，更新 `Constants.isTransWallpaperBlur` 后调用 `Eb.lh()`，由原版 SMEngine 重建 `t_blur_background`。
+  - 不要在 Java 层自行 StackBlur 主壁纸，也不要把 `t_blur_background` 覆盖回 `background.png`；这样会造成主桌面、Dock 或局部区域显示不一致。
+- 透明主题换壁纸要按原版链路做兼容，不能只依赖系统 Settings 或系统广播：
+  - 原版 `ApplicationProxy` 的 `M.onReceive()` 监听 `android.intent.action.WALLPAPER_CHANGED`，仅在 `Constants.isTransparentTheme=true` 时继续。
+  - 原版先通过 `e.s.ha(context)` 读取当前透明壁纸 URI，再和 `Constants.sWallpaperUri` 比较；不同则更新 `Constants.sWallpaperUri`，最后调用 `Eb.getInstance().lh()`。
+  - 原版 `Eb` 重建主背景时会在高斯 / 透明主题下使用 `Constants.sWallpaperUri` 调 `e.s.n(context, uri)` 解码壁纸，并刷新 `background.png` 纹理；`lh()` 主要负责透明壁纸变化后的节点 / blur 背景刷新。
+  - 实测普通 Android / 非系统签名设备上，`Settings.Global.putString(...)` 会因 `WRITE_SECURE_SETTINGS` 被拒，应用主动发送 `ACTION_WALLPAPER_CHANGED` 也会被系统拒绝；此时预览图会更新，但桌面可能继续显示系统壁纸。
+  - 2026-06-16 真机日志确认：当前普通 Android 设备上桌面实际背景仍优先跟随系统壁纸；只保存 launcher 私有壁纸副本会导致壁纸页预览变化，但桌面主界面继续显示旧系统壁纸。因此选择壁纸成功后必须直接调用 `WallpaperManager.setStream(..., FLAG_SYSTEM)` 同步系统桌面壁纸，私有 URI / `Constants.sWallpaperUri` / `Eb.Vh()` 作为原版透明主题链路和预览兜底继续保留。
+  - Android 7.0+（API 24+）支持 `WallpaperManager.setStream(InputStream, Rect, boolean, FLAG_SYSTEM)`，当前主 APK `minSdkVersion=23`，所以 Android 8 可以使用该接口；低版本保留 `WallpaperManager.setStream(InputStream)` 兼容回退。
+  - 普通应用不应主动发送系统保护广播 `Intent.ACTION_WALLPAPER_CHANGED`；系统壁纸由 `WallpaperManager` 设置成功后，系统会自行分发真实壁纸变化事件。手动发送只会在普通 Android 上产生 `Permission Denial` 噪音，不能作为刷新依据。
+  - 兼容修复必须把系统 Settings 和广播视为辅助：选择壁纸后先写 launcher 私有 prefs，再直接同步 `Constants.sWallpaperUri`，优先调用原版 `Eb.Vh()` 触发 `background.png` 主背景纹理重建，再调用 `Eb.lh()` / SMEngine 刷新透明壁纸节点和模糊背景。不能只调用 `lh()`，否则日志只会出现 `changeWallpaper TEXTURE_ID_BLUR_BACKGROUND`，主桌面仍可能不更新。
+- 检查更新读取 Gitee 下载仓库 Release 列表，只识别 `launcher-` 前缀的软件发布标签，并按版本号选择最高版本；APK 资产只选择桌面主 APK，跳过搜索、主题和 `theme-trans-signed.apk` 等附加包。下载走系统 `DownloadManager`，优先使用标准 Gitee Release 下载地址，失败后尝试 Release 资产返回的备用地址；下载完成后使用 `DownloadManager.getUriForDownloadedFile(downloadId)` 得到安装 URI。
+- 检查更新会复用已经下载完成的同版本安装包：保存 Release `tag`、APK 文件名和 `downloadId`；再次检查到同一线上版本时，`STATUS_SUCCESSFUL` 显示“安装”，`RUNNING/PENDING` 显示“下载中”，失败或资产变化才重新下载。
+- 后续发布 GitHub / Gitee Release 时，推荐同时上传 `build\launcher-signed.apk` 和 `build\theme-trans-signed.apk`；前者是桌面主 APK，后者是透明主题 Android 15 / Android 16 兼容安装包。不要把 `original_apks\com.smartisanos.launcher.theme.trans.apk` 当用户安装资产发布。
+- 桌面内“桌面设置”虚拟入口进入设置页后，已给 maintained 设置首页和壁纸页增加短暂点击保护；壁纸选择器入口也会再次检查保护状态并写入日志，避免 Activity 切换或残留输入导致刚进入设置就误打开图片选择器，进而被模拟器关闭整个 Launcher task。
+- 主题详情下载按钮状态已按当前主题项隔离，避免切换到其他主题后仍残留“正在下载”状态。
+- 桌面图标加载链路加入 drawable 归一化兜底，改善 MuMu 等环境 adaptive drawable 或特殊图标不显示的问题；MuMu 多用户 / 分身查询缺少 `INTERACT_ACROSS_USERS` 时，`getInstalledPackagesAsUser` 和 `queryIntentActivitiesAsUser` 会退回当前用户查询，避免初始化循环清库导致桌面空白。
+- 主题详情页预览图已改为外层居中容器，手机壳和主题截图保持原版层级叠加，并会按标题栏和底部主题色栏之间的可用空间自适应缩小，避免小屏手机底部被颜色栏遮住；从主题详情返回主题列表、从关于我们返回设置首页时会保持原滚动位置，并在首帧绘制前恢复，避免上下晃动。
+- 对照 maintained 的 APK 结构确认：maintained `minSdkVersion=19`、`targetSdkVersion=28`，且只保留 `assets/Textures/1080p`；当前工程第一轮先降到 `minSdkVersion=23`，保留更多运行安全余量，后续如需覆盖 Android 5.x / 4.x 再继续做 API 兼容回归。
+
+### 2026-06-24
+
+#### 设置页隐私密码入口与页面锁内置密码
+
+- 对照文档中页面锁现状，原版设置隐私密码入口没有迁到当前桌面设置页，导致用户只能在编辑模式点锁时被动设置。主设置页新增“隐私密码”行，点击后无密码则输入两遍 4-16 位数字密码；已有密码则先验证旧密码，再设置新密码。保存仍只写 Launcher 私有 `launcher_page_lock/password_hash`，摘要算法继续使用带命名域的 SHA-256，页面锁 requestCode 20/21 和原版页面状态机不变。
+- 页面锁弹窗的校验同步收紧为 4-16 位数字，避免设置页和锁入口对密码格式判断不一致。
+- 验证：`build.bat` 已完成 maintained 设置资源构建、apktool smali、Java 兼容层编译和签名，输出 `build\launcher-signed.apk`。APK 结构检查确认包含 `assets/settings_maintained/maintained-settings-res.apk`；当前 shell 中 `adb` 不在 PATH，`apksigner verify` / `aapt dump badging` 单独调用超时，未做装机交互验证。
+
+### 2026-06-22
+
+#### Android 16 触摸、图标尺寸与文件夹动画修复
+
+- Android 16 / VIVO 上压平手指后桌面不翻页：ADB 原始输入与应用事件确认触摸坐标没有中断，根因是旧 `TVelocityAndGestureTracker` 把较大的 `MotionEvent.getSize()` 当作专用 sweep 手势。Android 15+ 将旧 `sweep_threshold` 提升到 1.0，避免抢占普通翻页；下滑搜索改为先把完整 MotionEvent 交给 RootView / SMEngine，再旁路判断，避免搜索入口截断桌面触摸序列。
+- 普通、改进版和自定义图标此前存在两套尺寸规则：只有改进版按84%且只能缩小。现在统一按 alpha 可见边界居中到画布短边90%，允许有限度放大和缩小，所有来源共用 `normalizeLauncherIcon()`；设置页100%运行时基准由原先112%调整为120%，即用户确认观感合适的原120%大小，滑块显示值保持不变。
+- 展开文件夹内容按书架实际可见行高自适应：图标为 48%，应用名为 9.2%，文字中心偏移为 29%；用户调整 50%~150% 图标大小时，展开图标、文字和间距同比缩放。此前误把“缩略图松手后上移”当成展开页落点问题而临时修改的 `M.smali` / `FolderCellPositionAdapter` 入口已全部撤销，不保留错误方案。
+- 关闭文件夹缩略图松手后再上移：拖入动画以外框几何中心计算，而最终 2×2 / 3×3 viewport 使用 PNG 内真实搁板中心，两者相差约外框高度 3.6%~3.7%。`folder_icon_center_offset_2_2 / 3_3` 现在按当前外框尺寸动态补偿，使动画落点与最终缩略图一致，并随屏幕和图标比例自适应。
+- 日期刷新链路保持不变：系统 `DATE_CHANGED`、`TIME_SET`、`TIMEZONE_CHANGED` 广播仍由原版接收器处理，日期纹理缓存键继续包含年份和年内日序；其他手机只要能被标准日历类别或厂商包名检测到，就会显示当日日期并在跨日后更新。
+- 页面锁链路对照原版确认仍保留页状态 `0/2`、锁动画、待验证页面以及 requestCode 20（设置密码）/21（验证解锁）的结果处理；断点是原版依赖系统私有 `com.android.settings.ChooseLockPasswordFake`，已有 fallback 又启动依赖锤子安全中心控件的 `ConfirmPasswordActivity`。现改为 Launcher 内 AlertDialog：首次设置输入两遍4-16位数字密码，解锁输入一次；只在私有 `launcher_page_lock` 中保存带固定命名域的 SHA-256 摘要，验证成功后回调原版 `J.onActivityResult()`，页面锁定/隐藏/解锁仍由原版状态机执行。
+- 本轮验证：`build.bat` 构建、Java编译、apktool smali、签名均通过；APK覆盖安装到 API31 `emulator-5554` 和华为 DRA-AL00 成功，模拟器执行 `cmd package compile -m verify -f` 成功，两台设备均无 `VerifyError`、`NoSuchMethodError` 或 Launcher 崩溃。SMEngine编辑画面不暴露Android View层级，密码弹窗和页面锁交互仍需用户在当前页面点击确认。
+
+### 2026-06-21
+
+#### 厂商日历识别、日期刷新、双层错位与统一图标尺寸路径
+
+- 根因不是单一素材错误，而是原版仅把 `com.android.calendar` 当活动日历；VIVO 的 `com.bbk.calendar` 会先按主题 / 改进版静态图标绘制，随后兼容层又叠加日期，形成一大一小、底部错位或日期固定在素材中的现象。
+- 新增 `CalendarAppDetector`：优先查询 Android 标准 `ACTION_MAIN + CATEGORY_APP_CALENDAR`，再用 Google、VIVO/BBK、Samsung、MIUI、ColorOS/Oplus、Huawei、OnePlus 等常见包名回退。`ItemInfo.Te()` 和活动图标创建统一使用该检测结果。
+- 日期纹理缓存键加入年份和年内日序，避免跨日后继续命中旧 bitmap；活动日期节点保持可见，并继续响应系统日期 / 时间 / 时区刷新链路。VIVO Android 16 真机已确认系统日期 21 时桌面显示 21，刷新后不回退到主题素材中的 20。
+- 图标百分比保存虽然正确，但旧实现只在“待处理变更”存在时缩放 `LayoutProperty`；覆盖安装、杀进程或系统回收后会从 XML 恢复 100%。`maybeApplyLauncherIconSize()` 现在每个新进程从 XML 基准只执行一次 `100 -> 保存值`，避免漏应用和重复乘算。
+- 验证设备：VIVO V2435A、Android 16；ADB 覆盖安装、冷启动、日期 21、12 宫格以及图标尺寸变化均用于回归。时钟当前走普通图标尺寸链路，未增加厂商专用缩放特判。
+
+### 2026-06-20
+
+#### 图标大小即时生效、文件夹对齐、冷启动网格与设置首页排版
+
+- 图标大小不立即生效的根因不是设置值没有保存，而是保存后只把已有 Launcher Activity 拉到前台。旧进程中的 `Constants.layoutPropertyMap`、网格点、普通应用 `SceneNode` 和 SMEngine 纹理仍使用修改前尺寸；因此图标大小保存后必须完整重建 Launcher。
+- 删除 `Constants.applyLauncherIconSize()` 对 `MODE_9` 的跳过。当前桌面 3x3 模式同样必须应用用户比例；跳过它正是“应用图标大小改了但当前桌面不变”的直接回归点之一。
+- 关闭文件夹预览不能简单沿用 XML 固定边距，也不能把整个正方形平均切成 2 / 3 行。实测 MODE_12 的 246px 文件夹纹理与 MODE_20 的 178px 纹理具有相同的归一化内部几何；2x2 可见行中心为 0.280 / 0.646，列中心为 0.356 / 0.644；3x3 可见行中心为 0.220 / 0.464 / 0.708，列中心为 0.308 / 0.500 / 0.692。`LayoutPropertyAdapter.centerFolderPreview()` 以当前 `icon_size_with_shadow` 乘这些比例，反算 top / left margin 和横纵间距，所以换屏幕、换 12 / 20 宫格、改变 50%-150% 图标尺寸后仍在每层可见区域垂直居中。
+- 打开文件夹使用另一张 1080x1356 书架纹理：`FolderCellPositionAdapter.adjustY()` 只允许作用于 `com.smartisanos.launcher.view.b.a` 文件夹页，围绕中间层按可见书架行高修正 Y；X 继续用原版固定三列。普通桌面页必须原样返回坐标，否则会重现冷启动上下大缝隙。
+- 文件夹防回归计算顺序：先取当前关闭外框 / 打开书架的实际绘制尺寸，再从对应 PNG 的可见内部边界求行列中心，最后计算图标边长、margin 和 space；禁止按整张含透明边缘的 PNG 均分，也禁止按某一台设备截图写死像素。资源 XML 只保留原版基准，最终坐标统一在适配器中生成。
+- 图标尺寸重启使用 requestCode `1002` 的精确 HOME PendingIntent；它与透明主题曾使用的 requestCode `1001` 属于同类闪回风险。设置首页 `show()` 现在同时取消 1001 和 1002，避免用户修改尺寸后立刻重新进入设置时，残留任务再次把设置页顶回桌面。
+- 桌面设置首页三枚缩略图入口同步整理：缩略图左边距改为 12dp，与下方纯文字设置行的左侧视觉基线协调；箭头右侧内边距由 30dp 改为标准 12dp，与下方箭头对齐；副标题限制最多两行并在超长时尾部省略，避免“应用图标”说明挤成三行。
+- 缝隙修复：`adjustY()` 首先沿继承链确认当前 page 是打开文件夹页；普通桌面页直接返回原始 Y，只有文件夹页才按书架可见层中心修正。禁止在共用的 `M.smali` 坐标入口中使用不带页面类型保护的文件夹算法。
+- 验证：`build.bat` 编译、zipalign、签名成功；APK 覆盖安装到 `emulator-5554`。在 1080x1920 / 560dpi 下，当前修复版冷启动的网格顶边直接贴合状态栏、底边直接贴合 Dock，与 `b36f1a9a` 基线一致，无需进入编辑模式；打开文件夹后三列和逐行排列保持正常。图标大小 50% / 100% 下关闭预览均按可见层中心缩放；改完尺寸后立即进入设置并停留 3 秒，`ThemeChooserActivity` 未再闪回。Logcat 未出现 `FATAL EXCEPTION`、`VerifyError` 或 `NoSuchMethodError`。
+
+### 2026-06-19
+
+#### 文件夹预览、展开排列和多分辨率适配
+
+- 对照用户提供的原版 / 当前截图和 `clean_launcher_raw` 原版代码确认，原版文件夹预览由 `launcher/smali/com/smartisanos/launcher/view/a/la.smali` 按数量选择 2x2 或 3x3 参数组；展开布局由 `launcher/smali/com/smartisanos/launcher/view/b/M.smali` 直接使用 `fa.ir()[index]` 的固定网格坐标，项目按顺序逐行填充。原版不会把最后不足一行的项目移动到整行中央。
+- 修复方式：
+  - 删除 `M.smali` 两处 `FolderCellPositionAdapter.adjustX()` 调用，展开文件夹重新直接使用原版网格坐标；四个项目显示为第一行三项、第二行第一项，列中心与第一行一致。
+  - 12 / 20 宫格竖屏资源中的 `folder_preview_*` 只作为原始 100% 输入基准；运行时统一由 `LayoutPropertyAdapter.centerFolderPreview()` 根据当前 `icon_size_with_shadow` 和可见行列中心生成最终 2x2 / 3x3 参数。4 项以内保持 2x2，5-9 项保持 3x3。
+  - 删除 `LayoutProperty.smali` 文件夹专用的二次 X/Y 缩放，只保留 `LayoutPropertyAdapter` 单一适配入口。
+  - `MODE_9` 的 `folder_bookcase_*`、标题和分页点参数恢复原版基准。书架素材自身带透明边缘，节点宽度等于屏宽时，可见外框约占屏幕 84%，不能再额外乘 84%。
+  - 保留原版的多套 `MODE_9` 坐标基准：`values-xxhdpi` 使用 1080 基准，`values-sw411dp` 使用 1440 基准；不把两套资源强制覆盖成同一份。
+  - 实测原版 `folder_open_3_3.png` 为 1080x1356，透明区域外的书架范围为 y=129..1299，三层可见中心间距为 358。`LayoutPropertyAdapter` 以 `358 / 1356` 得到真实可见行高，再按行高限制图标、字体和 `name_off_set_y`，图标与文字作为同一组合留在层内。
+  - `_folder` 的书架、网格、图标偏移、文字偏移和裁剪参数统一使用屏幕宽度倍率，禁止同一文件夹混用 `scaleX` 与超长屏 `scaleY`。
+  - X 坐标继续完全使用原版 `fa.ir()` 固定三列。Y 坐标只在确认 page 类型为打开文件夹页后，以中间层坐标为锚点，用 `window_width * 358 / 1080` 计算当前可见书架行距；普通桌面页无条件返回原始坐标。
+  - `a.1.smali` 的文件夹页面裁剪高度改为当前 `folder_bookcase_height`，使大屏放大后的第一、三行不会被旧的 1080 网格裁剪区截断。
+- 验证：
+  - `build.bat` 编译、zipalign、签名成功，输出 `build\launcher-signed.apk`。
+  - `adb install -r -d` 覆盖安装到 `emulator-5556` 成功并保留原文件夹数据。
+  - 同一 APK 在 1080x2424 / 420dpi、720x1600 / 280dpi、1440x2560 / 560dpi 三种配置实测：桌面文件夹预览 2x2 对齐；打开后第一行三列对齐，第四项位于第二行第一列；各行图标和文字均留在对应层内，长名称不越过外框。
+- 防回归：
+  - 关闭预览的 `left/top/side/space` 必须由同一组归一化可见行列中心一次性反算；不能只把旧 XML 参数整组乘比例，也不能分别追加 X/Y 固定修正。
+  - 放大最终行距时必须同步放大文件夹页面裁剪高度；只移动图标而不扩大裁剪区，会表现为第一行图标上半部分被截掉。
+
+### 2026-06-17
+
+#### 更新下载通知与透明主题重启链路回归
+
+- 修复“检查更新”开始下载后通知栏提前显示“安装”的问题。原因是更新下载通知在未完成状态也绑定了安装 PendingIntent；现在只有 `complete=true` 且存在已下载 APK / 下载 ID 时才显示“安装”动作，开始新下载前会先清理旧更新通知。
+- 更新包下载使用系统 `DownloadManager` 标准链路；完成后通过 `getUriForDownloadedFile(downloadId)` 取得授权 URI，并附加 `FLAG_GRANT_READ_URI_PERMISSION` 拉起系统安装器。
+- 更新下载先 enqueue 标准 Gitee Release 地址；若 `DownloadManager` 返回失败，再自动切换 Release 资产返回的备用地址重新 enqueue。状态栏进度由系统下载管理器显示，应用内弹窗只做前台进度提示；下载完成通知和应用弹窗都使用同一个 downloadId 安装入口。
+- 检查更新弹窗会复用已经下载完成的更新包：下载时保存当前 Release 的 `tag`、APK 文件名和 `downloadId`；再次检查到同一个线上版本时，如果 `DownloadManager` 状态为 `STATUS_SUCCESSFUL`，右下角按钮显示“安装”并直接调用 `installApk(downloadId)`。如果状态仍是 `RUNNING/PENDING`，按钮显示“下载中”，避免重复下载同一个安装包。
+- 透明主题开启 / 关闭恢复原版方向的 Launcher 进程重启。上一轮为了避免设置页刚返回桌面时出现 SIGKILL 日志，把 `Process.killProcess()` 改成了裸 `startActivity()`，结果 `O.V()` / `Constants.isTransparentTheme` / `X.va()` 没完整重走，桌面会出现黑色主区域、Dock 和主题资源半加载。现在保留“显示加载层 -> 结束设置页 -> 重启进程”的完整初始化链路；从设置页触发时不再额外安排 `AlarmManager` HOME 重启，因为 Android 已会在 Launcher 进程结束后拉起默认桌面，残留闹钟反而会在用户立刻重新进入设置页后把页面顶回桌面。
+- 修复开启 / 关闭透明主题后立即进入设置页仍会闪回桌面的问题。原因是旧的 `scheduleLauncherRestart()` 用 requestCode `1001` 排了延迟 HOME PendingIntent，进程重启后用户重新打开 `ThemeChooserActivity`，该 PendingIntent 仍可能延后触发并抢焦点。现在设置页入口会调用 `cancelScheduledLauncherRestart()` 清理残留闹钟；透明主题从 Activity 触发时直接结束设置页并杀旧进程，不再排 HOME 闹钟，非 Activity 场景才保留兜底调度。
+- 回归注意：透明主题、宫格和图标大小这类依赖 Launcher 启动链路完整初始化的设置，不要仅靠运行时刷新或裸启动桌面替代进程重启；否则资源表、SMEngine 纹理、`Constants` 状态和原版主题管理器可能不同步。
+
+### 2026-06-16
+
+#### 透明 / 毛玻璃主题文字随壁纸明暗修复与壁纸链路说明
+
+修复内容：
+
+- 修复透明主题、毛玻璃主题下浅色壁纸仍显示白色应用文字的问题。
+  - 问题根因：`Constants.initByTheme()` 先调用 `initGaussianDarkLight(context)` 根据当前壁纸计算明暗，并会把浅色壁纸结果写为 `sGaussianResSuffix="_light"`；但紧接着旧代码又执行 `sGaussianResSuffix=""`，把 `_light` 后缀清掉，导致 `Constants.initGaussianTheme()` 和 `Mc.o(theme)` 无法进入原版浅色资源分支。
+  - 修复方式：删除这次错误清空 `sGaussianResSuffix` 的逻辑，保留 `initGaussianDarkLight()` 的计算结果；浅色壁纸继续加载 `def_apps_text_color_light`、`def_apps_shadow_color_light`、`page_title_text_color_light` 等原版资源，深色壁纸继续走默认资源。
+
+- 修复透明主题、毛玻璃主题下系统状态栏文字不随壁纸明暗稳定切换的问题。
+  - 问题根因：原版会解析 `status_bar_icon_color` / `status_bar_icon_color_light` 并传给 `ua.setSystemUiDecoration()`，但普通 Android 上状态栏深浅文字还受 `SYSTEM_UI_FLAG_LIGHT_STATUS_BAR` 控制，只写旧的装饰颜色不够。
+  - 修复方式：在 `launcher/smali/com/smartisanos/launcher/e/g.smali` 中，解析出最终 `status_bar_icon_color` 后按颜色亮度设置系统 UI flag：深色图标颜色时设置 `LIGHT_STATUS_BAR`，浅色 / 白色图标颜色时清除该 flag。
+
+- 验证结果：
+  - 浅色壁纸下，状态栏文字变深；应用文字应随 `_light` 资源变深，不再白字贴浅色壁纸。
+  - 深色壁纸下，状态栏和应用文字保持浅色，仍可读。
+  - 本轮只修文字明暗链路，没有改壁纸模糊和背景纹理链路。
+
+后续注意：
+
+- 透明主题和毛玻璃主题属于“壁纸主题 / 高斯主题”，文字明暗跟随壁纸；普通不透明主题不应跟随壁纸，必须继续使用当前主题自己的文字和状态栏资源。
+- 壁纸显示正常依赖原版链路：
+  - 自定义壁纸保存为 launcher 私有副本，并同步 `launcher_wallpaper_uri` / `desktop_wallpaper_uri` / `lockscreen_background`。
+  - 透明 / 毛玻璃主题加载壁纸时由原版路径按屏幕比例中心裁剪，不应拉伸整图。
+  - 模糊开关只写 `original_launcher_wallpaper_blur_on` 并刷新 `Constants.isTransWallpaperBlur`，再调用 `Eb.lh()` 让引擎重建 `t_blur_background`。
+- 不要再做以下改动：
+  - 不要在 `decodeLauncherWallpaperSurfaceBitmap()` 或 Java 辅助代码里主动 StackBlur 主壁纸 bitmap。
+  - 不要把 `t_blur_background` 覆盖回 `background.png`。
+  - 不要为了修 Dock 或模糊，替换原版 `background.png` 与 `t_blur_background` 的职责；这会导致主桌面、Dock、动画层使用不同来源的壁纸，出现局部清晰 / 局部模糊 / 底部错图。
+
+#### 自绘搜索页下滑误触与历史清除按钮修复
+
+修复内容：
+
+- 调整主设置页透明主题位置和翻页动画联动。
+  - 需求原因：透明主题下桌面背景、文字和高斯壁纸链路都走特殊资源分支，继续暴露“桌面翻页动画”容易让用户选到与透明主题不匹配的动画效果。
+  - 修复方式：在 `setting_main.xml` 中把“透明主题”开关移动到“强迫症选项”下面；透明主题开启时，`MaintainedLauncherSettingsHost.bindPage()` 隐藏 `item_page_flip_anims`，`applyTransparentThemeSetting()` 立即强制写回默认翻页动画。
+  - 回归注意：透明主题开启期间，`readPageAnimation()` 和 `writePageAnimation()` 都会把动画值钳制为 `0`，确保其他入口也只能使用“默认动画”；关闭透明主题后主设置页会重新显示“桌面翻页动画”选项。
+
+- 修复桌面自绘搜索页容易误触发的问题。
+  - 问题根因：此前搜索手势在 `Launcher.smali`、`RootView.smali`、`SMGLSurfaceView.smali` 三层都接入了 `MaintainedLauncherSettingsHost.handleLauncherSearchGesture()`，同一次下滑会被多处重复处理；同时 Java 侧在 `ACTION_MOVE` 阶段就会打开搜索页，距离和角度阈值偏松，没有多指 / 取消手势失效和冷却限制，所以短滑、拖动或图标附近滑动容易误触。
+  - 修复方式：只保留 `Launcher.smali` 顶层搜索触发入口，删除 `RootView.smali` 和 `SMGLSurfaceView.smali` 的重复搜索钩子；`handleLauncherSearchGesture()` 改为松手 `ACTION_UP` 时才确认打开，并限制单指、起始区域、下滑距离、纵向角度、手势时长和 1 秒冷却。
+
+- 修复自绘搜索页“搜索历史”右侧清除按钮偏大、和标题不水平对齐的问题。
+  - 修复方式：在 `MaintainedLauncherSettingsHost.showSearchPage()` 中让“搜索历史”标题使用垂直居中布局；右侧清除按钮从 `30dp / 18sp` 调整为 `22dp / 14sp`，圆角同步缩小，并保持 `CENTER_VERTICAL`，让按钮中心线和标题文字对齐。
+
+验证结果：
+
+- `.\build.bat` 编译成功，输出 `build\launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 在 Smartisan Launcher 桌面右侧空白区域短距离下滑，前台仍保持 `com.smartisanos.launcher/.Launcher`，未打开搜索页。
+- 在同一区域明确长距离下滑，前台进入 `com.smartisanos.launcher/.theme.ThemeChooserActivity` 自绘搜索页。
+- 截图 `build\search_page_after_fix.png` 确认“搜索历史”右侧 X 已缩小并与标题水平对齐。
+
+#### 桌面设置页偶发自动返回桌面排查
+
+现象：
+
+- 用户反馈启动后停在设置页面时，偶尔会自动返回桌面主页。
+- ADB 复现路径为：从桌面底部“桌面设置”虚拟入口进入 maintained 设置页，等待数秒后观察任务栈。
+
+ADB 结论：
+
+- 直接 `am start -n com.smartisanos.launcher/.theme.ThemeChooserActivity --ez from_desktop_settings true` 启动设置页，连续观察未复现自动返回。
+- 从桌面虚拟入口进入设置页时，旧包日志显示先进入 `ThemeChooserActivity`，约 7 秒后同一 Launcher 进程发起 `ACTION_GET_CONTENT image/*`，系统打开 `com.android.documentsui/.picker.PickActivity`。
+- 随后 MuMu 日志出现 `tabs/tab close task:3861`，系统以 `remove task` 原因 kill `com.smartisanos.launcher`，所以表现为设置页退回桌面。
+- 日志中没有 `AndroidRuntime FATAL EXCEPTION`，这次不是 Java 崩溃；真正异常点是刚进入设置页后误触发了“桌面壁纸 -> 选择图片”的壁纸选择器链路。
+
+修复方式：
+
+- `MaintainedLauncherSettingsHost.show()` 打开 maintained 设置首页时调用 `armSettingsClickGuard()`，给 Activity 切换后的早期输入增加 800ms 保护窗口。
+- `showWallpaperPage()` 切入桌面壁纸页时同样重置保护窗口。
+- 首页 `click(...)` 和二级简单列表 `replaceSimpleListWithScroll(...)` 的点击监听统一包装为 `guardedSettingsClick(...)`，保护窗口内的点击会被忽略并打印 `MaintainedSettings` 日志。
+- `pickWallpaper()` 在真正拉起系统图片选择器前再次检查保护状态，并记录 `pickWallpaper requested by user`，后续如果再误开图片选择器，可以直接从 logcat 确认入口。
+
+验证：
+
+- `build.bat` 构建成功，输出 `build\launcher-signed.apk`。
+- `adb install -r build\launcher-signed.apk` 安装到 `emulator-5554` 成功，设备显示 `versionCode=25`、`versionName=v1.5.0`。
+- 使用同一路径从桌面底部“桌面设置”进入设置页，连续 18 秒任务栈一直停留在 `com.smartisanos.launcher/.theme.ThemeChooserActivity`。
+- 修复后完整 logcat 中没有再出现 `ACTION_GET_CONTENT`、`PickActivity`、`remove task` 或 Launcher 被 kill 的记录。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `docs/development/DEVELOPMENT_LOG.md`
+
+### 2026-06-07
+
+#### v1.4.8 自绘搜索、主题详情与桌面恢复稳定性
+
+修复内容：
+
+- 版本发布：
+  - 文本 `launcher/AndroidManifest.xml` 调整为 `versionCode=24` / `versionName=1.4.8`。
+  - 同步修正最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 真实版本为 `v1.4.8 (24)`。
+  - 设置页“关于 / 当前版本”显示同步为 `1.4.8`。
+
+- 搜索方案：
+  - 搜索页由 launcher 内 `ThemeChooserActivity` / `MaintainedLauncherSettingsHost.showSearchPage()` 自绘，不依赖外部搜索 APK。
+  - Release、构建脚本和 README 均不包含独立搜索安装包；桌面更新资产只选择主 APK。
+
+- 检查更新与发布：
+  - 软件检查更新只匹配 `launcher-` 标签，避免 `themes-v1` 主题发布被误识别成软件新版本。
+  - Release 只把桌面主 APK 当作桌面更新资产；透明主题包可以随 Release 上传，但由桌面更新逻辑跳过。
+  - 主题下载仍使用 Gitee Release `themes-v1`，软件更新与主题下载接口分离。
+
+- 主题详情页：
+  - 主题详情页的 PRO3 手机预览改为根据可用宽高动态缩小，尤其适配小屏手机，避免预览底部被底部主题色栏遮挡。
+  - 手机外框继续使用白色主题详情框，并保持 PRO3 预览图与外框叠加。
+
+- 桌面恢复稳定性：
+  - `Launcher.onResume()` 后增加桌面 GL Surface 可见性、布局刷新和 `requestRender()` 唤醒，缓解部分手机从其他应用返回桌面时只显示黑屏和状态栏的问题。
+  - MuMu 上定位到原版分身查询会访问 user 10 并触发跨用户权限异常，已为安装包列表和应用入口查询补 fallback，避免 `dataInitProtected` 多次失败后清库导致桌面空白；ADB 抓屏确认 12 宫格可正常显示。
+
+- 构建验证：
+  - `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+  - `aapt dump badging build\launcher-signed.apk` 确认最终 APK 为 `versionCode='24'`、`versionName='v1.4.8'`、`sdkVersion:'23'`、`targetSdkVersion:'28'`。
+  - 主 APK 中不包含 `quicksearch` / `bundled_apps` 资产。
+
+### 2026-06-06
+
+#### 应用分身、图标识别、毛玻璃主题、搜索和更新下载修复
+
+修复内容：
+
+- 版本发布：
+  - 文本 `launcher/AndroidManifest.xml` 调整为 `versionCode=20` / `versionName=v1.4.6`。
+  - 同步修正最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 的真实版本也是 `v1.4.6 (20)`。
+  - 设置页“检查更新”默认版本字符串同步为 `v1.4.6`。
+
+- 应用分身：
+  - 对照 maintained 的多用户查询思路，把桌面应用列表、搜索页和启动链路继续向 `LauncherApps` / 用户句柄查询靠拢。
+  - 继续调整面具标记大小、位置和颜色，使其更接近原版锤子桌面左下角黑色面具效果。
+
+- 图标识别：
+  - 对照 `smartisan-launcher-maintained` 调整当前工程图标识别逻辑，同时保留当前项目已有的图标识别入口和 redirect / appfilter / 自定义图标能力。
+  - 修复部分普通应用被误识别成应用商店图标的情况，例如“闲鱼”“酷安”。
+  - 修复部分系统应用名称识别不稳定的情况，例如“电话”“拨号”“电话本”“电话管家”。
+  - 应用图标页加载速度继续优化，避免每次打开都做不必要的重拉取和整页重建。
+
+- 搜索页和拖动手势：
+  - 搜索页改为能搜索到普通应用和分身应用。
+  - 对照 maintained 收窄下滑搜索触发条件，只在明确快速下滑时打开搜索，减少长按拖动应用时误识别为打开搜索页。
+
+- 毛玻璃主题：
+  - 对比原版毛玻璃主题 `com.smartisanos.launcher.theme.aero.apk` 和 maintained 的显示效果，修复毛玻璃主题桌面文字、编辑页文字仍显示黑色或加载时先黑后白的问题。
+  - 毛玻璃主题文字效果恢复为和其他深色/浅蓝主题一致的白色文字效果。
+  - 删除白雾主题入口、显示顺序、字符串、公有资源项和相关 smali 判断；当前透明壁纸主题只保留毛玻璃。
+
+- 主题下载和模拟器兼容：
+  - 修复在线主题详情页从一个正在下载的主题切换到其他主题时，右上角下载按钮状态没有正确隐藏或刷新。
+  - 桌面图标加载链路加入 drawable 归一化处理，改善 MuMu 模拟器等环境中 adaptive drawable 或特殊 drawable 图标不显示的问题。
+
+- 检查更新：
+  - 修复“检查更新 -> 下载”没有任何进度显示的问题。
+  - 下载更新包后现在会弹出进度窗口；未知大小时显示等待 / 下载中，已知大小时显示百分比，下载完成后自动关闭并启动安装。
+
+- 构建和清理：
+  - 多次执行 `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+  - `aapt2 dump badging build\launcher-signed.apk` 确认最终 APK 为 `versionCode='20'`、`versionName='v1.4.6'`、`sdkVersion:'23'`、`targetSdkVersion:'28'`。
+  - `apksigner verify --verbose --print-certs build\launcher-signed.apk` 确认 v1 / v2 / v3 签名均为 true。
+  - 按当前约定清理 `build` 目录，只保留 `launcher-signed.apk`、`launcher-signed.apk.idsig` 和 `tools`。
+
+#### v1.4.7 更新下载与 Gitee 镜像测试版
+
+修复内容：
+
+- 版本发布：
+  - 文本 `launcher/AndroidManifest.xml` 调整为 `versionCode=21` / `versionName=v1.4.7`。
+  - 同步修正最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 的真实版本也是 `v1.4.7 (21)`。
+  - 设置页“检查更新”默认版本字符串同步为 `v1.4.7`。
+
+- 下载镜像：
+  - 软件更新版本列表读取 Gitee Release API，只遍历 `launcher-` 标签并选择最高版本；APK 下载优先 Gitee Release 镜像，失败后使用 Release 资产中的备用地址。
+  - 主题下载基地址切换到 Gitee Release `themes-v1`，用于测试国内镜像下载链路。
+  - 当前 Gitee `themes-v1` 已上传部分主题附件，已验证公开附件 URL 会跳转到 `attach_files` 下载地址；剩余主题因 Gitee 仓库附件配额提示超过 1GB，待网页端释放容量或扩容后补齐。
+
+- 验证：
+  - `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+  - `aapt2 dump badging build\launcher-signed.apk` 确认最终 APK 为 `versionCode='21'`、`versionName='v1.4.7'`、`sdkVersion:'23'`、`targetSdkVersion:'28'`。
+  - `apksigner verify --verbose --print-certs build\launcher-signed.apk` 确认 v1 / v2 / v3 签名均为 true。
+
+### 2026-06-04
+
+#### v1.4.5 设置体验、主题详情和英文文案修复
+
+修复内容：
+
+- 版本发布：
+  - 文本 `launcher/AndroidManifest.xml` 调整为 `versionCode=19` / `versionName=v1.4.5`。
+  - 同步修正最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，避免 APK 真实版本和文本 Manifest 不一致。
+  - 设置页“检查更新”默认版本字符串同步为 `v1.4.5`。
+- 强迫症选项：
+  - `launcher/tools/maintained_settings_res/res/values/strings.xml` 补齐 `ocd_setting=OCD Settings`，中文资源继续使用“强迫症选项”。
+  - 主设置页标题改用 `launcher_setting_name`，强迫症入口改用 `ocd_setting`，强迫症二级页标题改用 `obsession_header_title`。
+  - 修复英文系统下强迫症入口仍显示中文的问题；后续不要在 Java 中硬编码“强迫症选项 / 桌面设置”等标题。
+- 设置返回位置：
+  - 从“关于我们”、壁纸、翻页动画、应用图标、强迫症选项等子页返回主设置页时记录并恢复进入前的滚动位置。
+  - 从桌面主题列表进入主题详情后返回时恢复主题列表位置。
+  - 滚动恢复从 `post()` 延后滚动改为 `OnPreDrawListener` 首帧绘制前恢复，修复返回时先跳顶部再滚回当前位置造成的上下晃动。
+- 主题详情页：
+  - `activity_theme_item.xml` 改为外层 `phone_detail_preview` 填满标题栏和底部主题标签栏之间区域，内层保留原版手机预览图层并居中。
+  - 取消依赖运行时 `translationY` 硬调预览位置，避免手机外壳和主题截图错位。
+- 已纳入本轮发布记录的前序功能 / BUG：
+  - 应用图标页：改进版图标开关复用首页同款控件；图标包行和图标大小行补齐箭头与点击范围；单应用默认图标、推荐图标、相册自定义图标切换后只刷新当前行并保持滚动位置。
+  - 桌面图标大小：50% - 150% 连续调节，小 / 中 / 大三档快捷选择，保存后所有 12 / 20 宫格普通应用和桌面设置虚拟入口统一生效。
+  - 图标包兼容：支持 appfilter / component 精确匹配，图标包优先级高于锤子自动识别，单应用自定义图标优先级最高。
+  - 内置搜索页：设置页提供“启用下滑搜索”开关；搜索页去掉自绘键盘，改为系统输入法；顶部常用应用横向滑动；搜索结果行固定高度并垂直居中。
+  - 双开应用：通过 `LauncherApps.getProfiles()` 补齐多用户可启动 Activity，保存 `ItemInfo.userId` 并通过 `startActivityAsUser` 启动对应用户应用。
+  - 刘海屏 / 编辑态：Launcher 主窗口持续保留 fullscreen layout 和 cutout short edges，避免长按图标、进入编辑模式时露出系统状态栏并顶下桌面。
+  - 解锁动画：修正动画播放状态判断，让锁屏返回桌面时能按设置开关执行解锁动画。
+  - 设置体验：关于我们改为 maintained / 原版风格页面；检查更新、关闭电池优化、默认桌面、隐藏虚拟键、角标开关等入口已接入。
+
+验证计划：
+
+- `build.bat` 构建通过。
+- `aapt dump badging build\launcher-signed.apk` 应显示 `versionCode='19'`、`versionName='v1.4.5'`、`sdkVersion:'23'`、`targetSdkVersion:'28'`。
+- `apksigner verify --verbose --print-certs build\launcher-signed.apk` 应显示 v1 / v2 / v3 签名均为 true。
+- 英文系统进入桌面设置时，主标题应显示 `Launcher Settings`，强迫症入口和二级页标题应显示 `OCD Settings`。
+- 从主题列表滚动后进入某个主题详情再返回，应保持主题列表位置；从“关于我们”返回设置首页也应保持原位置且不再上下晃动。
+- 主题详情页手机预览应在标题栏与底部主题标签之间居中，手机壳和截图不应错位。
+
+### 2026-06-03
+
+#### 兼容安装与第一轮包体瘦身
+
+背景：
+
+- 用户反馈同一个 APK 发给其他手机安装失败，同时 maintained 能在更多手机上安装、分辨率适配更好，且包体更小。
+- 对比 `smartisan-launcher-maintained` 后确认，当前 original-port 主要问题有两类：
+  - 安装兼容：当前 APK 原本 `minSdkVersion=29`，Android 10 以下设备会直接安装失败；maintained 为 `minSdkVersion=19`、`targetSdkVersion=28`。
+  - 包体过大：当前 APK 约 105.9MB，其中 `assets` 占约 97.5MB；maintained APK 约 44.4MB，其中 `assets` 约 33.9MB。
+
+修复内容：
+
+- 安装兼容：
+  - 文本 `launcher/AndroidManifest.xml` 的 `uses-sdk` 从 `minSdkVersion=29` / `targetSdkVersion=29` 调整为 `minSdkVersion=23` / `targetSdkVersion=28`。
+  - 同步修正最终构建注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 真实输出 `sdkVersion:'23'`、`targetSdkVersion:'28'`。
+  - `launcher/apktool.yml` 同步记录 `minSdkVersion: 23`、`targetSdkVersion: 28`。
+- 包体瘦身：
+  - 对照 maintained，确认 maintained 只保留 `assets/Textures/1080p`，没有 `720p` 目录。
+  - 将 `com.smartisanos.launcher.pb.getResolution()` 改为统一返回 `1080p`，避免低密度设备继续选择 `Textures/720p`。
+  - 删除未跟踪的构建输入目录 `launcher/assets/Textures/720p`，减少约 36.9MB 纹理资源。
+- 签名兼容：
+  - 原构建脚本使用 `jarsigner`，`apksigner verify` 显示只有 `Verified using v1 scheme: true`，v2/v3 均为 false。
+  - Android 12 及部分厂商安装器对重打包 APK 的旧 v1/JAR 签名兼容较差，容易在文件管理器安装时只显示“安装失败”。
+  - `build.bat` 改为先 `zipalign -p -f 4`，再使用 `apksigner sign` 输出 v1/v2/v3 签名。
+
+验证：
+
+- `build.bat` 构建通过。
+- `aapt dump badging build\launcher-signed.apk` 验证：
+  - `versionCode='15'`
+  - `versionName='v1.4.1'`
+  - `sdkVersion:'23'`
+  - `targetSdkVersion:'28'`
+- `apksigner verify --verbose --print-certs build\launcher-signed.apk` 验证：
+  - `Verified using v1 scheme: true`
+  - `Verified using v2 scheme: true`
+  - `Verified using v3 scheme: true`
+- 新 APK 体积约 `63.92MB`，相比瘦身前约 `105.9MB` 明显降低。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 启动桌面成功，截图确认 12 宫格主界面显示正常。
+- 打开桌面设置成功，截图确认设置页可进入；删除 `720p` 后没有出现启动崩溃。
+
+后续优化方向：
+
+- 继续瘦身的主要大头：
+  - `assets/Textures/1080p` 约 27.8MB。
+  - `assets/theme_preview` 约 16.2MB。
+  - `assets/settings_maintained/maintained-settings-res.apk` 约 6.6MB。
+  - `assets/settings_native` 约 3.5MB。
+- 下一轮不建议直接删除这些目录，应先确认引用点：
+  - 主题预览图可以考虑改成更小尺寸或 WebP/JPG。
+  - `settings_maintained` 可以考虑把实际用到的资源合并进主 APK，取消内嵌 APK。
+  - `Textures/1080p` 需要继续按实际 12 / 20 宫格、主题和文件夹引用逐项裁剪。
+- Manifest 里仍存在大量原版系统级 / Smartisan 私有权限，部分普通 ROM 可能会提示风险；要真正清理需要对二进制 Manifest 做节点级删除或改造构建流程，不宜只改文本 Manifest。
+
+#### v1.4.1 版本与内置搜索页继续修复
+
+修复内容：
+
+- 版本号：
+  - 文本 `launcher/AndroidManifest.xml` 从 `versionCode=14` / `versionName=v1.4` 调整为 `versionCode=15` / `versionName=v1.4.1`。
+  - 同步修正最终构建会注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 的 `aapt dump badging` 能读到 `versionCode=15` / `versionName=v1.4.1`。
+  - 设置页“检查更新”右侧默认版本字符串同步为 `v1.4.1`。
+- 内置搜索页：
+  - 去掉自绘 T9 键盘，改为点击顶部输入框后由系统输入法接管。
+  - 设置首页新增“启用下滑搜索”开关，绑定 `launcher_search_page_enabled`，关闭后桌面下滑不再进入内置搜索页。
+  - 搜索页顶部常用应用区从固定 5 个等分项改成横向可滑动列表，最多展示前 20 个可启动应用。
+  - 修复搜索结果行文字错位：结果行固定 84dp 高度，图标和标题都垂直居中，标题使用单行省略。
+  - 启动搜索页时使用 `CLEAR_TOP | SINGLE_TOP`，减少最近任务里重复出现两个“锤子桌面”窗口的概率。
+
+验证：
+
+- `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 直接启动搜索页，确认顶部常用应用可以横向滑动，滑动后能看到“文件 / 浏览器 / 游戏中心”等后续应用。
+- 输入 `root` 后确认搜索结果行中 Root Explorer 图标和文字同一行垂直居中，不再出现标题贴到上方的问题。
+
+涉及文件：
+
+- `launcher/AndroidManifest.xml`
+- `launcher/original/AndroidManifest.xml`
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/maintained_settings_res/res/layout/setting_main.xml`
+- `launcher/tools/maintained_settings_res/res/values/strings.xml`
+- `launcher/tools/maintained_settings_res/res/values-zh-rCN/strings.xml`
+- `README.md`
+- `docs/development/DEVELOPMENT_LOG.md`
+
+#### v1.4.2 兼容签名发布
+
+修复内容：
+
+- 版本号：
+  - 文本 `launcher/AndroidManifest.xml` 从 `versionCode=15` / `versionName=v1.4.1` 调整为 `versionCode=16` / `versionName=v1.4.2`。
+  - 同步修正最终构建会注入的 `launcher/original/AndroidManifest.xml` 二进制 Manifest，确保最终 APK 的真实版本也为 `v1.4.2 (16)`。
+  - 设置页“检查更新”右侧默认版本字符串同步为 `v1.4.2`。
+- 兼容安装：
+  - 延续本日第一轮兼容修复，最终 APK 保持 `minSdkVersion=23`、`targetSdkVersion=28`。
+  - 构建脚本继续使用 `zipalign -p` 和 `apksigner` 输出 v1/v2/v3 签名，改善 Android 12 等新系统通过文件管理器安装时失败的问题。
+- 包体：
+  - 保持 `pb.getResolution()` 统一返回 `1080p`，并继续使用移除冗余 `720p` 纹理后的瘦身构建输入，当前 APK 约 64MB。
+
+验证计划：
+
+- `build.bat` 构建通过。
+- `aapt dump badging build\launcher-signed.apk` 应显示 `versionCode='16'`、`versionName='v1.4.2'`、`sdkVersion:'23'`、`targetSdkVersion:'28'`。
+- `apksigner verify --verbose --print-certs build\launcher-signed.apk` 应显示 v1 / v2 / v3 签名均为 true。
+
+#### 刘海屏编辑态状态栏下移修复
+
+背景：
+
+- 用户反馈刘海屏手机上长按图标或进入桌面编辑模式时，会露出原本的系统状态栏，桌面内容整体向下移动，底部图标显示不全。
+- 对照 maintained 的 `docs/compatibility-fixes.md`，同类问题的根因是编辑、排序、拖拽等特殊模式切换系统 fullscreen / status bar 状态，导致系统状态栏和桌面自绘状态栏坐标脱节。
+
+修复内容：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+  - `applyLauncherNavigationBarSetting()` 不再只处理隐藏虚拟键。
+  - 每次 `onResume()` / `onWindowFocusChanged()` 应用设置时，都强制保留 `View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN`。
+  - 关闭“桌面隐藏虚拟键”时只清理 `HIDE_NAVIGATION` / `IMMERSIVE_STICKY` / `LAYOUT_HIDE_NAVIGATION`，不再清掉顶部 fullscreen layout。
+  - Android 9 及以上设置 `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES`，让 Launcher 主窗口可以延伸到刘海短边区域。
+  - 同步保持透明状态栏和 `FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS`，避免系统白色状态栏重新参与布局。
+- `launcher/smali/com/smartisanos/launcher/ua.1.smali`
+  - 原版窗口初始化 `ua.a(Window)` 不再依赖 `Constants.IS_NAVIGATION_BAR` 才设置 fullscreen layout。
+  - 无论是否存在虚拟导航栏，都保留 `0x500`（`LAYOUT_STABLE | LAYOUT_FULLSCREEN`）。
+  - Android 9 及以上同步写入 `layoutInDisplayCutoutMode = SHORT_EDGES`。
+
+验证：
+
+- `build.bat` 构建通过。
+- `adb -s emulator-5556 install -r -d build\launcher-signed.apk` 安装成功。
+- `adb -s emulator-5556 shell am start -n com.smartisanos.launcher/.Launcher` 启动成功。
+- 截图 `build\cutout_statusbar_fix_desktop.png` 验证普通态仍使用桌面自绘状态栏，没有出现白色系统状态栏顶下桌面。
+- 该问题仍建议在实际刘海屏真机上补充回归：长按桌面图标、进入桌面编辑模式、多页预览、拖动图标到底部 Dock 附近，确认顶部不露系统状态栏、底部图标不被裁切。
+
+### 2026-06-02
+
+#### 桌面图标大小滑块接入 12 / 20 宫格
+
+背景：
+
+- 用户希望参考 `rianlu/smartisan-launcher-maintained` 的图标大小调节能力，但必须适配当前 original-port 的 12 / 20 宫格，而不是退回 maintained 的 9 / 16 宫格语义。
+- 用户要求设置入口放在应用图标页顶部“改进版图标”和“图标包”之间，并且调节后要立即生效。
+
+修复内容：
+
+- 应用图标设置页：
+  - 在顶部卡片组中新增“桌面图标大小”行，位于“改进版图标”和“图标包”之间。
+  - 三行共用 maintained 的 top / middle / bottom 卡片背景，保持为一个整体。
+  - 右侧显示当前百分比，例如 `100%`、`150%`。
+  - 点击“桌面图标大小”整行弹出滑块；“图标包”仍保持只点击右侧状态文字弹窗。
+- 图标大小弹窗：
+  - 使用 `SeekBar` 支持 50% - 150% 连续调节。
+  - 弹窗内实时显示当前百分比，按 `liying2008/SmartisanDialog` 的标准弹窗比例整理为 53dp 标题栏、内容区和 47dp 底部按钮区。
+  - 预览区不再使用具体图标，改为“小 / 中 / 大”三个文字，文字字号对应三档大小。
+  - 点击“小 / 中 / 大”所在等宽区域会立即把滑块跳到 50% / 100% / 150%，百分比同步刷新。
+  - 进度条、滑块和“确定”使用蓝色强调；“取消”保持灰色；底部按钮背景不会遮住弹窗圆角，上下四角保持一致圆角。
+  - 点击确定后写入 `launcher_icon_size` 本地 prefs；`Settings.Global` / `Settings.System` 只作为兼容兜底读取来源。
+- 桌面生效逻辑：
+  - 在 `Constants.initLayoutParams()` 中于 `initLayoutProperty()` 后应用图标大小比例。
+  - 通过 `LauncherSettingBridge.readIconSizePercent(Context)` 读取并规范化百分比，读取顺序与设置页保持一致：本地 prefs 优先，系统 Settings 兜底。
+  - 缩放 `LayoutProperty` 的 `icon_size_origin`、`icon_size_with_shadow`、`icon_size_origin_resize` 和 `name_off_set_y`。
+  - 覆盖 `layoutPropertyMap` 中所有桌面布局 mode，确保当前 12 宫格、20 宫格以及内部映射 mode 都能命中。
+  - 保存后安排 requestCode `1002` 的精确 Launcher 启动任务，结束设置任务并终止旧进程；新进程完整重建 `Constants`、网格点、普通应用节点和文件夹预览。设置页入口会取消残留 1002，避免修改后立刻进入设置又被顶回桌面。
+
+验证：
+
+- `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 进入“桌面设置 -> 应用图标”确认新增行显示在“改进版图标”和“图标包”之间，弹窗可正常打开。
+- 通过 UI 从 100% 调到 50%，确认后自动回桌面并重启，截图确认 12 宫格所有图标统一缩小。
+- 再通过 UI 从 50% 调到 150%，确认后自动回桌面并重启，截图确认相机、图库、设置、浏览器、文件、游戏中心、应用分身、Google、Root Explorer 和“桌面设置”全部统一放大。
+- 重新安装后打开图标大小弹窗，确认点击“小”直接跳到 50%，点击“大”直接跳到 150%，弹窗底部圆角和顶部圆角一致。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java`
+- `launcher/smali/com/smartisanos/launcher/data/Constants.smali`
+
+#### 桌面设置缺口第一批补齐
+
+修复内容：
+
+- 桌面隐藏虚拟键：
+  - restored maintained 首页 `item_id_hide_navigation_bar` 开关，绑定 key `launcher_hide_navigation_bar`。
+  - Launcher 主 Activity 在 `onCreate()`、`onResume()`、`onWindowFocusChanged()` 中读取该 key，只在桌面主界面应用 `HIDE_NAVIGATION`、`IMMERSIVE_STICKY`、`LAYOUT_HIDE_NAVIGATION`、`LAYOUT_STABLE`。
+  - 设置页、主题页、图标页不直接应用隐藏虚拟键，避免影响非桌面界面。
+- 角标相关强迫症选项：
+  - maintained 风格设置首页新增“隐藏图标上的角标”和“紧贴屏幕横扫清除角标”两个开关。
+  - 分别绑定 `launcher_hide_badge` 和 `launcher_badge_swipe_clean`，沿用旧桌面读取 / 刷新链路。
+- 更多区域：
+  - “检查更新”读取 Gitee Release 列表，筛选 `launcher-` 标签最高版本，下载使用 `DownloadManager`，Gitee 优先并保留 Release 资产备用地址。
+  - “关闭电池优化”优先使用 `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + 当前包名 `com.smartisanos.launcher`，目标是直接弹出当前锤子桌面的电池优化确认；系统或权限不允许时回退当前应用详情页，不再默认进入所有应用的电池优化列表。
+  - “关于我们”从简短信弹窗改为完整页面：顶部锤子风格标题栏、Smartisan OS 标识卡片、“更多 Smartisan 的应用软件”列表和“关注我们”分组。
+  - 隐藏“分享此应用给朋友”“问题反馈”“用户体验改进计划 / Smartisan 服务条款”，并修正更多区域卡片背景。
+- 下滑搜索：
+  - 这一阶段发现原桌面手势代码实际只认上滑，曾临时改为上下滑方向都可进入搜索；该过渡方案已在 2026-06-30 收口，上滑入口现已停用，仅保留下滑搜索。
+  - 移除旧逻辑中前三次只弹 `fling_down_tips` 提示、不真正打开搜索的分支，第一次触发就直接进入搜索页。
+  - `CallStubUtils.Q()` 不再调用缺失的 `com.smartisanos.quicksearch.provider.extra`，改为直接启动本项目内置搜索页。
+  - 将旧 `ua.fc()` 搜索目标从缺失的 `com.smartisanos.quicksearch / com.android.quicksearchbox.SearchActivity` 改为已注册的 `ThemeChooserActivity`，并通过 `launcher_show_search=true` extra 进入搜索模式。
+  - `MaintainedLauncherSettingsHost.show(...)` 根据 extra 切换为内置搜索页，支持应用名 / 包名过滤和点击启动。
+  - 搜索手势只保留 Launcher 顶层入口；RootView 和 SMGLSurfaceView 不再重复处理同一次触摸，避免下滑被多层触发。
+
+验证：
+
+- `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 设置首页截图确认“桌面隐藏虚拟键”“隐藏图标上的角标”“紧贴屏幕横扫清除角标”均显示为同款锤子开关。
+- 直接启动 `ThemeChooserActivity --ez launcher_show_search true` 可打开内置搜索页；输入 `root` 后列表过滤到 Root Explorer。
+- ADB 与桌面操作验证：短距离下滑保持桌面，明确长距离单指下滑进入 launcher 内自绘搜索页；搜索入口不依赖外部 provider。
+- 通过系统设置值和桌面启动路径确认 Launcher 可读取 `launcher_hide_navigation_bar` 并应用隐藏虚拟键 flags；当前模拟器本身底部虚拟键不可见，仍建议在有三键导航的设备上补充截图回归。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `launcher/tools/maintained_settings_res/res/layout/setting_main.xml`
+- `launcher/smali/com/smartisanos/launcher/Launcher.smali`
+- `README.md`
+- `docs/development/DEVELOPMENT_LOG.md`
+
+### 2026-06-01
+
+#### 应用图标页交互、样式和刷新稳定性修复
+
+背景：
+
+- 用户反馈应用图标页的“改进版图标”开关虽然接近首页开关，但不是同一个 Smartisan/maintained 样式。
+- 选择单应用图标后页面会整体刷新并跳回顶部，尤其从相册选择图片返回后会闪一下回到顶部。
+- 点击右侧图标行的文字区域也会弹出选择框，实际预期是只有图标块或图标包右侧状态文字可以点击。
+- 图标包行宽度和背景没有和上方开关组成同一组卡片。
+
+修复内容：
+
+- `改进版图标` 开关：
+  - 从手写 `LinearLayout + SwitchEx` 改为复用首页同款 `SettingItemSwitch`。
+  - 使用 maintained 的 `setting_item_switch_layout`、`SettingSubItemSingleStyle` 背景和同一个 `SwitchEx` 绘制链路。
+  - 点击整行和点击开关本身都能切换，但视觉样式不再单独手写。
+- `图标包` 行：
+  - 背景改为 maintained 的 `selector_setting_sub_item_bg_bottom`，和上面的 `改进版图标` 行组合成一个整体。
+  - 默认显示 `不使用图标包`。
+  - 弹窗入口收窄为右侧状态文字，点击左侧 `图标包` 标题不再弹出选择框。
+- 单应用图标选择：
+  - 左侧系统原图、右侧推荐/加号图标块保留点击。
+  - 取消整行点击，右侧应用名和说明文字不再误触发弹窗。
+  - 选择左侧默认图标、右侧推荐图标后只刷新当前行，不再调用 `showIconPage(activity)` 整页重建。
+- 相册自定义图标：
+  - 保存选择图片前的当前滚动位置。
+  - 图片返回后优先在当前页面查找对应应用行并刷新该行。
+  - 如果当前行找不到，才兜底重建应用图标页，并恢复原来的 `ScrollView` 位置。
+- 全局改进版图标开关：
+  - 开启/关闭后更新当前页面所有已渲染图标行的红色对号和说明文字。
+  - 不再通过整页重建制造滚动跳动。
+
+涉及文件：
+
+- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
+- `README.md`
+- `docs/development/DEVELOPMENT_LOG.md`
+
+验证：
+
+- `build.bat` 构建通过，输出 `build/launcher-signed.apk`。
+- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
+- 已在 MuMu 虚拟机中确认：
+  - 开关样式与桌面设置首页同款开关一致。
+  - 选择推荐图标、默认图标时当前页即时更新。
+  - 从相册选择图片作为图标后保持当前位置。
+  - 右侧应用文字区域不弹窗。
+  - 图标包只有右侧状态文字区域弹窗，左侧标题区域不弹窗。
+
+后续注意：
+
+- 应用图标页当前仍由 `ThemeChooserActivity` 承载 maintained 风格兼容页，还不是完整迁移的原生 Smartisan Settings Activity。
+- 图标自动识别资源和 Smartisan 网络图标链路仍建议继续做更多应用回归，尤其是系统应用、Google 应用和第三方应用混合安装场景。

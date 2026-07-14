@@ -420,6 +420,29 @@
 
     invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
+    # On ordinary Android the public package installer already provides the
+    # mandatory confirmation. Skip the original Smartisan confirmation for a
+    # single app so users do not have to approve the same uninstall twice.
+    iget v0, p0, Lcom/smartisanos/launcher/a/na;->ck:I
+
+    const/4 v1, 0x1
+
+    if-ne v0, v1, :cond_system_uninstall_continue
+
+    iget-object v0, p0, Lcom/smartisanos/launcher/a/na;->_j:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    if-eqz v0, :cond_system_uninstall_continue
+
+    iget-object v0, v0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
+
+    if-eqz v0, :cond_system_uninstall_continue
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstall(Ljava/lang/String;)V
+
+    return-void
+
+    :cond_system_uninstall_continue
+
     .line 2
     invoke-static {}, Lcom/smartisanos/launcher/yb;->getInstance()Lcom/smartisanos/launcher/yb;
 
@@ -511,6 +534,24 @@
     iget-byte v1, v1, Lcom/smartisanos/launcher/data/ItemInfo;->itemType:B
 
     if-nez v1, :cond_2
+
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v1
+
+    invoke-virtual {v1}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v1
+
+    iget-object v2, p0, Lcom/smartisanos/launcher/a/na;->_j:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-object v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
+
+    invoke-static {v1, v2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->hasEnabledProfilePackage(Landroid/content/Context;Ljava/lang/String;)Z
+
+    move-result v1
+
+    if-eqz v1, :cond_3
 
     .line 12
     sget v1, Lcom/smartisanos/launcher/ob;->uninstall_app_dialog_text_main_app:I

@@ -1337,7 +1337,7 @@
 
     move-result-object p0
 
-    const/4 v0, 0x1
+    const/4 v0, 0x0
 
     const-string v1, "sm_launcher_left_screen_state"
 
@@ -1345,7 +1345,9 @@
 
     move-result p0
 
-    if-ne p0, v0, :cond_0
+    const/4 v1, 0x1
+
+    if-ne p0, v1, :cond_0
 
     goto :goto_0
 

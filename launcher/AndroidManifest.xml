@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="28" android:versionName="v1.5.3" package="com.smartisanos.launcher">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="29" android:versionName="v1.5.4" package="com.smartisanos.launcher">
   <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
   <uses-feature android:glEsVersion="0x00020000" />
   <permission android:name="com.ranhf.smartisanlauncher.permission.READ_DATABASE" android:protectionLevel="signature" />
@@ -20,6 +20,7 @@
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
   <uses-permission android:name="android.permission.DELETE_PACKAGES" />
+  <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
   <uses-permission android:name="android.permission.GET_TASKS" />
   <uses-permission android:name="android.permission.SET_WALLPAPER_HINTS" />
   <uses-permission android:name="android.permission.WRITE_SETTINGS" />
@@ -154,6 +155,13 @@
       </intent-filter>
       <intent-filter>
         <action android:name="smartisan.intent.action.LAUNCHER_SETTINGS_CHANGED" />
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.PACKAGE_ADDED" />
+        <action android:name="android.intent.action.PACKAGE_CHANGED" />
+        <action android:name="android.intent.action.PACKAGE_REMOVED" />
+        <action android:name="android.intent.action.PACKAGE_REPLACED" />
+        <data android:scheme="package" />
       </intent-filter>
       <intent-filter>
         <action android:name="com.smartisanos.launcher.update_icon" />

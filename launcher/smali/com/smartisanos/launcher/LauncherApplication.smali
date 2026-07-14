@@ -214,6 +214,9 @@
     .line 4
     invoke-super {p0}, Landroid/app/Application;->onCreate()V
 
+    .line 4
+    invoke-static {p0}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->ensure(Landroid/content/Context;)V
+
     .line 5
     new-instance v0, Lcom/smartisanos/launcher/ja;
 

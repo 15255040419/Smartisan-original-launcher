@@ -6241,10 +6241,8 @@
 
     if-lez v0, :cond_1
 
-    if-eqz p1, :cond_1
-
     .line 214
-    invoke-virtual {p1, p0}, Landroid/content/pm/ApplicationManager;->unInstallPackage(Ljava/lang/String;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstall(Ljava/lang/String;)V
 
     :cond_1
     return-void
@@ -15419,11 +15417,22 @@
 
     move-result-object v4
 
+    instance-of v6, v4, Ljava/lang/Integer;
+
+    if-eqz v6, :install_added_no_user_id
+
     check-cast v4, Ljava/lang/Integer;
 
     invoke-virtual {v4}, Ljava/lang/Integer;->intValue()I
 
     move-result v4
+
+    goto :install_added_user_id_ready
+
+    :install_added_no_user_id
+    const/4 v4, 0x0
+
+    :install_added_user_id_ready
 
     invoke-virtual {v11, v4}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
 
@@ -17028,7 +17037,9 @@
 
     .line 12
     :cond_4
-    invoke-virtual {v1, p1}, Landroid/content/pm/ApplicationManager;->unInstallPackageWithAppGlobals(Lcom/smartisanos/launcher/data/ItemInfo;)V
+    invoke-static {p1}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstallItem(Ljava/lang/Object;)V
+
+    return-void
 
     .line 13
     new-instance v0, Ljava/lang/StringBuilder;
@@ -17218,7 +17229,7 @@
 
     .line 27
     :cond_7
-    invoke-virtual {v1, v2}, Landroid/content/pm/ApplicationManager;->unInstallPackageWithAppGlobals(Lcom/smartisanos/launcher/data/ItemInfo;)V
+    invoke-static {v2}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstallItem(Ljava/lang/Object;)V
 
     goto :goto_1
 
@@ -17250,7 +17261,7 @@
 
     .line 29
     :cond_9
-    invoke-virtual {v1, v0}, Landroid/content/pm/ApplicationManager;->unInstallPackageWithAppGlobals(Ljava/lang/String;)V
+    invoke-static {v0}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstall(Ljava/lang/String;)V
 
     .line 30
     :cond_a
@@ -19727,10 +19738,6 @@
 
 .method public static x(Landroid/content/Context;)Z
     .locals 5
-
-    const/4 v0, 0x0
-
-    return v0
 
     .line 1
     invoke-static {}, Lcom/smartisanos/launcher/data/N;->getInstance()Lcom/smartisanos/launcher/data/N;

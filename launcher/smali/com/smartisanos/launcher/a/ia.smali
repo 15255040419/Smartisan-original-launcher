@@ -164,6 +164,25 @@
 
     .line 16
     :cond_5
+    # Ordinary Android cannot use Smartisan's private deletePackage callback.
+    # Do not start the original trash/database-removal animation before the
+    # public package installer reports a real removal broadcast.
+    if-nez v0, :cond_5_original
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/compat/UninstallCompat;->requestUninstallItem(Ljava/lang/Object;)V
+
+    sget-object v0, Lcom/smartisanos/launcher/a/oa;->jk:Landroid/app/AlertDialog;
+
+    if-eqz v0, :cond_5_reset
+
+    invoke-virtual {v0}, Landroid/app/AlertDialog;->dismiss()V
+
+    :cond_5_reset
+    invoke-static {p2}, Lcom/smartisanos/launcher/a/oa;->w(Z)Z
+
+    return-void
+
+    :cond_5_original
     invoke-static {v2}, Lcom/smartisanos/launcher/a/oa;->w(Z)Z
 
     .line 17

@@ -10799,7 +10799,9 @@
 .end method
 
 .method public ir()[Lcom/smartisanos/smengine/a/j;
-    .locals 0
+    .locals 1
+
+    move-object v0, p0
 
     .line 1
     iget p0, p0, Lcom/smartisanos/launcher/view/b/fa;->hH:I
@@ -10808,6 +10810,12 @@
 
     .line 2
     sget-object p0, Lcom/smartisanos/launcher/data/Constants;->pageCellCenterPoints:[Lcom/smartisanos/smengine/a/j;
+
+    invoke-static {v0, p0}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adaptPositions(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object p0
+
+    check-cast p0, [Lcom/smartisanos/smengine/a/j;
 
     return-object p0
 .end method

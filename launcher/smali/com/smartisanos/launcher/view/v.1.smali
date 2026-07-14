@@ -905,6 +905,10 @@
 
     move-result-object v5
 
+    iget-object v7, p0, Lcom/smartisanos/launcher/view/d;->Qj:Lcom/smartisanos/launcher/view/a/g;
+
+    invoke-static {v7}, Lcom/smartisanos/launcher/compat/FolderReturnTargetCompat;->normalizeFolderReturnTargets(Ljava/lang/Object;)V
+
     invoke-virtual {v5}, Lcom/smartisanos/launcher/animations/r;->Cd()Lcom/smartisanos/smengine/g;
 
     move-result-object v5

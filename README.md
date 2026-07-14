@@ -17,14 +17,30 @@
 
 <p align="center">
   <img alt="Android" src="https://img.shields.io/badge/Android-6.0%2B-brightgreen?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.5.3-blue?style=flat-square">
-  <img alt="Build" src="https://img.shields.io/badge/build-27-orange?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.5.4-blue?style=flat-square">
+  <img alt="Build" src="https://img.shields.io/badge/build-29-orange?style=flat-square">
   <img alt="Status" src="https://img.shields.io/badge/status-active-success?style=flat-square">
+</p>
+
+<p align="center">
+  <img src="docs/1.jpg" width="47%" alt="Smartisan Launcher 演示截图 1">
+  <img src="docs/2.jpg" width="47%" alt="Smartisan Launcher 演示截图 2">
+</p>
+
+<p align="center">
+  <img src="docs/3.jpg" width="47%" alt="Smartisan Launcher 演示截图 3">
+  <img src="docs/4.jpg" width="47%" alt="Smartisan Launcher 演示截图 4">
+</p>
+
+<p align="center">
+  <a href="https://b23.tv/ciGhPuQ"><strong>▶ 观看完整演示视频</strong></a>
 </p>
 
 ---
 
 ## 项目简介
+
+项目文档入口：[docs/INDEX.md](docs/INDEX.md)。
 
 **Smartisan Launcher Original Port** 是一个基于原版 Smartisan Launcher 的兼容性移植项目。
 
@@ -36,11 +52,29 @@
 
 ## 当前状态
 
-当前版本：**v1.5.3 / versionCode 28**
+当前版本：**v1.5.4 / versionCode 29**
 支持系统：**Android 6.0 及以上**
 测试环境：已在 **Android 12 / Android 15 / Android 16** 环境开展兼容测试。
 
 不同厂商 ROM 在应用分身、后台限制、主题行为、解锁广播和系统入口暴露方式上仍可能存在差异，本项目会持续针对真实设备反馈进行适配。
+
+### v1.5.4 更新摘要
+
+#### 新增功能
+* 优化桌面与设置体验：统一设置页过渡动画、弹窗界面样式和回弹交互。
+* 优化首次进入桌面：默认关闭高开销的改进版图标、动态天气日历、通知角标与横扫清除角标，减少首帧加载压力。
+* 优化图标包加载方式，改为后台预热，不影响桌面启动。
+* 新增单应用图标替换功能，支持系统图标、图标包、自定义图标等多来源匹配。
+* 新增单应用支持重命名的功能。
+
+#### 修复问题
+* 修复首页向右滑动无反馈问题，恢复原版边界阻尼和回弹效果。
+* 修复设置页面顶部/底部无法拉伸回弹问题，恢复系统 Overscroll 效果。
+* 修复 12 / 20 宫格双向切换：12 宫格切至 20 宫格保留原板块成员、顺序与位置；20 宫格切回 12 宫格仅在超过容量时按原版规则拆分板块。
+* 修复部分图标加载慢、启动阶段卡顿问题。
+* 修复安装应用后无法显示，无法卸载应用的问题。
+* 修复文件夹里应用图标长按松手后错位的问题。
+* 修复应用图标界面点击左侧默认图标角标未及时刷新的问题。
 
 ## 核心特性
 

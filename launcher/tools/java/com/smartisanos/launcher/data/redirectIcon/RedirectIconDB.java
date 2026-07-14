@@ -19,9 +19,11 @@ public final class RedirectIconDB {
     public static final String MODE_ORIGINAL = "original";
     public static final String MODE_RESOURCE = "resource";
     public static final String MODE_CUSTOM = "custom";
+    public static final String MODE_PACK = "pack";
 
     private static final String PREFS = "redirect_icon_db";
     private static final String INDEX = "__index__";
+    private static volatile Boolean sHasManagedIconOverride;
 
     private RedirectIconDB() {
     }
@@ -31,6 +33,46 @@ public final class RedirectIconDB {
             return null;
         }
         return read(context, key(pkg, cmp), true);
+    }
+
+    /** Checks override metadata without decoding a custom icon from disk. */
+    public static boolean hasManagedIconOverride(Context context, String pkg, String cmp) {
+        if (context == null || TextUtils.isEmpty(pkg) || TextUtils.isEmpty(cmp)
+                || !hasAnyManagedIconOverride(context)) {
+            return false;
+        }
+        RedirectIconInfo info = read(context, key(pkg, cmp), false);
+        return isManagedIconOverride(info);
+    }
+
+    private static boolean hasAnyManagedIconOverride(Context context) {
+        Boolean cached = sHasManagedIconOverride;
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        boolean found = false;
+        if (context != null) {
+            SharedPreferences p = prefs(context);
+            String index = p.getString(INDEX, "");
+            if (index.length() != 0) {
+                String[] keys = index.split("\\n");
+                for (int i = 0; i < keys.length; i++) {
+                    String prefix = "r." + keys[i] + ".";
+                    if (p.getBoolean(prefix + "use", false)
+                            && !MODE_ORIGINAL.equals(p.getString(prefix + "drawable", MODE_ORIGINAL))) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
+        sHasManagedIconOverride = Boolean.valueOf(found);
+        return found;
+    }
+
+    private static boolean isManagedIconOverride(RedirectIconInfo info) {
+        return info != null && info.useImprovedAppIcon
+                && !MODE_ORIGINAL.equals(modeOf(info));
     }
 
     public static byte[] getRedirectIcon(Context context, String pkg, String cmp) {
@@ -105,8 +147,28 @@ public final class RedirectIconDB {
         write(context, info);
     }
 
+    public static void updatePackIcon(Context context, String pkg, String cmp, String iconPackPackage) {
+        if (TextUtils.isEmpty(iconPackPackage)) return;
+        RedirectIconInfo info = ensure(context, pkg, cmp);
+        if (info == null) return;
+        info.useImprovedAppIcon = true;
+        info.drawableName = MODE_PACK + ":" + iconPackPackage;
+        info.iconData = null;
+        write(context, info);
+    }
+
+    public static void updateDisplayName(Context context, String pkg, String cmp,
+                                         String displayName, String originalName) {
+        RedirectIconInfo info = ensure(context, pkg, cmp);
+        if (info == null) return;
+        info.displayName = displayName;
+        info.originalName = originalName;
+        write(context, info);
+    }
+
     public static void resetAllToDefault(Context context) {
         prefs(context).edit().clear().apply();
+        sHasManagedIconOverride = null;
     }
 
     public static Map<String, RedirectIconInfo> getIconTableData(Context context, boolean loadIcon) {
@@ -145,12 +207,22 @@ public final class RedirectIconDB {
         if (info.drawableName.startsWith(MODE_RESOURCE + ":")) {
             return MODE_RESOURCE;
         }
+        if (info.drawableName.startsWith(MODE_PACK + ":")) {
+            return MODE_PACK;
+        }
         return MODE_AUTO;
     }
 
     public static String resourceNameOf(RedirectIconInfo info) {
         if (info != null && info.drawableName != null && info.drawableName.startsWith(MODE_RESOURCE + ":")) {
             return info.drawableName.substring((MODE_RESOURCE + ":").length());
+        }
+        return null;
+    }
+
+    public static String packNameOf(RedirectIconInfo info) {
+        if (info != null && info.drawableName != null && info.drawableName.startsWith(MODE_PACK + ":")) {
+            return info.drawableName.substring((MODE_PACK + ":").length());
         }
         return null;
     }
@@ -164,8 +236,8 @@ public final class RedirectIconDB {
             info = new RedirectIconInfo();
             info.packageName = pkg;
             info.componentName = cmp;
-            info.drawableName = MODE_AUTO;
-            info.useImprovedAppIcon = true;
+            info.drawableName = MODE_ORIGINAL;
+            info.useImprovedAppIcon = false;
         }
         return info;
     }
@@ -184,10 +256,12 @@ public final class RedirectIconDB {
         RedirectIconInfo info = new RedirectIconInfo();
         info.packageName = pkg;
         info.componentName = cmp;
-        info.drawableName = p.getString(prefix + "drawable", MODE_AUTO);
-        info.useImprovedAppIcon = p.getBoolean(prefix + "use", !MODE_ORIGINAL.equals(info.drawableName));
+        info.drawableName = p.getString(prefix + "drawable", MODE_ORIGINAL);
+        info.useImprovedAppIcon = p.getBoolean(prefix + "use", false);
         info.installTime = p.getLong(prefix + "install", 0L);
         info.ownerId = p.getLong(prefix + "owner", 0L);
+        info.displayName = p.getString(prefix + "display_name", null);
+        info.originalName = p.getString(prefix + "original_name", null);
         if (loadIcon && MODE_CUSTOM.equals(info.drawableName)) {
             info.iconData = readCustomBytes(context, key);
         }
@@ -205,8 +279,19 @@ public final class RedirectIconDB {
         e.putBoolean(prefix + "use", info.useImprovedAppIcon);
         e.putLong(prefix + "install", info.installTime);
         e.putLong(prefix + "owner", info.ownerId);
+        if (TextUtils.isEmpty(info.displayName)) {
+            e.remove(prefix + "display_name");
+        } else {
+            e.putString(prefix + "display_name", info.displayName);
+        }
+        if (TextUtils.isEmpty(info.originalName)) {
+            e.remove(prefix + "original_name");
+        } else {
+            e.putString(prefix + "original_name", info.originalName);
+        }
         e.putString(INDEX, addIndex(p.getString(INDEX, ""), key));
         e.apply();
+        sHasManagedIconOverride = null;
         if (MODE_CUSTOM.equals(info.drawableName) && info.iconData != null) {
             writeCustomBytes(context, key, info.iconData);
         }

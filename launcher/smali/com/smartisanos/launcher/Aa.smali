@@ -2387,6 +2387,20 @@
 
     iput-object p0, v0, Lcom/smartisanos/launcher/data/ItemInfo;->componentName:Ljava/lang/String;
 
+    # Preserve launcher-local display name overrides when the original model
+    # recreates an item from PackageManager metadata.
+    iget-object p0, v0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
+
+    iget-object v1, v0, Lcom/smartisanos/launcher/data/ItemInfo;->componentName:Ljava/lang/String;
+
+    iget-object v2, v0, Lcom/smartisanos/launcher/data/ItemInfo;->title:Ljava/lang/String;
+
+    invoke-static {p0, v1, v2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->displayNameForDesktopItem(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object p0
+
+    iput-object p0, v0, Lcom/smartisanos/launcher/data/ItemInfo;->title:Ljava/lang/String;
+
     const/4 p0, 0x0
 
     .line 10

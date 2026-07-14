@@ -1,19 +1,24 @@
 package com.smartisanos.home.settings.icons;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 
 import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 public final class IconPackManager {
@@ -25,6 +30,8 @@ public final class IconPackManager {
     private static String sLoadedPackage;
     private static final HashMap<String, String> sPackageToDrawable = new HashMap<String, String>();
     private static final HashMap<String, String> sComponentToDrawable = new HashMap<String, String>();
+    private static final HashMap<String, PackMap> sPackMapCache = new HashMap<String, PackMap>();
+    private static boolean sSelectedPackPreloadPending;
 
     private IconPackManager() {
     }
@@ -33,7 +40,7 @@ public final class IconPackManager {
         return getPackedIcon(context, packageName, null);
     }
 
-    public static Drawable getPackedIcon(Context context, String packageName, String className) {
+    public static synchronized Drawable getPackedIcon(Context context, String packageName, String className) {
         if (context == null || TextUtils.isEmpty(packageName)) {
             return null;
         }
@@ -65,6 +72,48 @@ public final class IconPackManager {
         }
     }
 
+    /** Never parses appfilter on the caller thread; the desktop may use the original icon meanwhile. */
+    public static Drawable getPackedIconNonBlocking(Context context, String packageName,
+                                                    String className) {
+        if (context == null || TextUtils.isEmpty(packageName)) return null;
+        String loadedPackage;
+        String drawable;
+        synchronized (IconPackManager.class) {
+            if (TextUtils.isEmpty(sLoadedPackage)) {
+                preloadSelectedIconPackAsync(context);
+                return null;
+            }
+            loadedPackage = sLoadedPackage;
+            drawable = !TextUtils.isEmpty(className)
+                    ? sComponentToDrawable.get(flatten(packageName, className)) : null;
+            if (TextUtils.isEmpty(drawable) && isDialerComponent(className)) return null;
+            if (TextUtils.isEmpty(drawable)) drawable = sPackageToDrawable.get(packageName);
+        }
+        return TextUtils.isEmpty(drawable) ? null
+                : drawableFor(context, loadedPackage, drawable);
+    }
+
+    /** Resolves an icon from a specific installed pack without changing the global selection. */
+    public static Drawable getPackedIcon(Context context, String iconPackPackage,
+                                         String packageName, String className) {
+        if (context == null || TextUtils.isEmpty(iconPackPackage) || TextUtils.isEmpty(packageName)) return null;
+        String selected = getSelectedIconPackPackage(context);
+        if (iconPackPackage.equals(selected)) return getPackedIcon(context, packageName, className);
+        PackMap map;
+        synchronized (sPackMapCache) {
+            map = sPackMapCache.get(iconPackPackage);
+            if (map == null) {
+                map = new PackMap();
+                loadPackMap(context, iconPackPackage, map.packageToDrawable, map.componentToDrawable);
+                sPackMapCache.put(iconPackPackage, map);
+            }
+        }
+        String drawable = !TextUtils.isEmpty(className)
+                ? map.componentToDrawable.get(flatten(packageName, className)) : null;
+        if (TextUtils.isEmpty(drawable)) drawable = map.packageToDrawable.get(packageName);
+        return drawable == null ? null : drawableFor(context, iconPackPackage, drawable);
+    }
+
     private static boolean isDialerComponent(String className) {
         if (TextUtils.isEmpty(className)) {
             return false;
@@ -84,11 +133,29 @@ public final class IconPackManager {
             return packs;
         }
         PackageManager pm = context.getPackageManager();
+        HashSet<String> seen = new HashSet<String>();
         try {
+            String[] actions = new String[]{
+                    "org.adw.launcher.THEMES", "com.gau.go.launcherex.theme",
+                    "com.novalauncher.THEME", "com.anddoes.launcher.THEME",
+                    "ch.deletescape.lawnchair.ICONPACK", "app.lawnchair.icons.THEMED_ICON",
+                    "com.motorola.launcher.ACTION_ICON_PACK", "com.motorola.launcher3.ICON_PACK_CHANGED"
+            };
+            for (int i = 0; i < actions.length; i++) {
+                List<ResolveInfo> matches = pm.queryIntentActivities(new Intent(actions[i]), 0);
+                for (int j = 0; matches != null && j < matches.size(); j++) {
+                    ResolveInfo match = matches.get(j);
+                    if (match != null && match.activityInfo != null) {
+                        String pkg = match.activityInfo.packageName;
+                        if (seen.add(pkg) && hasAppFilter(pm, pkg)) packs.add(pkg);
+                    }
+                }
+            }
+            // Some older packs do not declare a launcher-standard intent.
             List<PackageInfo> packages = pm.getInstalledPackages(0);
             for (int i = 0; i < packages.size(); i++) {
                 String pkg = packages.get(i).packageName;
-                if (hasAppFilter(pm, pkg)) {
+                if (seen.add(pkg) && hasAppFilter(pm, pkg)) {
                     packs.add(pkg);
                 }
             }
@@ -103,6 +170,11 @@ public final class IconPackManager {
             return DISABLED;
         }
         return prefs(context).getString(PREF_KEY_SELECTED_ICON_PACK, DISABLED);
+    }
+
+    /** Returns the persisted mode only; it never scans packages or parses appfilter. */
+    public static boolean isIconPackSelectionEnabled(Context context) {
+        return !DISABLED.equals(getSelectedIconPackPackage(context));
     }
 
     public static void setSelectedIconPackPackage(Context context, String packageName) {
@@ -131,7 +203,43 @@ public final class IconPackManager {
     }
 
     public static void preloadSelectedIconPack(Context context) {
-        ensureLoaded(context);
+        synchronized (IconPackManager.class) {
+            ensureLoaded(context);
+        }
+    }
+
+    public static void preloadSelectedIconPackAsync(Context context) {
+        if (context == null || !isIconPackSelectionEnabled(context)) return;
+        final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        synchronized (IconPackManager.class) {
+            if (!TextUtils.isEmpty(sLoadedPackage) || sSelectedPackPreloadPending) return;
+            sSelectedPackPreloadPending = true;
+        }
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    preloadSelectedIconPack(app);
+                } finally {
+                    synchronized (IconPackManager.class) {
+                        sSelectedPackPreloadPending = false;
+                    }
+                }
+                com.smartisanos.launcher.theme.MaintainedLauncherSettingsHost
+                        .onSelectedIconPackPreloaded(app);
+            }
+        }, "selected-icon-pack-preload").start();
+    }
+
+    public static void warmUpIconPackList(Context context) {
+        if (context == null) return;
+        final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        new Thread(new Runnable() {
+            public void run() {
+                getIconPackPackages(app);
+                preloadSelectedIconPack(app);
+            }
+        }, "icon-pack-list-scan").start();
     }
 
     public static boolean hasSelectedIconPack(Context context) {
@@ -146,11 +254,17 @@ public final class IconPackManager {
     }
 
     public static boolean hasPackedIcon(Context context, String packageName) {
+        return hasPackedIcon(context, packageName, null);
+    }
+
+    public static boolean hasPackedIcon(Context context, String packageName, String className) {
         if (context == null || TextUtils.isEmpty(packageName)) {
             return false;
         }
         ensureLoaded(context);
-        return sPackageToDrawable.containsKey(packageName);
+        return (!TextUtils.isEmpty(className)
+                && sComponentToDrawable.containsKey(flatten(packageName, className)))
+                || sPackageToDrawable.containsKey(packageName);
     }
 
     public static void resetCache() {
@@ -158,6 +272,7 @@ public final class IconPackManager {
         sIconPackList = null;
         sPackageToDrawable.clear();
         sComponentToDrawable.clear();
+        synchronized (sPackMapCache) { sPackMapCache.clear(); }
     }
 
     private static void ensureLoaded(Context context) {
@@ -179,7 +294,7 @@ public final class IconPackManager {
         }
         clearLoaded();
         sLoadedPackage = selected;
-        loadPackMap(context, selected);
+        loadPackMap(context, selected, sPackageToDrawable, sComponentToDrawable);
     }
 
     private static void clearLoaded() {
@@ -191,40 +306,56 @@ public final class IconPackManager {
     private static boolean hasAppFilter(PackageManager pm, String packageName) {
         try {
             Resources res = pm.getResourcesForApplication(packageName);
-            return res.getIdentifier("appfilter", "xml", packageName) != 0;
+            if (res.getIdentifier("appfilter", "xml", packageName) != 0) return true;
+            InputStream in = res.getAssets().open("appfilter.xml");
+            in.close();
+            return true;
         } catch (Throwable ignored) {
             return false;
         }
     }
 
-    private static void loadPackMap(Context context, String packageName) {
+    private static void loadPackMap(Context context, String packageName,
+                                    HashMap<String, String> packageMap,
+                                    HashMap<String, String> componentMap) {
         XmlResourceParser parser = null;
+        InputStream stream = null;
+        XmlPullParser xml = null;
         try {
             PackageManager pm = context.getPackageManager();
             Resources res = pm.getResourcesForApplication(packageName);
             int id = res.getIdentifier("appfilter", "xml", packageName);
-            if (id == 0) {
-                return;
+            if (id != 0) {
+                parser = res.getXml(id);
+                xml = parser;
+            } else {
+                stream = res.getAssets().open("appfilter.xml");
+                XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+                factory.setNamespaceAware(true);
+                xml = factory.newPullParser();
+                xml.setInput(stream, "UTF-8");
             }
-            parser = res.getXml(id);
-            while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
-                if (parser.getEventType() == XmlPullParser.START_TAG
-                        && "item".equals(parser.getName())) {
-                    String component = parser.getAttributeValue(null, "component");
-                    String drawable = parser.getAttributeValue(null, "drawable");
-                    putMapping(component, drawable);
+            while (xml.getEventType() != XmlPullParser.END_DOCUMENT) {
+                if (xml.getEventType() == XmlPullParser.START_TAG
+                        && "item".equals(xml.getName())) {
+                    String component = xml.getAttributeValue(null, "component");
+                    String drawable = xml.getAttributeValue(null, "drawable");
+                    putMapping(component, drawable, packageMap, componentMap);
                 }
-                parser.next();
+                xml.next();
             }
         } catch (Throwable ignored) {
         } finally {
             if (parser != null) {
                 parser.close();
             }
+            if (stream != null) try { stream.close(); } catch (Throwable ignored) { }
         }
     }
 
-    private static void putMapping(String component, String drawable) {
+    private static void putMapping(String component, String drawable,
+                                   HashMap<String, String> packageMap,
+                                   HashMap<String, String> componentMap) {
         if (TextUtils.isEmpty(component) || TextUtils.isEmpty(drawable)) {
             return;
         }
@@ -243,8 +374,24 @@ public final class IconPackManager {
         if (cls.startsWith(".")) {
             cls = pkg + cls;
         }
-        sPackageToDrawable.put(pkg, drawable);
-        sComponentToDrawable.put(flatten(pkg, cls), drawable);
+        if (!packageMap.containsKey(pkg)) {
+            packageMap.put(pkg, drawable);
+        }
+        componentMap.put(flatten(pkg, cls), drawable);
+    }
+
+    private static Drawable drawableFor(Context context, String iconPackPackage, String drawable) {
+        try {
+            Resources res = context.getPackageManager().getResourcesForApplication(iconPackPackage);
+            int id = res.getIdentifier(drawable, "drawable", iconPackPackage);
+            if (id == 0) id = res.getIdentifier(drawable, "mipmap", iconPackPackage);
+            return id == 0 ? null : res.getDrawable(id);
+        } catch (Throwable ignored) { return null; }
+    }
+
+    private static final class PackMap {
+        final HashMap<String, String> packageToDrawable = new HashMap<String, String>();
+        final HashMap<String, String> componentToDrawable = new HashMap<String, String>();
     }
 
     private static String flatten(String packageName, String className) {

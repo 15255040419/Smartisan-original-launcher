@@ -716,10 +716,6 @@
     .line 25
     :cond_4
     :goto_0
-    # Active icons are created after the ordinary icon node. Ensure the same
-    # standard Cell shadow node (sc[27]) is attached once its textures exist.
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->rl()V
-
     iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
 
     aget-object v0, v0, v5
@@ -16700,6 +16696,12 @@
 
     iget-object v5, v5, Lcom/smartisanos/launcher/data/ItemInfo;->componentName:Ljava/lang/String;
 
+    invoke-static {v1, v2, v5}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->shouldUseManagedIcon(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Z
+
+    move-result v7
+
+    if-eqz v7, :cond_codex_original_icon
+
     iget-object v6, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
     iget-object v6, v6, Lcom/smartisanos/launcher/data/ItemInfo;->title:Ljava/lang/String;
@@ -16707,6 +16709,19 @@
     invoke-static {v1, v2, v5, v6}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->loadIconForDesktopItem(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Landroid/graphics/drawable/Drawable;
 
     move-result-object v1
+
+    goto :cond_codex_icon_loaded
+
+    :cond_codex_original_icon
+    invoke-virtual {v1}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
+
+    move-result-object v5
+
+    invoke-virtual {v5, v2}, Landroid/content/pm/PackageManager;->getApplicationIcon(Ljava/lang/String;)Landroid/graphics/drawable/Drawable;
+
+    move-result-object v1
+
+    :cond_codex_icon_loaded
     :try_end_0
     .catch Landroid/content/pm/PackageManager$NameNotFoundException; {:try_start_0 .. :try_end_0} :catch_0
 
@@ -16723,13 +16738,6 @@
     if-eqz v1, :cond_0
 
     .line 4
-    # The first desktop frame loads directly from PackageManager, before the
-    # asynchronous icon database refresh. Normalize this drawable here too so
-    # startup and refreshed frames use identical visible bounds.
-    invoke-static {v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->normalizeLauncherIcon(Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
-
-    move-result-object v1
-
     invoke-static {v1}, Lcom/smartisanos/launcher/e/s;->drawableToBitmap(Landroid/graphics/drawable/Drawable;)Landroid/graphics/Bitmap;
 
     move-result-object v1

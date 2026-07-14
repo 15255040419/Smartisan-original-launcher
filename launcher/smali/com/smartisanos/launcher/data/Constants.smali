@@ -4207,7 +4207,7 @@
     goto :goto_0
 
     :cond_5
-    const/16 v0, 0x14
+    const/16 v0, 0x9
 
     goto :goto_0
 

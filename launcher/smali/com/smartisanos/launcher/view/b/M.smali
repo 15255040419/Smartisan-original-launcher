@@ -5535,6 +5535,8 @@
 
     move-result v5
 
+    move v8, v5
+
     .line 7
     iget-object v6, v0, Lcom/smartisanos/launcher/view/b/M;->dl:Lcom/smartisanos/launcher/view/b/fa;
 
@@ -5549,6 +5551,10 @@
     iget v6, v5, Lcom/smartisanos/smengine/a/j;->x:F
 
     iget v5, v5, Lcom/smartisanos/smengine/a/j;->y:F
+
+    invoke-static {v0, v8, v5}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustYByIndex(Ljava/lang/Object;IF)F
+
+    move-result v5
 
     iget v7, v0, Lcom/smartisanos/launcher/view/b/M;->WG:F
 
@@ -5880,6 +5886,8 @@
 
     move-result v3
 
+    move v6, v3
+
     .line 77
     iget-object v4, v0, Lcom/smartisanos/launcher/view/b/M;->dl:Lcom/smartisanos/launcher/view/b/fa;
 
@@ -5894,6 +5902,10 @@
     iget v4, v3, Lcom/smartisanos/smengine/a/j;->x:F
 
     iget v3, v3, Lcom/smartisanos/smengine/a/j;->y:F
+
+    invoke-static {v0, v6, v3}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustYByIndex(Ljava/lang/Object;IF)F
+
+    move-result v3
 
     iget v5, v0, Lcom/smartisanos/launcher/view/b/M;->WG:F
 
@@ -6283,21 +6295,25 @@
     invoke-virtual {p1, v1, v0}, Lcom/smartisanos/launcher/view/a/g;->u(II)V
 
     .line 125
-    iget-object p0, p0, Lcom/smartisanos/launcher/view/b/M;->dl:Lcom/smartisanos/launcher/view/b/fa;
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/b/M;->dl:Lcom/smartisanos/launcher/view/b/fa;
 
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/b/fa;->ir()[Lcom/smartisanos/smengine/a/j;
+    invoke-virtual {v1}, Lcom/smartisanos/launcher/view/b/fa;->ir()[Lcom/smartisanos/smengine/a/j;
 
-    move-result-object p0
+    move-result-object v1
 
     .line 126
-    aget-object p0, p0, p2
+    aget-object v1, v1, p2
 
     .line 127
-    iget p2, p0, Lcom/smartisanos/smengine/a/j;->x:F
+    iget v0, v1, Lcom/smartisanos/smengine/a/j;->y:F
 
-    iget v0, p0, Lcom/smartisanos/smengine/a/j;->y:F
+    invoke-static {p0, p2, v0}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustYByIndex(Ljava/lang/Object;IF)F
 
-    iget p0, p0, Lcom/smartisanos/smengine/a/j;->z:F
+    move-result v0
+
+    iget p2, v1, Lcom/smartisanos/smengine/a/j;->x:F
+
+    iget p0, v1, Lcom/smartisanos/smengine/a/j;->z:F
 
     invoke-virtual {p1, p2, v0, p0}, Lcom/smartisanos/smengine/SceneNode;->setTranslate(FFF)V
 
@@ -6308,7 +6324,9 @@
 .end method
 
 .method public a(Lcom/smartisanos/launcher/view/a/g;Z)Z
-    .locals 7
+    .locals 8
+
+    move-object v7, p0
 
     .line 129
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/b/M;->nn()Ljava/util/ArrayList;
@@ -6372,14 +6390,18 @@
     if-eqz p2, :cond_0
 
     .line 135
-    aget-object p0, v1, v4
+    aget-object v5, v1, v4
 
     .line 136
-    iget p2, p0, Lcom/smartisanos/smengine/a/j;->x:F
+    iget v0, v5, Lcom/smartisanos/smengine/a/j;->y:F
 
-    iget v0, p0, Lcom/smartisanos/smengine/a/j;->y:F
+    invoke-static {v7, v4, v0}, Lcom/smartisanos/launcher/data/FolderCellPositionAdapter;->adjustYByIndex(Ljava/lang/Object;IF)F
 
-    iget p0, p0, Lcom/smartisanos/smengine/a/j;->z:F
+    move-result v0
+
+    iget p2, v5, Lcom/smartisanos/smengine/a/j;->x:F
+
+    iget p0, v5, Lcom/smartisanos/smengine/a/j;->z:F
 
     invoke-virtual {p1, p2, v0, p0}, Lcom/smartisanos/smengine/SceneNode;->setTranslate(FFF)V
 

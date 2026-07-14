@@ -435,27 +435,12 @@
 
     move-result v0
 
-    const-string v4, "com.smartisanos.launcher_prefs"
+    # Smartisan ROMs provide launcher_mode through Settings.Global. On other
+    # ROMs it is absent or may contain a legacy 3 x 3 mode, so accept only the
+    # port's persisted 12/20 choices before the original mode conversion.
+    invoke-static {v8, v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->resolvePortLauncherMode(Landroid/content/Context;I)I
 
-    const/4 v5, 0x0
-
-    invoke-virtual {v8, v4, v5}, Landroid/content/Context;->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;
-
-    move-result-object v4
-
-    const-string v5, "prefs_key_launcher_mode"
-
-    const/4 v6, -0x1
-
-    invoke-interface {v4, v5, v6}, Landroid/content/SharedPreferences;->getInt(Ljava/lang/String;I)I
-
-    move-result v4
-
-    if-eq v4, v6, :cond_launcher_mode_pref_done
-
-    move v0, v4
-
-    :cond_launcher_mode_pref_done
+    move-result v0
 
     .line 18
     invoke-static {v0}, Lcom/smartisanos/launcher/data/Constants;->checkSingleMode(I)Z

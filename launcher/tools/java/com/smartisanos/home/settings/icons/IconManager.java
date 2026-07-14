@@ -43,8 +43,8 @@ public class IconManager {
                 info = new RedirectIconInfo();
                 info.packageName = parts[0];
                 info.componentName = parts.length > 1 ? parts[1] : "";
-                info.useImprovedAppIcon = true;
-                info.drawableName = RedirectIconDB.MODE_AUTO;
+                info.useImprovedAppIcon = false;
+                info.drawableName = RedirectIconDB.MODE_ORIGINAL;
             }
             all.add(info);
         }
@@ -53,6 +53,10 @@ public class IconManager {
     }
 
     public String getLableForPackage(String packageName, String componentName) {
+        RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(mContext, packageName, componentName);
+        if (redirect != null && redirect.displayName != null && redirect.displayName.trim().length() > 0) {
+            return redirect.displayName;
+        }
         ResolveInfo info = resolveInfoMap.get(key(packageName, componentName));
         if (info == null) {
             return packageName;

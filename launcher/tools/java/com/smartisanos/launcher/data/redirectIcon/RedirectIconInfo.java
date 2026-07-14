@@ -10,6 +10,8 @@ public class RedirectIconInfo implements Serializable, Comparable<RedirectIconIn
     public boolean useImprovedAppIcon = true;
     public long installTime;
     public long ownerId;
+    public String displayName;
+    public String originalName;
     public String md5;
     public String lastUpdateTime;
 
