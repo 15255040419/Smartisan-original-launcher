@@ -1,6 +1,7 @@
 build/
 *.apk
 *.png
+!launcher/tools/maintained_settings_res/res/drawable/com_smartisanos_videoplayerproject.png
 !icons/drawable/*.png
 *.jpg
 *.jpeg

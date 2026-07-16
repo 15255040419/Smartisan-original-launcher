@@ -37,7 +37,7 @@
 - 普通/毛玻璃主题切换的实际前台宿主是 `ThemeChooserActivity`：主题详情以同一 Activity 的 `activity_theme_item` 根布局替换内容，并不启动原版 `ThemeItemActivity`。原版 `ThemeItemActivity` 成功提交主题后保留详情页约 100ms，由其 `Q` Handler 截取过渡画面、finish 并回到 HOME；随后 `J.onResume()` 消费主题消息并执行桌面主题动画。maintained 宿主保持同一时序，不能再加入冷重载式全屏黑色 Loading 或改 `J.onResume()` 原版桌面动画。实体机逐帧仍待验证。
 - 普通主题的原版 `theme_changing` Loading 由 `J -> widget.c -> SmartisanProgressDialog` 显示，不能套用宫格冷重载的全黑沉浸窗口。此前尝试的跨窗口 system bar 同步未改变真机现象，已撤回；普通主题系统栏问题仍待依据完整真机日志和原版窗口层级继续定位。主题动画保持原版 `finish -> HOME` 顺序且无 Activity 窗口动画。
 - 设置弹窗统一复用同一锤子风格根容器；应用改名、图标包选择和图标大小弹窗均使用统一宽度、圆角、标题、分隔线和按钮容器。动态天气/日历继续使用原版 ActiveIcon 数据更新与恢复链路，不在每次桌面翻页时触发定位或联网；当前移植版的完整静态应用图标不得作为 ActiveIcon 底板再次绘制。动态缓存帧使用原版 `icon_shadow_radius` / `icon_shadow_color` 两层软件阴影参数合成，不能强制启用在现代 Android 上会崩溃的私有 `sc[27]` GL 阴影链。
-- 在线图标库保留完整文件索引；同一应用的多版本 PNG 只通过 `icons/variants.json` 归组。不得以 `_2/_3` 后缀为由批量删除或重命名；系统视频跨 ROM 使用 `com.android.VideoPlayer` 类别图，原锤子视频图仍作为可选候选保留。
+- 在线图标库保留完整文件索引；同一应用的多版本 PNG 只通过 `icons/variants.json` 归组。不得以 `_2/_3` 后缀为由批量删除或重命名；系统视频跨 ROM 使用 `com.smartisanos.videoplayerproject` 原版锤子类别图，旧 `com.android.VideoPlayer` 图仍作为手动候选保留。
 - Dock 上方板块页码由 `view.V -> view.Z (DotView)` 的 SMEngine 网格和原版 `dot_fix/dot_mask/dot_move` 纹理绘制，不是 Settings 的 `DotsPageIndicator`。1080×2400 设备的兼容缩放此前把 `dot_width` 乘 `scaleX=1.0`、`dot_height` 乘 `scaleY=1.25`，会将同一个 mask 拉为纵向椭圆；现已将这对尺寸作为一个等比视觉单元统一使用 `scale`。Dock 位置、间距、颜色、透明度和翻页逻辑均未改。构建、v1/v2/v3 签名和 `emulator-5556` 覆盖安装通过；模拟器当前仅一页，实际 12/20、多页、不同 density 与真机截图测量仍待最终回归。
 - 图标大小确认已从旧的 `AlarmManager(350ms) -> finish Settings -> killProcess` 链路切换到既有 `:reload` 冷重载。主 prefs `commit()` 后才创建 `ICON_SIZE_CHANGE` token；不透明过渡页首帧后才结束旧主 PID，新进程在 `Constants.applyLauncherIconSize()` 读取新值并以真实 GL 首帧通知过渡页关闭。未调用 `N.d()`、`F.i()` 或数据库迁移；同值确认只记录 `ICON_SIZE_UNCHANGED_SKIP`。模拟器已完成 100→150、150→50 和同值 50→50；实体机逐帧、连续压力、12/20、文件夹/动态图标仍待最终回归。
 - 动态天气/日历只有 `launcher_dynamic_weather_calendar_enabled` 一个联合开关；现已复用稳定的 `:reload` / `FIRST_FRAME_READY` 冷重载外壳，原因是 `ACTIVE_ICON_SETTINGS_CHANGE`，不再在正常路径向旧 Launcher 发送 `update_icon` 局部刷新。首次从关闭开启时，联合开关先请求已声明的 `ACCESS_COARSE_LOCATION`，仅在授权成功后同步 `commit()` 配置、回读并发起冷重载；拒绝或永久拒绝时保持关闭且不重载。主 Launcher 固定 `screenOrientation=1`，过渡页也已在文本及二进制 Manifest 固定 portrait，并在 `onCreate()`、内容创建前执行运行时兜底。实体机授权、开关、横放和连续切换仍待验证。
@@ -53,6 +53,25 @@
 ## 每日修复记录（倒序）
 
 ### 2026-07-16
+
+#### 应用图标即时刷新收敛（核心实现完成，基本验证完成；最终回归待完成）
+
+- 根因分离：设置页此前递归遍历 DecorView 的 `refreshIconRowsInCurrentPage()/refreshIconRowsInTree()`，只能更新已经附着的可见行；屏幕外 ListView 行在滑动重新绑定前保留旧状态。桌面侧则存在两个时序问题：全局“改进版图标”无差别对全部 Launcher 包派发 `update_icon`，在线图标在缓存写入时先启动固定 2 秒静默刷新、之后才把 `RedirectIconDB` 置为 `MODE_AUTO`，使原版更新链可能读取旧状态。
+- 设置页修复：应用图标页现在以 `WeakReference<AppIconAdapter>` 维护当前页面 Adapter，不保存 Activity 或 ListView 的静态强引用。状态变化调用 `invalidateIconData() -> notifyDataSetChanged()`；每次 `getView()` 均重新读取 `RedirectIconDB` 当前记录，再解析 AUTO/ORIGINAL/RESOURCE/CUSTOM/PACK、图标包与在线内存/磁盘缓存。已删除递归 View 树刷新及其单行变体；自定义、资源、图标包、恢复原图和全局开关统一走 Adapter 刷新。
+- 左右预览：列表右侧“改进版候选”与当前选择状态已分离。关闭全局改进版图标时，AUTO 项使用左侧系统原图并将 `icon_frame_selected` 对号显示在左侧；右侧已缓存/内置候选继续保留为可选预览，不退化为加号。CUSTOM/RESOURCE/PACK 的用户明确选择优先级不变。
+- 桌面刷新：保留原版 `com.smartisanos.launcher.update_icon -> Aa.c -> Aa.r -> Aa.e -> DatabaseUpdater -> data/v.run -> PageView.y` 唯一链路。对比 `clean_launcher_raw` 后确认 `data/v.run()` 未改，`PageView.y()` 差异仅为既有文件夹位置适配，没有补加 Smali 回调、第二套广播、Cell 遍历或强制冷重载。`applyIconChanges()` 只向真正变更的 package 集合派发一次，不再在派发返回时假定数据库/渲染已完成或额外请求渲染帧。
+- 在线与并发：`writeCachedSmartisanIcon()` 现在只写缓存和清除 miss；下载成功后先更新内存缓存、仅在改进版开关仍开启且不存在 CUSTOM/RESOURCE/PACK 覆盖时写入 AUTO，随后将实际变化包加入主线程单飞集合。删除 2 秒静默期；同一 main-loop 周期完成的包合并为一次原版更新。全局开关每次递增 generation，旧后台扫描在写库或派发前发现 generation/目标状态不一致即记录 `IMPROVED_ICON_STALE_RESULT_SKIPPED` 并退出。
+- 在线别名回写：部分系统应用下载使用锤子标准图标别名，而该别名不是 Android 实际安装包名；此前下载完成后以该别名执行 `Intent.setPackage()`，查询不到 Activity，因而不会写 AUTO、刷新右侧对号或派发桌面更新。现在下载回写会遍历 Launcher Activity，以“实际包名或其 Smartisan 别名”匹配，再只将命中的真实包名加入 `update_icon`；不会刷新其他应用或重新加载 Launcher。新增 `ONLINE_ICON_AUTO_PROMOTION` 日志记录下载 key 与实际变更包。
+- 单应用桌面回写：合并 `update_icon` 时一度遗漏旧单应用路径在派发后的 `O.init(context)`。设置页直接读取 `RedirectIconDB`，所以云服务、小布助手等会先显示右侧对号；已附着的桌面 Cell 却仍按旧的原版运行时配置快照绘制。`applyIconChanges()` 现仅在确有变更包并完成该包的 `Aa.c -> Aa.r -> Aa.e` 派发后恢复 `O.init(context)`；不扫描其他应用、不重载 Launcher、不新增 Cell 遍历。
+- 设置页/桌面图标一致性：云服务和小布助手的截图确认，设置详情页已选中锤子图，桌面仍显示系统图。真实根因是旧桌面 `ItemInfo.componentName` 与设置页保存的当前 `ActivityInfo.name` 不一致；桌面精确组件查表失败后不进入受管图标分支。现保持精确组件记录优先；只有该包恰好只有一个 Launcher Activity 时，才回退查询其当前组件记录。多入口应用绝不使用此回退，避免跨入口串图。桌面随后以该实际组件和同一 `SettingsResourceContext` 解析选中项；联系人/拨号既有分流不变。新增 `DESKTOP_ICON_COMPONENT_FALLBACK` 日志记录命中的兼容回退。
+- 诊断：新增 `ICON_UPDATE_DISPATCHED`、`ICON_ADAPTER_INVALIDATED`、`IMPROVED_ICON_STALE_RESULT_SKIPPED`，包含 generation、变更包数量和状态；不记录 Bitmap 内容。后续若真机日志确认已到 `PageView.y` 却无下一帧，才可依据原版 GL 线程投递补一次合并渲染请求，本轮没有预先添加。
+- 基本验证：`build.bat` 成功，最终 APK v1/v2/v3 签名有效，PDCM00 ADB 覆盖安装并强制启动成功；启动后 logcat 未见新的 Launcher `FATAL EXCEPTION`、`VerifyError` 或 `NoSuchMethodError`。尚未在真机完成设置页屏幕外行、单次开关全量变化、在线下载完成、快速开关 generation、不同图标模式、桌面翻页/文件夹和多 ROM 回归，不能标记为全部完成。
+
+#### 系统视频自动图标改回原版锤子视频图（核心实现完成，基本验证完成；最终回归待完成）
+
+- 真机证据：替换图标页中的“OPPO 视频”已被系统视频类别识别，却显示 `com.android.VideoPlayer.png` 的旧跨 ROM 图；`com.smartisanos.videoplayerproject.png` 虽在在线索引和类别 variants 中存在，但仅作为手动候选，未进入自动映射。
+- 修复：将系统视频类别的自动 key 从 `com.android.VideoPlayer` 调整为已有的 `com.smartisanos.videoplayerproject`，并将同一张已有 PNG 作为 maintained 设置资源的离线回退。候选页和桌面先读取该资源，不再依赖首次在线下载或已有缓存；`com.android.VideoPlayer.png` 继续保留为手动可选 variant。OPPO、ColorOS、OnePlus 等系统视频仍通过同一已验证的系统应用分类条件命中，不按手机型号写死包名。
+- 验证状态：`build.bat`、v1/v2/v3 签名和 PDCM00 ADB 覆盖安装已通过。此前真机替换图标页只显示旧图，根因为在线图标未预置到 APK，且带点 key 在内置 drawable 的候选过滤中未转换为下划线资源名；现已同时修正。仍需在真机重新打开“OPPO 视频”替换图标页确认锤子视频图显示并选中，不能标记为全部完成。
 
 #### 宫格冷重载旧 token 二次启动（核心修复完成，基本验证完成；最终回归待完成）
 

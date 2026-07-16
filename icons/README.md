@@ -67,7 +67,7 @@ icons/variants.json
 
 不同厂商的系统应用包名并不统一。Launcher 会先确认目标是系统应用或更新后的系统应用，再按包名、Activity 名称和系统应用标签识别相机、相册、浏览器、联系人、短信、邮件、计算器、文件管理、指南针、录音、音乐、视频、天气、便签、设置、安装器和 SIM 工具包，并映射到本目录中的锤子标准图标。第三方同名应用不会套用该映射。
 
-系统视频统一请求 `com.android.VideoPlayer.png`，因此 OPPO、ColorOS、OnePlus 等系统视频应用不再依赖各自包名。`com.smartisanos.videoplayerproject.png` 保留为同一类别的第二个可选图标，用户可在“替换图标”中手动选择。
+系统视频统一请求 `com.smartisanos.videoplayerproject.png`，因此 OPPO、ColorOS、OnePlus 等系统视频应用不再依赖各自包名。`com.android.VideoPlayer.png` 保留为同一类别的可选图标，用户可在“替换图标”中手动选择。
 
 `icons/system/archive/` 仅保存曾被错误归到系统设置候选的历史图片，不参与在线下载、自动匹配或候选图展示。
 
