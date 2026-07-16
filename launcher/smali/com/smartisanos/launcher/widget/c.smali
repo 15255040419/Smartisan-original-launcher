@@ -135,15 +135,7 @@
 .end method
 
 .method public q(Landroid/content/Context;Ljava/lang/String;)V
-    .locals 2
-
-    move-object v1, p1
-
-    invoke-static {p1}, Lcom/smartisanos/launcher/reload/LauncherColdReloadCoordinator;->consumeInitialLoadingSuppression(Landroid/content/Context;)Z
-
-    move-result v0
-
-    if-nez v0, :cond_suppressed
+    .locals 1
 
     .line 1
     iget-object v0, p0, Lcom/smartisanos/launcher/widget/c;->mDialog:Lsmartisanos/app/SmartisanProgressDialog;
@@ -183,11 +175,10 @@
     :cond_0
     invoke-virtual {v0, p2}, Lsmartisanos/app/SmartisanProgressDialog;->setMessage(Ljava/lang/String;)V
 
-    invoke-static {v1, v0, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onOriginalThemeLoadingUiPrepared(Landroid/content/Context;Landroid/app/Dialog;Ljava/lang/String;)V
+    invoke-static {p1, v0, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onOriginalThemeLoadingUiPrepared(Landroid/content/Context;Landroid/app/Dialog;Ljava/lang/String;)V
 
-    return-void
+    invoke-static {v0}, Lcom/smartisanos/launcher/reload/LauncherColdReloadCoordinator;->prepareInitializationLoadingWindow(Landroid/app/Dialog;)V
 
-    :cond_suppressed
     return-void
 .end method
 

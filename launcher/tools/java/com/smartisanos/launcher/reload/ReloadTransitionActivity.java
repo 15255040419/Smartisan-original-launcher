@@ -20,7 +20,6 @@ import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
 /** Opaque private-process cover that remains visible until the new Launcher reports a real frame. */
@@ -38,7 +37,7 @@ public final class ReloadTransitionActivity extends Activity {
     private boolean receiverRegistered;
     private TextView status;
     private Button retry;
-    private View loadingPanel;
+    private OriginalLoadingContentFactory.Content loadingContent;
     private TransitionState state = TransitionState.FAILED;
     private final Runnable timeout = new Runnable() {
         @Override
@@ -65,12 +64,14 @@ public final class ReloadTransitionActivity extends Activity {
                     intent.getStringExtra(ReloadProtocol.EXTRA_THEME_MODE));
             LauncherColdReloadCoordinator.log("TRANSITION_FINISHED", token, reason, gridMode,
                     themeMode);
+            // Do not let task removal animate the cover (some ROMs move an empty task down).
+            // The new Launcher has already reported a real frame at this point.
+            dismissTransitionLoading();
+            LauncherColdReloadCoordinator.log("RELOAD_ACTIVITY_FINISH_NO_ANIMATION", token,
+                    reason, gridMode, themeMode);
             overridePendingTransition(0, 0);
-            if (Build.VERSION.SDK_INT >= 21) {
-                finishAndRemoveTask();
-            } else {
-                finish();
-            }
+            finish();
+            overridePendingTransition(0, 0);
         }
     };
 
@@ -112,9 +113,12 @@ public final class ReloadTransitionActivity extends Activity {
     private void buildOpaqueLoading() {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
-        loadingPanel = buildOriginalLoadingContent();
-        root.addView(loadingPanel, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, loadingHeight(), Gravity.CENTER));
+        int progressId = getResources().getIdentifier("loading_progress", "drawable",
+                getPackageName());
+        loadingContent = OriginalLoadingContentFactory.create(this,
+                progressId == 0 ? null : getDrawable(progressId), "正在加载桌面...");
+        root.addView(loadingContent.root, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -195,9 +199,7 @@ public final class ReloadTransitionActivity extends Activity {
         state = TransitionState.FAILED;
         LauncherColdReloadCoordinator.cancelPendingLauncherStart(token);
         handler.removeCallbacks(timeout);
-        if (loadingPanel != null) {
-            loadingPanel.setVisibility(View.GONE);
-        }
+        dismissTransitionLoading();
         status.setText("桌面重新载入失败");
         status.setVisibility(View.VISIBLE);
         retry.setVisibility(View.VISIBLE);
@@ -215,6 +217,7 @@ public final class ReloadTransitionActivity extends Activity {
             } catch (Throwable ignored) {
             }
         }
+        dismissTransitionLoading();
         super.onDestroy();
     }
 
@@ -236,48 +239,37 @@ public final class ReloadTransitionActivity extends Activity {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private View buildOriginalLoadingContent() {
-        int height = loadingHeight();
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.HORIZONTAL);
-        panel.setGravity(Gravity.CENTER);
-        android.graphics.drawable.GradientDrawable background =
-                new android.graphics.drawable.GradientDrawable();
-        background.setColor(Color.rgb(29, 33, 34));
-        background.setCornerRadius(height / 2f);
-        panel.setBackground(background);
-        panel.setPadding(height / 2, height / 6, height / 2, height / 6);
-
-        ProgressBar progress = new ProgressBar(this);
-        progress.setIndeterminate(true);
-        int progressId = getResources().getIdentifier("loading_progress", "drawable", getPackageName());
-        if (progressId != 0) {
-            progress.setIndeterminateDrawable(getResources().getDrawable(progressId));
-        }
-        int progressSize = (int) (height * 0.6f);
-        panel.addView(progress, new LinearLayout.LayoutParams(progressSize, progressSize));
-
-        TextView message = new TextView(this);
-        message.setText("正在加载桌面...");
-        message.setTextColor(Color.WHITE);
-        message.setTextSize(15);
-        LinearLayout.LayoutParams messageParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        messageParams.gravity = Gravity.CENTER_VERTICAL;
-        messageParams.leftMargin = height / 3;
-        panel.addView(message, messageParams);
-        return panel;
-    }
-
-    private int loadingHeight() {
-        int width = getResources().getDisplayMetrics().widthPixels;
-        return width * 3 / 4 / 5;
-    }
-
     private void showTransitionLoading() {
-        if (loadingPanel != null) {
-            loadingPanel.setVisibility(View.VISIBLE);
+        if (loadingContent != null) {
+            loadingContent.root.setVisibility(View.VISIBLE);
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        applyLoadingWindowIfWaiting("resume");
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus) {
+        super.onWindowFocusChanged(hasWindowFocus);
+        LauncherColdReloadCoordinator.log("RELOAD_LOADING_WINDOW_FOCUS", token,
+                "focused=" + hasWindowFocus + ",reason=" + reason, gridMode, themeMode);
+        if (hasWindowFocus) applyLoadingWindowIfWaiting("focus");
+    }
+
+    private void dismissTransitionLoading() {
+        if (loadingContent != null) {
+            loadingContent.root.setVisibility(View.GONE);
+        }
+    }
+
+    private void applyLoadingWindowIfWaiting(String source) {
+        if (state != TransitionState.WAITING_FIRST_FRAME) return;
+        LoadingUiWindowCompat.apply(getWindow());
+        LauncherColdReloadCoordinator.log("RELOAD_LOADING_SYSTEM_BARS_APPLIED", token,
+                source + ",reason=" + reason, gridMode, themeMode);
     }
 
 }

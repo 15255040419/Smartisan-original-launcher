@@ -6,6 +6,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 
 /** Keeps every original LoadingUI instance on one black, immersive window geometry. */
@@ -44,6 +46,12 @@ public final class LoadingUiWindowCompat {
             }
             if (Build.VERSION.SDK_INT >= 30) {
                 window.setDecorFitsSystemWindows(false);
+                WindowInsetsController controller = window.getInsetsController();
+                if (controller != null) {
+                    controller.setSystemBarsBehavior(
+                            WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                    controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                }
             }
             View decor = window.getDecorView();
             if (decor != null && decor.getSystemUiVisibility() != LOADING_SYSTEM_UI_FLAGS) {

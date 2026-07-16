@@ -1,6 +1,7 @@
 package com.smartisanos.launcher.reload;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
@@ -23,7 +24,8 @@ public final class LauncherColdReloadCoordinator {
     private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
     private static volatile String sReloadToken;
     private static volatile String sReportedToken;
-    private static volatile String sInitialLoadingSuppressedToken;
+    private static volatile boolean sInitialLoadingWindowPending;
+    private static volatile boolean sInitialLoadingWindowApplied;
     private static volatile String sPendingLauncherStartToken;
     private static volatile String sIconSizeToken;
     private static volatile int sIconSizeOld = -1;
@@ -126,7 +128,8 @@ public final class LauncherColdReloadCoordinator {
         }
         sReloadToken = token;
         sReportedToken = null;
-        sInitialLoadingSuppressedToken = token;
+        sInitialLoadingWindowPending = false;
+        sInitialLoadingWindowApplied = false;
         sLauncherActivity = new WeakReference<Activity>(activity);
         String reason = intent.getStringExtra(ReloadProtocol.EXTRA_RELOAD_REASON);
         if ("ICON_SIZE_CHANGE".equals(reason)) {
@@ -156,19 +159,20 @@ public final class LauncherColdReloadCoordinator {
         });
     }
 
-    /** Suppresses exactly the first original LoadingUI of a tokenized cold reload. */
-    public static boolean consumeInitialLoadingSuppression(Context context) {
-        if (!(context instanceof Activity)) {
-            return false;
-        }
-        Intent intent = ((Activity) context).getIntent();
-        String token = intent == null ? null : intent.getStringExtra(ReloadProtocol.EXTRA_RELOAD_TOKEN);
-        if (token == null || !token.equals(sInitialLoadingSuppressedToken)) {
-            return false;
-        }
-        sInitialLoadingSuppressedToken = null;
-        log("NEW_LAUNCHER_INITIAL_LOADING_SUPPRESSED", token, "reload_cover_visible", -1, null);
-        return true;
+    /** Armed only by J's exact R.string.initializing path, never by generic LoadingUI. */
+    public static void armInitializationLoadingWindow() {
+        if (sReloadToken == null || sInitialLoadingWindowApplied) return;
+        sInitialLoadingWindowPending = true;
+        log("INITIAL_LOADING_WINDOW_ARMED", sReloadToken, "exact_initializing", -1, null);
+    }
+
+    /** Invoked by widget.c before Dialog.show(), after J explicitly armed this one loading UI. */
+    public static void prepareInitializationLoadingWindow(Dialog dialog) {
+        if (!sInitialLoadingWindowPending || dialog == null || dialog.getWindow() == null) return;
+        sInitialLoadingWindowPending = false;
+        sInitialLoadingWindowApplied = true;
+        LoadingUiWindowCompat.apply(dialog.getWindow());
+        log("INITIAL_LOADING_WINDOW_PREPARED", sReloadToken, "before_dialog_show", -1, null);
     }
 
     private static void reportAfterDecorDraw(final Activity activity, final String token) {

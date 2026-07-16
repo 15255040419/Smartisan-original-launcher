@@ -1017,6 +1017,9 @@
 
     move-result-object p2
 
+    invoke-static {}, Lcom/smartisanos/launcher/reload/LauncherColdReloadCoordinator;->armInitializationLoadingWindow()V
+
+
     .line 9
     sget-boolean v1, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
 
@@ -2108,6 +2111,9 @@
     invoke-static {p1}, Lcom/smartisanos/launcher/e/s;->oa(I)Ljava/lang/String;
 
     move-result-object p1
+
+    invoke-static {}, Lcom/smartisanos/launcher/reload/LauncherColdReloadCoordinator;->armInitializationLoadingWindow()V
+
 
     .line 51
     iget-object p2, p0, Lcom/smartisanos/launcher/J;->eg:Lcom/smartisanos/launcher/widget/c;

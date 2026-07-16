@@ -33,149 +33,33 @@
 
 # virtual methods
 .method protected onCreate(Landroid/os/Bundle;)V
-    .locals 13
+    .locals 5
 
     invoke-super {p0, p1}, Landroid/app/Dialog;->onCreate(Landroid/os/Bundle;)V
 
-    iget-object p1, p0, Lsmartisanos/app/SmartisanProgressDialog;->mContext:Landroid/content/Context;
+    iget-object v0, p0, Lsmartisanos/app/SmartisanProgressDialog;->mContext:Landroid/content/Context;
 
-    invoke-virtual {p1}, Landroid/content/Context;->getResources()Landroid/content/res/Resources;
+    iget-object v1, p0, Lsmartisanos/app/SmartisanProgressDialog;->mIndeterminateDrawable:Landroid/graphics/drawable/Drawable;
+
+    iget-object v2, p0, Lsmartisanos/app/SmartisanProgressDialog;->mMessage:Ljava/lang/String;
+
+    invoke-static {v0, v1, v2}, Lcom/smartisanos/launcher/reload/OriginalLoadingContentFactory;->create(Landroid/content/Context;Landroid/graphics/drawable/Drawable;Ljava/lang/String;)Lcom/smartisanos/launcher/reload/OriginalLoadingContentFactory$Content;
 
     move-result-object v0
 
-    invoke-virtual {v0}, Landroid/content/res/Resources;->getDisplayMetrics()Landroid/util/DisplayMetrics;
+    iget-object v1, v0, Lcom/smartisanos/launcher/reload/OriginalLoadingContentFactory$Content;->progress:Landroid/widget/ProgressBar;
 
-    move-result-object v0
+    iput-object v1, p0, Lsmartisanos/app/SmartisanProgressDialog;->mProgress:Landroid/widget/ProgressBar;
 
-    iget v1, v0, Landroid/util/DisplayMetrics;->widthPixels:I
+    iget-object v1, v0, Lcom/smartisanos/launcher/reload/OriginalLoadingContentFactory$Content;->message:Landroid/widget/TextView;
 
-    mul-int/lit8 v2, v1, 0x3
+    iput-object v1, p0, Lsmartisanos/app/SmartisanProgressDialog;->mMessageView:Landroid/widget/TextView;
 
-    div-int/lit8 v2, v2, 0x4
+    iget-object v0, v0, Lcom/smartisanos/launcher/reload/OriginalLoadingContentFactory$Content;->root:Landroid/widget/FrameLayout;
 
-    div-int/lit8 v2, v2, 0x5
-
-    new-instance v3, Landroid/widget/FrameLayout;
-
-    invoke-direct {v3, p1}, Landroid/widget/FrameLayout;-><init>(Landroid/content/Context;)V
-
-    const v4, 0x99000000
-
-    invoke-virtual {v3, v4}, Landroid/widget/FrameLayout;->setBackgroundColor(I)V
-
-    new-instance v5, Landroid/widget/LinearLayout;
-
-    invoke-direct {v5, p1}, Landroid/widget/LinearLayout;-><init>(Landroid/content/Context;)V
-
-    const/4 v6, 0x0
-
-    invoke-virtual {v5, v6}, Landroid/widget/LinearLayout;->setOrientation(I)V
-
-    const/16 v7, 0x11
-
-    invoke-virtual {v5, v7}, Landroid/widget/LinearLayout;->setGravity(I)V
-
-    new-instance v8, Landroid/graphics/drawable/GradientDrawable;
-
-    invoke-direct {v8}, Landroid/graphics/drawable/GradientDrawable;-><init>()V
-
-    const v9, -0xe2dede
-
-    invoke-virtual {v8, v9}, Landroid/graphics/drawable/GradientDrawable;->setColor(I)V
-
-    int-to-float v9, v2
-
-    const/high16 v10, 0x40000000    # 2.0f
-
-    div-float/2addr v9, v10
-
-    invoke-virtual {v8, v9}, Landroid/graphics/drawable/GradientDrawable;->setCornerRadius(F)V
-
-    invoke-virtual {v5, v8}, Landroid/widget/LinearLayout;->setBackground(Landroid/graphics/drawable/Drawable;)V
-
-    div-int/lit8 v8, v2, 0x2
-
-    div-int/lit8 v9, v2, 0x6
-
-    invoke-virtual {v5, v8, v9, v8, v9}, Landroid/widget/LinearLayout;->setPadding(IIII)V
-
-    new-instance v8, Landroid/widget/ProgressBar;
-
-    invoke-direct {v8, p1}, Landroid/widget/ProgressBar;-><init>(Landroid/content/Context;)V
-
-    const/4 v9, 0x1
-
-    invoke-virtual {v8, v9}, Landroid/widget/ProgressBar;->setIndeterminate(Z)V
-
-    iget-object v10, p0, Lsmartisanos/app/SmartisanProgressDialog;->mIndeterminateDrawable:Landroid/graphics/drawable/Drawable;
-
-    if-eqz v10, :cond_no_drawable
-
-    invoke-virtual {v8, v10}, Landroid/widget/ProgressBar;->setIndeterminateDrawable(Landroid/graphics/drawable/Drawable;)V
-
-    :cond_no_drawable
-    iput-object v8, p0, Lsmartisanos/app/SmartisanProgressDialog;->mProgress:Landroid/widget/ProgressBar;
-
-    int-to-float v10, v2
-
-    const v11, 0x3f19999a    # 0.6f
-
-    mul-float/2addr v10, v11
-
-    float-to-int v10, v10
-
-    new-instance v11, Landroid/widget/LinearLayout$LayoutParams;
-
-    invoke-direct {v11, v10, v10}, Landroid/widget/LinearLayout$LayoutParams;-><init>(II)V
-
-    const/16 v10, 0x10
-
-    iput v10, v11, Landroid/widget/LinearLayout$LayoutParams;->gravity:I
-
-    invoke-virtual {v5, v8, v11}, Landroid/widget/LinearLayout;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V
-
-    new-instance v11, Landroid/widget/TextView;
-
-    invoke-direct {v11, p1}, Landroid/widget/TextView;-><init>(Landroid/content/Context;)V
-
-    iput-object v11, p0, Lsmartisanos/app/SmartisanProgressDialog;->mMessageView:Landroid/widget/TextView;
-
-    const/4 v8, -0x1
-
-    invoke-virtual {v11, v8}, Landroid/widget/TextView;->setTextColor(I)V
-
-    const/4 v8, 0x2
-
-    const/high16 v12, 0x41700000    # 15.0f
-
-    invoke-virtual {v11, v8, v12}, Landroid/widget/TextView;->setTextSize(IF)V
-
-    new-instance v8, Landroid/widget/LinearLayout$LayoutParams;
-
-    const/4 v12, -0x2
-
-    invoke-direct {v8, v12, v12}, Landroid/widget/LinearLayout$LayoutParams;-><init>(II)V
-
-    iput v10, v8, Landroid/widget/LinearLayout$LayoutParams;->gravity:I
-
-    div-int/lit8 v10, v2, 0x3
-
-    iput v10, v8, Landroid/widget/LinearLayout$LayoutParams;->leftMargin:I
-
-    invoke-virtual {v5, v11, v8}, Landroid/widget/LinearLayout;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V
+    invoke-virtual {p0, v0}, Landroid/app/Dialog;->setContentView(Landroid/view/View;)V
 
     invoke-direct {p0}, Lsmartisanos/app/SmartisanProgressDialog;->updateMessage()V
-    new-instance p1, Landroid/widget/FrameLayout$LayoutParams;
-
-    const/4 v8, -0x2
-
-    invoke-direct {p1, v8, v2}, Landroid/widget/FrameLayout$LayoutParams;-><init>(II)V
-
-    iput v7, p1, Landroid/widget/FrameLayout$LayoutParams;->gravity:I
-
-    invoke-virtual {v3, v5, p1}, Landroid/widget/FrameLayout;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V
-
-    invoke-virtual {p0, v3}, Landroid/app/Dialog;->setContentView(Landroid/view/View;)V
 
     invoke-virtual {p0}, Landroid/app/Dialog;->getWindow()Landroid/view/Window;
 
@@ -185,7 +69,9 @@
 
     new-instance v0, Landroid/graphics/drawable/ColorDrawable;
 
-    invoke-direct {v0, v6}, Landroid/graphics/drawable/ColorDrawable;-><init>(I)V
+    const/4 v1, 0x0
+
+    invoke-direct {v0, v1}, Landroid/graphics/drawable/ColorDrawable;-><init>(I)V
 
     invoke-virtual {p1, v0}, Landroid/view/Window;->setBackgroundDrawable(Landroid/graphics/drawable/Drawable;)V
 
@@ -193,9 +79,7 @@
 
     invoke-virtual {p1, v0, v0}, Landroid/view/Window;->setLayout(II)V
 
-    const/4 v0, 0x0
-
-    invoke-virtual {p1, v0}, Landroid/view/Window;->setDimAmount(F)V
+    invoke-virtual {p1, v1}, Landroid/view/Window;->setDimAmount(F)V
 
     const/16 v0, 0x400
 
