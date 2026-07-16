@@ -17,19 +17,32 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-07-14）
+## 当前状态总览（2026-07-16）
 
 - 构建产物为 `build\launcher-signed.apk`；构建、zipalign、v1/v2/v3 签名和 ADB 覆盖安装均已验证。
+- 启动专项阶段 0、阶段 1、阶段 2 已完成。阶段 3、阶段 4 为“核心实现完成，完整回归待最终验证”：阶段 3 已确认原版 `N.d + F.i`、12→20、同模式跳过且未改迁移算法；阶段 4 已确认独立 `:reload` 不透明过渡、原版 LoadingUI、精确旧 PID 终止和真实首帧 token 握手。`:reload` 在 Activity 结束后短暂作为 cached 进程存在属正常系统行为，不得手工杀掉。阶段 5–10 均为“核心实现完成，基本验证完成；最终回归待完成”；复杂宫格、逐帧、多 ROM、压力和异常恢复统一保留至最终回归。
+- 固定延迟审计已完成核心收敛与基础验证：只保留失败提示、有限条件重试、网络轮询/合并、天气 TTL 与 UI 动画；不再用透明壁纸、角标、主题或手动天气的固定时间重复刷新掩盖状态竞争。
+- 任务合并和状态阶段已完成核心收敛与基础验证：图标、天气、分身和冷重载各自保持单飞/合并状态；冷重载失败重试会重新进入等待首帧状态，不以超时当成功，也不为超时额外杀进程。建议 Commit 顺序已审阅；本轮未暂存或提交用户的混合工作区。
+- 2026-07-15 真机宫格连续切换日志确认：旧主 PID 的结束不是 Java/native 崩溃；问题来自新 Launcher 使用 `FLAG_ACTIVITY_CLEAR_TASK` 后，部分 ROM 会提前裁剪仍在等待 token 的 `:reload` 任务。该 flag 已移除；过渡 Activity 与原版 LoadingUI Dialog 现在共同复用桌面的导航栏隐藏/透明窗口策略。实体机连续切换与逐帧仍待最终回归，未将阶段 3、4 标为全部完成。
+- 后续 2.72 秒真机录屏逐帧确认，过渡 Loading 与新 Launcher 初始化虽然都复用原版 `widget.c / SmartisanProgressDialog`，但前者仍以灰黑的 Activity 和桌面常规 system-ui inset 承载，后者以 Launcher 初始化窗口承载；因此出现状态栏/隐藏虚拟键闪现、同一动画上下跳动和二次出现。现统一改为原版 LoadingUI 的共享纯黑沉浸窗口策略，最终实体机录屏复核仍待完成。
+- 最新真机日志已定位宫格连续切换的真实任务/进程根因：`ReloadTransitionActivity` 声明了独立 affinity 却未用 `NEW_TASK` 启动，实际进入 `smartisanos.task.launcher`；Launcher 的 `clearTaskOnLaunch` 随后 `clear-task-all` 销毁过渡页、设置页和旧 Launcher，并触发 `2nd-crash`。紧接的旧 PID 尚未从 ActivityManager 脱离时立即启动新单实例 Launcher，又造成 Oplus `attached to a previous process` / `Already have existing proc`。现已按这两个状态条件收敛，仍待实体机复测。
+- 冷重载可见 Loading 已收敛为 `ReloadTransitionActivity` content root 的唯一一套：直接复用原版 `loading_progress` drawable 和 `SmartisanProgressDialog` 的原始居中尺寸/圆角/padding 公式，但不再创建 Dialog window。新 Launcher tokenized 冷启动只抑制一次原版 `widget.c` 初始化 Loading，防止“正在加载桌面...”后又出现第二套“正在初始化”。实体机逐帧验收仍待完成。
 - 普通 Android 不存在锤子专用全局键 `sm_launcher_left_screen_state` 时，负一屏默认关闭；首页向右拖动继续执行原版 `PageView.updateScroll()` 的阻尼位移，松手回弹到第一页。不得再次把缺失的系统键默认解释为已开启负一屏，也不得删除原版边界回弹算法。
 - 设置页一级、二级和三级页面的 `ScrollView`、`ListView`、`GridView` 统一保持 `OVER_SCROLL_ALWAYS`；到达顶部或底部继续拖动时使用现代 Android 的系统拉伸效果并在松手后回弹。不得再在 Java 公共调校中递归写入 `OVER_SCROLL_NEVER` 覆盖 maintained 资源。
 - 宫格遵循原版：12 -> 20 只切换运行布局，保留同一板块全部图标、顺序与格子位置；20 -> 12 仅在单板块超过 12 个时按原顺序拆到后续板块。
 - 单应用替换支持系统原图、已安装图标包、已缓存的改进版图标和相册自定义图标；展示名称只影响桌面文案，图标匹配始终按包名/组件名进行。
+- 强迫症选项中的“显示图标上的角标”现为“角标提醒”。角标提醒与紧贴屏幕横扫清除角标均以 `NotificationListenerService` 通知使用权为前提：未授权不会先写入开启值，返回系统设置后只开启本次请求目标；撤销授权会同步关闭两个依赖项。该链路只使用 `BadgeBridge.hasNotificationAccess()` / `openNotificationAccessSettings()`，没有使用 `POST_NOTIFICATIONS`、运行时普通权限或冷重载。真机授权、拒绝、撤销和角标刷新仍待验证。
 - 首次安装默认关闭改进版图标、动态天气和日历、图标角标、紧贴屏幕横扫清除角标；图标包预热仅扫描本地已安装 APK 资源，不下载在线图片。
 - 普通应用首帧已恢复原版快速路径：未启用改进版、未选图标包且没有单应用覆盖时直接调用 `PackageManager.getApplicationIcon()`；自定义/图标包/改进版才进入兼容图标链。在线图片只在后台下载并持久缓存，图标包 `appfilter` 只在后台预热，在线 Bitmap 内存缓存限制为 8 MiB。
 - 设置页面切换和桌面重载仍需持续真机回归。任何宫格切换不得再自行重排、按 9 宫格解释 20 宫格，或绕过原版数据库线程调用迁移。
-- 普通主题和毛玻璃主题必须等待原版消息生成、提交过渡截图、退出设置页并返回 HOME，再由 `J.onResume()` 消费 `a.r.sj` 中唯一的主题消息；maintained 设置宿主不得在前台直接调用 `a.r.a(Message)` 或 `a.r.b(Message)`。透明主题只写 `launcher_grid_theme`，不生成普通主题消息，也不得走 `J.a(theme, message)` 热加载；透明覆盖通过独立 Launcher 冷启动初始化。Launcher 状态栏和导航栏保持透明。
+- 普通主题和毛玻璃主题必须等待原版消息生成、提交过渡截图、退出设置页并返回 HOME，再由 `J.onResume()` 消费 `a.r.sj` 中唯一的主题消息；maintained 设置宿主不得在前台直接调用 `a.r.a(Message)` 或 `a.r.b(Message)`。普通主题选择即使发现遗留 `launcher_grid_theme=1`，也必须先清除透明覆盖并继续走此原版主题链，不得误入 `ReloadTransitionActivity` 黑色 Loading。`widget.c` 是全局原版 LoadingUI，普通主题不得向其注入冷重载的纯黑沉浸窗口策略；仅 `ReloadTransitionActivity` 自身使用该策略。透明主题开关本身仍通过独立 Launcher 冷启动初始化。Launcher 状态栏和导航栏保持透明。
+- 普通/毛玻璃主题切换的实际前台宿主是 `ThemeChooserActivity`：主题详情以同一 Activity 的 `activity_theme_item` 根布局替换内容，并不启动原版 `ThemeItemActivity`。原版 `ThemeItemActivity` 成功提交主题后保留详情页约 100ms，由其 `Q` Handler 截取过渡画面、finish 并回到 HOME；随后 `J.onResume()` 消费主题消息并执行桌面主题动画。maintained 宿主保持同一时序，不能再加入冷重载式全屏黑色 Loading 或改 `J.onResume()` 原版桌面动画。实体机逐帧仍待验证。
+- 普通主题的原版 `theme_changing` Loading 由 `J -> widget.c -> SmartisanProgressDialog` 显示，不能套用宫格冷重载的全黑沉浸窗口。此前尝试的跨窗口 system bar 同步未改变真机现象，已撤回；普通主题系统栏问题仍待依据完整真机日志和原版窗口层级继续定位。主题动画保持原版 `finish -> HOME` 顺序且无 Activity 窗口动画。
 - 设置弹窗统一复用同一锤子风格根容器；应用改名、图标包选择和图标大小弹窗均使用统一宽度、圆角、标题、分隔线和按钮容器。动态天气/日历继续使用原版 ActiveIcon 数据更新与恢复链路，不在每次桌面翻页时触发定位或联网；当前移植版的完整静态应用图标不得作为 ActiveIcon 底板再次绘制。动态缓存帧使用原版 `icon_shadow_radius` / `icon_shadow_color` 两层软件阴影参数合成，不能强制启用在现代 Android 上会崩溃的私有 `sc[27]` GL 阴影链。
 - 在线图标库保留完整文件索引；同一应用的多版本 PNG 只通过 `icons/variants.json` 归组。不得以 `_2/_3` 后缀为由批量删除或重命名；系统视频跨 ROM 使用 `com.android.VideoPlayer` 类别图，原锤子视频图仍作为可选候选保留。
+- Dock 上方板块页码由 `view.V -> view.Z (DotView)` 的 SMEngine 网格和原版 `dot_fix/dot_mask/dot_move` 纹理绘制，不是 Settings 的 `DotsPageIndicator`。1080×2400 设备的兼容缩放此前把 `dot_width` 乘 `scaleX=1.0`、`dot_height` 乘 `scaleY=1.25`，会将同一个 mask 拉为纵向椭圆；现已将这对尺寸作为一个等比视觉单元统一使用 `scale`。Dock 位置、间距、颜色、透明度和翻页逻辑均未改。构建、v1/v2/v3 签名和 `emulator-5556` 覆盖安装通过；模拟器当前仅一页，实际 12/20、多页、不同 density 与真机截图测量仍待最终回归。
+- 图标大小确认已从旧的 `AlarmManager(350ms) -> finish Settings -> killProcess` 链路切换到既有 `:reload` 冷重载。主 prefs `commit()` 后才创建 `ICON_SIZE_CHANGE` token；不透明过渡页首帧后才结束旧主 PID，新进程在 `Constants.applyLauncherIconSize()` 读取新值并以真实 GL 首帧通知过渡页关闭。未调用 `N.d()`、`F.i()` 或数据库迁移；同值确认只记录 `ICON_SIZE_UNCHANGED_SKIP`。模拟器已完成 100→150、150→50 和同值 50→50；实体机逐帧、连续压力、12/20、文件夹/动态图标仍待最终回归。
+- 动态天气/日历只有 `launcher_dynamic_weather_calendar_enabled` 一个联合开关；现已复用稳定的 `:reload` / `FIRST_FRAME_READY` 冷重载外壳，原因是 `ACTIVE_ICON_SETTINGS_CHANGE`，不再在正常路径向旧 Launcher 发送 `update_icon` 局部刷新。首次从关闭开启时，联合开关先请求已声明的 `ACCESS_COARSE_LOCATION`，仅在授权成功后同步 `commit()` 配置、回读并发起冷重载；拒绝或永久拒绝时保持关闭且不重载。主 Launcher 固定 `screenOrientation=1`，过渡页也已在文本及二进制 Manifest 固定 portrait，并在 `onCreate()`、内容创建前执行运行时兜底。实体机授权、开关、横放和连续切换仍待验证。
 ## 阅读顺序
 
 建议按下面顺序接手，不要从文件中间的旧计划直接开始：
@@ -40,6 +53,226 @@
 4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
 
 ## 每日修复记录（倒序）
+
+### 2026-07-16
+
+#### 【已撤回】普通主题 Loading 的跨窗口系统栏颜色交接
+
+- 真机截图确认该桥接没有改变可见的状态栏/内容分层，因此已仅撤回本次加入的主题页状态预留与向 Launcher 复制中性色的代码；没有回退普通主题原版动画时序、透明主题冷重载或宫格功能。后续必须依赖完整真机日志和窗口层级证据重新定位，不能把本次假设标记为修复完成。
+
+#### 冷重载 Loading 窗口策略污染普通主题原版 Dialog（核心修复完成，基本验证待完成；最终回归待完成）
+
+- 追加根因：此前为消除宫格冷重载 Loading 的 system-ui/inset 跳动，向全局原版 `widget.c.q()` 和 `widget.c.show()` 注入了 `LoadingUiWindowCompat.apply(Dialog)`。`J` 在常规初始化与主题切换中同样使用这一全局 `widget.c`，故普通主题的原版 `SmartisanProgressDialog` 也被错误强制改成了纯黑、全屏沉浸窗口。
+- 修复：仅删除 `widget.c` 的两处全局 Dialog window 强制黑化调用，保留其原版资源、文案、时机和 Dialog 宿主。`ReloadTransitionActivity.onCreate()` 仍在首帧前直接对自己的不透明 Activity window 调用 `LoadingUiWindowCompat.apply(getWindow())`；tokenized 冷启动仍抑制新 Launcher 首个原版 Loading，因此宫格、图标大小与动态图标的冷重载视觉链不依赖、也不会重新污染普通主题。
+- 验证状态：`build.bat` 成功，`build/launcher-signed.apk` 于 14:12 生成；`apksigner verify --verbose` 确认 v1/v2/v3 有效。当前无 ADB 设备，普通/毛玻璃主题切换必须在真机确认仅显示原版主题页内提示及桌面主题动画；宫格、图标大小和动态图标冷重载还需确认仍为单一黑色过渡页、无第二套 Loading。
+
+#### 普通主题被透明覆盖状态误导进入冷重载（核心修复完成，基本验证待完成；最终回归待完成）
+
+- 日志证据：用户在普通主题操作中，`ThemeChooserActivity` 于 13:56:13 和 13:56:18 被 `ReloadTransitionActivity` 顶替，随后 `com.smartisanos.launcher:reload` 启动并结束旧主进程；这不是原版 `J.onResume()` 主题动画链。源码审计确认 `beginThemeReload()` 唯一调用点是 `applyTransparentThemeSetting()`。
+- 根因：`applyTheme()` 对任何非透明主题先读取 `launcher_grid_theme`。当该透明覆盖状态仍为 `1` 时，旧分支把用户选择的普通主题错误改写为“关闭透明主题”，直接调用 `applyTransparentThemeSetting(false, true)`，因而触发黑色冷重载 Loading。
+- 修复：非 `smartisan_theme_trans` 的选择现在无条件清除透明覆盖、壁纸模糊运行状态并继续原版 `ChangeThemeHandler` / `ThemeItemActivity` 等价的 100ms 返回 HOME 时序；不再因为旧覆盖状态调用 `beginThemeReload()`。透明主题的显式开启入口保持原有冷重载范围，未改宫格、图标大小、动态天气/日历、数据库或 `J` 的原版桌面动画。
+- 验证状态：`build.bat` 已成功完成，最终 `build/launcher-signed.apk` 于 14:04 生成；`apksigner verify --verbose --print-certs` 确认 v1/v2/v3 签名有效。当前 ADB 无连接设备，尚未声称真机普通主题/毛玻璃主题切换、透明→普通切换的逐帧结果；需确认普通主题全程没有 `ReloadTransitionActivity`/黑色 Loading，且没有主题页闪回、壁纸闪回或新增 Java/native 崩溃。
+
+#### 普通主题切换回归原版主题动画时序（核心实现完成，基本验证待完成；最终回归待完成）
+
+- 原版证据：`clean_launcher/.../ThemeItemActivity` 成功执行 `X.ja()`、`RequireChangeFrom.SETTING`、`O.a()` 和 `ja.l(false)` 后，调用其 `Q` Handler 的 `sendEmptyMessageDelayed(1, 100ms)`；Handler 在约 100ms 后截取过渡画面、finish 当前主题详情 Activity 并启动 HOME。原版没有在此路径创建全屏黑色 `loading_progress` 或 `SmartisanProgressDialog`。
+- 修复：maintained `ThemeChooserActivity` 的主题详情虽然不是独立 `ThemeItemActivity`，但普通/毛玻璃主题提交后现保持同一原版 100ms 时序：继续停留当前详情页，随后提交过渡截图并无动画返回 Launcher。此前新增的黑色 Decor Loading 遮罩和其生命周期转发已全部移除；透明主题、阶段 4 冷重载、宫格、图标大小、动态天气/日历、角标和主题数据库均未改。
+- 桌面动画：返回 Launcher 后仍由原版 `J.onResume()` 读取已有的 `ChangeThemeHandler.RequireChangeFrom.SETTING` / `a.r.sj` 并执行 `J.a(theme, theme_changing)` 的主题切换事件；maintained 宿主不直接调用 `a.r.a(Message)` 或 `a.r.b(Message)`，也没有重新实现主题动画。
+- 验证状态：`build.bat` 已成功完成 maintained 资源构建、apktool 回编译、Java 宿主编译、dex 合并、zipalign 和签名；最终 `build/launcher-signed.apk` 的 v1/v2/v3 签名均有效，版本保持 `v1.5.4 (29)`。当前无连接 ADB 设备，未声称逐帧、普通主题/毛玻璃主题来回切换、返回主题页、锁屏后切换或新主题下载完成后的真机结果；必须确认点击设定后不再出现全屏黑色 Loading、当前主题页短暂保留、随后直接进入原版桌面主题动画。
+
+#### 角标提醒与横扫清除角标的通知使用权流程（核心实现完成，基本验证待完成；最终回归待完成）
+
+- 语义确认：原版键 `launcher_hide_badge=true` 的真实含义是“隐藏角标”，所以“角标提醒”UI 采用 `checked = !launcher_hide_badge`；开启写入 `false`，关闭写入 `true`。横扫功能继续使用独立正向键 `launcher_badge_swipe_clean`，两个功能没有互相自动开启或关闭。
+- 授权流程：两个关闭状态的开关准备开启时先调用既有 `BadgeBridge.hasNotificationAccess()`；未授权不修改 UI 或持久化设置，而是复用设置页锤子风格确认弹窗，用户确认后由既有 `BadgeBridge.openNotificationAccessSettings()` 打开 `ACTION_NOTIFICATION_LISTENER_SETTINGS`。没有新增通知权限、`POST_NOTIFICATIONS`、`requestPermissions()` 或第二套通知服务。
+- 返回与撤销：pending 目标仅以 `badge_reminder` / `badge_swipe_clean` 写入 `launcher_settings`，可跨设置 Activity 重建恢复。`ThemeChooserActivity.onResume()` 回读真实通知监听授权：授权后只持久化并开启本次目标；未授权返回则保持关闭；每次进入强迫症页面或 settings resume 检测到授权被撤销时，将两个依赖键修正为关闭。开启角标提醒后复用 `BadgeBridge.replay()`，横扫开关不会清空现有角标；全程未调用阶段 4 冷重载、`N.d()`、`F.i()` 或数据库迁移。
+- 文案与日志：`obsession_hide_badge` 资源 ID 保持不变，中文文案改为“角标提醒”，未使用的 Native fallback 同步该显示名。新增请求、已授权、弹窗、跳转、返回授予/拒绝、撤销、重复拦截、开关落盘及 replay 日志，不包含通知正文或标题。
+- 验证状态：`build.bat` 成功；最终 APK 的 v1/v2/v3 签名均有效，`aapt2 dump xmltree` 确认 `SmartisanBadgeListenerService` 和 `android.permission.BIND_NOTIFICATION_LISTENER_SERVICE` 仍在最终二进制 Manifest。当前 ADB 无连接设备，系统设置跳转、授权后自动开启、取消/拒绝、撤销同步、角标 replay、快速重复点击和 Activity 重建均待用户真机验证，不能标记为全部完成。
+
+#### 动态天气/日历联合开关定位授权前置（核心实现完成，基本验证待完成；最终回归待完成）
+
+- 根因：`setting_dynamic_weather` 的联合开关此前直接写入 `launcher_dynamic_weather_calendar_enabled=true` 并立即请求 `ACTIVE_ICON_SETTINGS_CHANGE` 冷重载；虽然最终 APK 已声明 `ACCESS_COARSE_LOCATION`，该入口没有调用运行时 `requestPermissions()`，因此新 Launcher 启动后天气定位仍无授权。
+- 修复：保留 WeatherBridge 已验证的粗略定位策略，不申请精确或后台定位。首次关闭→开启先由 `ThemeChooserActivity` 请求 `ACCESS_COARSE_LOCATION`；授权回调才执行主 `launcher_settings` 的同步 `commit()`、回读确认和 `LauncherColdReloadCoordinator.beginActiveIconReload()`。拒绝时开关保持关闭、不写入 `true`、不生成 token、不发送旧进程 `update_icon`；永久拒绝复用现有锤子风格确认弹窗，引导至系统应用详情设置。关闭不请求权限，直接持久化后进入同一冷重载。
+- 回调与并发：设置 Activity 新增最小 `onRequestPermissionsResult()` 转发；静态 pending 标记会拦截授权弹窗未返回时的重复点击。日志覆盖 `DYNAMIC_ICON_ENABLE_REQUEST`、`DYNAMIC_ICON_PERMISSION_REQUESTED`、`DYNAMIC_ICON_PERMISSION_RESULT`、`DYNAMIC_ICON_CONFIG_COMMITTED`、`DYNAMIC_ICON_RELOAD_REQUESTED` 与永久拒绝分支，且不记录坐标。
+- 验证状态：代码级检查确认权限使用点与 `WeatherBridge` 均为 `ACCESS_COARSE_LOCATION`；`build.bat` 已成功，`apksigner verify --verbose` 通过 v1/v2/v3，`aapt2 dump xmltree` 确认最终二进制 Manifest 包含粗略定位权限。当前 ADB 无连接设备，系统授权弹窗、拒绝/永久拒绝、授权后冷重载、关闭开关及连续操作仍待真机验证，不能标记为全部完成。
+
+#### 动态天气/日历联合冷重载与过渡页竖屏统一（核心实现完成，基本验证待设备恢复；最终回归待完成）
+
+- 当前代码与原版定位：设置页 `setting_dynamic_weather` 只绑定 `launcher_dynamic_weather_calendar_enabled`；旧路径在写入后调用 `refreshDynamicIconMode()`，向仍存活的旧 Launcher 发送原版 `com.smartisanos.launcher.update_icon`。原版 `LauncherReceiver` 确实消费该广播，但它不是当前冷重载的可靠窗口交接路径。
+- 修复：写入后先从权威 prefs 回读确认值，再调用 `LauncherColdReloadCoordinator.beginActiveIconReload(oldEnabled, newEnabled)`。该方法只复用既有 `ReloadTransitionActivity`、原版 `loading_progress`、`reloadToken`、旧 PID 精确终止、新 Launcher token 启动和稳定的 `FIRST_FRAME_READY` 握手；原因固定为 `ACTIVE_ICON_SETTINGS_CHANGE`。未改首帧协议、SMEngine、数据库、`N.d()`、`F.i()`、主题队列或 ActiveIcon 业务实现。无法启动过渡页时保留已落盘设置并提示手动重试，不回退为旧进程 `update_icon`。
+- 方向：`Launcher` 的最终 Manifest 已是 `screenOrientation=1`，即桌面不支持横屏。此前 `ReloadTransitionActivity` 缺少方向属性，系统可以按触发瞬间 display configuration 创建横屏 cover。现文本 Manifest 和二进制 AXML 注入脚本均声明 `screenOrientation=portrait`；`ReloadTransitionActivity.onCreate()` 在 Window/content/Loading 创建前调用 `setRequestedOrientation(SCREEN_ORIENTATION_PORTRAIT)` 作为 ROM 兜底。没有使用 `locked`、`sensor`、`behind` 或 `configChanges` 规避方向重建。
+- 验证：`build.bat` 成功；`apksigner verify --verbose` 确认 v1/v2/v3 签名有效；`aapt2 dump xmltree` 确认最终 APK 的 `ReloadTransitionActivity` 为 `screenOrientation=1 (portrait)`。ADB 在覆盖安装前显示无连接设备，故本轮没有声称设备安装、动态开关、横放或逐帧验证通过。用户提供的 `build/launcher_log.txt` 已被回退删除，无法用不存在的日志判定之前“桌面重新载入失败”的具体栈；本轮刻意未恢复此前扩大有效桌面帧握手的改动。
+- 最终回归待完成：真机执行天气/日历关闭↔开启、连续十次、12/20 宫格、图标大小和横放/自动旋转/横屏应用返回，确认 `ACTIVE_ICON_SETTINGS_CHANGE -> TRANSITION_FIRST_FRAME -> OLD_MAIN_PROCESS_EXIT_CONFIRMED -> NEW_LAUNCHER_STARTED -> FIRST_FRAME_READY -> TRANSITION_FINISHED`，全程竖屏且无失败提示、壁纸、黑白帧或第二套 Loading。
+
+### 2026-07-15
+
+#### 图标大小变更复用冷重载过渡（核心修复完成，基本验证完成；最终回归待完成）
+
+- 原链路与根因：`MaintainedLauncherSettingsHost.showIconSizeDialog()` 的确认按钮写入 `launcher_icon_size` 后调用 `restartLauncherForIconSizeChange()`。旧实现先显示设置页内的 Loading，再通过 requestCode `1002` 安排 `AlarmManager` 350ms HOME、结束设置任务并直接 `killProcess(Process.myPid())`；旧 Launcher 消失到延迟 HOME 的新首帧之间没有不透明窗口，因此会闪回系统壁纸。
+- 配置：权威读取顺序仍是 `launcher_settings` → `com.smartisanos.launcher_prefs` → 系统 Settings fallback。现在先对 `launcher_settings` 执行同步 `commit()`，失败不请求重载；成功后再镜像私有 prefs 和系统兼容值。没有修改配置 key、数据库、图标映射、在线图标缓存或用户自定义图标。
+- 重载：新增 `LauncherColdReloadCoordinator.beginIconSizeReload()`，原因固定为 `ICON_SIZE_CHANGE`。它复用 `ReloadTransitionActivity`、`ReloadProtocol`、`reloadToken`、旧主 PID 精确终止、原版 `loading_progress`、首个原版 LoadingUI 抑制、`FIRST_FRAME_READY` 和失败/手动重试；没有新建 Activity、遮罩、Loading 或重启工具。`ReloadTransitionActivity` 首帧后才调用旧 PID 结束，确认 PID 已退出后才启动携带 token 的新 Launcher；过渡页只在真实 GL 首帧 token 匹配后无动画关闭。
+- 新进程：`Constants.applyLauncherIconSize()` 继续按原有 `LauncherSettingBridge.readIconSizePercent()` 读取值并在 `initPoints()` 前应用尺寸；本轮只在该真实读取点增加 `ICON_SIZE_CONFIG_READ` 诊断，没有局部重建 PageView/Cell 或清除不相关缓存。
+- 日志：图标大小链路现在记录 `ICON_SIZE_CHANGE_REQUESTED`、旧/新值、`ICON_SIZE_PERSISTED`、`RELOAD_TRANSITION_REQUESTED`、`TRANSITION_FIRST_FRAME`、`OLD_LAUNCHER_PID_TERMINATED`、`NEW_LAUNCHER_STARTED`、`ICON_SIZE_CONFIG_READ`、`FIRST_FRAME_READY` 和 `TRANSITION_FINISHED`。图标大小重载日志附带 token、oldPid、newPid、oldSize、newSize 和 reason；同值确认只记录 `ICON_SIZE_UNCHANGED_SKIP`，不生成 token、不结束进程。
+- 基本验证：完整构建、v1/v2/v3 签名与 `emulator-5556` 覆盖安装通过。真实 UI 操作完成 100%→150% 与 150%→50%：日志确认 `TRANSITION_FIRST_FRAME -> OLD_LAUNCHER_PID_TERMINATED -> ICON_SIZE_CONFIG_READ -> FIRST_FRAME_READY -> TRANSITION_FINISHED`；同值 50%→50% 仅记录 skip，PID 保持不变。日志未见新 `FATAL EXCEPTION`、native fatal、`VerifyError` 或 `NoSuchMethodError`。
+- 最终回归待完成：当前仅完成模拟器基本链路验证，不能把静态截图当作实体机逐帧验收。仍需真机录制小→中、中→大、大→小和连续十次，覆盖 12/20 宫格、文件夹、动态天气/日历、在线/自定义图标、锁屏解锁、重启保持及不同 ROM；逐帧确认无壁纸、状态栏/底栏、黑白帧、第二套 Loading、旧尺寸闪现或布局异常。
+
+#### Dock 板块页码圆点等比缩放修复（核心修复完成，基本验证完成；最终回归待完成）
+
+- 实现定位：Dock 页码不是 Android `Canvas`/`Drawable` 控件。`com.smartisanos.launcher.view.V` 从 `LayoutProperty.dot_width/dot_height` 构造 `com.smartisanos.launcher.view.Z`；`Z` 用这两个值创建 SMEngine 网格并缩放原版 `assets/Textures/1080p/dot_fix.png`、`dot_mask.png`、`dot_move.png`。12 宫格和 20 宫格均复用此链路。
+- 根因：当前项目新增的 `LayoutPropertyAdapter.factorFor()` 先按字段名分支，导致 `dot_width` 走 `scaleX`、`dot_height` 走 `scaleY`。在已采集的 1080×2400 / 420dpi 设备上，运行日志证实 `scaleX=1.0`、`scaleY=1.25`；同一圆点的目标尺寸因此为宽×1.0、高×1.25，形成纵向椭圆。原版 `clean_launcher_raw` 不存在该兼容适配层。
+- 修复：仅将 `dot_width` 和 `dot_height` 提前视为一个固定比例单元，统一返回既有 `scale=min(1, scaleX, scaleY)`。该设备上修复前布局比例为 1.0:1.25，修复后为 1.0:1.0；未改 `view.V`、`view.Z`、纹理、点数、点距、横向居中、纵向位置、Dock 高度或翻页状态。
+- 资源检查：`point_normal/point_selected` 不是此指示器，未使用或修改。实际三张 SMEngine 纹理画布仍为 24×24；本轮没有重新绘制、替换或缩放其资源。
+- 基本验证：`build.bat` 成功；`apksigner verify --verbose` 确认 v1/v2/v3 为 true；`emulator-5556` 覆盖安装并强制冷启动成功，日志无 Launcher `FATAL EXCEPTION`、native fatal 或 linkage 错误。
+- 最终回归待完成：当前模拟器只有一个板块，原始 `screencap` 未出现可测的多页页码，不能伪造截图像素宽高。须在至少 2/5 页、12/20 宫格及另一种 density 真机原始截图中实测选中和未选中圆点宽高，并覆盖左右翻页、Launcher/设备重启与显示大小变化。
+
+#### 宫格冷重载唯一可见 LoadingUI（核心实现完成，基本验证完成；最终回归待完成）
+
+- 结构调整：`ReloadTransitionActivity` 不再反射构造或显示 `SmartisanProgressDialog`。它的完全不透明 content root 直接承载 `ProgressBar`，继续引用原版 `loading_progress` 资源，并逐项保留原版 `SmartisanProgressDialog.onCreate()` 的居中高度（屏宽×3/4/5）、横向 gravity、圆角、padding、spinner 尺寸、文字字号和左 margin；因此没有新增或重画加载动画，也没有新的 Dialog window/inset 坐标系。
+- 重复 Loading 抑制：新 Launcher 捕获 `reloadToken` 时记录一次性 suppression token；原版 `widget.c.q()` 只在该 tokenized 冷启动的第一次调用返回而不创建 Dialog，`widget.c.show()` 同时安全处理无 Dialog。普通启动和后续原版 LoadingUI 不受影响。结果是宫格冷重载不再出现“过渡 Dialog 消失 → Launcher 初始化 Dialog 再出现”的两套可见链路。
+- 系统栏：过渡 Activity 在 `onCreate()`、首个 content layout 与重新获得窗口焦点时都应用纯黑、`FULLSCREEN`、`HIDE_NAVIGATION`、布局扩展和 `IMMERSIVE_STICKY`；其根视图也是纯黑且不透明。Launcher starting window 沿用既有全屏启动主题；本轮未修改二进制 Manifest。
+- 基本验证：完整构建、v1/v2/v3 签名、`emulator-5556` 覆盖安装和强制冷启动通过（`TotalTime=1850ms`），日志无 Java/native/linkage 崩溃。
+- 最终回归待完成：在实体机以 60fps 逐帧确认确认弹窗后只保留 `ReloadTransitionActivity` 的同一 Loading，未显示第二个“正在初始化”、无状态栏/底部栏、无 LoadingY轴跳动、无壁纸/黑白帧，并连续 12→20→12 至少 10 次验证任务/进程修复不回归。
+
+#### 宫格冷重载 LoadingUI 无窗口位移收口（核心修复完成，基本验证完成；最终回归待完成）
+
+- 根因收敛：项目资源中未检出自定义 `slide`、`translate` 或 `windowAnimationStyle`。此前逐帧中的整体上下位移是多项窗口级因素共同造成：系统默认 Activity/task enter/exit 动画、过渡页在窗口获得焦点后才再次修改 system-ui 所引发的 inset/居中根布局重算，以及旧版独立 `SmartisanProgressDialog` window 与 Launcher 初始化 window 的不同坐标系。它不是 `loading_progress` 自身动画，也不应由固定延迟掩盖。
+- 修复：`ReloadTransitionActivity` 和新 Launcher 的启动 Intent 均增加 `FLAG_ACTIVITY_NO_ANIMATION`；启动和结束 Activity 均立即调用 `overridePendingTransition(0, 0)`。过渡页在 `setContentView()` 前即禁用 window animation，并在同一时机完成纯黑背景、全屏、状态栏/导航栏隐藏、沉浸布局、显示缺口策略（Android 9+）和 `decorFitsSystemWindows=false`（Android 11+）。移除 `onWindowFocusChanged()` 中的二次 system-ui 写入，避免 Loading 已可见后因 inset 变化重居中。
+- Loading 继续直接挂载在过渡页的 full-screen content root；冷重载场景没有 `SmartisanProgressDialog` 独立 Dialog window，只有原版 `loading_progress` spinner 自身动画。新 Launcher 的 tokenized 初始化 Loading 仍只抑制一次。Launcher starting window 继续使用既有黑色全屏启动主题，未修改二进制 Manifest、数据库结构、原版 `F.i()` 或 token/首帧协议。
+- 基本验证：完整构建、v1/v2/v3 签名、`emulator-5556` 覆盖安装和强制冷启动通过（`TotalTime=2233ms`），未发现新增 Java/native/linkage 崩溃。
+- 最终回归待完成：必须在反馈设备录制 60fps 以上 12→20→12，逐帧确认第一次出现后的 Loading Y 坐标不变、无 Activity/task 滑入滑出、无状态栏/导航栏、无第二套初始化 Loading、无壁纸/黑白帧；并完成连续 10 次、手势/三键导航和多 ROM 回归。当前环境不能据模拟器冷启动替代该视觉验收。
+
+#### 宫格连续切换闪退根因：任务归属错误与旧进程记录竞争（核心修复完成，基本验证完成；最终回归待完成）
+
+- 根因证据（`build/launcher_log.txt`）：最新三次 token 均记录 `TRANSITION_FIRST_FRAME -> OLD_MAIN_PROCESS_KILL_REQUESTED -> NEW_LAUNCHER_STARTED`，但没有 `FIRST_FRAME_TOKEN_MATCHED`。WindowManager 将 `ReloadTransitionActivity` 放入 task `3405`，其 affinity 为 `smartisanos.task.launcher`，而非 Manifest 声明的 `com.smartisanos.launcher.reload`；随后出现 `clear-task-all`、`wm_finish_activity Launcher,2nd-crash`。同一序列还出现 `ProcessRecord ... is attached to a previous process` 和 `Already have existing proc`，说明新 Launcher 启动早于旧精确终止 PID 完成 ActivityManager 脱离。
+- 修复：启动 `ReloadTransitionActivity` 时无条件使用 `FLAG_ACTIVITY_NEW_TASK`，使声明的独立 `:reload` affinity 真正生效。旧主 PID 发出 kill 后不立即猜测性启动新 Launcher，而是在每个 Choreographer 帧检查 `ActivityManager`，仅在旧 PID 已不再存在时发送 HOME Launcher Intent；等待是进程状态条件，不是固定成功延迟。失败/销毁会取消未完成的启动等待。
+- 原版与边界：保留 `N.d() -> F.i()`、旧主 PID 精确终止、原版 `widget.c` LoadingUI、`reloadToken` 和 `FIRST_FRAME_READY`；未改数据库、二进制 Manifest 或主题/宫格业务状态，未加入 Alarm、`recreate()` 或固定成功延迟。
+- 基本验证：完整构建、v1/v2/v3 签名、`emulator-5556` 覆盖安装和冷启动通过（`TotalTime=1732ms`），无新增 Java/native/linkage 崩溃。
+- 最终回归待完成：在该 Oplus 真机连续 12→20→12 至少 10 次，确认每次都有 `OLD_MAIN_PROCESS_EXIT_CONFIRMED -> NEW_LAUNCHER_STARTED -> NEW_LAUNCHER_FIRST_FRAME -> FIRST_FRAME_TOKEN_MATCHED`，且无 `clear-task-all`、`2nd-crash`、旧 ProcessRecord 竞争、壁纸/黑白帧或 LoadingUI 位移；继续覆盖复杂宫格、异常/超时和多 ROM。
+
+#### 宫格冷重载 LoadingUI 逐帧收口（核心修复完成，基本验证完成；最终回归待完成）
+
+- 逐帧素材：`5a5d2c36dd3696dedcee1095c9b11293.mp4`，720×1600、44.74fps、2.72 秒。帧序列确认“正在加载桌面...”和“正在初始化”使用同一原版转圈资源，却先后落在带 status/navigation inset 的过渡窗口与新 Launcher 初始化窗口；过渡页灰黑背景还透出为非纯黑。问题不是重新绘制的动画资源，也不是 `FIRST_FRAME_READY` 成功延迟。
+- 修复：新增最小 `LoadingUiWindowCompat`，仅为原版 `widget.c` 展示后的 `SmartisanProgressDialog` 和 `ReloadTransitionActivity` 设置同一纯黑背景、`FULLSCREEN`、`HIDE_NAVIGATION`、布局扩展与 `IMMERSIVE_STICKY`。过渡页首帧即使用该策略，原版 LoadingUI 展示后再应用同一策略；不重绘 `loading_progress`、不手工计算加载控件坐标、不中断原版 `widget.c` 生命周期。
+- 结果目标：设置确认后立即为纯黑且没有系统状态栏/底部虚拟键；“正在加载桌面...”结束后，新 Launcher 的“正在初始化”继续使用同一原版控件、同一全屏坐标系，不再上下位移或出现不同底色。
+- 基本验证：完整构建、v1/v2/v3 签名、`emulator-5556` 覆盖安装和强制冷启动通过（`TotalTime=1107ms`）；日志无 `FATAL EXCEPTION`、native fatal、`VerifyError` 或 `NoSuchMethodError`。
+- 最终回归待完成：在录屏实体机连续执行 12→20→12，逐帧确认首帧即无状态栏/导航栏、两个 Loading 文案位置一致、无系统壁纸/黑白闪帧；同时覆盖手势导航、三键导航与其他 ROM。
+
+#### 宫格连续切换：过渡任务栈与底部导航栏修复（核心修复完成，基本验证完成；最终回归待完成）
+
+- 真机 `build/launcher_log.txt` 未出现 Launcher `FATAL EXCEPTION` 或 native fatal signal；其中旧 `com.smartisanos.launcher` PID 死亡是过渡页首帧后按设计精确结束旧主进程。异常窗口序列显示：新 Launcher 启动后 `ReloadTransitionActivity` 被 `recent-task-trimmed`/`clear-task-all` 提前销毁，未能继续等待 `FIRST_FRAME_READY`，从而可能暴露系统壁纸并让连续切换表现为闪退。
+- 修复：`LauncherColdReloadCoordinator` 启动单实例 Launcher 时仅保留 `FLAG_ACTIVITY_NEW_TASK`，删除会跨 ROM 裁剪仍在等待的 `:reload` 任务的 `FLAG_ACTIVITY_CLEAR_TASK`。不改数据库迁移、token 协议、旧 PID 精确终止时机或失败手动重试。
+- 视觉衔接：`ReloadTransitionActivity` 调用已有 `MaintainedLauncherSettingsHost.applyLauncherNavigationBarSetting()`，LoadingUI 仍复用原版 `widget.c -> SmartisanProgressDialog`；在原版 Dialog 展示后只把 Launcher 已计算的 system-ui flags、透明状态栏/导航栏同步给 Dialog window，不新绘制加载动画。这样“隐藏桌面虚拟键”开启时，过渡页与原版 LoadingUI 不再由 ROM 补出不同颜色的底部条。
+- 基本验证：完整 APK 构建通过；`apksigner verify --verbose` 确认 v1/v2/v3 有效；二进制 Manifest 仍确认 `ReloadTransitionActivity` 为私有 `:reload`、`excludeFromRecents`、独立 affinity；覆盖安装到 `emulator-5556` 后冷启动 `TotalTime=1417ms`，无新增 Launcher Java/native 崩溃。
+- 最终回归待完成：在提供日志的实体机连续执行 12→20→12 至少 10 次，录屏逐帧检查 `:reload`/新 Launcher 交接期间无系统壁纸、黑帧、白帧、底部导航栏残留或 LoadingUI 位移；并覆盖复杂宫格数据、失败/超时重试和其他 ROM。
+
+#### 任务合并和状态 + 建议 Commit 顺序（核心实现完成，基本验证完成；最终回归待完成）
+
+- 冷重载过渡页补齐显式 `WAITING_FIRST_FRAME`、`COMPLETED`、`FAILED` 状态：首帧 token 只接受一次；等待超时只显示失败；手动重试重新挂载失败超时并再次等待新 Launcher 真实首帧，避免旧实现重试后无期限停留在过渡页。未改变旧主 PID 精确终止时机，未手工清理正常 cached 的 `:reload` 进程。
+- 图标下载、图标包预热、天气和分身已有 pending/单飞状态继续复用；本阶段没有新建全局 Manager、第二套数据库或全局重试队列。
+- 建议 Commit 顺序按专项计划审阅；当前工作区包含用户既有改动、跨阶段源码与构建产物，本轮未执行 git add、commit、reset 或清理，待最终回归后按阶段边界拆分。
+- 基本验证：完整 APK 构建、v1/v2/v3 签名、`emulator-5556` 覆盖安装和 HOME 启动通过；无新增 Launcher Java `FATAL EXCEPTION` 或 native fatal。冷重载失败重试的实体机中断、超时恢复与连续压力仍待最终验证。
+
+#### 固定延迟审计（核心审计完成，基本验证完成；最终回归待完成）
+
+- 删除的竞态补偿：透明壁纸运行时原先同步 `Eb.lh()` 后又在 160ms 重复刷新；角标可见性在同步节点更新后又在 180ms 重刷；主题运行时 120/360ms 重复初始化/刷新；手动城市写入后 1800ms 再次安排天气刷新。它们均有同一调用中的原版配置、场景或天气调度入口，重复时间不能证明完成。
+- 保留分类：`ReloadTransitionActivity` 的 10 秒仅进入失败提示和手动重试，绝不当作首帧成功；安装的 300ms 仅在 `PackageManager` 暂未暴露 Launcher Activity 时最多两次；主题/更新下载 800–1500ms 是 `DownloadManager` 状态轮询；在线图标 2 秒是磁盘写入的安静窗口合并；天气 TTL、Loading 120ms 帧、键盘/预览 UI 延迟均为功能性调度。旧的 Alarm 重启 helper 不在当前阶段链路中，未重新接入。
+- 基本验证：完整 APK 构建完成，`apksigner verify --verbose` 确认 v1/v2/v3 有效，已覆盖安装到 `emulator-5556` 并启动 HOME；日志未发现 Launcher 新增 Java `FATAL EXCEPTION` 或 native fatal。透明壁纸、角标、普通主题和手动城市的实体机交互时序仍待最终逐帧/多 ROM 回归。
+
+#### 启动专项阶段 10（核心实现完成，基本验证完成；最终回归待完成）：原版安装卸载事件与分身按需刷新
+
+- 根因：普通安装完成路径会立刻、800ms、2500ms 三次调用原版新增入口；卸载路径只清理下载占位项，没有进入原版 `Aa.D()` 的数据库删除事件。分身恢复/更新保留 350/450/900/2200/2000/8000ms 的多次全量数据库刷新，并且部分图标刷新入口即使没有用户启用分身也会枚举 `LauncherApps.getProfiles()`。
+- 当前修复：安装只在 `PackageManager` 已能查询 Launcher Activity 后调用一次原版 `Aa.c(context, package)`；信息暂未可用时最多重试两次，成功立即停止。卸载保留下载占位清理后调用原版 `Aa.D(package)`，并删除该包在线改进图标的内存、文件和 miss 缓存。分身 bootstrap/图标更新先检查本地已启用记录；原版 `EVENT_USER_PACKAGE_ADDED/CHANGED/REMOVED` 之后只请求一次 render，不再以延迟全量 `EVENT_REFRESH` 补偿。
+- 原版复用：普通应用继续由 `Aa.c` / `Aa.D` 转换为原版 `DatabaseUpdater` 事件；分身继续使用原版 `EVENT_USER_PACKAGE_*`，没有新建桌面数据库或 profile 模型。
+- 基本验证：完整 APK 构建完成，`apksigner verify --verbose` 确认 v1/v2/v3 有效，已覆盖安装到 `emulator-5556` 并启动 HOME；日志未发现 Launcher 新增 Java `FATAL EXCEPTION` 或 native fatal。尚未执行真实 APK 安装、卸载、替换、工作资料/应用分身和角标联动回归，以上保留到最终验证。
+
+#### 启动专项阶段 9（核心实现完成，基本验证完成；最终回归待完成）：图标加载按需初始化与受影响包更新
+
+- 根因：首帧后的统一延后任务无条件调用所选图标包预热；`shouldUseManagedIcon()` 这个应当只读模式元数据的判定也会触发预热。即使所有图标覆盖关闭，旧的一次性 `maybeRefreshLauncherIcons()` 仍可能扫描已安装图标包和解析 `appfilter`。图标包解析完成、在线 PNG 写入缓存和设置资源预热还会发出 `EVENT_REFRESH`，造成与本次图标无关的全量数据库刷新。
+- 当前修复：图标包仅在持久化选择已启用时才在首帧后异步预热，普通模式不初始化图标包系统；`shouldUseManagedIcon()` 保持纯元数据快速判断。图标包完成解析后从已加载 `appfilter` 映射提取包名，合并为一次原版 `update_icon` 和一次 render。在线图标缓存写入继续保留 2 秒安静窗口合并，但只更新本批下载完成的包名；设置资源预热不再触发数据库刷新。
+- 原版复用：受影响图标仍通过原版 `com.smartisanos.launcher.update_icon -> LauncherReceiver -> Aa.c/Aa.r` 更新，未新增第二套桌面模型或数据库；首帧无覆盖时继续走 `PackageManager.getApplicationIcon()` 原版快速路径。
+- 基本验证：完整 APK 构建完成，`apksigner verify --verbose` 确认 v1/v2/v3 有效，已覆盖安装到 `emulator-5556` 并启动 HOME；日志未发现 Launcher 新增 Java `FATAL EXCEPTION` 或 native fatal。尚未执行真实图标包解析、在线下载、单应用覆盖与动态天气/日历混合回归，以上保留到最终验证。
+
+#### 启动专项阶段 5（核心实现完成，基本验证完成；最终回归待完成）：透明主题复用统一冷重载
+
+- 透明主题开启和关闭不再调用旧的 `restartLauncherForColdSceneChange()`，该旧路径会显示独立 Loading、安排 Alarm 并直接结束当前主进程，不符合统一过渡链路。
+- 新入口先确认 `com.smartisanos.launcher.theme.trans` 已安装；开启时保存 `transparent_previous_theme`，再 commit `launcher_grid_theme=1`；关闭时先读取并恢复该普通主题、清除透明壁纸模糊配置，再 commit `launcher_grid_theme=0`。`smartisan_theme_trans` 不写入普通 `launcher_theme`，也不进入普通主题消息队列。
+- commit 成功后仅调用 `LauncherColdReloadCoordinator.beginThemeReload()`；协调器只传递透明/普通主题语义给 `ReloadTransitionActivity`，不调用 `N.d()`、`F.i()`，不携带宫格迁移状态。新 Launcher 继续从 `LauncherSettingBridge.readTransparentMode()` 读取配置，由现有 `Constants`、`O`、`Eb` 和原版主题资源完成冷启动初始化。
+- 基本验证：Java helper 已通过 Android API 36 classpath 编译；完整 APK 已构建，v1/v2/v3 签名验证通过，并已覆盖安装到 `emulator-5556`。HOME 启动回到 Launcher，日志未见新增 Java/native 崩溃。透明开启/关闭交互、资源呈现和 token 链路仍待本阶段继续验证；最终逐帧、多 ROM、压力与异常回归继续集中处理。
+
+#### 启动专项阶段 6（核心实现完成，基本验证完成；最终回归待完成）：普通主题原版消息链收敛
+
+- 原版对照：`a.r` 先由 `X.ja(package:id)` 写入当前主题，再将 `ChangeThemeHandler` 来源设为 `SETTING`、写入原版 `O` 配置；返回 Launcher 后消费一条原版 `MESSAGE_CHANGE_THEME` 完成场景更新。
+- 当前修复：普通主题入口不再在原版持久化成功后重复 `storeThemeSelection()`，也不再使用 120 ms 固定延迟补发截图/返回桌面。现在先同步提交一次原版过渡截图并返回 Launcher；只有 `X.ja()` 明确失败时才写入一条 `a.r.sj` fallback pending message。
+- 边界：未使用冷重载作为普通主题刷新，不触碰阶段 3 宫格迁移或阶段 4 冷重载协调器；未新增 Alarm、killProcess、Activity.recreate 或 PageView/EGL/SMEngine 局部重建。
+- 基本验证：完整 APK 构建、v1/v2/v3 签名、`emulator-5556` 覆盖安装和 HOME 启动均通过，未出现新增 Java/native 崩溃；普通主题 A→B、透明↔普通交替及真实主题资源呈现仍待最终回归。
+
+#### 启动专项阶段 7（核心实现完成，基本验证完成；最终回归待完成）：动态天气和日历原版场景更新
+
+- 原版协议：`LauncherReceiver` 将 `com.smartisanos.launcher.update_icon` 转交 `Aa.c(Intent)`；该方法解析 `extra_packagename`，并进入原版 `Aa.r(String[])` 数据库/Cell 更新链。
+- 根因：动态开关原先虽然调用该协议，却先扫描全部 Launcher Activity，再固定等待 600 ms 后调用冷重启，导致不必要的全量查询、进程重生和壁纸过渡。
+- 当前修复：直接从原版 `activeicon.H/m.PACKAGE_NAME` 取得天气/日历包名（反射不可用时使用原版默认包名），一次发送 `update_icon`。不扫描全部应用、不调用 `reloadOriginalSettings()`、不重启、不手工操作 ActiveIcon/Cell/Eb 节点。
+- 基本验证：完整 APK 构建、v1/v2/v3 签名及 `emulator-5556` 覆盖安装通过；在运行中的 Launcher 上发送包含两个原版包名的 `update_icon` 广播，接收完成且未出现 Java/native 崩溃。天气应用实际数据、日历跨日和开关 UI 回归仍待最终验证。
+
+#### 启动专项阶段 8（核心实现完成，基本验证完成；最终回归待完成）：壁纸单次原版刷新
+
+- 原版调查：`Eb.lh()` 的日志和实现明确为 `TransWallpaper changeWallpaper`，会释放旧透明壁纸节点并建立新的原版壁纸节点；`Eb.Vh()` 则开始 PageView 加载，不能作为壁纸热刷新入口。
+- 当前修复：壁纸选择后的复制、解码、高斯图、缩略图、系统壁纸写入和 URI 落盘移入 `LauncherWallpaperSave` 后台线程；主线程只通知原版配置并调用一次 `lh()`，随后一次 render。删除 `Vh/oh/Z` 反射调用以及立即、120ms、420ms 的重复刷新。
+- pending 只在 `Eb` 场景暂不可用时保留；运行时刷新成功立即清除。恢复默认壁纸同样移除额外 180ms 补帧。
+- 基本验证：完整 APK 构建完成，`apksigner verify --verbose` 确认 v1/v2/v3 有效，已覆盖安装到 `emulator-5556` 并启动 HOME；日志未发现 Launcher 新增 Java `FATAL EXCEPTION` 或 native fatal。尚未在实体机选择真实大图，也未完成透明主题换壁纸、恢复默认壁纸和逐帧壁纸连续性检查，以上保留到最终回归。
+
+#### 启动专项阶段 3 + 阶段 4（进行中）：12/20 宫格迁移与统一重载
+
+- 原版调查：`LauncherPreview` 在原版 Settings 中使用 `content://com.smartisanos.launcher.exportprovider` 配置链；宫格相关检索未找到 `killProcess`、`restartPackage`、`forceStopPackage` 或 Launcher Alarm 重启。原版 Launcher 的 `Launcher.onDestroy()` 只记录日志，`J`/`vc` 可见 EGL 建立和局部节点释放，但未找到按 Activity → EGL → SMEngine → PageView → 静态单例完整、有序且可重入的释放重建链，因此不再尝试同进程 recreate。
+- 冷重载协调：新增私有 `:reload` 进程的 `ReloadTransitionActivity`。主进程只在原版数据库迁移完成后生成唯一 token 并启动该 Activity；过渡页完成 OnPreDraw 和下一 Choreographer 帧后，核对旧主 PID，再仅对这个 PID 调用 `Process.killProcess`，随后显式启动新的 Launcher。宫格流程不再写主题 Loading、清理主题 pending 或触碰主题状态。
+- 首帧握手：新 Launcher 通过 Intent 接收 token；原版 `vc.onDrawFrame()` 在 `Eb.update()` 后上报 GL 帧，再由 Decor OnPreDraw 和下一 Choreographer 帧发送包内显式 `ACTION_FIRST_FRAME_READY`。过渡页只接受同 token 的信号后结束；10 秒仅显示失败和一次手动重试，不把超时当成功。
+- 过渡视觉：过渡窗口使用完全不透明背景，Loading 动画复用原版 `com.smartisanos.launcher.widget.c -> SmartisanProgressDialog -> loading_progress`，未自绘进度图。新 Launcher 使用不透明原有启动主题。
+- 最新模拟器验证：12→20 和 20→12 均出现 `TRANSITION_FIRST_FRAME -> OLD_MAIN_PROCESS_KILL_REQUESTED -> NEW_LAUNCHER_FIRST_FRAME -> FIRST_FRAME_TOKEN_MATCHED -> TRANSITION_FINISHED`，token 一致，无 `FATAL EXCEPTION` 或 native fatal signal；截图确认过渡页为原版锤子 LoadingUI，最终宫格正确。`finishAndRemoveTask()` 后 `:reload` 仍可能被 Android 短暂保留为缓存进程，未主动 kill 该进程，因此阶段 4 不完成。
+
+- 原版对照：设置 UI 使用外部 12/20 单元数；原版数据库只接受 `Constants.getPageModeFromMode()` 得到的内部页模式。迁移必须在 `DatabaseHandler.mWorker` 中依次执行 `N.d(context,newPageMode)` 和 `F.i(oldPageMode,newPageMode)`，PageView 不得由设置页手工重排。
+- 持久化修复：设置确认后先同步 commit `com.smartisanos.launcher_prefs/prefs_key_launcher_mode=12|20`；commit 失败则停止迁移。成功后才尽力镜像 Settings.Global，因此主存储不再依赖系统写权限。页模式优先反射调用原版 `Constants.getPageModeFromMode()`，只在反射不可用时保留已验证的 12→12、20→9 fallback。
+- 设备模式配对：首次同进程刷新捕获到 `Constants.verify(): single page mode is 16, multi page mode error [10]`。根因是 `checkPageModeWithDevice()` 会把基础页适配为设备内部模式，但 Settings.Global 仍残留另一宫格的 multi mode。当前 `O.init()` 在存在私有 12/20 主配置时，按适配后的基础页选择原版合法 multi mode；修复后该异常为 0。
+- 数据和视觉验证：12→20 后原 12 个图标、板块和顺序保持不变；最终 20→12 后诊断为 `grid=12`，截图确认 3×4，图标顺序不变。当前测试板块只有 12 项，因此没有构造“超过 12 项”的拆分样本；拆分算法仍完全由原版 `F.i()` 负责。
+- 同进程根因：保持当前 Surface 并触发原版 `J.onResume() -> v.run() -> J.Hv()` 时，日志证明配置变化可被识别，complex mode 会在 10/13 间切换；但现有 PageView 仍持有迁移前的 Cell 模型和 native batch 容量。只调用原版 Cell/Page 私有刷新会在 20→12 读取已拆分后的旧 Cell，并在 12→20 写越旧 native 容量，分别触发空引用、数组越界或 GL 事件重入，不能作为最小安全修复。
+- 已否决并清理：`Activity.recreate()` 会撞上原版单 Activity 防护和进程级 EGL/SMEngine 全局状态，出现旧 GL 事件访问新场景、黑块或 native SIGSEGV；局部重建 Cell/Page 则实质上需要重写 PageView 模型和 native 批次生命周期。相关实验入口、trace 和 pending 状态均已删除，未把失败方案留在最终源码。
+- 当前安全路径：宫格数据库迁移完成后使用独立的进程重生兜底，不再复用会清理主题消息的主题冷切换辅助函数；新旧模式相同时直接跳过。2026-07-15 最终 12→20 回归中，视觉为 4×5、模式日志为 `grid=20`，无新增 Java/native 崩溃，但 PID 从 `17724` 变为 `17942`，所以阶段 3 和阶段 4 均保持进行中。
+- 验证：完整构建、v1/v2/v3 签名、ADB 覆盖安装通过；最终新进程首帧为 5530 ms，数据库和视觉迁移正确，日志无 single/multi 校验异常、无 `FATAL EXCEPTION` 或 native fatal signal。
+
+本次未修改数据库结构或原版 `F.i()` 算法，未修改二进制 Manifest，未新增固定延迟。保留既有 grid 重载的 killProcess/Alarm 兜底，因此阶段 3、阶段 4 仍为进行中；阶段 5 及以后没有与该 PageView/EGL 生命周期共用安全修改链，本次未修改。
+
+#### 启动专项阶段 2：天气和角标的恢复开销
+
+- 根因：WeatherBridge 的 Launcher 恢复入口没有自身开关门禁，每次会查询全部 Launcher Activity 并加载 Label，HOME 自动定位缺权限时还会主动弹权限；已安排的小时任务不检查关闭状态。角标恢复每次 resume 都可能回放持久计数并请求监听服务绑定，旧实现还在 1500 ms 后重复 rebind；通知监听 rebuild 会广播所有包，即使计数未变化。
+- 原版复用：天气数据仍进入原版 `LauncherReceiver -> DatabaseHandler/DatabaseUpdater -> Cell/PageView -> ActiveIcon/WeatherView/CalendarView`；角标继续向原版接收链广播受影响包的计数，不新增桌面数据库或场景模型。
+- 天气修复：WeatherBridge 自身第一层检查动态开关，关闭时不扫描、不加载 Label、不定位、不安排周期任务、不联网；天气组件首次需要时缓存，只在包增删替换变化及 Profile/分身变化时失效。明确包名/组件名走快速判断，只有厂商天气命名空间候选才读取 Label。HOME 恢复不再申请定位权限；小时任务每轮重新检查开关，关闭后停止续约。
+- 角标修复：生命周期只保留首帧后的 `applyBadgeIfDirty() -> replayIfDirty()`；角标隐藏、无通知访问权限、服务已同步或持久计数版本未变化时返回。删除 1500 ms 第二次 rebind；监听服务比较新旧计数，只广播变化包，通知消失时仍通过旧记录集合广播 0。
+- 验证：完整构建、v1/v2/v3 签名和 ADB 覆盖安装成功。模拟器显式冷启动为 1253 ms；诊断确认动态天气关闭、角标隐藏。连续三次从系统设置返回前后 PID 均为 `7353`，WeatherBridge、天气缓存解析、定位权限请求和 Launcher `FATAL EXCEPTION` 日志均为 0。
+- 未验证：通知访问开启且存在活动通知时的角标增量广播、动态天气开启后的组件缓存失效、实体机和多 ROM 功耗仍待真机回归。
+
+本阶段未修改二进制 Manifest、数据库结构和原版 `F.i()`，未新增 killProcess 或 Alarm 重启；删除角标 1500 ms 重复 rebind 固定延迟，保留天气必要的 1 小时 TTL 调度且关闭后不续约。阶段 3 尚未开始。
+
+#### 启动专项阶段 1：Launcher 启动和返回桌面
+
+- 根因：`Launcher.onCreate()` 在原版 `J.b()` 后立即再次写系统栏并执行 `stabilizeLauncherResume()`；该方法同步回放角标、主动 requestLayout/invalidate/requestRender，并在 80/260/1200 ms 重复补帧。`onResume()` 又同步执行导航栏、壁纸、天气扫描和角标回放，`onWindowFocusChanged()` 继续无条件写窗口属性。首帧前兼容工作重复且没有真实完成信号。
+- 原版复用：保留 `Launcher.onCreate() -> J.b(Activity)` 和 `Launcher.onResume() -> J.onResume()`；使用原版 `vc.onDrawFrame() -> Eb.update()` 后的真实 GL 帧作为兼容任务边界，不改变 PageView、模型或 SMEngine 初始化。
+- 修复：拆分为一次性进程兼容、按状态变化应用导航栏、角标 dirty 回放和首帧后 Loading 完成。启动及每次 resume 只请求一个 GL 帧信号，GL 线程随后把壁纸 pending、角标、动态图标和所选图标包任务合并投递到主线程。动态天气关闭时不进入 WeatherBridge；角标隐藏或持久数据未变化时不 replay。
+- 导航栏缓存：记录 Window token、隐藏导航栏开关、目标 system UI visibility 和导航栏颜色；ROM 没有改变实际窗口状态时直接返回，真实状态被 ROM 重置时仍会重新应用。
+- 删除延迟：移除普通启动 80/260/1200 ms 三次补帧和重载 Loading 320/760/1600 ms 三次补帧；没有新增固定延迟。Loading 改为真实 GL 帧后再等待一个 Choreographer 帧关闭。
+- 验证：完整构建、签名、覆盖安装成功。冷启动原版初始化 159 ms、Surface 564 ms、首个 GL 帧 937 ms、兼容任务 938–941 ms、Model/Page 964 ms；兼容任务确认晚于首帧。连续 5 次热返回为 173–219 ms，PID 前后均为 `6559`，日志无 Launcher 崩溃或定位权限请求。
+- 未验证：实体机、多 ROM、通知角标开启状态、动态图标开启状态、真实重载 Loading 和逐帧录像仍待后续专项阶段或真机回归。
+
+本阶段未修改二进制 Manifest、数据库结构和原版 `F.i()`，未新增 killProcess 或 Alarm 重启。阶段 2 后续已完成。
+
+#### 启动专项阶段 0：启动基线和诊断
+
+- 阶段判定：专项计划没有完成标记，代码中也不存在规定的九个诊断标记，`ORIGINAL_BEHAVIOR_REFERENCE.md` 不存在，因此阶段 0 是第一个未完成阶段。本次没有进入阶段 1。
+- 原版对照：`Launcher.onCreate()` 保持调用原版 `J.b(Activity)`；`J.handleMessage()` 的 `MESSAGE_COMPLETE` 作为模型完成信号；`vc.onSurfaceChanged()` 作为有效 Surface/场景尺寸信号；`vc.onDrawFrame()` 作为真实 GL 帧信号。
+- 修改：新增 `LauncherStartupDiagnostics`，记录 `elapsedRealtime`、启动相对耗时、PID、线程、Activity 实例、宫格、普通主题、透明模式、动态图标、图标包和角标状态。每个标记每次 Activity 启动只输出一次，不逐帧或逐图标记录。默认开启，可通过全局键 `launcher_startup_diagnostics_enabled=0` 关闭；状态读取异常只降级为 `state=unavailable`，不阻断 Launcher。
+- 原版链路：新增 `docs/development/ORIGINAL_BEHAVIOR_REFERENCE.md`；实测结果写入 `docs/development/LAUNCHER_STARTUP_BASELINE.md`。
+- 首次冷启动（覆盖安装、保留数据）：原版同步初始化 429 ms、当前兼容任务完成 824 ms、Surface 1761 ms、首个 GL 帧 1766 ms、Model/Page 4279 ms、系统 `Displayed` 2455 ms。
+- 第二次冷启动：原版同步初始化 119 ms、当前兼容任务完成 135 ms、Surface 627 ms、首个 GL 帧 983 ms、Model/Page 1018/1019 ms、系统 `TotalTime` 1262 ms。
+- 热返回：从系统设置页返回 Launcher 为 `LaunchState=HOT`、237 ms，PID 前后均为 `4749`；熄屏/点亮后 PID 仍保持。关闭诊断开关后冷启动标记数为 0。测试日志无 Launcher `FATAL EXCEPTION`。
+- 未验证：没有清除数据测试首次安装空数据库；未单独自动化最近任务卡片返回；未做实体机、多 ROM 和逐帧录像。
+
+验证：`build.bat` 完整通过；最终 APK 为 `v1.5.4 (29)`、`minSdkVersion=23`、`targetSdkVersion=28`；二进制 Manifest 可由 `aapt2 dump xmltree` 解析；`apksigner verify --verbose` 确认 v1/v2/v3 签名有效；`adb install -r -d` 覆盖安装到 `emulator-5554` 成功。
 
 ### 2026-07-13
 

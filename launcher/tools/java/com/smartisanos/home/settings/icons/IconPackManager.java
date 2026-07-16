@@ -231,6 +231,18 @@ public final class IconPackManager {
         }, "selected-icon-pack-preload").start();
     }
 
+    /** Returns only appfilter targets already parsed for the selected pack. */
+    public static synchronized ArrayList<String> getLoadedIconPackages() {
+        HashSet<String> packages = new HashSet<String>(sPackageToDrawable.keySet());
+        for (String component : sComponentToDrawable.keySet()) {
+            int separator = component == null ? -1 : component.indexOf('/');
+            if (separator > 0) {
+                packages.add(component.substring(0, separator));
+            }
+        }
+        return new ArrayList<String>(packages);
+    }
+
     public static void warmUpIconPackList(Context context) {
         if (context == null) return;
         final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();

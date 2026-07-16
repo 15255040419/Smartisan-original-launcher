@@ -61,6 +61,8 @@ public final class SmartisanInstallManager {
     private static final int STATUS_ORIGINAL_FAILED = 0x400;
     private static final long SESSION_SCAN_INTERVAL_MS = 1200L;
     private static final long MIN_VISIBLE_ANIMATION_MS = 3500L;
+    private static final int MAX_PACKAGE_READY_RETRIES = 2;
+    private static final long PACKAGE_READY_RETRY_DELAY_MS = 300L;
 
     private static final Pattern PACKAGE_PATTERN =
             Pattern.compile("([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*){1,})");
@@ -177,6 +179,8 @@ public final class SmartisanInstallManager {
                     }
                     String pkg = intent.getData().getSchemeSpecificPart();
                     String action = intent.getAction();
+                    com.smartisanos.launcher.theme.WeatherBridge
+                            .invalidateWeatherApplicationCache();
                     if (TextUtils.isEmpty(pkg) || context.getPackageName().equals(pkg)) {
                         return;
                     }
@@ -446,21 +450,7 @@ public final class SmartisanInstallManager {
             return;
         }
         if (!ENABLE_DOWNLOAD_ANIMATION) {
-            notifyOriginalPackageAdded(context, pkg);
-            deletePendingIcon(context, pkg);
-            Handler handler = sHandler == null ? new Handler(Looper.getMainLooper()) : sHandler;
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    notifyOriginalPackageAdded(context, pkg);
-                }
-            }, 800L);
-            handler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    notifyOriginalPackageAdded(context, pkg);
-                }
-            }, 2500L);
+            dispatchOriginalPackageAddedWhenReady(context, pkg, 0);
             return;
         }
         final String displayPkg = displayPackageForCompletedPackage(context, pkg);
@@ -508,7 +498,46 @@ public final class SmartisanInstallManager {
 
     private static void failOrRemove(Context context, String pkg) {
         removeDownloadCell(context, pkg);
+        notifyOriginalPackageRemoved(pkg);
+        MaintainedLauncherSettingsHost.clearCachedImprovedIcon(context, pkg);
         forgetDisplay(null, pkg);
+    }
+
+    /** Retry only while PackageManager has not exposed the new launcher activity. */
+    private static void dispatchOriginalPackageAddedWhenReady(final Context context,
+                                                               final String pkg, final int attempt) {
+        if (launcherActivityAvailable(context, pkg)) {
+            notifyOriginalPackageAdded(context, pkg);
+            deletePendingIcon(context, pkg);
+            return;
+        }
+        if (attempt >= MAX_PACKAGE_READY_RETRIES) {
+            return;
+        }
+        Handler handler = sHandler == null ? new Handler(Looper.getMainLooper()) : sHandler;
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                dispatchOriginalPackageAddedWhenReady(context, pkg, attempt + 1);
+            }
+        }, PACKAGE_READY_RETRY_DELAY_MS);
+    }
+
+    private static boolean launcherActivityAvailable(Context context, String pkg) {
+        if (context == null || TextUtils.isEmpty(pkg)) {
+            return false;
+        }
+        try {
+            PackageManager pm = context.getPackageManager();
+            pm.getPackageInfo(pkg, 0);
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            intent.setPackage(pkg);
+            List matches = pm.queryIntentActivities(intent, 0);
+            return matches != null && !matches.isEmpty();
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private static void removeDownloadCell(Context context, String pkg) {
@@ -622,6 +651,18 @@ public final class SmartisanInstallManager {
             Class<?> cls = Class.forName("com.smartisanos.launcher.Aa");
             Method method = cls.getMethod("c", Context.class, String.class);
             method.invoke(null, context, pkg);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void notifyOriginalPackageRemoved(String pkg) {
+        if (TextUtils.isEmpty(pkg)) {
+            return;
+        }
+        try {
+            Class<?> cls = Class.forName("com.smartisanos.launcher.Aa");
+            Method method = cls.getMethod("D", String.class);
+            method.invoke(null, pkg);
         } catch (Throwable ignored) {
         }
     }

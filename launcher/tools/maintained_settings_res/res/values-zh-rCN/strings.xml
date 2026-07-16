@@ -165,7 +165,7 @@
     <string name="obsession_badge_notification_access">显示通知角标需要授予通知使用权，点击前往设置</string>
     <string name="obsession_badge_notification_access_action">前往设置</string>
     <string name="obsession_header_title">强迫症选项</string>
-    <string name="obsession_hide_badge">显示图标上的角标</string>
+    <string name="obsession_hide_badge">角标提醒</string>
     <string name="obsession_hide_lable">隐藏桌面图标名称</string>
     <string name="hide_navigation_bar_label">桌面隐藏虚拟键</string>
     <string name="ocd_setting">强迫症选项</string>

@@ -29,7 +29,6 @@
 
 .field private time:J
 
-
 # direct methods
 .method static constructor <clinit>()V
     .locals 1
@@ -205,6 +204,24 @@
     iget-object p1, p0, Lcom/smartisanos/launcher/view/vc;->ly:Lcom/smartisanos/launcher/view/Eb;
 
     invoke-virtual {p1}, Lcom/smartisanos/launcher/view/Eb;->update()V
+
+    sget-boolean p1, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->sLauncherFrameReportPending:Z
+
+    if-eqz p1, :startup_frame_reported
+
+    const/4 p1, 0x0
+
+    sput-boolean p1, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->sLauncherFrameReportPending:Z
+
+    const-string p1, "LAUNCH_FIRST_FRAME"
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->mark(Ljava/lang/String;)V
+
+    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onLauncherFirstFrame()V
+
+    invoke-static {}, Lcom/smartisanos/launcher/reload/LauncherColdReloadCoordinator;->onRendererFirstFrame()V
+
+    :startup_frame_reported
 
     .line 2
     sget-boolean p1, Lcom/smartisanos/launcher/view/vc;->my:Z
@@ -431,6 +448,10 @@
     move-result-object p0
 
     invoke-virtual {p0}, Lcom/smartisanos/smengine/Ra;->wt()V
+
+    const-string p0, "LAUNCH_SURFACE_READY"
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->mark(Ljava/lang/String;)V
 
     return-void
 .end method

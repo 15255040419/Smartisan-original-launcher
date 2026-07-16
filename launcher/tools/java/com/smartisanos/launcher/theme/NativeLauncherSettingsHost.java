@@ -115,7 +115,7 @@ public final class NativeLauncherSettingsHost {
         content.addView(card(activity,
                 switchRow(activity, "隐藏桌面图标名称", "launcher_hide_lable", false)));
         content.addView(card(activity,
-                switchRow(activity, "隐藏图标上的角标", "launcher_hide_badge", false),
+                switchRow(activity, "角标提醒", "launcher_hide_badge", false),
                 switchRow(activity, "紧贴屏幕横扫清除角标", "launcher_badge_swipe_clean", true)));
         content.addView(card(activity,
                 disabledSwitchRow(activity, "拨号面板模式", false),

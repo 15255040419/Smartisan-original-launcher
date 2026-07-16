@@ -1,5 +1,6 @@
 package com.smartisanos.launcher.theme;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.AlertDialog;
@@ -15,6 +16,7 @@ import android.content.ContextWrapper;
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.BroadcastReceiver;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -51,6 +53,8 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.os.StrictMode;
 import android.os.UserHandle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.SpannableString;
@@ -62,12 +66,14 @@ import android.util.Log;
 import android.util.LruCache;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.Choreographer;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.InputMethodManager;
@@ -89,6 +95,7 @@ import android.widget.SeekBar;
 import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.smartisanos.launcher.reload.LauncherColdReloadCoordinator;
 
 import com.smartisanos.home.settings.PreviewSettingItemView;
 import com.smartisanos.home.settings.SettingItemSwitch;
@@ -108,6 +115,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -121,6 +129,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -129,6 +138,13 @@ public final class MaintainedLauncherSettingsHost {
     private static final String LOG_TAG = "MaintainedSettings";
     private static android.os.Handler sThemePageHandler;
     private static Runnable sThemePageRunnable;
+    private static volatile String sPendingThemeLoadingThemeId;
+    private static ThemeLoadingSystemBarsState sThemeLoadingSystemBars;
+    private static boolean sDynamicWeatherLocationPermissionPending;
+    private static WeakReference<SettingItemSwitch> sDynamicWeatherLocationPermissionItem;
+    private static WeakReference<SettingItemSwitch> sBadgeReminderSwitch;
+    private static WeakReference<SettingItemSwitch> sBadgeSwipeCleanSwitch;
+    private static boolean sBadgeNotificationAccessDialogShowing;
     private static volatile Resources sSettingsResources;
     private static boolean sSettingsResourcesWarmPending;
     private static List<WeatherBridge.CityResult> sBundledWeatherCities;
@@ -181,6 +197,16 @@ public final class MaintainedLauncherSettingsHost {
     private static final String KEY_SEARCH_PAGE_ENABLED = "launcher_search_page_enabled";
     private static final String KEY_DYNAMIC_WEATHER_CALENDAR =
             "launcher_dynamic_weather_calendar_enabled";
+    private static final int REQUEST_DYNAMIC_WEATHER_LOCATION = 2414;
+    private static final String PREF_DYNAMIC_WEATHER_LOCATION_REQUESTED =
+            "dynamic_weather_location_permission_requested";
+    private static final String KEY_BADGE_HIDE = "launcher_hide_badge";
+    private static final String KEY_BADGE_SWIPE_CLEAN = "launcher_badge_swipe_clean";
+    private static final String PREF_BADGE_NOTIFICATION_ACCESS_PENDING =
+            "badge_notification_access_pending_target";
+    private static final String BADGE_PENDING_NONE = "";
+    private static final String BADGE_PENDING_REMINDER = "badge_reminder";
+    private static final String BADGE_PENDING_SWIPE_CLEAN = "badge_swipe_clean";
     private static final String KEY_TRANSPARENT_THEME_ENABLED = "launcher_grid_theme";
     private static final String KEY_TRANSPARENT_WALLPAPER_BLUR = "original_launcher_wallpaper_blur_on";
     private static final String PREF_TRANSPARENT_PREVIOUS_THEME = "transparent_previous_theme";
@@ -226,6 +252,8 @@ public final class MaintainedLauncherSettingsHost {
                 }
             };
     private static final Map<String, Boolean> sSmartisanIconFetchPending = new HashMap<String, Boolean>();
+    private static final java.util.HashSet<String> sSmartisanIconRefreshPackages =
+            new java.util.HashSet<String>();
     private static boolean sSmartisanIconRefreshScheduled;
     private static long sSmartisanIconLastWriteUptime;
     private static boolean sDoppelgangerBootstrapScheduled;
@@ -234,6 +262,19 @@ public final class MaintainedLauncherSettingsHost {
     private static long sLastLifecycleUnlockUptime;
     private static long sLastOriginalUnlockUptime;
     private static long sThemeChangeGuardUntilUptime;
+    private static boolean sProcessCompatApplied;
+    private static Object sLastNavigationWindowToken;
+    private static boolean sLastHideNavigationBar;
+    private static int sLastSystemUiVisibility = Integer.MIN_VALUE;
+    private static int sLastNavigationBarColor = Integer.MIN_VALUE;
+    private static Boolean sLastBadgeHidden;
+    private static WeakReference<Activity> sDeferredLauncherActivity;
+    private static WeakReference<Activity> sPendingReloadSettingsActivity;
+    private static boolean sLauncherFirstFrameReady;
+    private static boolean sDeferredLauncherTasksPosted;
+    private static final Map<Activity, PasswordPageExit> sPasswordPageExits =
+            new WeakHashMap<Activity, PasswordPageExit>();
+    public static volatile boolean sLauncherFrameReportPending;
     private static final String SMARTISAN_ICON_CACHE_PREFS = "online_icon_cache_v3";
     private static final String SMARTISAN_ICON_CACHE_DIR = "online_icon_cache_v3";
     // Keep only the opaque artwork before the original launcher generates its
@@ -322,7 +363,6 @@ public final class MaintainedLauncherSettingsHost {
         try {
             resumeOperationLogIfNeeded(activity);
             cancelScheduledLauncherRestart(activity);
-            cancelScheduledIconSizeLauncherRestart(activity);
             Intent intent = activity.getIntent();
             if (intent != null && UPDATE_INSTALL_ACTION.equals(intent.getAction())) {
                 long downloadId = intent.getLongExtra(EXTRA_UPDATE_DOWNLOAD_ID, -1);
@@ -482,6 +522,10 @@ public final class MaintainedLauncherSettingsHost {
         if (context == null) {
             return;
         }
+        if (!com.smartisanos.home.settings.icons.IconPackManager
+                .isIconPackSelectionEnabled(context)) {
+            return;
+        }
         final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
         final String key = "maintained_icon_loader_refresh_v2";
         try {
@@ -517,18 +561,7 @@ public final class MaintainedLauncherSettingsHost {
             sDoppelgangerBootstrapScheduled = true;
         }
         final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
-        Handler handler = new Handler(Looper.getMainLooper());
         bootstrapDoppelgangerPackages(app);
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                bootstrapDoppelgangerPackages(app);
-            }
-        }, 2000);
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                bootstrapDoppelgangerPackages(app);
-            }
-        }, 8000);
     }
 
     private static void bootstrapDoppelgangerPackages(final Context context) {
@@ -554,17 +587,7 @@ public final class MaintainedLauncherSettingsHost {
                     }
                 }
                 if (!packagesByUser.isEmpty()) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        public void run() {
-                            postDatabaseRefreshEvent();
-                            applyIconChange(context);
-                        }
-                    }, 900);
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        public void run() {
-                            postDatabaseRefreshEvent();
-                        }
-                    }, 2200);
+                    requestLauncherFrameFromContext(context);
                 }
             }
         }, "DoppelgangerBootstrap").start();
@@ -815,7 +838,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void refreshEnabledDoppelgangerIcons(final Context context) {
-        if (context == null) {
+        if (context == null || !hasEnabledProfileApps(context)) {
             return;
         }
         synchronized (MaintainedLauncherSettingsHost.class) {
@@ -847,11 +870,7 @@ public final class MaintainedLauncherSettingsHost {
                     }
                 }
                 if (changed) {
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        public void run() {
-                            postDatabaseRefreshEvent();
-                        }
-                    }, 450);
+                    requestLauncherFrameFromContext(app);
                 }
             }
         }, "DoppelgangerIconRefresh").start();
@@ -862,6 +881,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void postDatabaseUserPackageEvent(String eventName, ArrayList params) {
+        WeatherBridge.invalidateWeatherApplicationCache();
         try {
             Class actionClass = Class.forName("com.smartisanos.launcher.data.DatabaseUpdater$Action");
             Object action = java.lang.Enum.valueOf(actionClass, eventName);
@@ -1130,6 +1150,10 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static void applyLauncherNavigationBarSetting(Activity activity) {
+        applyNavigationBarIfChanged(activity);
+    }
+
+    public static void applyNavigationBarIfChanged(Activity activity) {
         if (activity == null || activity.getWindow() == null) {
             return;
         }
@@ -1153,22 +1177,55 @@ public final class MaintainedLauncherSettingsHost {
                 visibility &= ~View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
                 visibility &= ~View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
             }
-            decor.setSystemUiVisibility(visibility);
-            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            Object windowToken = decor.getWindowToken();
+            if (windowToken == null) {
+                windowToken = window;
+            }
+            int navigationBarColor = Build.VERSION.SDK_INT >= 21
+                    ? window.getNavigationBarColor() : Color.TRANSPARENT;
+            boolean cacheMatches = windowToken == sLastNavigationWindowToken
+                    && hideNavigation == sLastHideNavigationBar
+                    && visibility == sLastSystemUiVisibility
+                    && navigationBarColor == sLastNavigationBarColor;
+            boolean flagsMatch = (window.getAttributes().flags
+                    & WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS) != 0
+                    && (window.getAttributes().flags
+                    & WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS) == 0;
+            boolean cutoutMatches = Build.VERSION.SDK_INT < 28
+                    || window.getAttributes().layoutInDisplayCutoutMode
+                    == WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            if (cacheMatches && decor.getSystemUiVisibility() == visibility
+                    && flagsMatch && cutoutMatches) {
+                return;
+            }
+            if (decor.getSystemUiVisibility() != visibility) {
+                decor.setSystemUiVisibility(visibility);
+            }
+            if (!flagsMatch) {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+                window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            }
             if (Build.VERSION.SDK_INT >= 21) {
-                window.setStatusBarColor(Color.TRANSPARENT);
+                if (window.getStatusBarColor() != Color.TRANSPARENT) {
+                    window.setStatusBarColor(Color.TRANSPARENT);
+                }
                 // Keep both system bars on the same Launcher surface while a
                 // theme reload recreates the activity. Leaving navigation at
                 // the ROM default produced a visibly different bottom strip.
-                window.setNavigationBarColor(Color.TRANSPARENT);
+                if (window.getNavigationBarColor() != Color.TRANSPARENT) {
+                    window.setNavigationBarColor(Color.TRANSPARENT);
+                }
             }
-            if (Build.VERSION.SDK_INT >= 28) {
+            if (Build.VERSION.SDK_INT >= 28 && !cutoutMatches) {
                 WindowManager.LayoutParams attrs = window.getAttributes();
                 attrs.layoutInDisplayCutoutMode =
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
                 window.setAttributes(attrs);
             }
+            sLastNavigationWindowToken = windowToken;
+            sLastHideNavigationBar = hideNavigation;
+            sLastSystemUiVisibility = visibility;
+            sLastNavigationBarColor = Color.TRANSPARENT;
         } catch (Throwable ignored) {
         }
     }
@@ -2220,10 +2277,6 @@ public final class MaintainedLauncherSettingsHost {
         boolean iconPackEnabled = com.smartisanos.home.settings.icons.IconPackManager
                 .isIconPackSelectionEnabled(context);
         if (isImprovedIconEnabled(context) || iconPackEnabled) {
-            if (iconPackEnabled) {
-                com.smartisanos.home.settings.icons.IconPackManager
-                        .preloadSelectedIconPackAsync(context);
-            }
             return true;
         }
         return RedirectIconDB.hasManagedIconOverride(context, packageName, className);
@@ -2235,8 +2288,8 @@ public final class MaintainedLauncherSettingsHost {
                 ? context : context.getApplicationContext();
         new Handler(Looper.getMainLooper()).post(new Runnable() {
             public void run() {
-                postDatabaseRefreshEvent();
-                applyIconChange(app);
+                applyIconChanges(app, com.smartisanos.home.settings.icons.IconPackManager
+                        .getLoadedIconPackages());
             }
         });
     }
@@ -2652,14 +2705,24 @@ public final class MaintainedLauncherSettingsHost {
             Toast.makeText(activity, "未选择图片", Toast.LENGTH_SHORT).show();
             return true;
         }
+        final Uri uri = data.getData();
         try {
-            Uri uri = data.getData();
-            try {
-                int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                activity.getContentResolver().takePersistableUriPermission(uri, flags);
-            } catch (Throwable ignored) {
+            int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            activity.getContentResolver().takePersistableUriPermission(uri, flags);
+        } catch (Throwable ignored) {
+        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                persistPickedWallpaper(activity, uri);
             }
+        }, "LauncherWallpaperSave").start();
+        return true;
+    }
+
+    private static void persistPickedWallpaper(final Activity activity, Uri uri) {
+        try {
             String launcherUri = saveLauncherWallpaperCopy(activity, uri);
             if (launcherUri == null || launcherUri.length() == 0) {
                 launcherUri = uri.toString();
@@ -2686,14 +2749,24 @@ public final class MaintainedLauncherSettingsHost {
                     + ", setSystemWallpaper=" + systemWallpaperApplied);
             Log.d(LOG_TAG, "Wallpaper picked, set system wallpaper=" + systemWallpaperApplied
                     + ", uri=" + launcherUri);
-            refreshLauncherWallpaperNow(activity);
-            markWallpaperRefreshPending(activity, true);
-            Toast.makeText(activity, "桌面壁纸已应用", Toast.LENGTH_SHORT).show();
-            bindWallpaperSettingIcon(activity, activity.getResources(), activity.getWindow().getDecorView());
+            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    boolean refreshed = refreshLauncherWallpaperNow(activity);
+                    markWallpaperRefreshPending(activity, !refreshed);
+                    Toast.makeText(activity, "桌面壁纸已应用", Toast.LENGTH_SHORT).show();
+                    bindWallpaperSettingIcon(activity, activity.getResources(),
+                            activity.getWindow().getDecorView());
+                }
+            });
         } catch (Throwable t) {
-            Toast.makeText(activity, "壁纸设置失败", Toast.LENGTH_SHORT).show();
+            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(activity, "壁纸设置失败", Toast.LENGTH_SHORT).show();
+                }
+            });
         }
-        return true;
     }
 
     private static boolean setWallpaperFromUri(Context context, Uri uri) {
@@ -3688,11 +3761,6 @@ public final class MaintainedLauncherSettingsHost {
                 try {
                     android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
                     settingsResources(app);
-                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                        public void run() {
-                            postDatabaseRefreshEvent();
-                        }
-                    }, 600L);
                 } catch (Throwable ignored) {
                 } finally {
                     synchronized (MaintainedLauncherSettingsHost.class) {
@@ -4066,11 +4134,18 @@ public final class MaintainedLauncherSettingsHost {
     private static void applyTransparentThemeSetting(Activity activity, boolean transparent, boolean animate) {
         String targetTheme;
         if (transparent) {
+            if (!packageInstalled(activity, "com.smartisanos.launcher.theme.trans")) {
+                Toast.makeText(activity, "透明主题包未安装", Toast.LENGTH_SHORT).show();
+                return;
+            }
             ensureTransparentThemeRegistered(activity);
             forceDefaultPageAnimation(activity);
             String current = currentTheme(activity);
             if (!"smartisan_theme_trans".equals(current)) {
-                saveTransparentPreviousTheme(activity, current);
+                if (!saveTransparentPreviousTheme(activity, current)) {
+                    Toast.makeText(activity, "原主题保存失败", Toast.LENGTH_SHORT).show();
+                    return;
+                }
             }
             targetTheme = current;
             if (targetTheme == null || targetTheme.length() == 0 || "smartisan_theme_trans".equals(targetTheme)) {
@@ -4086,18 +4161,24 @@ public final class MaintainedLauncherSettingsHost {
                 targetTheme = "smartisan_theme_black";
             }
         }
-        writeTransparentModeSetting(activity, transparent);
+        if (!writeTransparentModeSetting(activity, transparent)) {
+            Toast.makeText(activity, "透明主题设置保存失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (!transparent) {
             storeThemeSelection(activity, targetTheme);
         }
         if (transparent) {
             ensureTransparentThemeRegistered(activity);
         }
-        applyTransparentThemeRuntimeFlags(activity, transparent);
         Toast.makeText(activity, transparent ? "正在应用透明主题" : "正在恢复桌面主题", Toast.LENGTH_SHORT).show();
         if (animate) {
-            restartLauncherForColdSceneChange(activity, "transparent_theme_process_rebirth");
+            if (!com.smartisanos.launcher.reload.LauncherColdReloadCoordinator
+                    .beginThemeReload(activity, transparent)) {
+                Toast.makeText(activity, "无法启动桌面重载", Toast.LENGTH_SHORT).show();
+            }
         } else {
+            applyTransparentThemeRuntimeFlags(activity, transparent);
             reloadOriginalSettings(activity);
             rebuildLauncherLayoutForIconSize();
             applyIconChange(activity);
@@ -4133,21 +4214,7 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         notifyOriginalConfigChanged(KEY_TRANSPARENT_WALLPAPER_BLUR);
-        try {
-            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
-                    .getMethod("getInstance").invoke(null);
-            if (mainView != null) {
-                mainView.getClass().getMethod("lh").invoke(mainView);
-            }
-        } catch (Throwable ignored) {
-        }
         refreshLauncherWallpaperSurface();
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                refreshLauncherWallpaperSurface();
-            }
-        }, 160);
     }
 
     private static String describeTheme(Object theme) {
@@ -4165,12 +4232,13 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void saveTransparentPreviousTheme(Context context, String theme) {
+    private static boolean saveTransparentPreviousTheme(Context context, String theme) {
         if (theme == null || theme.length() == 0 || "smartisan_theme_trans".equals(theme)) {
-            return;
+            return true;
         }
+        boolean committed = false;
         try {
-            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+            committed = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
                     .edit()
                     .putString(PREF_TRANSPARENT_PREVIOUS_THEME, theme)
                     .commit();
@@ -4184,6 +4252,7 @@ public final class MaintainedLauncherSettingsHost {
             Settings.System.putString(context.getContentResolver(), PREF_TRANSPARENT_PREVIOUS_THEME, theme);
         } catch (Throwable ignored) {
         }
+        return committed;
     }
 
     private static void ensureTransparentThemeRegistered(Context context) {
@@ -4264,12 +4333,20 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void toggleBoundSwitch(Context context, SettingItemSwitch item, String key) {
+        boolean oldDynamicIconEnabled = LauncherSettingBridge.dynamicWeatherCalendarEnabled(context);
         boolean next = !item.isChecked();
-        if (next && "launcher_badge_swipe_clean".equals(key)
-                && !com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(context)) {
-            Toast.makeText(context, "请先授予锤子桌面通知使用权，以显示和横扫清除角标",
-                    Toast.LENGTH_LONG).show();
-            com.smartisanos.launcher.badge.BadgeBridge.openNotificationAccessSettings(context);
+        if (KEY_DYNAMIC_WEATHER_CALENDAR.equals(key)) {
+            if (next && Build.VERSION.SDK_INT >= 23
+                    && !WeatherBridge.hasLocationPermissionForSettings(context)) {
+                if (!(context instanceof Activity)) {
+                    Log.w(LOG_TAG, "DYNAMIC_ICON_PERMISSION_REQUEST_UNAVAILABLE no Activity host");
+                    Toast.makeText(context, "无法打开定位授权页面", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                requestDynamicWeatherLocationPermission((Activity) context, item);
+                return;
+            }
+            applyDynamicWeatherCalendarSetting(context, item, oldDynamicIconEnabled, next);
             return;
         }
         item.setCheckedAnimated(next);
@@ -4281,14 +4358,299 @@ public final class MaintainedLauncherSettingsHost {
         if ("launcher_hide_badge".equals(key)) {
             applyBadgeVisibility(context, next, true);
         }
-        if (KEY_DYNAMIC_WEATHER_CALENDAR.equals(key)) {
-            Toast.makeText(context, next
-                    ? "已启用动态天气和日历"
-                    : "已关闭动态图标，正在恢复普通图标",
-                    Toast.LENGTH_SHORT).show();
-            refreshDynamicIconMode(context, next);
+    }
+
+    /** Applies the original theme-changing Dialog dim to its owning settings window only. */
+    public static void onOriginalThemeLoadingUiPrepared(final Context context, Dialog dialog,
+            String message) {
+        if (!(context instanceof Activity) || dialog == null || !isThemeChangingMessage(context, message)) {
             return;
         }
+        final Activity activity = (Activity) context;
+        final Window window = activity.getWindow();
+        final View decor = window == null ? null : window.getDecorView();
+        if (window == null || decor == null) {
+            return;
+        }
+        final float dimAmount = dialogDimAmount(dialog);
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            if (sThemeLoadingSystemBars != null && sThemeLoadingSystemBars.activity != activity) {
+                restoreThemeLoadingSystemBarsLocked(false);
+            }
+            if (sThemeLoadingSystemBars == null) {
+                sThemeLoadingSystemBars = new ThemeLoadingSystemBarsState(activity, window,
+                        window.getStatusBarColor(), window.getNavigationBarColor(),
+                        decor.getSystemUiVisibility(), sPendingThemeLoadingThemeId);
+            }
+        }
+        ThemeLoadingSystemBarsState state = sThemeLoadingSystemBars;
+        if (Build.VERSION.SDK_INT >= 21) {
+            window.setStatusBarColor(dimmedColor(state.statusBarColor, dimAmount));
+            window.setNavigationBarColor(dimmedColor(state.navigationBarColor, dimAmount));
+        }
+        int systemUi = state.systemUiVisibility & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        if (Build.VERSION.SDK_INT >= 26) systemUi &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        decor.setSystemUiVisibility(systemUi);
+        if (Build.VERSION.SDK_INT >= 30) {
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) controller.setSystemBarsAppearance(0,
+                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                            | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+        }
+    }
+
+    public static void onOriginalThemeLoadingUiDismissed() {
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            restoreThemeLoadingSystemBarsLocked(true);
+        }
+    }
+
+    private static void markThemeSettingsExitRequested(Activity activity) {
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            if (sThemeLoadingSystemBars != null && sThemeLoadingSystemBars.activity == activity) {
+                sThemeLoadingSystemBars.exitRequested = true;
+            }
+        }
+    }
+
+    private static boolean isThemeChangingMessage(Context context, String message) {
+        if (message == null || context == null) return false;
+        try {
+            int id = context.getResources().getIdentifier("theme_changing", "string",
+                    context.getPackageName());
+            return id != 0 && message.equals(context.getString(id));
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static float dialogDimAmount(Dialog dialog) {
+        try {
+            Window dialogWindow = dialog.getWindow();
+            if (dialogWindow != null && dialogWindow.getAttributes().dimAmount > 0f) {
+                return dialogWindow.getAttributes().dimAmount;
+            }
+        } catch (Throwable ignored) {
+        }
+        return 0.32f;
+    }
+
+    private static int dimmedColor(int color, float dimAmount) {
+        float keep = Math.max(0f, Math.min(1f, 1f - dimAmount));
+        return Color.rgb(Math.round(Color.red(color) * keep), Math.round(Color.green(color) * keep),
+                Math.round(Color.blue(color) * keep));
+    }
+
+    private static void restoreThemeLoadingSystemBarsLocked(boolean restoreIfStillVisible) {
+        ThemeLoadingSystemBarsState state = sThemeLoadingSystemBars;
+        sThemeLoadingSystemBars = null;
+        if (state == null || state.exitRequested || state.activity == null || state.activity.isFinishing()
+                || (Build.VERSION.SDK_INT >= 17 && state.activity.isDestroyed()) || !restoreIfStillVisible) {
+            return;
+        }
+        Window window = state.window;
+        View decor = window == null ? null : window.getDecorView();
+        if (window == null || decor == null) return;
+        if (Build.VERSION.SDK_INT >= 21) {
+            window.setStatusBarColor(state.statusBarColor);
+            window.setNavigationBarColor(state.navigationBarColor);
+        }
+        decor.setSystemUiVisibility(state.systemUiVisibility);
+        if (Build.VERSION.SDK_INT >= 30) {
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                int appearance = 0;
+                if ((state.systemUiVisibility & View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR) != 0) {
+                    appearance |= WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
+                }
+                if (Build.VERSION.SDK_INT >= 26 && (state.systemUiVisibility
+                        & View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR) != 0) {
+                    appearance |= WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                }
+                controller.setSystemBarsAppearance(appearance,
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
+        }
+    }
+
+    private static final class ThemeLoadingSystemBarsState {
+        final Activity activity;
+        final Window window;
+        final int statusBarColor;
+        final int navigationBarColor;
+        final int systemUiVisibility;
+        final String themeId;
+        boolean exitRequested;
+
+        ThemeLoadingSystemBarsState(Activity activity, Window window, int statusBarColor,
+                int navigationBarColor, int systemUiVisibility, String themeId) {
+            this.activity = activity;
+            this.window = window;
+            this.statusBarColor = statusBarColor;
+            this.navigationBarColor = navigationBarColor;
+            this.systemUiVisibility = systemUiVisibility;
+            this.themeId = themeId;
+        }
+    }
+
+    private static void applyDynamicWeatherCalendarSetting(Context context,
+            SettingItemSwitch item, boolean oldEnabled, boolean enabled) {
+        Log.i(LOG_TAG, "DYNAMIC_ICON_ENABLE_REQUEST old=" + oldEnabled + " new=" + enabled);
+        if (!persistDynamicWeatherCalendarSetting(context, enabled)) {
+            Log.w(LOG_TAG, "DYNAMIC_ICON_CONFIG_COMMIT_FAILED requested=" + enabled);
+            Toast.makeText(context, "动态天气和日历设置保存失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        boolean reread = LauncherSettingBridge.dynamicWeatherCalendarEnabled(context);
+        Log.i(LOG_TAG, "DYNAMIC_ICON_CONFIG_COMMITTED requested=" + enabled
+                + " reread=" + reread);
+        if (reread != enabled) {
+            Log.w(LOG_TAG, "DYNAMIC_ICON_CONFIG_REREAD_MISMATCH requested=" + enabled
+                    + " reread=" + reread);
+            Toast.makeText(context, "动态天气和日历设置保存失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (item != null) {
+            item.setCheckedAnimated(enabled);
+        }
+        Toast.makeText(context, enabled
+                ? "已启用动态天气和日历"
+                : "已关闭动态图标，正在恢复普通图标",
+                Toast.LENGTH_SHORT).show();
+        Log.i(LOG_TAG, "DYNAMIC_ICON_RELOAD_REQUESTED reason=ACTIVE_ICON_SETTINGS_CHANGE"
+                + " old=" + oldEnabled + " new=" + enabled);
+        if (!LauncherColdReloadCoordinator.beginActiveIconReload(context, oldEnabled, enabled)) {
+            Toast.makeText(context, "桌面重新载入未启动，请重试", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private static boolean persistDynamicWeatherCalendarSetting(Context context, boolean enabled) {
+        if (context == null) {
+            return false;
+        }
+        int value = enabled ? 1 : 0;
+        try {
+            Settings.System.putInt(context.getContentResolver(),
+                    KEY_DYNAMIC_WEATHER_CALENDAR, value);
+            Settings.System.putString(context.getContentResolver(),
+                    KEY_DYNAMIC_WEATHER_CALENDAR, Boolean.toString(enabled));
+        } catch (Throwable ignored) {
+        }
+        try {
+            Settings.Global.putInt(context.getContentResolver(),
+                    KEY_DYNAMIC_WEATHER_CALENDAR, value);
+            Settings.Global.putString(context.getContentResolver(),
+                    KEY_DYNAMIC_WEATHER_CALENDAR, Boolean.toString(enabled));
+        } catch (Throwable ignored) {
+        }
+        boolean committed;
+        try {
+            committed = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_DYNAMIC_WEATHER_CALENDAR, enabled)
+                    .putInt(KEY_DYNAMIC_WEATHER_CALENDAR + "_int", value)
+                    .commit();
+        } catch (Throwable ignored) {
+            return false;
+        }
+        if (!committed) {
+            return false;
+        }
+        try {
+            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_DYNAMIC_WEATHER_CALENDAR, enabled)
+                    .putInt(KEY_DYNAMIC_WEATHER_CALENDAR + "_int", value)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        return LauncherSettingBridge.dynamicWeatherCalendarEnabled(context) == enabled;
+    }
+
+    private static void requestDynamicWeatherLocationPermission(final Activity activity,
+            SettingItemSwitch item) {
+        if (activity == null || item == null) {
+            return;
+        }
+        if (sDynamicWeatherLocationPermissionPending) {
+            Log.i(LOG_TAG, "DYNAMIC_ICON_PERMISSION_REQUEST_IGNORED pending=true");
+            return;
+        }
+        boolean prompted = activity.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                .getBoolean(PREF_DYNAMIC_WEATHER_LOCATION_REQUESTED, false);
+        if (prompted && !activity.shouldShowRequestPermissionRationale(
+                Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            Log.i(LOG_TAG, "DYNAMIC_ICON_PERMISSION_PERMANENTLY_DENIED");
+            showDynamicWeatherPermissionSettingsDialog(activity);
+            return;
+        }
+        sDynamicWeatherLocationPermissionPending = true;
+        sDynamicWeatherLocationPermissionItem = new WeakReference<SettingItemSwitch>(item);
+        activity.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE).edit()
+                .putBoolean(PREF_DYNAMIC_WEATHER_LOCATION_REQUESTED, true).commit();
+        Log.i(LOG_TAG, "DYNAMIC_ICON_PERMISSION_REQUESTED permission=ACCESS_COARSE_LOCATION");
+        try {
+            activity.requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
+                    REQUEST_DYNAMIC_WEATHER_LOCATION);
+        } catch (Throwable error) {
+            clearDynamicWeatherLocationPermissionRequest();
+            Log.w(LOG_TAG, "DYNAMIC_ICON_PERMISSION_REQUEST_FAILED", error);
+            Toast.makeText(activity, "无法请求定位权限", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public static void onRequestPermissionsResult(Activity activity, int requestCode,
+            String[] permissions, int[] grantResults) {
+        if (requestCode != REQUEST_DYNAMIC_WEATHER_LOCATION) {
+            return;
+        }
+        SettingItemSwitch item = sDynamicWeatherLocationPermissionItem == null ? null
+                : sDynamicWeatherLocationPermissionItem.get();
+        clearDynamicWeatherLocationPermissionRequest();
+        boolean granted = activity != null
+                && WeatherBridge.hasLocationPermissionForSettings(activity);
+        Log.i(LOG_TAG, "DYNAMIC_ICON_PERMISSION_RESULT granted=" + granted);
+        if (!granted) {
+            if (item != null) {
+                item.setChecked(false);
+            }
+            if (activity != null) {
+                Toast.makeText(activity, "未授予定位权限，未启用动态天气和日历",
+                        Toast.LENGTH_SHORT).show();
+            }
+            if (activity != null && !activity.shouldShowRequestPermissionRationale(
+                    Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                Log.i(LOG_TAG, "DYNAMIC_ICON_PERMISSION_PERMANENTLY_DENIED");
+                showDynamicWeatherPermissionSettingsDialog(activity);
+            }
+            return;
+        }
+        if (activity != null) {
+            boolean oldEnabled = LauncherSettingBridge.dynamicWeatherCalendarEnabled(activity);
+            applyDynamicWeatherCalendarSetting(activity, item, oldEnabled, true);
+        }
+    }
+
+    private static void clearDynamicWeatherLocationPermissionRequest() {
+        sDynamicWeatherLocationPermissionPending = false;
+        sDynamicWeatherLocationPermissionItem = null;
+    }
+
+    private static void showDynamicWeatherPermissionSettingsDialog(final Activity activity) {
+        showConfirmDialog(activity, "需要定位权限", "动态天气需要使用粗略位置来获取当前城市天气。"
+                        + "请在系统设置中允许定位权限后再开启。",
+                "取消", "去设置", new View.OnClickListener() {
+                    public void onClick(View v) {
+                        try {
+                            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                            intent.setData(Uri.parse("package:" + activity.getPackageName()));
+                            activity.startActivity(intent);
+                        } catch (Throwable error) {
+                            Toast.makeText(activity, "无法打开应用设置", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
     }
 
     private static void writeBoolSetting(Context context, String key, boolean value) {
@@ -4348,8 +4710,9 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void writeTransparentModeSetting(Context context, boolean enabled) {
+    private static boolean writeTransparentModeSetting(Context context, boolean enabled) {
         int value = enabled ? 1 : 0;
+        boolean committed = false;
         try {
             Settings.Global.putInt(context.getContentResolver(), KEY_TRANSPARENT_THEME_ENABLED, value);
         } catch (Throwable ignored) {
@@ -4361,7 +4724,7 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         try {
-            context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+            committed = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
                     .edit()
                     .putBoolean(KEY_TRANSPARENT_THEME_ENABLED, enabled)
                     .putInt(KEY_TRANSPARENT_THEME_ENABLED, value)
@@ -4376,6 +4739,7 @@ public final class MaintainedLauncherSettingsHost {
                     .commit();
         } catch (Throwable ignored) {
         }
+        return committed;
     }
 
     private static boolean readTransparentModeSetting(Context context) {
@@ -4436,16 +4800,6 @@ public final class MaintainedLauncherSettingsHost {
             postDatabaseRefreshEvent();
             requestLauncherFrameFromContext(context);
             applyIconChange(context);
-            final Context app = context.getApplicationContext() == null
-                    ? context : context.getApplicationContext();
-            final boolean hiddenAfterReload = hidden;
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                public void run() {
-                    setBadgeRuntimeVisibility(app, hiddenAfterReload);
-                    refreshBadgeSceneNodes(app);
-                    requestLauncherFrameFromContext(app);
-                }
-            }, 180);
         }
     }
 
@@ -4833,24 +5187,233 @@ public final class MaintainedLauncherSettingsHost {
             return;
         }
         final SettingItemSwitch item = (SettingItemSwitch) view;
-        item.setTitle("显示图标上的角标");
-        item.setChecked(!readSystemBool(activity, "launcher_hide_badge", true));
+        sBadgeReminderSwitch = new WeakReference<SettingItemSwitch>(item);
+        item.setTitle("角标提醒");
+        item.setChecked(!readSystemBool(activity, KEY_BADGE_HIDE, true));
         bindSwitchControlOnly(item, new View.OnClickListener() {
             public void onClick(View v) {
                 boolean show = !item.isChecked();
-                if (show && !com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity)) {
-                    Toast.makeText(activity, "请先授予锤子桌面通知使用权，以显示应用角标",
-                            Toast.LENGTH_LONG).show();
-                    com.smartisanos.launcher.badge.BadgeBridge.openNotificationAccessSettings(activity);
+                if (show) {
+                    Log.i(LOG_TAG, "BADGE_REMINDER_ENABLE_REQUESTED targetSwitch=badge_reminder"
+                            + " oldUiChecked=false newUiChecked=true");
+                }
+                if (show && !com.smartisanos.launcher.badge.BadgeBridge
+                        .hasNotificationAccess(activity)) {
+                    requestBadgeNotificationAccess(activity, BADGE_PENDING_REMINDER, item);
                     return;
                 }
-                item.setCheckedAnimated(show);
-                boolean hidden = !show;
-                writeBoolSetting(activity, "launcher_hide_badge", hidden);
-                applyLauncherSettingChange(activity, "launcher_hide_badge");
-                applyBadgeVisibility(activity, hidden, true);
+                if (show) {
+                    Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_ALREADY_GRANTED"
+                            + " targetSwitch=badge_reminder notificationAccess=true");
+                }
+                applyBadgeReminderSetting(activity, item, show, show);
             }
         });
+    }
+
+    private static void bindBadgeSwipeCleanSwitch(final Activity activity, Resources resources,
+            View root) {
+        View view = find(resources, root, "item_id_badge_swipe_clean");
+        if (!(view instanceof SettingItemSwitch)) {
+            return;
+        }
+        final SettingItemSwitch item = (SettingItemSwitch) view;
+        sBadgeSwipeCleanSwitch = new WeakReference<SettingItemSwitch>(item);
+        item.setChecked(readSystemBool(activity, KEY_BADGE_SWIPE_CLEAN, false));
+        bindSwitchControlOnly(item, new View.OnClickListener() {
+            public void onClick(View v) {
+                boolean enabled = !item.isChecked();
+                if (enabled) {
+                    Log.i(LOG_TAG, "BADGE_SWIPE_CLEAN_ENABLE_REQUESTED"
+                            + " targetSwitch=badge_swipe_clean oldUiChecked=false"
+                            + " newUiChecked=true");
+                }
+                if (enabled && !com.smartisanos.launcher.badge.BadgeBridge
+                        .hasNotificationAccess(activity)) {
+                    requestBadgeNotificationAccess(activity, BADGE_PENDING_SWIPE_CLEAN, item);
+                    return;
+                }
+                if (enabled) {
+                    Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_ALREADY_GRANTED"
+                            + " targetSwitch=badge_swipe_clean notificationAccess=true");
+                }
+                applyBadgeSwipeCleanSetting(activity, item, enabled);
+            }
+        });
+    }
+
+    private static void requestBadgeNotificationAccess(final Activity activity,
+            final String target, final SettingItemSwitch item) {
+        if (activity == null || item == null) {
+            return;
+        }
+        boolean access = com.smartisanos.launcher.badge.BadgeBridge
+                .hasNotificationAccess(activity);
+        if (access) {
+            Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_ALREADY_GRANTED targetSwitch=" + target);
+            enableBadgeSettingAfterNotificationAccess(activity, target, item);
+            return;
+        }
+        if (sBadgeNotificationAccessDialogShowing || !BADGE_PENDING_NONE.equals(
+                readBadgeNotificationAccessPending(activity))) {
+            Log.i(LOG_TAG, "BADGE_PERMISSION_REQUEST_DUPLICATE_SKIPPED targetSwitch=" + target
+                    + " pendingTarget=" + readBadgeNotificationAccessPending(activity));
+            return;
+        }
+        sBadgeNotificationAccessDialogShowing = true;
+        Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_DIALOG_SHOWN targetSwitch=" + target
+                + " notificationAccess=false oldUiChecked=" + item.isChecked());
+        String message = BADGE_PENDING_REMINDER.equals(target)
+                ? "角标提醒需要读取应用通知，请在系统设置中允许“锤子桌面”访问通知。"
+                : "紧贴屏幕横扫清除角标需要通知使用权，请在系统设置中允许“锤子桌面”访问通知。";
+        showConfirmDialog(activity, "需要通知使用权", message, "取消", "前往设置",
+                new View.OnClickListener() {
+                    public void onClick(View v) {
+                        if (!writeBadgeNotificationAccessPending(activity, target)) {
+                            Toast.makeText(activity, "无法保存授权等待状态", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_SETTINGS_OPENED targetSwitch="
+                                + target + " pendingTarget=" + target);
+                        com.smartisanos.launcher.badge.BadgeBridge
+                                .openNotificationAccessSettings(activity);
+                    }
+                }, new Runnable() {
+                    public void run() {
+                        sBadgeNotificationAccessDialogShowing = false;
+                    }
+                });
+    }
+
+    public static void onSettingsHostResumed(Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        String pending = readBadgeNotificationAccessPending(activity);
+        boolean access = com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity);
+        if (!BADGE_PENDING_NONE.equals(pending)) {
+            clearBadgeNotificationAccessPending(activity);
+            if (access) {
+                Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_GRANTED_ON_RETURN targetSwitch="
+                        + pending + " notificationAccess=true");
+                enableBadgeSettingAfterNotificationAccess(activity, pending,
+                        badgeSwitchForTarget(pending));
+            } else {
+                Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_DENIED_ON_RETURN targetSwitch="
+                        + pending + " notificationAccess=false");
+                disableBadgeSettingWithoutNotificationAccess(activity, pending);
+                Toast.makeText(activity, "未授予通知使用权，功能无法开启", Toast.LENGTH_SHORT).show();
+            }
+        }
+        synchronizeBadgeSettingsWithNotificationAccess(activity, access);
+    }
+
+    private static void enableBadgeSettingAfterNotificationAccess(Activity activity, String target,
+            SettingItemSwitch item) {
+        if (BADGE_PENDING_REMINDER.equals(target)) {
+            applyBadgeReminderSetting(activity, item, true, true);
+        } else if (BADGE_PENDING_SWIPE_CLEAN.equals(target)) {
+            applyBadgeSwipeCleanSetting(activity, item, true);
+        }
+    }
+
+    private static void disableBadgeSettingWithoutNotificationAccess(Activity activity,
+            String target) {
+        if (BADGE_PENDING_REMINDER.equals(target)) {
+            applyBadgeReminderSetting(activity, badgeSwitchForTarget(target), false, false);
+        } else if (BADGE_PENDING_SWIPE_CLEAN.equals(target)) {
+            applyBadgeSwipeCleanSetting(activity, badgeSwitchForTarget(target), false);
+        }
+    }
+
+    private static void synchronizeBadgeSettingsWithNotificationAccess(Activity activity,
+            boolean access) {
+        if (access) {
+            updateBadgeSwitchUi(activity);
+            return;
+        }
+        boolean reminderEnabled = !readSystemBool(activity, KEY_BADGE_HIDE, true);
+        boolean swipeCleanEnabled = readSystemBool(activity, KEY_BADGE_SWIPE_CLEAN, false);
+        if (reminderEnabled || swipeCleanEnabled) {
+            Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_REVOKED notificationAccess=false"
+                    + " reminderEnabled=" + reminderEnabled
+                    + " swipeCleanEnabled=" + swipeCleanEnabled);
+        }
+        if (reminderEnabled) {
+            applyBadgeReminderSetting(activity, badgeSwitchForTarget(BADGE_PENDING_REMINDER),
+                    false, false);
+        }
+        if (swipeCleanEnabled) {
+            applyBadgeSwipeCleanSetting(activity,
+                    badgeSwitchForTarget(BADGE_PENDING_SWIPE_CLEAN), false);
+        }
+        updateBadgeSwitchUi(activity);
+    }
+
+    private static void applyBadgeReminderSetting(Context context, SettingItemSwitch item,
+            boolean enabled, boolean replay) {
+        boolean hidden = !enabled;
+        writeBoolSetting(context, KEY_BADGE_HIDE, hidden);
+        applyLauncherSettingChange(context, KEY_BADGE_HIDE);
+        applyBadgeVisibility(context, hidden, true);
+        if (item != null) {
+            item.setCheckedAnimated(enabled);
+        }
+        String event = enabled ? "BADGE_SWITCH_ENABLED_AFTER_ACCESS"
+                : (com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(context)
+                ? "BADGE_SWITCH_DISABLED" : "BADGE_SWITCH_DISABLED_NO_ACCESS");
+        Log.i(LOG_TAG, event + " targetSwitch=badge_reminder"
+                + " persistedValue=" + hidden);
+        if (enabled && replay) {
+            Log.i(LOG_TAG, "BADGE_REPLAY_REQUESTED targetSwitch=badge_reminder");
+            com.smartisanos.launcher.badge.BadgeBridge.replay(context);
+        }
+    }
+
+    private static void applyBadgeSwipeCleanSetting(Context context, SettingItemSwitch item,
+            boolean enabled) {
+        writeBoolSetting(context, KEY_BADGE_SWIPE_CLEAN, enabled);
+        applyLauncherSettingChange(context, KEY_BADGE_SWIPE_CLEAN);
+        if (item != null) {
+            item.setCheckedAnimated(enabled);
+        }
+        String event = enabled ? "BADGE_SWITCH_ENABLED_AFTER_ACCESS"
+                : (com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(context)
+                ? "BADGE_SWITCH_DISABLED" : "BADGE_SWITCH_DISABLED_NO_ACCESS");
+        Log.i(LOG_TAG, event + " targetSwitch=badge_swipe_clean"
+                + " persistedValue=" + enabled);
+    }
+
+    private static SettingItemSwitch badgeSwitchForTarget(String target) {
+        WeakReference<SettingItemSwitch> reference = BADGE_PENDING_REMINDER.equals(target)
+                ? sBadgeReminderSwitch : sBadgeSwipeCleanSwitch;
+        return reference == null ? null : reference.get();
+    }
+
+    private static void updateBadgeSwitchUi(Activity activity) {
+        SettingItemSwitch reminder = badgeSwitchForTarget(BADGE_PENDING_REMINDER);
+        if (reminder != null) {
+            reminder.setChecked(!readSystemBool(activity, KEY_BADGE_HIDE, true));
+        }
+        SettingItemSwitch swipeClean = badgeSwitchForTarget(BADGE_PENDING_SWIPE_CLEAN);
+        if (swipeClean != null) {
+            swipeClean.setChecked(readSystemBool(activity, KEY_BADGE_SWIPE_CLEAN, false));
+        }
+    }
+
+    private static String readBadgeNotificationAccessPending(Context context) {
+        return context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                .getString(PREF_BADGE_NOTIFICATION_ACCESS_PENDING, BADGE_PENDING_NONE);
+    }
+
+    private static boolean writeBadgeNotificationAccessPending(Context context, String target) {
+        return context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE).edit()
+                .putString(PREF_BADGE_NOTIFICATION_ACCESS_PENDING, target).commit();
+    }
+
+    private static void clearBadgeNotificationAccessPending(Context context) {
+        context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE).edit()
+                .remove(PREF_BADGE_NOTIFICATION_ACCESS_PENDING).commit();
     }
 
     public static boolean hasEnabledProfilePackage(Context context, String packageName) {
@@ -4927,15 +5490,7 @@ public final class MaintainedLauncherSettingsHost {
             logOperation(context, "PROFILE_NATIVE_ITEM", "failed package=" + entry.packageName
                     + ", userId=" + entry.userId + ", error=" + shortError(t));
         }
-        postDatabaseRefreshEvent();
-        final Context app = context.getApplicationContext() == null
-                ? context : context.getApplicationContext();
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            public void run() {
-                postDatabaseRefreshEvent();
-                applyIconChange(app);
-            }
-        }, 350);
+        requestLauncherFrameFromContext(context);
     }
 
     private static void updateProfileShortcut(Context context, ProfileAppEntry entry,
@@ -5654,27 +6209,11 @@ public final class MaintainedLauncherSettingsHost {
         return label;
     }
 
-    /** Rebuild the scene after the weather/calendar database rows have changed. */
+    /** Route a dynamic-icon mode change through the original per-package update pipeline. */
     private static void refreshDynamicIconMode(final Context context, final boolean enabled) {
         final Context app = context.getApplicationContext() == null
                 ? context : context.getApplicationContext();
-        new Handler(Looper.getMainLooper()).post(new Runnable() {
-            @Override
-            public void run() {
-                applyDynamicIconChange(app);
-                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (context instanceof Activity) {
-                            restartLauncherForColdSceneChange((Activity) context,
-                                    "dynamic_icon_mode_process_rebirth");
-                        } else {
-                            restartLauncher(context);
-                        }
-                    }
-                }, 600L);
-            }
-        });
+        applyDynamicIconChange(app);
     }
 
     private static void applyUnlockAnimationEnabled(boolean enabled) {
@@ -5962,9 +6501,24 @@ public final class MaintainedLauncherSettingsHost {
         Window window = activity.getWindow();
         if (window != null) {
             window.setWindowAnimations(0);
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.BLACK));
+            window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN
+                    | WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             window.setStatusBarColor(Color.BLACK);
-            if (Build.VERSION.SDK_INT >= 23) {
-                window.getDecorView().setSystemUiVisibility(0);
+            window.setNavigationBarColor(Color.BLACK);
+            window.getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            if (Build.VERSION.SDK_INT >= 28) {
+                window.getAttributes().layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            }
+            if (Build.VERSION.SDK_INT >= 30) {
+                window.setDecorFitsSystemWindows(false);
             }
         }
         Intent source = activity.getIntent();
@@ -6023,20 +6577,122 @@ public final class MaintainedLauncherSettingsHost {
                 String saved = activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
                         .getString("password_hash", "");
                 if (saved.equals(launcherPagePasswordHash(value))) {
-                    Intent target = passwordTargetIntent(activity);
-                    activity.setResult(Activity.RESULT_OK, new Intent());
-                    activity.finish();
-                    activity.overridePendingTransition(0, 0);
-                    if (target != null) {
-                        startPasswordTarget(activity, target);
-                    }
+                    final Intent target = passwordTargetIntent(activity);
+                    finishPasswordPage(activity, Activity.RESULT_OK, new Runnable() {
+                        @Override
+                        public void run() {
+                            if (target != null) {
+                                startPasswordTarget(activity, target);
+                            }
+                        }
+                    });
                 } else {
                     Toast.makeText(activity, "密码错误", Toast.LENGTH_SHORT).show();
+                    vibrateOriginalPasswordError(activity);
                     reset.run();
                 }
             }
         });
+        showPasswordPageContent(activity, root);
+    }
+
+    private static final class PasswordPageExit {
+        final View root;
+        Runnable afterFinish;
+        boolean running;
+        boolean finishCommitted;
+
+        PasswordPageExit(View root) {
+            this.root = root;
+        }
+    }
+
+    private static void showPasswordPageContent(final Activity activity, final View root) {
+        if (activity == null || root == null) return;
+        final PasswordPageExit exit = new PasswordPageExit(root);
+        synchronized (sPasswordPageExits) {
+            sPasswordPageExits.put(activity, exit);
+        }
+        int height = activity.getResources().getDisplayMetrics().heightPixels;
+        root.setTranslationY(Math.max(1, height));
         activity.setContentView(root);
+        root.post(new Runnable() {
+            @Override
+            public void run() {
+                if (activity.isFinishing() || exit.running) return;
+                root.animate().translationY(0f).setDuration(300L)
+                        .setInterpolator(new DecelerateInterpolator(1.35f)).start();
+            }
+        });
+    }
+
+    public static boolean interceptLauncherPasswordActivityFinish(final Activity activity) {
+        if (activity == null) return false;
+        final PasswordPageExit exit;
+        synchronized (sPasswordPageExits) {
+            exit = sPasswordPageExits.get(activity);
+            if (exit == null) return false;
+            if (exit.finishCommitted) {
+                sPasswordPageExits.remove(activity);
+                return false;
+            }
+            if (exit.running) return true;
+            exit.running = true;
+        }
+        disablePasswordPageInput(exit.root);
+        final int height = Math.max(1, activity.getResources().getDisplayMetrics().heightPixels);
+        exit.root.animate().translationY(height).setDuration(300L)
+                .setInterpolator(new DecelerateInterpolator(1.35f))
+                .withEndAction(new Runnable() {
+                    @Override
+                    public void run() {
+                        synchronized (sPasswordPageExits) {
+                            exit.finishCommitted = true;
+                        }
+                        activity.finish();
+                        activity.overridePendingTransition(0, 0);
+                        if (exit.afterFinish != null) exit.afterFinish.run();
+                    }
+                }).start();
+        return true;
+    }
+
+    private static void finishPasswordPage(Activity activity, int resultCode, Runnable afterFinish) {
+        if (activity == null) return;
+        activity.setResult(resultCode, new Intent());
+        synchronized (sPasswordPageExits) {
+            PasswordPageExit exit = sPasswordPageExits.get(activity);
+            if (exit != null) exit.afterFinish = afterFinish;
+        }
+        activity.finish();
+    }
+
+    private static void disablePasswordPageInput(View view) {
+        if (view == null) return;
+        view.setEnabled(false);
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                disablePasswordPageInput(group.getChildAt(i));
+            }
+        }
+    }
+
+    private static void vibrateOriginalPasswordError(Context context) {
+        if (context == null) return;
+        try {
+            Vibrator vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+            if (vibrator == null || !vibrator.hasVibrator()) return;
+            if (Build.VERSION.SDK_INT >= 29) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK));
+            } else if (Build.VERSION.SDK_INT >= 26) {
+                vibrator.vibrate(VibrationEffect.createOneShot(10L,
+                        VibrationEffect.DEFAULT_AMPLITUDE));
+            } else {
+                vibrator.vibrate(10L);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void showLauncherPasswordSetStep(final Activity activity, final String firstPassword) {
@@ -6214,10 +6870,12 @@ public final class MaintainedLauncherSettingsHost {
                         v.playSoundEffect(android.view.SoundEffectConstants.CLICK);
                         v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
                         if ("取消".equals(key)) {
-                            activity.setResult(Activity.RESULT_CANCELED, new Intent());
-                            finishLauncherPasswordVerification();
-                            activity.finish();
-                            activity.overridePendingTransition(0, 0);
+                            finishPasswordPage(activity, Activity.RESULT_CANCELED, new Runnable() {
+                                @Override
+                                public void run() {
+                                    finishLauncherPasswordVerification();
+                                }
+                            });
                         } else if ("⌫".equals(key)) {
                             if (input.length() > 0) {
                                 input.deleteCharAt(input.length() - 1);
@@ -6530,11 +7188,6 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         refreshLauncherWallpaperSurface();
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            public void run() {
-                refreshLauncherWallpaperSurface();
-            }
-        }, 180);
     }
 
     private static void clearWallpaperPrefs(Context context, String prefs) {
@@ -6617,9 +7270,16 @@ public final class MaintainedLauncherSettingsHost {
         // PAGE_1_4X5 is 0x09. The latter still has 20 cells.
         int oldPageMode = pageModeForLauncherCellCount(readLauncherMode(context));
         int pageMode = pageModeForLauncherCellCount(mode);
+        if (!writeLauncherModePref(context, mode)) {
+            logOperation(context, "GRID_MIGRATION", "private_pref_commit_failed mode=" + mode);
+            Toast.makeText(context, "桌面宫格设置保存失败", Toast.LENGTH_SHORT).show();
+            return;
+        }
         int multiBlockMode = mode == 20 ? 0x50 : 0x30;
         int maintainedMultiBlockMode = mode == 20 ? 0x40 : 0x24;
         try {
+            // Settings.Global is only a best-effort mirror on non-Smartisan ROMs.
+            // The committed private preference above remains authoritative.
             Settings.Global.putInt(context.getContentResolver(), "launcher_mode", mode);
             Settings.Global.putInt(context.getContentResolver(), "launcher_multi_block_mode", multiBlockMode);
             Settings.Global.putInt(context.getContentResolver(), "multi_block_mode", maintainedMultiBlockMode);
@@ -6631,6 +7291,16 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static int pageModeForLauncherCellCount(int cellCount) {
+        try {
+            Object value = Class.forName("com.smartisanos.launcher.data.Constants")
+                    .getMethod("getPageModeFromMode", Integer.TYPE)
+                    .invoke(null, cellCount);
+            if (value instanceof Integer) {
+                return ((Integer) value).intValue();
+            }
+        } catch (Throwable ignored) {
+        }
+        // Preserve the verified original mapping if reflection is unavailable.
         return cellCount == 20 ? 9 : 12;
     }
 
@@ -6655,11 +7325,41 @@ public final class MaintainedLauncherSettingsHost {
         return systemMode == 20 ? 20 : 12;
     }
 
+    /** Keeps the original single/multi mode pair valid after device adaptation. */
+    public static int resolvePortLauncherMultiMode(Context context, int systemMode,
+            int adaptedBasePageMode) {
+        boolean hasPortMode = false;
+        if (context != null) {
+            try {
+                int saved = context.getSharedPreferences("com.smartisanos.launcher_prefs",
+                        Context.MODE_PRIVATE).getInt("prefs_key_launcher_mode", -1);
+                hasPortMode = saved == 12 || saved == 20;
+            } catch (Throwable ignored) {
+            }
+        }
+        if (!hasPortMode) {
+            return systemMode;
+        }
+        if (adaptedBasePageMode == 4) {
+            return 0x40;
+        }
+        if (adaptedBasePageMode == 9) {
+            return 0x50;
+        }
+        if (adaptedBasePageMode == 12) {
+            return 0x30;
+        }
+        if (adaptedBasePageMode == 1) {
+            return 0x24;
+        }
+        return systemMode;
+    }
+
     public static void migrateLauncherModeAndRestart(final Context context,
                                                      final int oldPageMode,
                                                      final int newPageMode) {
         if (oldPageMode == newPageMode) {
-            restartLauncher(context);
+            logOperation(context, "GRID_MIGRATION", "skip_same_mode=" + newPageMode);
             return;
         }
         try {
@@ -6707,89 +7407,116 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    /**
-     * A grid mode change only needs the launcher configuration to be read
-     * again. Recreate the home activity in-process so the loading surface
-     * remains visible; killing the process briefly exposes the system wallpaper.
-     */
+    /** Grid migration is complete; use the verified cold-scene fallback. */
     private static void restartLauncherAfterGridMigration(Context context) {
-        restartLauncher(context);
+        int gridMode = readLauncherMode(context);
+        if (!com.smartisanos.launcher.reload.LauncherColdReloadCoordinator
+                .beginGridReload(context, gridMode)) {
+            logOperation(context, "RESTART", "grid_transition_start_failed");
+        }
     }
 
     private static void restartLauncher(final Context context) {
         markThemeReloadLoadingPending(context, "正在加载桌面...");
-        if (context instanceof Activity) {
-            showRestartLoading((Activity) context);
-        }
-        if (recreateLauncherInPlace(context)) {
+        if (reloadLauncherSceneInPlace(context)) {
             return;
         }
         // Last-resort path for devices where the active Launcher activity
         // cannot be reached.  Normal settings changes use the in-process
         // recreation above and never expose the underlying wallpaper.
+        if (context instanceof Activity) {
+            showRestartLoading((Activity) context);
+        }
         scheduleLauncherRestart(context);
         if (context instanceof Activity) {
             logOperation(context, "RESTART", "process_rebirth_for_launcher_reload");
         } else {
             logOperation(context, "RESTART", "scheduled_process_rebirth_for_launcher_reload");
         }
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    Process.killProcess(Process.myPid());
-                } catch (Throwable ignored) {
-                    startLauncherFromForeground(context);
-                }
-            }
-        }, 0L);
+        try {
+            Process.killProcess(Process.myPid());
+        } catch (Throwable ignored) {
+            startLauncherFromForeground(context);
+        }
     }
 
     /**
-     * The launcher lives below the settings task in the same process. Recreate
-     * that paused activity first, then dismiss settings once its first frame is
-     * ready. This is much cheaper than a process rebirth and keeps the desktop
-     * surface continuously covered.
+     * The launcher lives below the settings task in the same process. Mark the
+     * original scene dirty and bring that activity forward so J.onResume() can
+     * run its existing v -> J.Hv() configuration and PageView update chain on
+     * the current EGL surface. Dismiss settings only after the next frame.
      */
-    private static boolean recreateLauncherInPlace(final Context context) {
+    private static boolean reloadLauncherSceneInPlace(final Context context) {
         try {
-            Object launcher = Class.forName("com.smartisanos.launcher.J")
-                    .getMethod("getInstance").invoke(null);
-            if (launcher == null) {
+            final Activity launcherActivity = activeLauncherActivity();
+            if (launcherActivity == null) {
+                logOperation(context, "RESTART", "fallback_no_launcher_activity");
                 return false;
             }
-            Object candidate = launcher.getClass().getMethod("getActivity").invoke(launcher);
-            if (!(candidate instanceof Activity)) {
-                return false;
-            }
-            final Activity launcherActivity = (Activity) candidate;
             if (launcherActivity.isFinishing()) {
+                logOperation(context, "RESTART", "fallback_launcher_finishing");
                 return false;
             }
-            reloadOriginalSettings(context);
-            new Handler(Looper.getMainLooper()).post(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        launcherActivity.recreate();
-                        logOperation(context, "RESTART", "in_process_launcher_recreate");
-                    } catch (Throwable error) {
-                        Log.w(LOG_TAG, "In-process Launcher recreate failed", error);
-                    }
-                }
-            });
-            if (context instanceof Activity && context != launcherActivity) {
-                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        finishSettingsTask((Activity) context);
-                    }
-                }, 260L);
+            final Activity settingsActivity = context instanceof Activity
+                    && context != launcherActivity ? (Activity) context : null;
+            synchronized (MaintainedLauncherSettingsHost.class) {
+                sPendingReloadSettingsActivity = settingsActivity == null
+                        ? null : new WeakReference<Activity>(settingsActivity);
+                sDeferredLauncherActivity = new WeakReference<Activity>(launcherActivity);
+                sLauncherFirstFrameReady = false;
+                sDeferredLauncherTasksPosted = false;
+                sLauncherFrameReportPending = true;
             }
+            Class.forName("com.smartisanos.launcher.Aa")
+                    .getMethod("p", Boolean.TYPE).invoke(null, Boolean.TRUE);
+            showRestartLoading(launcherActivity, "正在加载桌面...", true);
+            Intent intent = launcherActivityIntent(context);
+            intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            context.startActivity(intent);
+            if (settingsActivity != null) {
+                settingsActivity.overridePendingTransition(0, 0);
+            }
+            logOperation(context, "RESTART", "in_process_original_dirty_scene_reload");
             return true;
         } catch (Throwable error) {
             Log.w(LOG_TAG, "Unable to find active Launcher for in-process reload", error);
+            logOperation(context, "RESTART", "fallback_launcher_lookup_failed error="
+                    + shortError(error));
             return false;
+        }
+    }
+
+    private static Activity activeLauncherActivity() {
+        Activity activity = sDeferredLauncherActivity == null
+                ? null : sDeferredLauncherActivity.get();
+        if (isLauncherActivity(activity)) {
+            return activity;
+        }
+        try {
+            Object launcher = Class.forName("com.smartisanos.launcher.J")
+                    .getMethod("getInstance").invoke(null);
+            Object candidate = launcher == null ? null
+                    : launcher.getClass().getMethod("getActivity").invoke(launcher);
+            return candidate instanceof Activity && isLauncherActivity((Activity) candidate)
+                    ? (Activity) candidate : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isLauncherActivity(Activity activity) {
+        return activity != null
+                && "com.smartisanos.launcher.Launcher".equals(activity.getClass().getName());
+    }
+
+    private static void fallbackToProcessRebirth(Context context) {
+        scheduleLauncherRestart(context);
+        logOperation(context, "RESTART", "exceptional_process_rebirth");
+        try {
+            Process.killProcess(Process.myPid());
+        } catch (Throwable ignored) {
+            startLauncherFromForeground(context);
         }
     }
 
@@ -6979,12 +7706,13 @@ public final class MaintainedLauncherSettingsHost {
                 Activity activity = (Activity) context;
                 Intent intent = launcherActivityIntent(activity);
                 intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                activity.startActivity(intent);
+                markThemeSettingsExitRequested(activity);
+                activity.finish();
                 try {
                     activity.overridePendingTransition(0, 0);
                 } catch (Throwable ignored) {
                 }
-                activity.finish();
+                activity.startActivity(intent);
                 try {
                     activity.overridePendingTransition(0, 0);
                 } catch (Throwable ignored) {
@@ -6996,57 +7724,9 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void refreshLauncherWallpaperNow(final Context context) {
+    private static boolean refreshLauncherWallpaperNow(final Context context) {
         applyWallpaperChange(context);
-        refreshLauncherWallpaperSurface();
-        refreshLauncherAfterWallpaperUriChanged(context);
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                refreshLauncherWallpaperSurface();
-                refreshLauncherAfterWallpaperUriChanged(context);
-            }
-        }, 120);
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                refreshLauncherWallpaperSurface();
-                refreshLauncherAfterWallpaperUriChanged(context);
-            }
-        }, 420);
-    }
-
-    private static void refreshLauncherAfterWallpaperUriChanged(Context context) {
-        try {
-            Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
-                    .getMethod("getInstance").invoke(null);
-            if (mainView != null) {
-                try {
-                    mainView.getClass().getMethod("Vh").invoke(mainView);
-                    logOperation(context, "WALLPAPER", "refresh_mainview_vh_ok");
-                    return;
-                } catch (Throwable t) {
-                    logOperation(context, "WALLPAPER", "refresh_mainview_vh_failed " + shortError(t));
-                }
-                try {
-                    mainView.getClass().getMethod("oh").invoke(mainView);
-                } catch (Throwable ignored) {
-                }
-                try {
-                    mainView.getClass().getMethod("Z", Boolean.TYPE).invoke(mainView, Boolean.TRUE);
-                } catch (Throwable ignored) {
-                }
-            }
-        } catch (Throwable t) {
-            logOperation(context, "WALLPAPER", "refresh_mainview_extra_failed " + shortError(t));
-        }
-        try {
-            Object renderer = Class.forName("com.smartisanos.smengine.Ra")
-                    .getMethod("getInstance").invoke(null);
-            if (renderer != null) {
-                renderer.getClass().getMethod("wt").invoke(renderer);
-            }
-        } catch (Throwable ignored) {
-        }
+        return refreshLauncherWallpaperSurface();
     }
 
     private static void markWallpaperRefreshPending(Context context, boolean pending) {
@@ -7091,16 +7771,20 @@ public final class MaintainedLauncherSettingsHost {
             syncLauncherWallpaperUri(context, uri);
             setLauncherWallpaperConstant(uri);
         }
-        refreshLauncherWallpaperSurface();
-        markWallpaperRefreshPending(context, false);
+        if (refreshLauncherWallpaperSurface()) {
+            markWallpaperRefreshPending(context, false);
+        }
     }
 
-    private static void refreshLauncherWallpaperSurface() {
+    /** Original Eb.lh() is TransWallpaper.changeWallpaper, not a PageView reload. */
+    private static boolean refreshLauncherWallpaperSurface() {
+        boolean refreshed = false;
         try {
             Object mainView = Class.forName("com.smartisanos.launcher.view.Eb")
                     .getMethod("getInstance").invoke(null);
             if (mainView != null) {
                 mainView.getClass().getMethod("lh").invoke(mainView);
+                refreshed = true;
             }
         } catch (Throwable ignored) {
         }
@@ -7112,6 +7796,7 @@ public final class MaintainedLauncherSettingsHost {
             }
         } catch (Throwable ignored) {
         }
+        return refreshed;
     }
 
     private static void setLauncherWallpaperConstant(String uri) {
@@ -7147,11 +7832,7 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         try {
-            if (Build.VERSION.SDK_INT >= 21) {
-                activity.finishAndRemoveTask();
-            } else {
-                activity.finish();
-            }
+            activity.finish();
         } catch (Throwable ignored) {
             try {
                 activity.finish();
@@ -7457,18 +8138,32 @@ public final class MaintainedLauncherSettingsHost {
 
     }
 
-    private static void writeLauncherModePref(Context context, int mode) {
+    private static boolean writeLauncherModePref(Context context, int mode) {
         try {
-            context.getSharedPreferences("com.smartisanos.launcher_prefs", 0)
+            return context.getSharedPreferences("com.smartisanos.launcher_prefs", 0)
                     .edit()
                     .putInt("prefs_key_launcher_mode", mode)
                     .commit();
         } catch (Throwable ignored) {
+            return false;
         }
     }
 
     private static void showConfirmDialog(final Activity activity, String title, String message, String negative, String positive, final View.OnClickListener positiveClick) {
+        showConfirmDialog(activity, title, message, negative, positive, positiveClick, null);
+    }
+
+    private static void showConfirmDialog(final Activity activity, String title, String message,
+            String negative, String positive, final View.OnClickListener positiveClick,
+            final Runnable dismissed) {
         final Dialog dialog = new Dialog(activity);
+        if (dismissed != null) {
+            dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                public void onDismiss(DialogInterface dialogInterface) {
+                    dismissed.run();
+                }
+            });
+        }
         LinearLayout root = new LinearLayout(activity);
         prepareSmartisanDialogRoot(activity, root);
 
@@ -7638,39 +8333,65 @@ public final class MaintainedLauncherSettingsHost {
                 + ", before=" + themeDiagnosticState(activity)
                 + ", package_installed=" + packageInstalled(activity, pkg));
         sThemeChangeGuardUntilUptime = android.os.SystemClock.uptimeMillis() + 4000L;
+        sPendingThemeLoadingThemeId = id;
         pkg = normalizeThemePackage(activity, id, pkg);
         if ("smartisan_theme_trans".equals(id)) {
-            ensureTransparentThemeRegistered(activity);
-            String current = currentTheme(activity);
-            if (current != null && current.length() > 0 && !"smartisan_theme_trans".equals(current)) {
-                saveTransparentPreviousTheme(activity, current);
-            }
-            writeTransparentModeSetting(activity, true);
-            applyTransparentThemeRuntimeFlags(activity);
-            Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
-            restartLauncherForColdSceneChange(activity, "transparent_theme_process_rebirth");
+            applyTransparentThemeSetting(activity, true, true);
             return;
         } else {
+            // A regular theme selection must always remain on the original
+            // ChangeThemeHandler path.  launcher_grid_theme is an overlay
+            // state, not the requested theme identity; routing this branch
+            // through the transparent-theme reload made a normal selection
+            // show ReloadTransitionActivity whenever stale overlay state was
+            // present.
+            boolean transparentOverlayWasEnabled = isTransparentThemeEnabled(activity);
             writeTransparentModeSetting(activity, false);
             writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false);
             applyTransparentThemeRuntimeFlags(activity, false);
+            if (transparentOverlayWasEnabled) {
+                logOperation(activity, "THEME",
+                        "normal_theme_cleared_transparent_overlay_without_cold_reload id=" + id);
+            }
         }
-        // Keep the original theme flow authoritative. It normally owns
-        // MESSAGE_CHANGE_THEME; a fallback is needed only when that stack did
-        // not persist the selected theme at all.
-        boolean stored = applyThemeViaOriginalStack(activity, id, pkg);
-        storeThemeSelection(activity, id);
-        boolean queued = !stored && queueThemeChangeForLauncher(activity, id);
-        logOperation(activity, "THEME", "persisted_before_dispatch id=" + id
-                + ", original=" + stored + ", queued=" + queued
+        // The original ThemeManager/ChangeThemeHandler owns the normal path.
+        // Only synthesize its pending message after that stack explicitly fails
+        // to persist the selected theme.
+        boolean originalApplied = applyThemeViaOriginalStack(activity, id, pkg);
+        boolean fallbackQueued = false;
+        if (!originalApplied) {
+            storeThemeSelection(activity, id);
+            fallbackQueued = queueThemeChangeForLauncher(activity, id);
+        }
+        logOperation(activity, "THEME", "dispatch id=" + id
+                + ", original=" + originalApplied + ", fallback=" + fallbackQueued
                 + ", after=" + themeDiagnosticState(activity));
         Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+        returnToLauncherForOriginalThemeTransition(activity);
+    }
+
+    private static void returnToLauncherForOriginalThemeTransition(final Activity activity) {
+        if (activity == null || activity.isFinishing()) {
+            return;
+        }
+        View root = activity.getWindow() == null ? null : activity.getWindow().getDecorView();
+        if (root == null) {
+            submitThemeSnapshot(activity);
+            startLauncherFromForeground(activity);
+            return;
+        }
+        // ThemeItemActivity waits 100 ms after the original theme state is committed.
+        // Its handler captures the transition image, finishes the settings page and returns HOME.
+        root.postDelayed(new Runnable() {
             public void run() {
+                if (activity.isFinishing()
+                        || (Build.VERSION.SDK_INT >= 17 && activity.isDestroyed())) {
+                    return;
+                }
                 submitThemeSnapshot(activity);
                 startLauncherFromForeground(activity);
             }
-        }, 120L);
+        }, 100L);
     }
 
     public static Bitmap normalizeNotificationBadgeBitmap(Bitmap source) {
@@ -7729,22 +8450,6 @@ public final class MaintainedLauncherSettingsHost {
         notifyOriginalConfigChanged(KEY_TRANSPARENT_THEME_ENABLED);
         notifyOriginalConfigChanged(KEY_TRANSPARENT_WALLPAPER_BLUR);
         refreshLauncherThemeSurface(context);
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                try {
-                    Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
-                    constants.getMethod("initByTheme", Context.class).invoke(null, context);
-                } catch (Throwable ignored) {
-                }
-                refreshLauncherThemeSurface(context);
-            }
-        }, 120L);
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                refreshLauncherThemeSurface(context);
-            }
-        }, 360L);
     }
 
     private static void refreshLauncherThemeSurface(Context context) {
@@ -7815,7 +8520,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static boolean applyThemeViaOriginalStack(Activity activity, String id, String pkg) {
-        boolean ok = false;
+        boolean stored = false;
         Object theme = null;
         try {
             Class<?> manager = Class.forName("com.smartisanos.launcher.theme.X");
@@ -7829,9 +8534,12 @@ public final class MaintainedLauncherSettingsHost {
                 theme = manager.getMethod("fa", String.class).invoke(null, id);
                 pkg = themePackage(theme, pkg);
             }
-            Object stored = manager.getMethod("ja", String.class).invoke(null, pkg + ":" + id);
-            ok = Boolean.TRUE.equals(stored);
+            Object result = manager.getMethod("ja", String.class).invoke(null, pkg + ":" + id);
+            stored = Boolean.TRUE.equals(result);
         } catch (Throwable ignored) {
+        }
+        if (!stored) {
+            return false;
         }
         Object handlerInstance = null;
         Class<?> handler = null;
@@ -7849,7 +8557,6 @@ public final class MaintainedLauncherSettingsHost {
             Class<?> settings = Class.forName("com.smartisanos.launcher.data.O");
             settings.getMethod("a", android.content.ContentResolver.class, String.class)
                     .invoke(null, activity.getContentResolver(), id);
-            ok = true;
         } catch (Throwable ignored) {
         }
         try {
@@ -7858,7 +8565,7 @@ public final class MaintainedLauncherSettingsHost {
             proxy.getMethod("l", Boolean.TYPE).invoke(instance, false);
         } catch (Throwable ignored) {
         }
-        return ok;
+        return true;
     }
 
     private static void storeThemeSelection(Context context, String id) {
@@ -9123,36 +9830,127 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    public static void stabilizeLauncherResume(final Activity activity) {
+    public static synchronized void prepareLauncherDeferredTasks(Activity activity) {
+        sDeferredLauncherActivity = new WeakReference<Activity>(activity);
+        sLauncherFirstFrameReady = false;
+        sDeferredLauncherTasksPosted = false;
+        sLauncherFrameReportPending = true;
+        sLastBadgeHidden = null;
+    }
+
+    public static void applyProcessCompatOnce() {
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            if (sProcessCompatApplied) {
+                return;
+            }
+            sProcessCompatApplied = true;
+        }
+        disableLegacyTouchSizeSweepOnModernAndroid();
+    }
+
+    public static void scheduleLauncherPostFirstFrameTasks(Activity activity) {
         if (activity == null) {
             return;
         }
-        disableLegacyTouchSizeSweepOnModernAndroid();
-        applyLauncherNavigationBarSetting(activity);
-        applyBadgeVisibility(activity,
-                readSystemBool(activity, "launcher_hide_badge", true), false);
-        // Some ColorOS builds grant notification-listener access in the installer UI
-        // but do not bind the service until the settings page is opened. Re-check and
-        // request the binding whenever HOME becomes active, without requiring that detour.
-        com.smartisanos.launcher.badge.BadgeBridge.replay(activity);
-        requestLauncherFrame(activity);
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                requestLauncherFrame(activity);
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            sDeferredLauncherActivity = new WeakReference<Activity>(activity);
+            if (sLauncherFirstFrameReady && !sLauncherFrameReportPending) {
+                sLauncherFirstFrameReady = false;
+                sDeferredLauncherTasksPosted = false;
+                sLauncherFrameReportPending = true;
             }
-        }, 80);
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                requestLauncherFrame(activity);
+        }
+        postDeferredLauncherTasksIfReady();
+    }
+
+    public static void onLauncherFirstFrame() {
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            if (sLauncherFirstFrameReady) {
+                return;
             }
-        }, 260);
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                requestLauncherFrame(activity);
-                dismissPendingLauncherReloadLoading();
+            sLauncherFirstFrameReady = true;
+        }
+        postDeferredLauncherTasksIfReady();
+    }
+
+    private static void postDeferredLauncherTasksIfReady() {
+        final Activity activity;
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            activity = sDeferredLauncherActivity == null
+                    ? null : sDeferredLauncherActivity.get();
+            if (!sLauncherFirstFrameReady || activity == null
+                    || activity.isFinishing() || sDeferredLauncherTasksPosted) {
+                return;
             }
-        }, 1200);
+            sDeferredLauncherTasksPosted = true;
+        }
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                com.smartisanos.launcher.diagnostics.LauncherStartupDiagnostics
+                        .mark("LAUNCH_DEFERRED_TASKS_BEGIN");
+                applyProcessCompatOnce();
+                applyNavigationBarIfChanged(activity);
+                maybeRefreshLauncherWallpaper(activity);
+                applyBadgeIfDirty(activity);
+                if (LauncherSettingBridge.dynamicWeatherCalendarEnabled(activity)) {
+                    WeatherBridge.onLauncherResume(activity);
+                }
+                if (com.smartisanos.home.settings.icons.IconPackManager
+                        .isIconPackSelectionEnabled(activity)) {
+                    com.smartisanos.home.settings.icons.IconPackManager
+                            .preloadSelectedIconPackAsync(activity);
+                }
+                completePendingReloadAfterFirstFrame();
+                com.smartisanos.launcher.diagnostics.LauncherStartupDiagnostics
+                        .mark("LAUNCH_DEFERRED_TASKS_END");
+            }
+        });
+    }
+
+    public static void applyBadgeIfDirty(Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        boolean hidden = readSystemBool(activity, "launcher_hide_badge", true);
+        if (sLastBadgeHidden == null || sLastBadgeHidden.booleanValue() != hidden) {
+            applyBadgeVisibility(activity, hidden, false);
+            sLastBadgeHidden = Boolean.valueOf(hidden);
+        }
+        if (!hidden) {
+            com.smartisanos.launcher.badge.BadgeBridge.replayIfDirty(activity);
+        }
+    }
+
+    public static void completePendingReloadAfterFirstFrame() {
+        final Activity settingsActivity;
+        synchronized (MaintainedLauncherSettingsHost.class) {
+            settingsActivity = sPendingReloadSettingsActivity == null
+                    ? null : sPendingReloadSettingsActivity.get();
+            if (sLauncherReloadDialog == null && settingsActivity == null) {
+                return;
+            }
+            sPendingReloadSettingsActivity = null;
+        }
+        if (sLauncherReloadDialog == null && settingsActivity == null) {
+            return;
+        }
+        try {
+            Choreographer.getInstance().postFrameCallback(new Choreographer.FrameCallback() {
+                @Override
+                public void doFrame(long frameTimeNanos) {
+                    dismissPendingLauncherReloadLoading();
+                    if (settingsActivity != null && !settingsActivity.isFinishing()) {
+                        finishSettingsTask(settingsActivity);
+                    }
+                }
+            });
+        } catch (Throwable ignored) {
+            dismissPendingLauncherReloadLoading();
+            if (settingsActivity != null && !settingsActivity.isFinishing()) {
+                finishSettingsTask(settingsActivity);
+            }
+        }
     }
 
     private static void disableLegacyTouchSizeSweepOnModernAndroid() {
@@ -9173,23 +9971,6 @@ public final class MaintainedLauncherSettingsHost {
         String message = themeReloadLoadingMessage(activity);
         clearThemeReloadLoadingPending(activity);
         showRestartLoading(activity, message, true);
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                requestLauncherFrame(activity);
-            }
-        }, 320);
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                requestLauncherFrame(activity);
-            }
-        }, 760);
-        handler.postDelayed(new Runnable() {
-            public void run() {
-                requestLauncherFrame(activity);
-                dismissPendingLauncherReloadLoading();
-            }
-        }, 1600);
     }
 
     private static void dismissPendingLauncherReloadLoading() {
@@ -10561,9 +11342,11 @@ public final class MaintainedLauncherSettingsHost {
             bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
             bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
             bindBadgeVisibilitySwitch(activity, resources, root);
-            bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", false);
+            bindBadgeSwipeCleanSwitch(activity, resources, root);
             bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
             bindSwitch(activity, resources, root, "item_id_search_page_enabled", KEY_SEARCH_PAGE_ENABLED, true);
+            synchronizeBadgeSettingsWithNotificationAccess(activity,
+                    com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity));
             tuneScrollBars(root);
             setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
@@ -11574,6 +12357,9 @@ public final class MaintainedLauncherSettingsHost {
                 int percent = normalizeIconSizePercent(seekBar.getProgress() + 50);
                 if (percent != current) {
                     saveIconSizePercent(activity, current, percent);
+                } else {
+                    com.smartisanos.launcher.reload.LauncherColdReloadCoordinator
+                            .beginIconSizeReload(activity, current, percent);
                 }
                 dialog.dismiss();
             }
@@ -11817,8 +12603,27 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void saveIconSizePercent(Context context, int oldPercent, int percent) {
+    private static boolean saveIconSizePercent(Context context, int oldPercent, int percent) {
         percent = normalizeIconSizePercent(percent);
+        boolean persisted = false;
+        try {
+            persisted = context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt(KEY_LAUNCHER_ICON_SIZE, percent)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
+        if (!persisted) {
+            logOperation(context, "ICON_SIZE_PERSIST_FAILED", "old=" + oldPercent + ",new=" + percent);
+            return false;
+        }
+        try {
+            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putInt(KEY_LAUNCHER_ICON_SIZE, percent)
+                    .commit();
+        } catch (Throwable ignored) {
+        }
         try {
             Settings.System.putInt(context.getContentResolver(), KEY_LAUNCHER_ICON_SIZE, percent);
         } catch (Throwable ignored) {
@@ -11827,87 +12632,17 @@ public final class MaintainedLauncherSettingsHost {
             Settings.Global.putInt(context.getContentResolver(), KEY_LAUNCHER_ICON_SIZE, percent);
         } catch (Throwable ignored) {
         }
-        context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
-                .edit()
-                .putInt(KEY_LAUNCHER_ICON_SIZE, percent)
-                .commit();
-        try {
-            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
-                    .edit()
-                    .putInt(KEY_LAUNCHER_ICON_SIZE, percent)
-                    .commit();
-        } catch (Throwable ignored) {
-        }
         notifyOriginalConfigChanged(KEY_LAUNCHER_ICON_SIZE);
         if (context instanceof Activity) {
             refreshIconSizeSubtitle((Activity) context, percent);
-            restartLauncherForIconSizeChange((Activity) context, oldPercent, percent);
-        }
-    }
-
-    private static void restartLauncherForIconSizeChange(Activity activity,
-            int oldPercent, int newPercent) {
-        markThemeReloadLoadingPending(activity, "正在加载桌面...");
-        showRestartLoading(activity);
-        // Existing icon SceneNodes retain their geometry even after a page update;
-        // partially scaling LayoutProperty only breaks folder previews. Start an
-        // explicit fresh Launcher process after killing this one so Constants,
-        // grid points, regular icons and folder previews are created atomically.
-        scheduleIconSizeLauncherRestart(activity);
-        logOperation(activity, "RESTART", "icon_size_exact_process_rebirth");
-        finishSettingsTask(activity);
-        try {
-            Process.killProcess(Process.myPid());
-        } catch (Throwable ignored) {
-            startLauncherFromForeground(activity);
-        }
-    }
-
-    private static void scheduleIconSizeLauncherRestart(Context context) {
-        try {
-            Intent intent = launcherHomeIntent(context);
-            int flags = PendingIntent.FLAG_CANCEL_CURRENT;
-            if (Build.VERSION.SDK_INT >= 23) {
-                flags |= PendingIntent.FLAG_IMMUTABLE;
+            if (!com.smartisanos.launcher.reload.LauncherColdReloadCoordinator
+                    .beginIconSizeReload(context, oldPercent, percent)) {
+                logOperation(context, "ICON_SIZE_RELOAD_FAILED",
+                        "old=" + oldPercent + ",new=" + percent);
+                return false;
             }
-            PendingIntent pendingIntent = PendingIntent.getActivity(context, 1002, intent, flags);
-            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-            if (alarmManager == null) {
-                throw new IllegalStateException("AlarmManager unavailable");
-            }
-            long trigger = android.os.SystemClock.elapsedRealtime() + 350L;
-            if (Build.VERSION.SDK_INT >= 23) {
-                alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.ELAPSED_REALTIME_WAKEUP, trigger, pendingIntent);
-            } else {
-                alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, trigger, pendingIntent);
-            }
-        } catch (Throwable ignored) {
-            startLauncherFromForeground(context);
         }
-    }
-
-    private static void cancelScheduledIconSizeLauncherRestart(Context context) {
-        if (context == null) {
-            return;
-        }
-        try {
-            Intent intent = launcherHomeIntent(context);
-            int flags = PendingIntent.FLAG_NO_CREATE;
-            if (Build.VERSION.SDK_INT >= 23) {
-                flags |= PendingIntent.FLAG_IMMUTABLE;
-            }
-            PendingIntent pendingIntent = PendingIntent.getActivity(context, 1002, intent, flags);
-            if (pendingIntent != null) {
-                AlarmManager alarmManager =
-                        (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-                if (alarmManager != null) {
-                    alarmManager.cancel(pendingIntent);
-                }
-                pendingIntent.cancel();
-            }
-        } catch (Throwable ignored) {
-        }
+        return true;
     }
 
     private static void markPendingIconSizeRuntimeChange(Context context, int oldPercent, int percent) {
@@ -11941,6 +12676,8 @@ public final class MaintainedLauncherSettingsHost {
             android.content.SharedPreferences prefs =
                     context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE);
             int newPercent = normalizeIconSizePercent(readIconSizePercent(context));
+            com.smartisanos.launcher.reload.LauncherColdReloadCoordinator
+                    .reportIconSizeConfigRead(newPercent);
             prefs.edit().putBoolean(PREF_ICON_SIZE_RUNTIME_DIRTY, false).commit();
             if (newPercent == 100) {
                 return;
@@ -12410,6 +13147,33 @@ public final class MaintainedLauncherSettingsHost {
         reloadOriginalSettings(context);
     }
 
+    /** Sends one original per-package update and one render for merged icon changes. */
+    private static void applyIconChanges(Context context, java.util.Collection<String> packages) {
+        if (context == null || packages == null || packages.isEmpty()) {
+            return;
+        }
+        StringBuilder names = new StringBuilder();
+        for (String packageName : packages) {
+            if (TextUtils.isEmpty(packageName)) {
+                continue;
+            }
+            if (names.length() > 0) {
+                names.append(',');
+            }
+            names.append(packageName);
+        }
+        if (names.length() == 0) {
+            return;
+        }
+        try {
+            Intent intent = new Intent("com.smartisanos.launcher.update_icon");
+            intent.putExtra("extra_packagename", names.toString());
+            dispatchIconUpdate(context, intent);
+        } catch (Throwable ignored) {
+        }
+        requestLauncherFrameFromContext(context);
+    }
+
     private static void warmAndApplyIconPack(final Activity activity) {
         if (activity == null) return;
         final Context app = activity.getApplicationContext() == null ? activity : activity.getApplicationContext();
@@ -12458,35 +13222,49 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    /** Refresh only weather/calendar rows when switching active-icon mode. */
+    /** Refresh only the original WeatherView/CalendarView package rows. */
     private static void applyDynamicIconChange(Context context) {
         if (context == null) {
             return;
         }
         try {
-            Intent query = new Intent(Intent.ACTION_MAIN);
-            query.addCategory(Intent.CATEGORY_LAUNCHER);
-            int flags = Build.VERSION.SDK_INT >= 23 ? 0x00020000 : 0;
-            List<ResolveInfo> apps = context.getPackageManager().queryIntentActivities(query, flags);
-            StringBuilder packages = new StringBuilder();
-            java.util.HashSet<String> seen = new java.util.HashSet<String>();
-            for (ResolveInfo info : apps) {
-                ActivityInfo ai = info == null ? null : info.activityInfo;
-                String pkg = ai == null ? null : ai.packageName;
-                if (!LauncherSettingBridge.isDynamicIconPackage(pkg) || !seen.add(pkg)) {
-                    continue;
-                }
-                if (packages.length() > 0) packages.append(',');
-                packages.append(pkg);
-            }
+            String packages = originalDynamicIconPackages();
             if (packages.length() > 0) {
                 Intent update = new Intent("com.smartisanos.launcher.update_icon");
-                update.putExtra("extra_packagename", packages.toString());
+                update.putExtra("extra_packagename", packages);
                 dispatchIconUpdate(context, update);
             }
         } catch (Throwable ignored) {
         }
-        reloadOriginalSettings(context);
+    }
+
+    private static String originalDynamicIconPackages() {
+        StringBuilder packages = new StringBuilder();
+        appendOriginalDynamicIconPackage(packages,
+                "com.smartisanos.launcher.view.activeicon.H", "com.smartisanos.weather");
+        appendOriginalDynamicIconPackage(packages,
+                "com.smartisanos.launcher.view.activeicon.m", "com.android.calendar");
+        return packages.toString();
+    }
+
+    private static void appendOriginalDynamicIconPackage(StringBuilder packages, String className,
+            String fallback) {
+        String packageName = fallback;
+        try {
+            Object value = Class.forName(className).getField("PACKAGE_NAME").get(null);
+            if (value instanceof String && ((String) value).length() > 0) {
+                packageName = (String) value;
+            }
+        } catch (Throwable ignored) {
+        }
+        if (packageName == null || packageName.length() == 0
+                || packages.toString().contains(packageName)) {
+            return;
+        }
+        if (packages.length() > 0) {
+            packages.append(',');
+        }
+        packages.append(packageName);
     }
 
     private static String allLauncherPackages(Context context) {
@@ -15012,6 +15790,25 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    /** Removes only the uninstalled package's optional improved-icon cache. */
+    public static void clearCachedImprovedIcon(Context context, String packageName) {
+        if (context == null || TextUtils.isEmpty(packageName)) {
+            return;
+        }
+        synchronized (sSmartisanIconCache) {
+            sSmartisanIconCache.remove(packageName);
+        }
+        try {
+            File file = smartisanIconCacheFile(context, packageName);
+            if (file != null && file.isFile()) {
+                file.delete();
+            }
+            context.getSharedPreferences(SMARTISAN_ICON_CACHE_PREFS, Context.MODE_PRIVATE).edit()
+                    .remove("miss." + packageName).apply();
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static void writeCachedSmartisanIcon(Context context, String packageName, Bitmap bitmap) {
         if (bitmap == null) {
             return;
@@ -15030,7 +15827,7 @@ public final class MaintainedLauncherSettingsHost {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
             context.getSharedPreferences(SMARTISAN_ICON_CACHE_PREFS, Context.MODE_PRIVATE).edit()
                     .remove("miss." + packageName).apply();
-            scheduleSmartisanIconRefresh(context);
+            scheduleSmartisanIconRefresh(context, packageName);
         } catch (Throwable ignored) {
         } finally {
             if (out != null) {
@@ -15042,11 +15839,12 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void scheduleSmartisanIconRefresh(Context context) {
-        if (context == null) {
+    private static void scheduleSmartisanIconRefresh(Context context, String packageName) {
+        if (context == null || TextUtils.isEmpty(packageName)) {
             return;
         }
         synchronized (MaintainedLauncherSettingsHost.class) {
+            sSmartisanIconRefreshPackages.add(packageName);
             sSmartisanIconLastWriteUptime = android.os.SystemClock.uptimeMillis();
             if (sSmartisanIconRefreshScheduled) {
                 return;
@@ -15065,9 +15863,11 @@ public final class MaintainedLauncherSettingsHost {
                         return;
                     }
                     sSmartisanIconRefreshScheduled = false;
+                    java.util.ArrayList<String> changedPackages =
+                            new java.util.ArrayList<String>(sSmartisanIconRefreshPackages);
+                    sSmartisanIconRefreshPackages.clear();
+                    applyIconChanges(app, changedPackages);
                 }
-                postDatabaseRefreshEvent();
-                applyIconChange(app);
             }
         }, 2000L);
     }

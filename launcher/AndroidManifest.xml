@@ -125,6 +125,7 @@
     <activity android:theme="@0x7f0c015f" android:name="com.smartisanos.launcher.theme.ThemeItemActivity" android:taskAffinity="com.android.settings" android:launchMode="1" android:screenOrientation="1">
       <meta-data android:name="smartisanos.PACKAGELOCK_PACKAGENAME" android:value="com.android.settings" />
     </activity>
+    <activity android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:name="com.smartisanos.launcher.reload.ReloadTransitionActivity" android:process=":reload" android:exported="false" android:excludeFromRecents="true" android:taskAffinity="com.smartisanos.launcher.reload" android:screenOrientation="portrait" />
     <provider android:name="com.smartisanos.launcher.data.ExportDataProvider" android:readPermission="com.ranhf.smartisanlauncher.permission.READ_DATABASE" android:writePermission="com.ranhf.smartisanlauncher.permission.WRITE_DATABASE" android:exported="true" android:authorities="com.smartisanos.launcher.exportprovider" />
     <activity android:name="com.smartisanos.launcher.StartActivityForSearch" android:exported="true" android:stateNotNeeded="true" android:excludeFromRecents="true" android:screenOrientation="1">
       <intent-filter>

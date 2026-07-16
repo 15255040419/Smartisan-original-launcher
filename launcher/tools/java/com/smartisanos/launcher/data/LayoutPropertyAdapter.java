@@ -297,6 +297,14 @@ public final class LayoutPropertyAdapter {
         if (containsAny(name, "scale", "factor", "modulus", "angle")) {
             return 1.0f;
         }
+        // DotView turns these two layout values into the width and height of
+        // one SMEngine mask texture. They therefore form one visual unit:
+        // scaling width with scaleX and height with scaleY stretches the
+        // original circular page indicator on displays whose aspect ratio
+        // differs from the resource baseline.
+        if ("dot_width".equals(name) || "dot_height".equals(name)) {
+            return scale;
+        }
         // The opened folder is one fixed-aspect scene designed from the screen width.
         // Its frame, grid, icon offsets and labels must all use the same scale or the
         // cells drift away from the shelves on tall displays.

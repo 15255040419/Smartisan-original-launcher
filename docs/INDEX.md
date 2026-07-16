@@ -11,6 +11,7 @@
 ## 开发
 
 - [DEVELOPMENT_LOG.md](development/DEVELOPMENT_LOG.md)：BUG 根因、修复方式、验证过程、回归注意和倒序每日记录。
+- [LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md](development/LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md)：Launcher 启动、重载、宫格和主题专项的阶段计划与验收条件。
 - [CLEANUP.md](development/CLEANUP.md)：清理和归档候选项。记录候选，不代表可以直接删除。
 
 ## 构建

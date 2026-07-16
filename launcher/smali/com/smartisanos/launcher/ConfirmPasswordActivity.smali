@@ -669,6 +669,12 @@
 .method public finish()V
     .locals 3
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->interceptLauncherPasswordActivityFinish(Landroid/app/Activity;)Z
+
+    move-result v0
+
+    if-nez v0, :password_exit_intercepted
+
     .line 1
     invoke-super {p0}, Landroid/app/Activity;->finish()V
 
@@ -703,6 +709,9 @@
     invoke-virtual {p0, v0, v1}, Landroid/app/Activity;->overridePendingTransition(II)V
 
     :goto_0
+    return-void
+
+    :password_exit_intercepted
     return-void
 .end method
 

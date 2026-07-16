@@ -4808,6 +4808,10 @@
 
     .line 9
     :pswitch_2
+    const-string v0, "LAUNCH_MODEL_READY"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->mark(Ljava/lang/String;)V
+
     sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
 
     if-eqz v0, :cond_2
@@ -4884,6 +4888,10 @@
 
     .line 21
     invoke-virtual {p0, v1, v2}, Lcom/smartisanos/launcher/J;->b(ZI)V
+
+    const-string v2, "LAUNCH_PAGE_READY"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->mark(Ljava/lang/String;)V
 
     .line 22
     invoke-virtual {p0}, Lcom/smartisanos/launcher/J;->Wa()Z

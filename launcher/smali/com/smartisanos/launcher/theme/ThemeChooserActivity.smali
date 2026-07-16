@@ -62,6 +62,26 @@
     return-void
 .end method
 
+.method public onRequestPermissionsResult(I[Ljava/lang/String;[I)V
+    .locals 0
+
+    invoke-super {p0, p1, p2, p3}, Landroid/app/Activity;->onRequestPermissionsResult(I[Ljava/lang/String;[I)V
+
+    invoke-static {p0, p1, p2, p3}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onRequestPermissionsResult(Landroid/app/Activity;I[Ljava/lang/String;[I)V
+
+    return-void
+.end method
+
+.method protected onResume()V
+    .locals 0
+
+    invoke-super {p0}, Landroid/app/Activity;->onResume()V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onSettingsHostResumed(Landroid/app/Activity;)V
+
+    return-void
+.end method
+
 .method protected onDestroy()V
     .locals 1
 

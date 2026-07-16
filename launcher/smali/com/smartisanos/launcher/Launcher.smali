@@ -94,6 +94,8 @@
 .method protected onCreate(Landroid/os/Bundle;)V
     .locals 3
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->begin(Landroid/app/Activity;)V
+
     .line 1
     sget-object v0, Lcom/smartisanos/launcher/Launcher;->log:Lcom/smartisanos/launcher/va;
 
@@ -120,16 +122,26 @@
     .line 2
     invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyLauncherNavigationBarSetting(Landroid/app/Activity;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/reload/LauncherColdReloadCoordinator;->captureLauncherReloadIntent(Landroid/app/Activity;)V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->prepareLauncherDeferredTasks(Landroid/app/Activity;)V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyNavigationBarIfChanged(Landroid/app/Activity;)V
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->showPendingLauncherReloadLoading(Landroid/app/Activity;)V
+
+    const-string v0, "LAUNCH_ORIGINAL_INIT_BEGIN"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->mark(Ljava/lang/String;)V
 
     .line 3
     invoke-static {p0}, Lcom/smartisanos/launcher/J;->b(Landroid/app/Activity;)V
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyLauncherNavigationBarSetting(Landroid/app/Activity;)V
+    const-string v0, "LAUNCH_ORIGINAL_INIT_END"
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->stabilizeLauncherResume(Landroid/app/Activity;)V
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->mark(Ljava/lang/String;)V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->scheduleLauncherPostFirstFrameTasks(Landroid/app/Activity;)V
 
     return-void
 .end method
@@ -185,6 +197,10 @@
 
     .line 1
     invoke-super {p0, p1}, Landroid/app/Activity;->onNewIntent(Landroid/content/Intent;)V
+
+    invoke-virtual {p0, p1}, Landroid/app/Activity;->setIntent(Landroid/content/Intent;)V
+
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/reload/LauncherColdReloadCoordinator;->captureLauncherReloadIntent(Landroid/app/Activity;Landroid/content/Intent;)V
 
     if-nez p1, :cond_0
 
@@ -273,13 +289,7 @@
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onLauncherResumedForUnlock(Landroid/app/Activity;)V
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyLauncherNavigationBarSetting(Landroid/app/Activity;)V
-
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->maybeRefreshLauncherWallpaper(Landroid/content/Context;)V
-
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/WeatherBridge;->onLauncherResume(Landroid/app/Activity;)V
-
-    invoke-static {p0}, Lcom/smartisanos/launcher/badge/BadgeBridge;->replay(Landroid/content/Context;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->scheduleLauncherPostFirstFrameTasks(Landroid/app/Activity;)V
 
     return-void
 .end method
@@ -336,7 +346,7 @@
     .line 1
     invoke-super {p0, p1}, Landroid/app/Activity;->onWindowFocusChanged(Z)V
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyLauncherNavigationBarSetting(Landroid/app/Activity;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyNavigationBarIfChanged(Landroid/app/Activity;)V
 
     .line 2
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;

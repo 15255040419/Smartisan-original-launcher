@@ -6,8 +6,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.provider.Settings;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.service.notification.NotificationListenerService;
 import android.text.TextUtils;
 
@@ -22,6 +20,9 @@ public final class BadgeBridge {
     static final String COUNTS = "counts";
     static final String ACTIVE_PREFIX = "active:";
     static final String SUPPRESSED_PREFIX = "suppressed:";
+    private static int sLastReplayHash = Integer.MIN_VALUE;
+    private static boolean sLastReplayAccess;
+    private static boolean sServiceSynchronized;
 
     private BadgeBridge() {
     }
@@ -61,14 +62,6 @@ public final class BadgeBridge {
                 final ComponentName listener = new ComponentName(
                         context, SmartisanBadgeListenerService.class);
                 NotificationListenerService.requestRebind(listener);
-                new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                    public void run() {
-                        try {
-                            NotificationListenerService.requestRebind(listener);
-                        } catch (Throwable ignored) {
-                        }
-                    }
-                }, 1500);
             } catch (Throwable ignored) {
             }
         }
@@ -90,6 +83,39 @@ public final class BadgeBridge {
             } catch (RuntimeException ignored) {
             }
         }
+    }
+
+    /** Skips lifecycle replay when permission and persisted counts have not changed. */
+    public static synchronized void replayIfDirty(Context context) {
+        if (context == null) {
+            return;
+        }
+        boolean access = hasNotificationAccess(context);
+        if (!access) {
+            sLastReplayAccess = false;
+            sServiceSynchronized = false;
+            return;
+        }
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        Set<String> rows = prefs.getStringSet(COUNTS, null);
+        int hash = rows == null ? 0 : new HashSet<String>(rows).hashCode();
+        if ((sServiceSynchronized || access == sLastReplayAccess)
+                && hash == sLastReplayHash) {
+            return;
+        }
+        sLastReplayAccess = access;
+        sLastReplayHash = hash;
+        replay(context);
+    }
+
+    static synchronized void markServiceSynchronized(Set<String> rows) {
+        sServiceSynchronized = true;
+        sLastReplayAccess = true;
+        sLastReplayHash = rows == null ? 0 : new HashSet<String>(rows).hashCode();
+    }
+
+    static synchronized void markServiceDisconnected() {
+        sServiceSynchronized = false;
     }
 
     /** Called by the original sweep animation after its local badge database is cleared. */

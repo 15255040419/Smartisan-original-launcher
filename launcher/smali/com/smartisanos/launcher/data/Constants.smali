@@ -8344,6 +8344,8 @@
 
     move-result p0
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/reload/LauncherColdReloadCoordinator;->reportIconSizeConfigRead(I)V
+
     const/16 v0, 0x64
 
     if-ne p0, v0, :cond_0

@@ -23,13 +23,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/1.jpg" width="47%" alt="Smartisan Launcher 演示截图 1">
-  <img src="docs/2.jpg" width="47%" alt="Smartisan Launcher 演示截图 2">
-</p>
-
-<p align="center">
-  <img src="docs/3.jpg" width="47%" alt="Smartisan Launcher 演示截图 3">
-  <img src="docs/4.jpg" width="47%" alt="Smartisan Launcher 演示截图 4">
+  <img src="docs/1.jpg" width="23%" alt="Smartisan Launcher 演示截图 1">
+  <img src="docs/2.jpg" width="23%" alt="Smartisan Launcher 演示截图 2">
+  <img src="docs/3.jpg" width="23%" alt="Smartisan Launcher 演示截图 3">
+  <img src="docs/4.jpg" width="23%" alt="Smartisan Launcher 演示截图 4">
 </p>
 
 <p align="center">
@@ -66,6 +63,7 @@
 * 优化图标包加载方式，改为后台预热，不影响桌面启动。
 * 新增单应用图标替换功能，支持系统图标、图标包、自定义图标等多来源匹配。
 * 新增单应用支持重命名的功能。
+* 大幅优化代码逻辑，提升系统流畅度。
 
 #### 修复问题
 * 修复首页向右滑动无反馈问题，恢复原版边界阻尼和回弹效果。
@@ -75,6 +73,8 @@
 * 修复安装应用后无法显示，无法卸载应用的问题。
 * 修复文件夹里应用图标长按松手后错位的问题。
 * 修复应用图标界面点击左侧默认图标角标未及时刷新的问题。
+* 修复页面底部小圆点不圆的问题。
+* 修复切换透明主题、宫格切换闪回系统壁纸的问题。
 
 ## 核心特性
 

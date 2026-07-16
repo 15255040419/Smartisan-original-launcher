@@ -542,6 +542,12 @@
 
     move-result v0
 
+    iget v1, p0, Lcom/smartisanos/launcher/data/O;->wr:I
+
+    invoke-static {v8, v0, v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->resolvePortLauncherMultiMode(Landroid/content/Context;II)I
+
+    move-result v0
+
     .line 25
     invoke-static {v0}, Lcom/smartisanos/launcher/data/Constants;->checkMultiMode(I)Z
 

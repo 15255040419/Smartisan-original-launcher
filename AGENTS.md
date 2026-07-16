@@ -114,12 +114,19 @@ Smartisan Launcher Original Port 项目开发规则
 7. `docs/development/CLEANUP.md`
 8. `README.md`
 
+涉及 Launcher 启动、宫格、主题重载或系统壁纸闪回时，还必须阅读：
+
+```text
+docs/development/LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md
+```
+
 各文档职责：
 
 * `AGENTS.md`：AI Agent 的项目施工规则。
 * `MEMORY.md`：长期有效的项目记忆、兼容性结论、用户纠正和稳定决策。
 * `docs/INDEX.md`：专项文档索引和项目参考目录入口。
 * `docs/development/DEVELOPMENT_LOG.md`：BUG 根因、修复方式、验证过程、回归注意、当前状态总览和倒序每日修复记录。
+* `docs/development/LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md`：Launcher 修复和性能优化专项的阶段状态、范围及验收条件。
 * `docs/build/BUILD_GUIDE.md`：Windows / PowerShell 构建工具、PATH、签名、版本号写入点、二进制 Manifest 修改方式。
 * `docs/architecture/APK_STRUCTURE.md`：原始 APK、反编译目录、主题包身份、当前构建产物、Release 资产筛选规则。
 * `docs/development/CLEANUP.md`：清理和归档候选项。

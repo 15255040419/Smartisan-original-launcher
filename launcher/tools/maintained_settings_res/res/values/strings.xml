@@ -163,7 +163,7 @@
     <string name="obsession_badge_notification_access">Notification access is required for badges. Tap to configure.</string>
     <string name="obsession_badge_notification_access_action">Tap to configure</string>
     <string name="obsession_header_title">OCD Settings</string>
-    <string name="obsession_hide_badge">Show Icon Badges</string>
+    <string name="obsession_hide_badge">Badge Reminders</string>
     <string name="obsession_hide_lable">Hide Icon Labels</string>
     <string name="hide_navigation_bar_label">Hide Navigation Bar On Home Screen</string>
     <string name="ocd_setting">OCD Settings</string>

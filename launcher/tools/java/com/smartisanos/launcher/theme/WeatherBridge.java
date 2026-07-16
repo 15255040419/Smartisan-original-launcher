@@ -51,6 +51,9 @@ public final class WeatherBridge {
     private static boolean sCityResolving;
     private static long sCityAttemptAt;
     private static boolean sPendingForcedRefresh;
+    private static Boolean sHasWeatherApplication;
+    private static String sWeatherPackage;
+    private static String sWeatherComponent;
     private static final Map<String, CitySearchCacheEntry> CITY_SEARCH_CACHE =
             new HashMap<String, CitySearchCacheEntry>();
     private static final long CITY_SEARCH_CACHE_MS = 10L * 60L * 1000L;
@@ -78,17 +81,25 @@ public final class WeatherBridge {
                 || "com.sec.android.daemonapp".equals(pkg)) {
             return true;
         }
-        boolean vendorNamespace = pkg.startsWith("com.vivo.") || pkg.startsWith("com.bbk.")
+        return isVendorWeatherNamespace(pkg)
+                && (pkg.contains("weather") || component.contains("weather")
+                || "天气".equals(label) || "weather".equals(label));
+    }
+
+    private static boolean isVendorWeatherNamespace(String packageName) {
+        String pkg = lower(packageName);
+        return pkg.startsWith("com.vivo.") || pkg.startsWith("com.bbk.")
                 || pkg.startsWith("com.oplus.") || pkg.startsWith("com.coloros.")
                 || pkg.startsWith("com.miui.") || pkg.startsWith("com.huawei.")
                 || pkg.startsWith("com.hihonor.") || pkg.startsWith("com.sec.android.")
                 || pkg.startsWith("com.samsung.") || pkg.startsWith("com.motorola.");
-        return vendorNamespace && (pkg.contains("weather") || component.contains("weather")
-                || "天气".equals(label) || "weather".equals(label));
     }
 
     public static Bundle getWeatherBundle(Context context) {
         if (context == null) {
+            return null;
+        }
+        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)) {
             return null;
         }
         Context app = app(context);
@@ -100,6 +111,9 @@ public final class WeatherBridge {
         if (activity == null) {
             return;
         }
+        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(activity)) {
+            return;
+        }
         if (!hasWeatherApplication(activity)) {
             return;
         }
@@ -109,19 +123,6 @@ public final class WeatherBridge {
             return;
         }
         if (!hasLocationPermission(activity)) {
-            SharedPreferences prefs = prefs(activity);
-            if (!prefs.getBoolean("location_prompted", false)) {
-                prefs.edit().putBoolean("location_prompted", true).apply();
-                if (Build.VERSION.SDK_INT >= 23) {
-                    try {
-                        activity.requestPermissions(
-                                new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
-                                REQUEST_LOCATION);
-                    } catch (Throwable error) {
-                        Log.w(TAG, "location permission request failed", error);
-                    }
-                }
-            }
             return;
         }
         scheduleRefresh(app(activity), false);
@@ -186,12 +187,6 @@ public final class WeatherBridge {
                 .remove("weather_last_error")
                 .putLong("weather_updated_at", 0L).apply();
         scheduleRefresh(context, true);
-        final Context target = app(context);
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override public void run() {
-                if (!isAutomaticLocation(target)) scheduleRefresh(target, true);
-            }
-        }, 1800L);
     }
 
     public static String getLocationLabel(Context context) {
@@ -476,6 +471,12 @@ public final class WeatherBridge {
     }
 
     private static void schedulePeriodicRefresh(final Context context) {
+        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)) {
+            synchronized (LOCK) {
+                sPeriodicScheduled = false;
+            }
+            return;
+        }
         synchronized (LOCK) {
             if (sPeriodicScheduled) {
                 return;
@@ -488,6 +489,9 @@ public final class WeatherBridge {
                 synchronized (LOCK) {
                     sPeriodicScheduled = false;
                 }
+                if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)) {
+                    return;
+                }
                 scheduleRefresh(context, false);
                 schedulePeriodicRefresh(context);
             }
@@ -495,6 +499,14 @@ public final class WeatherBridge {
     }
 
     private static boolean hasWeatherApplication(Context context) {
+        synchronized (LOCK) {
+            if (sHasWeatherApplication != null) {
+                return sHasWeatherApplication.booleanValue();
+            }
+        }
+        boolean found = false;
+        String foundPackage = null;
+        String foundComponent = null;
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -506,24 +518,50 @@ public final class WeatherBridge {
                 if (info == null || info.activityInfo == null) {
                     continue;
                 }
-                CharSequence label = null;
-                try {
-                    label = info.loadLabel(context.getPackageManager());
-                } catch (Throwable ignored) {
+                String packageName = info.activityInfo.packageName;
+                String componentName = info.activityInfo.name;
+                boolean weather = isWeatherPackage(packageName, componentName, null);
+                if (!weather && isVendorWeatherNamespace(packageName)) {
+                    CharSequence label = null;
+                    try {
+                        label = info.loadLabel(context.getPackageManager());
+                    } catch (Throwable ignored) {
+                    }
+                    weather = isWeatherPackage(packageName, componentName, label);
                 }
-                if (isWeatherPackage(info.activityInfo.packageName,
-                        info.activityInfo.name, label)) {
-                    return true;
+                if (weather) {
+                    found = true;
+                    foundPackage = packageName;
+                    foundComponent = componentName;
+                    break;
                 }
             }
         } catch (Throwable error) {
             Log.w(TAG, "weather application scan failed", error);
         }
-        return false;
+        synchronized (LOCK) {
+            sHasWeatherApplication = Boolean.valueOf(found);
+            sWeatherPackage = foundPackage;
+            sWeatherComponent = foundComponent;
+        }
+        Log.i(TAG, "weather component cache resolved package=" + foundPackage
+                + " component=" + foundComponent + " available=" + found);
+        return found;
+    }
+
+    public static void invalidateWeatherApplicationCache() {
+        synchronized (LOCK) {
+            sHasWeatherApplication = null;
+            sWeatherPackage = null;
+            sWeatherComponent = null;
+        }
     }
 
     public static void scheduleRefresh(Context context, boolean force) {
         if (context == null) {
+            return;
+        }
+        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)) {
             return;
         }
         final Context app = app(context);
@@ -570,6 +608,9 @@ public final class WeatherBridge {
     }
 
     private static void requestSingleLocation(final Context context) {
+        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)) {
+            return;
+        }
         synchronized (LOCK) {
             if (sLocationRequesting) {
                 return;
@@ -597,7 +638,8 @@ public final class WeatherBridge {
                     } catch (Throwable ignored) {
                     }
                     finishLocationRequest();
-                    if (location != null) {
+                    if (location != null
+                            && LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)) {
                         if (isAutomaticLocation(context)) {
                             rememberLocation(context, location);
                             fetchAsync(context, location.getLatitude(), location.getLongitude());
@@ -663,6 +705,9 @@ public final class WeatherBridge {
 
     private static void fetchAsync(final Context context, final double latitude,
             final double longitude) {
+        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)) {
+            return;
+        }
         synchronized (LOCK) {
             if (sRefreshing) {
                 return;

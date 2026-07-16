@@ -44,6 +44,7 @@ public final class SmartisanBadgeListenerService extends NotificationListenerSer
     @Override
     public void onListenerDisconnected() {
         super.onListenerDisconnected();
+        BadgeBridge.markServiceDisconnected();
         if (Build.VERSION.SDK_INT >= 24) {
             requestRebind(new android.content.ComponentName(this, SmartisanBadgeListenerService.class));
         }
@@ -121,9 +122,29 @@ public final class SmartisanBadgeListenerService extends NotificationListenerSer
             editor.putStringSet(BadgeBridge.ACTIVE_PREFIX + badgeId, activeKeys);
             editor.putStringSet(suppressedKey, suppressed);
             newRows.add(badgeId + "=" + count);
-            BadgeBridge.dispatch(this, pkg, uid, count);
+            if (countFor(oldRows, badgeId) != count) {
+                BadgeBridge.dispatch(this, pkg, uid, count);
+            }
         }
         editor.putStringSet(BadgeBridge.COUNTS, newRows).apply();
+        BadgeBridge.markServiceSynchronized(newRows);
+    }
+
+    private static int countFor(Set<String> rows, String badgeId) {
+        if (rows == null || badgeId == null) {
+            return 0;
+        }
+        String prefix = badgeId + "=";
+        for (String row : rows) {
+            if (row != null && row.startsWith(prefix)) {
+                try {
+                    return Integer.parseInt(row.substring(prefix.length()));
+                } catch (NumberFormatException ignored) {
+                    return 0;
+                }
+            }
+        }
+        return 0;
     }
 
     private int countVisible(List<StatusBarNotification> list, Set<String> suppressed) {
