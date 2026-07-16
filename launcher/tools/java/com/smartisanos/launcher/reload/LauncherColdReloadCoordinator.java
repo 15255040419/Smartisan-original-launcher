@@ -21,8 +21,12 @@ import java.util.UUID;
 /** Coordinates only the process/window handoff; it never changes Launcher business state. */
 public final class LauncherColdReloadCoordinator {
     private static final String TAG = "LauncherColdReload";
+    private static final String RELOAD_PREFS = "launcher_reload_protocol";
+    private static final String KEY_EXPECTED_LAUNCHER_TOKEN = "expected_launcher_token";
     private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
     private static volatile String sReloadToken;
+    /** Expected token retained while a singleTask root is being recreated from a stale base Intent. */
+    private static volatile String sExpectedLauncherToken;
     private static volatile String sReportedToken;
     private static volatile boolean sInitialLoadingWindowPending;
     private static volatile boolean sInitialLoadingWindowApplied;
@@ -78,6 +82,7 @@ public final class LauncherColdReloadCoordinator {
             return false;
         }
         String token = UUID.randomUUID().toString();
+        persistExpectedLauncherToken(context, token, reason, gridMode, themeMode);
         if ("ICON_SIZE_CHANGE".equals(reason)) {
             registerIconSizeContext(token, oldIconSize, newIconSize, Process.myPid(), -1);
             log("ICON_SIZE_CHANGE_REQUESTED", token, reason, gridMode, themeMode);
@@ -126,10 +131,23 @@ public final class LauncherColdReloadCoordinator {
         if (token == null || token.length() == 0) {
             return;
         }
+        if (!isExpectedLauncherToken(activity, token)) {
+            sExpectedLauncherToken = readExpectedLauncherToken(activity);
+            log("STALE_LAUNCHER_INTENT_IGNORED", token,
+                    "expected=" + sExpectedLauncherToken,
+                    intent.getIntExtra(ReloadProtocol.EXTRA_GRID_MODE, -1),
+                    intent.getStringExtra(ReloadProtocol.EXTRA_THEME_MODE));
+            return;
+        }
+        boolean preserveInitialLoadingWindow = token.equals(sExpectedLauncherToken)
+                && (sInitialLoadingWindowPending || sInitialLoadingWindowApplied);
         sReloadToken = token;
+        sExpectedLauncherToken = token;
         sReportedToken = null;
-        sInitialLoadingWindowPending = false;
-        sInitialLoadingWindowApplied = false;
+        if (!preserveInitialLoadingWindow) {
+            sInitialLoadingWindowPending = false;
+            sInitialLoadingWindowApplied = false;
+        }
         sLauncherActivity = new WeakReference<Activity>(activity);
         String reason = intent.getStringExtra(ReloadProtocol.EXTRA_RELOAD_REASON);
         if ("ICON_SIZE_CHANGE".equals(reason)) {
@@ -161,9 +179,10 @@ public final class LauncherColdReloadCoordinator {
 
     /** Armed only by J's exact R.string.initializing path, never by generic LoadingUI. */
     public static void armInitializationLoadingWindow() {
-        if (sReloadToken == null || sInitialLoadingWindowApplied) return;
+        String token = sReloadToken != null ? sReloadToken : sExpectedLauncherToken;
+        if (token == null || sInitialLoadingWindowApplied) return;
         sInitialLoadingWindowPending = true;
-        log("INITIAL_LOADING_WINDOW_ARMED", sReloadToken, "exact_initializing", -1, null);
+        log("INITIAL_LOADING_WINDOW_ARMED", token, "exact_initializing", -1, null);
     }
 
     /** Invoked by widget.c before Dialog.show(), after J explicitly armed this one loading UI. */
@@ -172,7 +191,8 @@ public final class LauncherColdReloadCoordinator {
         sInitialLoadingWindowPending = false;
         sInitialLoadingWindowApplied = true;
         LoadingUiWindowCompat.apply(dialog.getWindow());
-        log("INITIAL_LOADING_WINDOW_PREPARED", sReloadToken, "before_dialog_show", -1, null);
+        String token = sReloadToken != null ? sReloadToken : sExpectedLauncherToken;
+        log("INITIAL_LOADING_WINDOW_PREPARED", token, "before_dialog_show", -1, null);
     }
 
     private static void reportAfterDecorDraw(final Activity activity, final String token) {
@@ -217,6 +237,7 @@ public final class LauncherColdReloadCoordinator {
         ready.putExtra(ReloadProtocol.EXTRA_THEME_MODE,
                 activity.getIntent().getStringExtra(ReloadProtocol.EXTRA_THEME_MODE));
         activity.sendBroadcast(ready);
+        clearExpectedLauncherToken(activity, token);
         log("FIRST_FRAME_READY", token,
                 activity.getIntent().getStringExtra(ReloadProtocol.EXTRA_RELOAD_REASON),
                 ready.getIntExtra(ReloadProtocol.EXTRA_GRID_MODE, -1),
@@ -339,6 +360,55 @@ public final class LauncherColdReloadCoordinator {
             ((Activity) context).overridePendingTransition(0, 0);
         }
         log("NEW_LAUNCHER_STARTED", token, reason, gridMode, themeMode);
+    }
+
+    /**
+     * Launcher is singleTask. On some ROMs a dead task is first recreated with its old base
+     * Intent, then the current reload Intent arrives through onNewIntent(). Persisting only the
+     * one expected token prevents that stale base Intent from arming a second cold reload.
+     */
+    private static void persistExpectedLauncherToken(Context context, String token, String reason,
+            int gridMode, String themeMode) {
+        try {
+            boolean committed = context.getSharedPreferences(RELOAD_PREFS, Context.MODE_PRIVATE)
+                    .edit().putString(KEY_EXPECTED_LAUNCHER_TOKEN, token).commit();
+            log(committed ? "EXPECTED_LAUNCHER_TOKEN_PERSISTED"
+                            : "EXPECTED_LAUNCHER_TOKEN_PERSIST_FAILED",
+                    token, reason, gridMode, themeMode);
+        } catch (Throwable error) {
+            log("EXPECTED_LAUNCHER_TOKEN_PERSIST_FAILED", token,
+                    shortError(error), gridMode, themeMode);
+        }
+    }
+
+    private static boolean isExpectedLauncherToken(Context context, String token) {
+        String expected = readExpectedLauncherToken(context);
+        return expected == null || expected.length() == 0 || expected.equals(token);
+    }
+
+    private static String readExpectedLauncherToken(Context context) {
+        try {
+            return context.getSharedPreferences(RELOAD_PREFS, Context.MODE_PRIVATE)
+                    .getString(KEY_EXPECTED_LAUNCHER_TOKEN, null);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static void clearExpectedLauncherToken(Context context, String token) {
+        if (!token.equals(readExpectedLauncherToken(context))) {
+            return;
+        }
+        try {
+            context.getSharedPreferences(RELOAD_PREFS, Context.MODE_PRIVATE).edit()
+                    .remove(KEY_EXPECTED_LAUNCHER_TOKEN).commit();
+            if (token.equals(sExpectedLauncherToken)) {
+                sExpectedLauncherToken = null;
+            }
+            log("EXPECTED_LAUNCHER_TOKEN_CLEARED", token, "first_frame_ready", -1, null);
+        } catch (Throwable error) {
+            log("EXPECTED_LAUNCHER_TOKEN_CLEAR_FAILED", token, shortError(error), -1, null);
+        }
     }
 
     private static boolean isMainProcessAlive(Context context, int pid) {

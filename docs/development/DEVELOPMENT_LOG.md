@@ -54,6 +54,22 @@
 
 ### 2026-07-16
 
+#### 宫格冷重载旧 token 二次启动（核心修复完成，基本验证完成；最终回归待完成）
+
+- 真机日志证据：连续切换中，`:reload` 正确为当前 token 启动新 Launcher 后，新主进程又先后接收过期 `f4982e48-98a6-417f-a976-bf750ecac703` 的 `grid_migration/20` Intent，再接收当前 token。例如 18:49:58 当前 token `ae2438fa...` 为 12 宫格，但同一新 PID 8159 先记录旧 token、再记录当前 token；此前 20 宫格和透明主题切换也重复同一旧 token。该双初始化可与当前 token 的首帧、任务恢复发生竞争，足以解释偶发闪退和不透明过渡页短暂失去覆盖后的系统壁纸闪回。
+- 根因：Launcher 是 `singleTask`。旧主进程结束后，部分 ROM 会先用 Launcher 任务保留的旧 base Intent 重建 Activity，再把本次 `startLauncher()` 的 Intent 通过 `onNewIntent()` 送达。此前 `captureLauncherReloadIntent()` 无条件接受任意 token，因而把这次旧 base Intent 误当成新的冷重载。
+- 修复：每次 `beginReload()` 在启动过渡页前同步写入唯一的 `expected_launcher_token`；新 Launcher 只接受该 token。与其不匹配的旧 base Intent 记录 `STALE_LAUNCHER_INTENT_IGNORED` 且不重置 reload 状态、不初始化 Loading window；当前 token 在 `FIRST_FRAME_READY` 后清除标记。未改 `N.d()`、`F.i()`、数据库、旧 PID 精确终止、`FIRST_FRAME_READY` 判定或 Loading 视觉链。
+- 视觉回归修正：首次实现只忽略旧 token，会使当前 token 经 `onNewIntent()` 到达前，原版 `J.b()` 已创建“正在初始化”Dialog，丢失其 `show()` 前的统一窗口几何准备，导致两个 Loading 位置再次不一致。现将“业务 token 接受”与“初始化 Dialog 窗口准备”分离：旧 token 仍不会设置 `sReloadToken`，但会暂存已持久化的当前期望 token，用它在原版 Dialog 创建前应用同一几何；当前 token 到达时保留已准备状态。
+- 基本验证：两次完整 `build.bat`、v1/v2/v3 签名校验与 ADB 覆盖安装均通过；代码审计确认当前 token 的 `onNewIntent()` 仍会照常捕获，旧 token 仍不会重置 reload 状态。未擅自修改真机默认桌面或宫格设置，尚未把本次连续宫格实体机回归标记为完成。
+- 最终回归待完成：在 Smartisan 默认桌面连续 12→20→12 至少 10 次，并混合透明主题、图标大小、动态天气/日历切换；每轮必须只出现一个业务 `NEW_LAUNCHER_STARTED`/`FIRST_FRAME_READY` token，旧 token 仅允许出现 `STALE_LAUNCHER_INTENT_IGNORED` 和初始化窗口准备日志，不得再次进入业务初始化、壁纸闪回、失败提示或 Java/native 崩溃；逐帧确认两段 Loading 的位置不再回归。
+
+#### 首次冷启动“正在初始化”真机耗时基线（调查完成，未改业务逻辑）
+
+- 真机：PDCM00，受控 `am force-stop` 后冷启动 `com.smartisanos.launcher/.Launcher`；当前配置为 12 宫格、普通黑色主题、透明主题关闭、动态天气/日历关闭、图标包关闭、角标隐藏。
+- 日志：`LAUNCH_ONCREATE_BEGIN=0ms`，`LAUNCH_ORIGINAL_INIT_END=82ms`，`LAUNCH_SURFACE_READY=158ms`，`LAUNCH_FIRST_FRAME=165ms`，`LAUNCH_MODEL_READY/LAUNCH_PAGE_READY=710ms`；系统 `Displayed` 为 `+329ms`。因此“正在初始化”在当前设备约覆盖首帧后 545ms 的原版模型/PageView 完整就绪窗口，不是 `ReloadTransitionActivity`、`FIRST_FRAME_READY`、网络下载或固定延迟造成的等待。
+- 结论：阶段 4 的优化目标是旧进程退出、新进程首帧和窗口连续性，不能以提前关闭初始化 Dialog 代替首次桌面模型完成；否则会重新引入桌面未就绪、旧/新 Loading 交接或白/黑帧。后续若某一真实配置超过该基线，必须以同一诊断标记定位是图标包、动态天气/日历、数据库数据量或 ROM 调度，再仅把非首帧必需工作移出模型关键路径。
+- 验证状态：已完成本次 ADB 冷启动与日志采样；未修改代码、资源、数据库或冷重载协议。不同宫格、动态图标开启、图标包、复杂桌面数据和其他 ROM 的首次启动耗时仍待专项采样。
+
 #### 冷重载两段 Loading 文案与几何一致性确认（核心实现完成，基本验证完成；最终回归待完成）
 
 - 现象：冷重载首段 `ReloadTransitionActivity` 与新 Launcher 原版初始化 Dialog 的文案归属被写反，真机先显示“正在初始化”、后显示“正在加载桌面”。

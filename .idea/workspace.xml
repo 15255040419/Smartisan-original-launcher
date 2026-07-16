@@ -5,19 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="295b82c4-8572-45f1-add8-3c13ec0468e1" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/reload/OriginalLoadingContentFactory.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-aligned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-aligned.apk" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-unsigned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-unsigned.apk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/development/DEVELOPMENT_LOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/development/DEVELOPMENT_LOG.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/J.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/J.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/widget/c.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/widget/c.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/smali/smartisanos/app/SmartisanProgressDialog.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/smartisanos/app/SmartisanProgressDialog.smali" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/reload/LauncherColdReloadCoordinator.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/reload/LauncherColdReloadCoordinator.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/reload/LoadingUiWindowCompat.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/reload/LoadingUiWindowCompat.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/reload/ReloadTransitionActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/reload/ReloadTransitionActivity.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
