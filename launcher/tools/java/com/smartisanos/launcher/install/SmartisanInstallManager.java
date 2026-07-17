@@ -5,7 +5,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.content.pm.LauncherApps;
 import android.content.pm.PackageInstaller;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -18,6 +21,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.UserHandle;
 import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 import android.util.Log;
@@ -28,6 +32,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -61,8 +66,14 @@ public final class SmartisanInstallManager {
     private static final int STATUS_ORIGINAL_FAILED = 0x400;
     private static final long SESSION_SCAN_INTERVAL_MS = 1200L;
     private static final long MIN_VISIBLE_ANIMATION_MS = 3500L;
-    private static final int MAX_PACKAGE_READY_RETRIES = 2;
-    private static final long PACKAGE_READY_RETRY_DELAY_MS = 300L;
+    /* Keep package events until both PackageManager and the original model are ready. */
+    private static final long[] PACKAGE_READY_RETRY_DELAYS_MS = {
+            0L, 100L, 250L, 500L, 1000L, 2000L, 4000L
+    };
+    private static final long PACKAGE_READY_PENDING_NOTICE_MS = 12000L;
+    private static final String PENDING_PREFS = "smartisan_install_pending_v2";
+    private static final String PENDING_EVENTS = "events";
+    private static final String BASELINE_TIME = "baseline_time";
 
     private static final Pattern PACKAGE_PATTERN =
             Pattern.compile("([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z][A-Za-z0-9_]*){1,})");
@@ -72,7 +83,11 @@ public final class SmartisanInstallManager {
     private static final Map<String, String> PENDING_LABEL_PACKAGES = new HashMap<String, String>();
     private static final Map<String, String> PACKAGE_DISPLAY_PACKAGES = new HashMap<String, String>();
     private static final Map<String, Long> DISPLAY_START_TIMES = new HashMap<String, Long>();
+    private static final Map<String, PendingPackageEvent> PENDING_PACKAGE_EVENTS =
+            new HashMap<String, PendingPackageEvent>();
     private static boolean sStarted;
+    private static boolean sModelReady;
+    private static boolean sLauncherAppsRegistered;
     private static Context sAppContext;
     private static Handler sHandler;
     private static Handler sWorkerHandler;
@@ -97,9 +112,11 @@ public final class SmartisanInstallManager {
             sWorkerThread.start();
             sWorkerHandler = new Handler(sWorkerThread.getLooper());
         }
+        restorePendingEvents(sAppContext);
         registerPackageReceiver(sAppContext);
+        registerLauncherAppsCallback(sAppContext);
+        registerPackageInstallerCallback(sAppContext);
         if (ENABLE_DOWNLOAD_ANIMATION) {
-            registerPackageInstallerCallback(sAppContext);
             scheduleSessionScan(0L);
         }
     }
@@ -109,7 +126,45 @@ public final class SmartisanInstallManager {
             return;
         }
         ensure(context);
-        completeInstall(context, packageName);
+        enqueuePackageEvent(context, packageName, Intent.ACTION_PACKAGE_ADDED,
+                false, 0, "legacy");
+    }
+
+    /** Called from the manifest receiver after the original theme-specific handling. */
+    public static void onPackageEvent(Context context, Intent intent) {
+        if (context == null || intent == null || intent.getData() == null) {
+            return;
+        }
+        String packageName = intent.getData().getSchemeSpecificPart();
+        enqueuePackageEvent(context, packageName, intent.getAction(),
+                intent.getBooleanExtra(Intent.EXTRA_REPLACING, false),
+                intent.getIntExtra("android.intent.extra.user_handle", 0), "manifest");
+    }
+
+    /** J.MESSAGE_COMPLETE: the original model has accepted its initial database state. */
+    public static void onLauncherModelReady() {
+        final Context context;
+        synchronized (LOCK) {
+            sModelReady = true;
+            context = sAppContext;
+        }
+        if (context == null) {
+            return;
+        }
+        SharedPreferences prefs = pendingPrefs(context);
+        if (prefs.getLong(BASELINE_TIME, 0L) == 0L) {
+            prefs.edit().putLong(BASELINE_TIME, System.currentTimeMillis()).commit();
+        }
+        Log.i(TAG, "INSTALL_MODEL_READY pending=" + pendingEventCount());
+        processPendingEvents(context, "model_ready_reconcile");
+    }
+
+    /** Read by the original ItemInfo creation path before the same-row database insert. */
+    public static boolean shouldMarkNewlyInstalled(String packageName) {
+        synchronized (LOCK) {
+            PendingPackageEvent event = PENDING_PACKAGE_EVENTS.get(packageName);
+            return event != null && event.dispatched && event.newInstall;
+        }
     }
 
     public static void onNotificationPosted(Context context, StatusBarNotification sbn) {
@@ -181,17 +236,7 @@ public final class SmartisanInstallManager {
                     String action = intent.getAction();
                     com.smartisanos.launcher.theme.WeatherBridge
                             .invalidateWeatherApplicationCache();
-                    if (TextUtils.isEmpty(pkg) || context.getPackageName().equals(pkg)) {
-                        return;
-                    }
-                    boolean replacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false);
-                    if (Intent.ACTION_PACKAGE_ADDED.equals(action)
-                            || Intent.ACTION_PACKAGE_REPLACED.equals(action)
-                            || Intent.ACTION_PACKAGE_CHANGED.equals(action)) {
-                        completeInstall(context, pkg);
-                    } else if (Intent.ACTION_PACKAGE_REMOVED.equals(action) && !replacing) {
-                        failOrRemove(context, pkg);
-                    }
+                    onPackageEvent(c == null ? context : c, intent);
                 }
             }, filter);
         } catch (Throwable t) {
@@ -241,14 +286,58 @@ public final class SmartisanInstallManager {
                         return;
                     }
                     if (success) {
-                        completeInstall(context, pkg);
+                        enqueuePackageEvent(context, pkg, Intent.ACTION_PACKAGE_ADDED,
+                                false, 0, "package_installer");
                     } else {
-                        failOrRemove(context, pkg);
+                        onPackageRemoved(context, pkg, "package_installer_failed");
                     }
                 }
             }, sWorkerHandler == null ? new Handler(Looper.getMainLooper()) : sWorkerHandler);
         } catch (Throwable t) {
             Log.w(TAG, "register package installer failed", t);
+        }
+    }
+
+    private static void registerLauncherAppsCallback(final Context context) {
+        if (Build.VERSION.SDK_INT < 21) {
+            return;
+        }
+        synchronized (LOCK) {
+            if (sLauncherAppsRegistered) {
+                return;
+            }
+            sLauncherAppsRegistered = true;
+        }
+        try {
+            LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (apps == null) {
+                return;
+            }
+            apps.registerCallback(new LauncherApps.Callback() {
+                @Override public void onPackageAdded(String packageName, UserHandle user) {
+                    enqueuePackageEvent(context, packageName, Intent.ACTION_PACKAGE_ADDED,
+                            false, userId(user), "launcher_apps");
+                }
+                @Override public void onPackageChanged(String packageName, UserHandle user) {
+                    enqueuePackageEvent(context, packageName, Intent.ACTION_PACKAGE_CHANGED,
+                            false, userId(user), "launcher_apps");
+                }
+                @Override public void onPackageRemoved(String packageName, UserHandle user) {
+                    SmartisanInstallManager.onPackageRemoved(context, packageName, "launcher_apps");
+                }
+                @Override public void onPackagesAvailable(String[] packages, UserHandle user,
+                                                          boolean replacing) {
+                    if (packages == null) return;
+                    for (String packageName : packages) {
+                        enqueuePackageEvent(context, packageName, Intent.ACTION_PACKAGE_ADDED,
+                                replacing, userId(user), "launcher_apps_available");
+                    }
+                }
+                @Override public void onPackagesUnavailable(String[] packages, UserHandle user,
+                                                            boolean replacing) { }
+            });
+        } catch (Throwable t) {
+            Log.w(TAG, "register launcher apps callback failed", t);
         }
     }
 
@@ -450,7 +539,8 @@ public final class SmartisanInstallManager {
             return;
         }
         if (!ENABLE_DOWNLOAD_ANIMATION) {
-            dispatchOriginalPackageAddedWhenReady(context, pkg, 0);
+            enqueuePackageEvent(context, pkg, Intent.ACTION_PACKAGE_ADDED,
+                    false, 0, "download_compat");
             return;
         }
         final String displayPkg = displayPackageForCompletedPackage(context, pkg);
@@ -503,24 +593,147 @@ public final class SmartisanInstallManager {
         forgetDisplay(null, pkg);
     }
 
-    /** Retry only while PackageManager has not exposed the new launcher activity. */
-    private static void dispatchOriginalPackageAddedWhenReady(final Context context,
-                                                               final String pkg, final int attempt) {
-        if (launcherActivityAvailable(context, pkg)) {
-            notifyOriginalPackageAdded(context, pkg);
-            deletePendingIcon(context, pkg);
+    private static void enqueuePackageEvent(Context context, String packageName, String action,
+                                            boolean replacing, int userId, String source) {
+        if (context == null || TextUtils.isEmpty(packageName)
+                || context.getPackageName().equals(packageName)) {
             return;
         }
-        if (attempt >= MAX_PACKAGE_READY_RETRIES) {
+        ensure(context);
+        if (Intent.ACTION_PACKAGE_REMOVED.equals(action) && !replacing) {
+            onPackageRemoved(context, packageName, source);
             return;
         }
-        Handler handler = sHandler == null ? new Handler(Looper.getMainLooper()) : sHandler;
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                dispatchOriginalPackageAddedWhenReady(context, pkg, attempt + 1);
+        if (!Intent.ACTION_PACKAGE_ADDED.equals(action)
+                && !Intent.ACTION_PACKAGE_REPLACED.equals(action)
+                && !Intent.ACTION_PACKAGE_CHANGED.equals(action)) {
+            return;
+        }
+        synchronized (LOCK) {
+            PendingPackageEvent existing = PENDING_PACKAGE_EVENTS.get(packageName);
+            if (existing != null) {
+                existing.replacing |= replacing || Intent.ACTION_PACKAGE_REPLACED.equals(action);
+                existing.source = source;
+                if (!existing.dispatched) {
+                    existing.action = action;
+                }
+            } else {
+                PENDING_PACKAGE_EVENTS.put(packageName, new PendingPackageEvent(packageName, action,
+                        replacing || Intent.ACTION_PACKAGE_REPLACED.equals(action), userId, source));
             }
-        }, PACKAGE_READY_RETRY_DELAY_MS);
+        }
+        persistPendingEvents(context);
+        Log.i(TAG, "INSTALL_EVENT_RECEIVED pkg=" + packageName + " action=" + action
+                + " replacing=" + replacing + " source=" + source);
+        processPendingEvents(context, source);
+    }
+
+    private static void onPackageRemoved(Context context, String packageName, String source) {
+        if (TextUtils.isEmpty(packageName)) {
+            return;
+        }
+        synchronized (LOCK) {
+            PENDING_PACKAGE_EVENTS.remove(packageName);
+        }
+        persistPendingEvents(context);
+        Log.i(TAG, "INSTALL_EVENT_REMOVED pkg=" + packageName + " source=" + source);
+        failOrRemove(context, packageName);
+    }
+
+    private static void processPendingEvents(final Context context, String trigger) {
+        final Handler handler = sWorkerHandler;
+        if (handler == null || context == null) {
+            return;
+        }
+        handler.post(new Runnable() {
+            @Override public void run() {
+                PendingPackageEvent[] events;
+                synchronized (LOCK) {
+                    events = PENDING_PACKAGE_EVENTS.values().toArray(
+                            new PendingPackageEvent[PENDING_PACKAGE_EVENTS.size()]);
+                }
+                for (PendingPackageEvent event : events) {
+                    attemptOriginalPackageAdd(context, event);
+                }
+            }
+        });
+    }
+
+    private static void attemptOriginalPackageAdd(final Context context,
+                                                  final PendingPackageEvent event) {
+        synchronized (LOCK) {
+            if (event.dispatched || event.scheduled) {
+                return;
+            }
+            if (!sModelReady) {
+                schedulePendingAttemptLocked(context, event, 100L);
+                return;
+            }
+            if (!launcherActivityAvailable(context, event.packageName)) {
+                if (event.retryIndex < PACKAGE_READY_RETRY_DELAYS_MS.length) {
+                    long delay = PACKAGE_READY_RETRY_DELAYS_MS[event.retryIndex++];
+                    schedulePendingAttemptLocked(context, event, delay);
+                } else {
+                    long age = System.currentTimeMillis() - event.receivedAt;
+                    if (age >= PACKAGE_READY_PENDING_NOTICE_MS) {
+                        Log.w(TAG, "INSTALL_PENDING_RETAINED pkg=" + event.packageName
+                                + " ageMs=" + age + " noLauncherActivity");
+                    } else {
+                        schedulePendingAttemptLocked(context, event,
+                                PACKAGE_READY_PENDING_NOTICE_MS - age);
+                    }
+                }
+                persistPendingEvents(context);
+                return;
+            }
+            event.dispatched = true;
+            event.newInstall = isTrueNewInstall(context, event);
+            persistPendingEvents(context);
+        }
+        Log.i(TAG, "INSTALL_ORIGINAL_ADD_DISPATCH pkg=" + event.packageName
+                + " new=" + event.newInstall + " user=" + event.userId);
+        Handler main = sHandler == null ? new Handler(Looper.getMainLooper()) : sHandler;
+        main.post(new Runnable() {
+            @Override public void run() {
+                notifyOriginalPackageAdded(context, event.packageName);
+                deletePendingIcon(context, event.packageName);
+            }
+        });
+    }
+
+    private static void schedulePendingAttemptLocked(final Context context,
+                                                      final PendingPackageEvent event, long delayMs) {
+        if (event.scheduled) {
+            return;
+        }
+        event.scheduled = true;
+        Handler handler = sWorkerHandler;
+        if (handler == null) {
+            event.scheduled = false;
+            return;
+        }
+        handler.postDelayed(new Runnable() {
+            @Override public void run() {
+                synchronized (LOCK) {
+                    event.scheduled = false;
+                }
+                attemptOriginalPackageAdd(context, event);
+            }
+        }, Math.max(0L, delayMs));
+    }
+
+    private static boolean isTrueNewInstall(Context context, PendingPackageEvent event) {
+        if (event.replacing) {
+            return false;
+        }
+        long baseline = pendingPrefs(context).getLong(BASELINE_TIME, 0L);
+        try {
+            PackageInfo info = context.getPackageManager().getPackageInfo(event.packageName, 0);
+            return baseline > 0L && info.firstInstallTime >= baseline
+                    && info.firstInstallTime == info.lastUpdateTime;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private static boolean launcherActivityAvailable(Context context, String pkg) {
@@ -712,6 +925,109 @@ public final class SmartisanInstallManager {
             return true;
         } catch (Throwable ignored) {
             return false;
+        }
+    }
+
+    private static SharedPreferences pendingPrefs(Context context) {
+        return context.getApplicationContext().getSharedPreferences(PENDING_PREFS, Context.MODE_PRIVATE);
+    }
+
+    private static void restorePendingEvents(Context context) {
+        if (context == null) {
+            return;
+        }
+        try {
+            HashSet<String> encoded = new HashSet<String>(
+                    pendingPrefs(context).getStringSet(PENDING_EVENTS, new HashSet<String>()));
+            synchronized (LOCK) {
+                for (String value : encoded) {
+                    PendingPackageEvent event = PendingPackageEvent.decode(value);
+                    if (event != null) {
+                        PENDING_PACKAGE_EVENTS.put(event.packageName, event);
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "restore pending installs failed", t);
+        }
+    }
+
+    private static void persistPendingEvents(Context context) {
+        if (context == null) {
+            return;
+        }
+        HashSet<String> encoded = new HashSet<String>();
+        synchronized (LOCK) {
+            for (PendingPackageEvent event : PENDING_PACKAGE_EVENTS.values()) {
+                encoded.add(event.encode());
+            }
+        }
+        try {
+            pendingPrefs(context).edit().putStringSet(PENDING_EVENTS, encoded).commit();
+        } catch (Throwable t) {
+            Log.w(TAG, "persist pending installs failed", t);
+        }
+    }
+
+    private static int pendingEventCount() {
+        synchronized (LOCK) {
+            return PENDING_PACKAGE_EVENTS.size();
+        }
+    }
+
+    private static int userId(UserHandle user) {
+        if (user == null) {
+            return 0;
+        }
+        try {
+            return user.hashCode();
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
+    private static final class PendingPackageEvent {
+        final String packageName;
+        final long receivedAt;
+        final int userId;
+        boolean replacing;
+        boolean dispatched;
+        boolean newInstall;
+        boolean scheduled;
+        int retryIndex;
+        String action;
+        String source;
+
+        PendingPackageEvent(String packageName, String action, boolean replacing,
+                            int userId, String source) {
+            this.packageName = packageName;
+            this.action = action;
+            this.replacing = replacing;
+            this.userId = userId;
+            this.source = source;
+            this.receivedAt = System.currentTimeMillis();
+        }
+
+        String encode() {
+            return packageName + "|" + action + "|" + replacing + "|" + userId + "|"
+                    + receivedAt + "|" + dispatched + "|" + newInstall + "|" + retryIndex;
+        }
+
+        static PendingPackageEvent decode(String value) {
+            try {
+                String[] fields = value.split("\\|", -1);
+                if (fields.length != 8 || TextUtils.isEmpty(fields[0])) {
+                    return null;
+                }
+                PendingPackageEvent event = new PendingPackageEvent(fields[0], fields[1],
+                        Boolean.parseBoolean(fields[2]), Integer.parseInt(fields[3]), "restored");
+                event.dispatched = Boolean.parseBoolean(fields[5]);
+                event.newInstall = Boolean.parseBoolean(fields[6]);
+                event.retryIndex = Integer.parseInt(fields[7]);
+                return event;
+            } catch (Throwable ignored) {
+                return null;
+            }
         }
     }
 

@@ -13,6 +13,8 @@
             <com.smartisanos.home.widget.sys.TipsView android:layout_marginTop="@dimen/settings_item_title_margin_top" android:text="@string/unlock_animation_tips" style="@style/SettingItemTipsStyle" />
             <com.smartisanos.home.settings.SettingItemSwitch android:id="@+id/item_id_search_page_enabled" android:layout_marginTop="@dimen/settings_item_top_bottom_margin" setting:setting_item_switch_title="@string/search_page_enabled_title" style="@style/SettingSubItemSingleStyle" />
             <com.smartisanos.home.widget.sys.TipsView android:layout_marginTop="@dimen/settings_item_title_margin_top" android:text="@string/setting_default_search_engine_tips" style="@style/SettingItemTipsStyle" />
+            <com.smartisanos.home.settings.SettingItemSwitch android:id="@+id/item_id_swipe_down_system_panels" android:layout_marginTop="@dimen/settings_item_top_bottom_margin" setting:setting_item_switch_title="@string/swipe_down_system_panels_title" style="@style/SettingSubItemSingleStyle" />
+            <com.smartisanos.home.widget.sys.TipsView android:layout_marginTop="@dimen/settings_item_title_margin_top" android:text="@string/swipe_down_system_panels_tips" style="@style/SettingItemTipsStyle" />
             <include layout="@layout/item_bottom_shadow_layout" />
         </LinearLayout>
     </ScrollView>

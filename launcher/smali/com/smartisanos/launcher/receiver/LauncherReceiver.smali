@@ -608,6 +608,42 @@
 
     .line 45
     :cond_11
+    # Normal package broadcasts are coordinated by the compatibility manager.
+    # It waits for the original model and PackageManager activity visibility
+    # before calling Aa.c, preventing this receiver and its dynamic peer from
+    # racing each other on modern ROMs.
+    invoke-virtual {v4, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v6
+
+    if-nez v6, :managed_package_event
+
+    invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v6
+
+    if-nez v6, :managed_package_event
+
+    invoke-virtual {v5, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v6
+
+    if-nez v6, :managed_package_event
+
+    const-string v6, "android.intent.action.PACKAGE_REPLACED"
+
+    invoke-virtual {v6, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v6
+
+    if-eqz v6, :original_package_event
+
+    :managed_package_event
+    invoke-static {p1, p2}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->onPackageEvent(Landroid/content/Context;Landroid/content/Intent;)V
+
+    return-void
+
+    :original_package_event
     invoke-virtual {p2, v8, v9}, Landroid/content/Intent;->getBooleanExtra(Ljava/lang/String;Z)Z
 
     move-result p0

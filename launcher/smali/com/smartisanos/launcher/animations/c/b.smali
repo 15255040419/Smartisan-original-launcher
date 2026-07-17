@@ -72,6 +72,8 @@
 .method public onComplete()V
     .locals 8
 
+    invoke-static {}, Lcom/smartisanos/launcher/diagnostics/AnimationTimingDiagnostics;->onUnlockAnimationFinished()V
+
     .line 1
     sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
 
@@ -772,6 +774,8 @@
 
 .method public onStart()V
     .locals 2
+
+    invoke-static {}, Lcom/smartisanos/launcher/diagnostics/AnimationTimingDiagnostics;->onUnlockAnimationStarted()V
 
     .line 1
     sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z

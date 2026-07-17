@@ -12017,7 +12017,7 @@
 .end method
 
 .method public update()V
-    .locals 6
+    .locals 8
 
     .line 1
     invoke-direct {p0}, Lcom/smartisanos/launcher/view/Eb;->Hx()Z
@@ -12036,26 +12036,52 @@
 
     const-wide/16 v4, 0x0
 
-    cmp-long v2, v2, v4
+    cmp-long v4, v2, v4
 
-    if-nez v2, :cond_0
+    if-nez v4, :cond_delta_available
 
     .line 4
-    iput-wide v0, p0, Lcom/smartisanos/launcher/view/Eb;->mStartTime:J
+    const/4 v6, 0x0
+
+    goto :goto_delta_ready
 
     .line 5
-    :cond_0
+    :cond_delta_available
+    sub-long v2, v0, v2
+
+    long-to-float v6, v2
+
+    :goto_delta_ready
     iput-wide v0, p0, Lcom/smartisanos/launcher/view/Eb;->mStartTime:J
 
     .line 6
-    iget p0, p0, Lcom/smartisanos/launcher/view/Eb;->fx:F
+    move v5, v6
+
+    const/high16 v7, 0x42c80000    # 100.0f
+
+    cmpg-float v4, v6, v7
+
+    if-lez v4, :cond_delta_clamped
+
+    move v6, v7
+
+    :cond_delta_clamped
+    iget v4, p0, Lcom/smartisanos/launcher/view/Eb;->fx:F
+
+    mul-float/2addr v6, v4
+
+    const v7, 0x3d75c28f    # 0.06f
+
+    mul-float/2addr v6, v7
+
+    invoke-static {v0, v1, v5, v6, v4}, Lcom/smartisanos/launcher/diagnostics/AnimationTimingDiagnostics;->logFrameDelta(JFFF)V
 
     .line 7
     invoke-static {}, Lcom/smartisanos/smengine/Ra;->getInstance()Lcom/smartisanos/smengine/Ra;
 
     move-result-object v0
 
-    invoke-virtual {v0, p0}, Lcom/smartisanos/smengine/Ra;->T(F)V
+    invoke-virtual {v0, v6}, Lcom/smartisanos/smengine/Ra;->T(F)V
 
     goto :goto_0
 

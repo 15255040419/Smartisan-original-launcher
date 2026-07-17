@@ -1409,7 +1409,9 @@
     :cond_2
     iget-object v0, p0, Lcom/smartisanos/smengine/Ra;->BU:Lcom/smartisanos/smengine/b/i;
 
-    const v1, 0x3ca3d70a    # 0.02f
+    const/high16 v1, 0x447a0000    # 1000.0f
+
+    div-float v1, p1, v1
 
     invoke-virtual {v0, v1}, Lcom/smartisanos/smengine/b/i;->ea(F)V
 

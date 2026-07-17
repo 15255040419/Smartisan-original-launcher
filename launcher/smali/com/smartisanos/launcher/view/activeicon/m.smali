@@ -16,6 +16,8 @@
 
 .field private CJ:Lcom/smartisanos/smengine/F;
 
+.field private activeIconShadowNode:Lcom/smartisanos/smengine/F;
+
 .field private CP:I
 
 .field private EP:I
@@ -1274,7 +1276,7 @@
 .end method
 
 .method private jz()V
-    .locals 4
+    .locals 5
 
     .line 1
     iget-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/m;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
@@ -1352,6 +1354,74 @@
     iget-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/m;->CJ:Lcom/smartisanos/smengine/F;
 
     invoke-virtual {p0, v0}, Lcom/smartisanos/smengine/SceneNode;->addChild(Lcom/smartisanos/smengine/SceneNode;)I
+
+    # The live calendar background is an independent SMEngine node, not the
+    # cached ActiveIconView bitmap.  Attach a shadow-only sibling below it.
+    iget-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/m;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_back_size:F
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->activeIconLiveShadowNodeSize(F)F
+
+    move-result v1
+
+    const-string v2, "calendar/bg.png"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/pb;->path(Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v2
+
+    const-string v3, "CALENDAR"
+
+    invoke-static {v2, v0, v3}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->createActiveIconLiveShadowTexture(Ljava/lang/String;FLjava/lang/String;)Ljava/lang/String;
+
+    move-result-object v2
+
+    if-eqz v2, :cond_live_shadow_done
+
+    const-string v3, "calendarLiveShadow"
+
+    const/4 v0, 0x0
+
+    const/4 v4, 0x1
+
+    invoke-static {v3, v1, v1, v0, v4}, Lcom/smartisanos/smengine/F;->a(Ljava/lang/String;FFFZ)Lcom/smartisanos/smengine/F;
+
+    move-result-object v3
+
+    iput-object v3, p0, Lcom/smartisanos/launcher/view/activeicon/m;->activeIconShadowNode:Lcom/smartisanos/smengine/F;
+
+    const-string v0, "TextureModularColorMaterial"
+
+    invoke-static {v0}, Lcom/smartisanos/smengine/mymaterial/g;->jb(Ljava/lang/String;)Lcom/smartisanos/smengine/mymaterial/f;
+
+    move-result-object v0
+
+    invoke-virtual {v3, v0}, Lcom/smartisanos/smengine/SceneNode;->setMaterial(Lcom/smartisanos/smengine/mymaterial/f;)V
+
+    invoke-virtual {v3, v2}, Lcom/smartisanos/smengine/F;->setImageName(Ljava/lang/String;)V
+
+    invoke-virtual {v3, v4}, Lcom/smartisanos/smengine/SceneNode;->setIsEnableBlend(Z)V
+
+    invoke-virtual {v3, v4}, Lcom/smartisanos/smengine/SceneNode;->setRenderQueue(I)V
+
+    iget v0, p0, Lcom/smartisanos/launcher/view/activeicon/m;->xP:I
+
+    add-int/lit8 v0, v0, -0x1
+
+    invoke-virtual {v3, v0}, Lcom/smartisanos/smengine/SceneNode;->setLayer(I)V
+
+    invoke-virtual {p0, v3}, Lcom/smartisanos/smengine/SceneNode;->addChild(Lcom/smartisanos/smengine/SceneNode;)I
+
+    const-string v0, "CALENDAR"
+
+    iget-object v3, p0, Lcom/smartisanos/launcher/view/activeicon/m;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    iget v3, v3, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_back_size:F
+
+    invoke-static {v0, v3, v1, v2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->logActiveIconLiveShadowNodeAttached(Ljava/lang/String;FFLjava/lang/String;)V
+
+    :cond_live_shadow_done
 
     return-void
 .end method

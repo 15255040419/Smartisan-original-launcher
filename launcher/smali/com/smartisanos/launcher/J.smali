@@ -4952,6 +4952,11 @@
 
     .line 26
     :cond_6
+    # MESSAGE_COMPLETE is the original model-ready boundary.  Replay any
+    # persisted package events only after this point, never from a guessed
+    # Activity lifecycle callback.
+    invoke-static {}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->onLauncherModelReady()V
+
     new-instance v2, Landroid/content/Intent;
 
     const-string v3, "com.smartisanos.launcher.ready"

@@ -192,13 +192,15 @@
     <string name="search_hint_content_detail">Search for apps, contacts and web</string>
     <string name="search_hint_title">Search</string>
     <string name="search_keywordeditor_hint">Search</string>
-    <string name="search_page_enabled_title">Enable Slide Search</string>
+    <string name="search_page_enabled_title">Swipe Up to Open Search</string>
+    <string name="swipe_down_system_panels_title">Swipe Down for Notifications and Control Center</string>
+    <string name="swipe_down_system_panels_tips">Swipe down on the left half for notifications, or on the right half for Control Center.</string>
     <string name="quick_search_install_title">Built-in Search</string>
     <string name="quick_search_install_subtitle">Original Smartisan phone search app</string>
     <string name="quick_search_install_button">Install</string>
     <string name="quick_search_installed_button">Installed</string>
     <string name="quick_search_reinstall_button">Reinstall</string>
-    <string name="setting_default_search_engine_tips">Swipe down on the desktop to quickly search apps.</string>
+    <string name="setting_default_search_engine_tips">Swipe up on the desktop to quickly search apps.</string>
     <string name="search_searchapp_toast">current app</string>
     <string name="search_text">"search 
  mail message"</string>

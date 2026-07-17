@@ -196,13 +196,15 @@
     <string name="search_hint_content_detail">目前可搜索应用程序，联系人和网页内容</string>
     <string name="search_hint_title">搜索</string>
     <string name="search_keywordeditor_hint">搜索</string>
-    <string name="search_page_enabled_title">启用下滑搜索</string>
+    <string name="search_page_enabled_title">上滑打开搜索页</string>
+    <string name="swipe_down_system_panels_title">下滑打开通知栏和控制中心</string>
+    <string name="swipe_down_system_panels_tips">左半屏下滑打开通知栏，右半屏下滑打开控制中心；不支持时回退通知栏</string>
     <string name="quick_search_install_title">内置搜索</string>
     <string name="quick_search_install_subtitle">锤子手机原版搜索软件</string>
     <string name="quick_search_install_button">安装</string>
     <string name="quick_search_installed_button">已安装</string>
     <string name="quick_search_reinstall_button">重装</string>
-    <string name="setting_default_search_engine_tips">在桌面上下滑呼出搜索，即可快速搜索应用</string>
+    <string name="setting_default_search_engine_tips">在桌面上滑呼出搜索，即可快速搜索应用</string>
     <string name="search_searchapp_toast">当前应用</string>
     <string name="search_text">"可搜索应用程序 
  邮件，短信"</string>

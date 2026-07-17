@@ -571,8 +571,34 @@
 
     if-ne p1, v3, :cond_b
 
+    iget-object v3, p0, Lcom/smartisanos/smengine/v;->LE:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    if-eqz v3, :cond_7_system_panel_empty
+
+    const/4 v3, 0x1
+
+    invoke-static {v3}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->setInteractionBlocked(Z)V
+
+    goto :goto_0_system_panel_eligibility
+
+    :cond_7_system_panel_empty
+    const/4 v3, 0x0
+
+    invoke-static {v3}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->setInteractionBlocked(Z)V
+
+    :goto_0_system_panel_eligibility
     .line 28
     invoke-static {p2}, Lcom/smartisanos/launcher/a/a/a;->b(Landroid/view/MotionEvent;)V
+
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->isSystemPanelGestureConsumed()Z
+
+    move-result v3
+
+    if-eqz v3, :cond_7_system_panel_not_consumed
+
+    return v0
+
+    :cond_7_system_panel_not_consumed
 
     .line 29
     invoke-virtual {p2}, Landroid/view/MotionEvent;->getPointerCount()I
@@ -718,6 +744,19 @@
 
     .line 41
     invoke-static {p2}, Lcom/smartisanos/launcher/a/a/a;->c(Landroid/view/MotionEvent;)V
+
+    # SystemPanelCompat keeps a successful pull-down claimed through ACTION_UP.
+    # Do not deliver that UP into the original Cell queue, or the touched app
+    # can launch after SystemUI has already opened.
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->isSystemPanelGestureConsumed()Z
+
+    move-result p1
+
+    if-eqz p1, :cond_e_system_panel_not_consumed
+
+    return v0
+
+    :cond_e_system_panel_not_consumed
 
     goto :goto_7
 

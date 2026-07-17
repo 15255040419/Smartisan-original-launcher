@@ -16,6 +16,8 @@
 # instance fields
 .field private CJ:Lcom/smartisanos/smengine/F;
 
+.field private activeIconShadowNode:Lcom/smartisanos/smengine/F;
+
 .field private LP:Ljava/util/HashMap;
 
 .field private MP:Ljava/util/HashMap;
@@ -5048,6 +5050,100 @@
     iget-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/H;->CJ:Lcom/smartisanos/smengine/F;
 
     invoke-virtual {p0, v0}, Lcom/smartisanos/smengine/SceneNode;->addChild(Lcom/smartisanos/smengine/SceneNode;)I
+
+    # Weather keeps its original live background and foreground animation.  This
+    # sibling is only the original-parameter, software-rendered external shadow.
+    iget-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/H;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->weather_back_size:F
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->activeIconLiveShadowNodeSize(F)F
+
+    move-result v1
+
+    const-string v2, "weather/weather_bg_%s.png"
+
+    const/4 v3, 0x1
+
+    new-array v3, v3, [Ljava/lang/Object;
+
+    iget-object v4, p0, Lcom/smartisanos/launcher/view/activeicon/H;->VP:[Ljava/lang/String;
+
+    const/4 v1, 0x1
+
+    aget-object v4, v4, v1
+
+    const/4 v1, 0x0
+
+    aput-object v4, v3, v1
+
+    invoke-static {v2, v3}, Ljava/lang/String;->format(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;
+
+    move-result-object v2
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/pb;->path(Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v2
+
+    const-string v3, "WEATHER"
+
+    invoke-static {v2, v0, v3}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->createActiveIconLiveShadowTexture(Ljava/lang/String;FLjava/lang/String;)Ljava/lang/String;
+
+    move-result-object v2
+
+    if-eqz v2, :cond_live_shadow_done
+
+    iget-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/H;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->weather_back_size:F
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->activeIconLiveShadowNodeSize(F)F
+
+    move-result v1
+
+    const-string v3, "weatherLiveShadow"
+
+    const/4 v0, 0x0
+
+    const/4 v4, 0x1
+
+    invoke-static {v3, v1, v1, v0, v4}, Lcom/smartisanos/smengine/F;->a(Ljava/lang/String;FFFZ)Lcom/smartisanos/smengine/F;
+
+    move-result-object v3
+
+    iput-object v3, p0, Lcom/smartisanos/launcher/view/activeicon/H;->activeIconShadowNode:Lcom/smartisanos/smengine/F;
+
+    const-string v0, "TextureModularColorMaterial"
+
+    invoke-static {v0}, Lcom/smartisanos/smengine/mymaterial/g;->jb(Ljava/lang/String;)Lcom/smartisanos/smengine/mymaterial/f;
+
+    move-result-object v0
+
+    invoke-virtual {v3, v0}, Lcom/smartisanos/smengine/SceneNode;->setMaterial(Lcom/smartisanos/smengine/mymaterial/f;)V
+
+    invoke-virtual {v3, v2}, Lcom/smartisanos/smengine/F;->setImageName(Ljava/lang/String;)V
+
+    invoke-virtual {v3, v4}, Lcom/smartisanos/smengine/SceneNode;->setIsEnableBlend(Z)V
+
+    invoke-virtual {v3, v4}, Lcom/smartisanos/smengine/SceneNode;->setRenderQueue(I)V
+
+    iget v0, p0, Lcom/smartisanos/launcher/view/activeicon/H;->xP:I
+
+    add-int/lit8 v0, v0, -0x1
+
+    invoke-virtual {v3, v0}, Lcom/smartisanos/smengine/SceneNode;->setLayer(I)V
+
+    invoke-virtual {p0, v3}, Lcom/smartisanos/smengine/SceneNode;->addChild(Lcom/smartisanos/smengine/SceneNode;)I
+
+    const-string v0, "WEATHER"
+
+    iget-object v3, p0, Lcom/smartisanos/launcher/view/activeicon/H;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    iget v3, v3, Lcom/smartisanos/launcher/data/LayoutProperty;->weather_back_size:F
+
+    invoke-static {v0, v3, v1, v2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->logActiveIconLiveShadowNodeAttached(Ljava/lang/String;FFLjava/lang/String;)V
+
+    :cond_live_shadow_done
 
     return-void
 .end method

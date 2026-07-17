@@ -17,9 +17,11 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-07-16）
+## 当前状态总览（2026-07-17）
 
+- SMEngine 动画时间推进已从每个渲染帧固定 `20.0f` 改为真实 `uptimeMillis` 帧间隔，并按原帧基准折算为 `realDelta * 20 / 16.6667`、单帧上限 100ms；因此不依赖设备报告的刷新率，90/120Hz 会自然缩短单帧逻辑推进以保持总时长。`Ra.T(float)` 的唯一明确粒子入口也已由固定 `0.02f` 改为本帧引擎 delta / 1000。未改动任何 unlock XML、解锁广播、生命周期兜底或冷重载。构建、zipalign、v1/v2/v3 签名与最终二进制 Manifest 验证已完成；60/90/120Hz 真机回归待验证。
 - 构建产物为 `build\launcher-signed.apk`；构建、zipalign、v1/v2/v3 签名和 ADB 覆盖安装均已验证。
+- 桌面手势现已收敛为两个独立设置：`swipe_up_search_enabled`（默认开）仅控制原版 SMEngine `FlingUpGesture` 进入现有项目内搜索页；`swipe_down_system_panels_enabled`（默认开）仅控制左半屏下拉通知栏、右半屏优先控制中心并在失败时回退通知栏。原先 `Launcher.dispatchTouchEvent` 的下滑搜索旁路已删除。下滑只允许空白区手势：真实 Cell 的 touch-down 和 long-click/拖动会立即阻止候选；SystemUI 接管后持续吞掉本次 UP，不能再启动图标。跨 ROM 和实体机回归待最终验证。
 - 启动专项阶段 0、阶段 1、阶段 2 已完成。阶段 3、阶段 4 为“核心实现完成，完整回归待最终验证”：阶段 3 已确认原版 `N.d + F.i`、12→20、同模式跳过且未改迁移算法；阶段 4 已确认独立 `:reload` 不透明过渡、原版 LoadingUI、精确旧 PID 终止和真实首帧 token 握手。`:reload` 在 Activity 结束后短暂作为 cached 进程存在属正常系统行为，不得手工杀掉。阶段 5–10 均为“核心实现完成，基本验证完成；最终回归待完成”；复杂宫格、逐帧、多 ROM、压力和异常恢复统一保留至最终回归。
 - 固定延迟审计已完成核心收敛与基础验证：只保留失败提示、有限条件重试、网络轮询/合并、天气 TTL 与 UI 动画；不再用透明壁纸、角标、主题或手动天气的固定时间重复刷新掩盖状态竞争。
 - 任务合并和状态阶段已完成核心收敛与基础验证：图标、天气、分身和冷重载各自保持单飞/合并状态；冷重载失败重试会重新进入等待首帧状态，不以超时当成功，也不为超时额外杀进程。建议 Commit 顺序已审阅；本轮未暂存或提交用户的混合工作区。
@@ -29,15 +31,16 @@
 - 设置页一级、二级和三级页面的 `ScrollView`、`ListView`、`GridView` 统一保持 `OVER_SCROLL_ALWAYS`；到达顶部或底部继续拖动时使用现代 Android 的系统拉伸效果并在松手后回弹。不得再在 Java 公共调校中递归写入 `OVER_SCROLL_NEVER` 覆盖 maintained 资源。
 - 宫格遵循原版：12 -> 20 只切换运行布局，保留同一板块全部图标、顺序与格子位置；20 -> 12 仅在单板块超过 12 个时按原顺序拆到后续板块。
 - 单应用替换支持系统原图、已安装图标包、已缓存的改进版图标和相册自定义图标；展示名称只影响桌面文案，图标匹配始终按包名/组件名进行。
-- 强迫症选项中的“显示图标上的角标”现为“角标提醒”。角标提醒与紧贴屏幕横扫清除角标均以 `NotificationListenerService` 通知使用权为前提：未授权不会先写入开启值，返回系统设置后只开启本次请求目标；撤销授权会同步关闭两个依赖项。该链路只使用 `BadgeBridge.hasNotificationAccess()` / `openNotificationAccessSettings()`，没有使用 `POST_NOTIFICATIONS`、运行时普通权限或冷重载。真机授权、拒绝、撤销和角标刷新仍待验证。
+- 强迫症选项中的“显示图标上的角标”现为“角标提醒”。角标提醒与紧贴屏幕横扫清除角标均以 `NotificationListenerService` 通知使用权为前提：未授权不会先写入开启值，返回系统设置后只开启本次请求目标；撤销授权会同步关闭两个依赖项。该链路只使用 `BadgeBridge.hasNotificationAccess()` / `openNotificationAccessSettings()`，没有使用 `POST_NOTIFICATIONS`、运行时普通权限或冷重载。通知数字角标继续受此开关控制，但原版新安装 `NEW` 已从共享显示位中分离：无通知使用权或关闭角标提醒时，`isNewlyInstalled && messagesNumber == 0` 仍显示原版 `newapp.png`；真实数字通知优先级不变。真机授权、拒绝、撤销和角标刷新仍待验证。
 - 首次安装默认关闭改进版图标、动态天气和日历、图标角标、紧贴屏幕横扫清除角标；图标包预热仅扫描本地已安装 APK 资源，不下载在线图片。
 - 普通应用首帧已恢复原版快速路径：未启用改进版、未选图标包且没有单应用覆盖时直接调用 `PackageManager.getApplicationIcon()`；自定义/图标包/改进版才进入兼容图标链。在线图片只在后台下载并持久缓存，图标包 `appfilter` 只在后台预热，在线 Bitmap 内存缓存限制为 8 MiB。
 - 设置页面切换和桌面重载仍需持续真机回归。任何宫格切换不得再自行重排、按 9 宫格解释 20 宫格，或绕过原版数据库线程调用迁移。
 - 普通主题和毛玻璃主题必须等待原版消息生成、提交过渡截图、退出设置页并返回 HOME，再由 `J.onResume()` 消费 `a.r.sj` 中唯一的主题消息；maintained 设置宿主不得在前台直接调用 `a.r.a(Message)` 或 `a.r.b(Message)`。普通主题选择即使发现遗留 `launcher_grid_theme=1`，也必须先清除透明覆盖并继续走此原版主题链，不得误入 `ReloadTransitionActivity` 黑色 Loading。透明主题开关本身仍通过独立 Launcher 冷启动初始化。Launcher 状态栏和导航栏保持透明。
 - 普通/毛玻璃主题切换的实际前台宿主是 `ThemeChooserActivity`：主题详情以同一 Activity 的 `activity_theme_item` 根布局替换内容，并不启动原版 `ThemeItemActivity`。原版 `ThemeItemActivity` 成功提交主题后保留详情页约 100ms，由其 `Q` Handler 截取过渡画面、finish 并回到 HOME；随后 `J.onResume()` 消费主题消息并执行桌面主题动画。maintained 宿主保持同一时序，不能再加入冷重载式全屏黑色 Loading 或改 `J.onResume()` 原版桌面动画。实体机逐帧仍待验证。
 - 普通主题的原版 `theme_changing` Loading 由 `J -> widget.c -> SmartisanProgressDialog` 显示，不能套用宫格冷重载的全黑沉浸窗口。此前尝试的跨窗口 system bar 同步未改变真机现象，已撤回；普通主题系统栏问题仍待依据完整真机日志和原版窗口层级继续定位。主题动画保持原版 `finish -> HOME` 顺序且无 Activity 窗口动画。
-- 设置弹窗统一复用同一锤子风格根容器；应用改名、图标包选择和图标大小弹窗均使用统一宽度、圆角、标题、分隔线和按钮容器。动态天气/日历继续使用原版 ActiveIcon 数据更新与恢复链路，不在每次桌面翻页时触发定位或联网；当前移植版的完整静态应用图标不得作为 ActiveIcon 底板再次绘制。动态缓存帧使用原版 `icon_shadow_radius` / `icon_shadow_color` 两层软件阴影参数合成，不能强制启用在现代 Android 上会崩溃的私有 `sc[27]` GL 阴影链。
+- 设置弹窗统一复用同一锤子风格根容器；应用改名、图标包选择和图标大小弹窗均使用统一宽度、圆角、标题、分隔线和按钮容器。动态天气/日历继续使用原版 ActiveIcon 数据更新与恢复链路，不在每次桌面翻页时触发定位或联网；当前移植版的完整静态应用图标不得作为 ActiveIcon 底板再次绘制。动态缓存帧和实时节点均只读原版 `Constants` 的当前 shadow mode、`ICON_SHADOW_RADIUS` / `ICON_SHADOW_RADIUS_TRANSPARENT` 与 `ICON_SHADOW_COLOR[mode]`，不能再根据 `launcher_grid_theme` 或资源名猜测，也不能强制启用在现代 Android 上会崩溃的私有 `sc[27]` GL 阴影链；实时节点视觉仍待真机确认。
 - 在线图标库保留完整文件索引；同一应用的多版本 PNG 只通过 `icons/variants.json` 归组。不得以 `_2/_3` 后缀为由批量删除或重命名；系统视频跨 ROM 使用 `com.smartisanos.videoplayerproject` 原版锤子类别图，旧 `com.android.VideoPlayer` 图仍作为手动候选保留。
+- 新安装应用兼容链已收敛到 `SmartisanInstallManager`：Manifest `LauncherReceiver`、动态包广播、`LauncherApps` 和 `PackageInstaller` 完成事件只提交同一持久化事件队列；仅在原版 `J.MESSAGE_COMPLETE` 后，且 PackageManager 已能解析 Launcher Activity 时才调用原版 `Aa.c()`。初始基线应用不会补 NEW；真正新安装在原始 `A.b()` 创建 `ItemInfo` 时写入原版 `isNewlyInstalled/newlyInstalled`，首次点击仍由原版链路清除。构建、签名和最终 Manifest 已验证；OPPO/HyperOS、升级、卸载重装、分身、多用户与冷启动恢复仍待真机最终回归。
 - Dock 上方板块页码由 `view.V -> view.Z (DotView)` 的 SMEngine 网格和原版 `dot_fix/dot_mask/dot_move` 纹理绘制，不是 Settings 的 `DotsPageIndicator`。1080×2400 设备的兼容缩放此前把 `dot_width` 乘 `scaleX=1.0`、`dot_height` 乘 `scaleY=1.25`，会将同一个 mask 拉为纵向椭圆；现已将这对尺寸作为一个等比视觉单元统一使用 `scale`。Dock 位置、间距、颜色、透明度和翻页逻辑均未改。构建、v1/v2/v3 签名和 `emulator-5556` 覆盖安装通过；模拟器当前仅一页，实际 12/20、多页、不同 density 与真机截图测量仍待最终回归。
 - 图标大小确认已从旧的 `AlarmManager(350ms) -> finish Settings -> killProcess` 链路切换到既有 `:reload` 冷重载。主 prefs `commit()` 后才创建 `ICON_SIZE_CHANGE` token；不透明过渡页首帧后才结束旧主 PID，新进程在 `Constants.applyLauncherIconSize()` 读取新值并以真实 GL 首帧通知过渡页关闭。未调用 `N.d()`、`F.i()` 或数据库迁移；同值确认只记录 `ICON_SIZE_UNCHANGED_SKIP`。模拟器已完成 100→150、150→50 和同值 50→50；实体机逐帧、连续压力、12/20、文件夹/动态图标仍待最终回归。
 - 动态天气/日历只有 `launcher_dynamic_weather_calendar_enabled` 一个联合开关；现已复用稳定的 `:reload` / `FIRST_FRAME_READY` 冷重载外壳，原因是 `ACTIVE_ICON_SETTINGS_CHANGE`，不再在正常路径向旧 Launcher 发送 `update_icon` 局部刷新。首次从关闭开启时，联合开关先请求已声明的 `ACCESS_COARSE_LOCATION`，仅在授权成功后同步 `commit()` 配置、回读并发起冷重载；拒绝或永久拒绝时保持关闭且不重载。主 Launcher 固定 `screenOrientation=1`，过渡页也已在文本及二进制 Manifest 固定 portrait，并在 `onCreate()`、内容创建前执行运行时兜底。实体机授权、开关、横放和连续切换仍待验证。
@@ -51,6 +54,53 @@
 4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
 
 ## 每日修复记录（倒序）
+
+### 2026-07-17
+
+#### SMEngine 按真实墙钟 delta 推进，修复高刷新率动画加速（代码实现完成；构建、签名与二进制 Manifest 验证完成；真机回归待验证）
+
+- 根因：原版 `view/Eb.update()` 虽读取 `SystemClock.uptimeMillis()`，却在写回 `mStartTime` 后丢弃 `now - previousStartTime`，每次 `GL/vsync -> Eb.update() -> Ra.T(float)` 均传入固定 `fx=20.0f`。120Hz 因而每秒调用约为 60Hz 的两倍，解锁 XML、主题和翻页等同一 SMEngine 时间线会以约两倍逻辑速度推进。
+- 对照：`clean_launcher_raw` 与当前 APK 的 `Eb.update()` 均为相同固定步长；维护参考提交 `1e6ab7265dfe1b48855283d4be98b2f00e4f9546` 的 `MainView.update()` / `World.runOneFrame()` 是同一混淆映射。本轮仅按其最小差异移植到当前 `Eb -> Ra` 命名。
+- 修复：每帧保留真实 delta，首次帧为 0，后续限制为最大 100ms，随后计算 `engineDelta = realDelta * fx * (1 / 16.6667)`，再调用既有 `Ra.T(engineDelta)`。100ms 上限只防止掉帧、后台恢复或调试停顿使动画跳到结尾；不读取 `Display.getRefreshRate()`，因为该 API 在部分 ROM 可返回默认模式而非实际 GL vsync。
+- 粒子：已确认 `Ra.T(float)` 内的 `BU.ea(0.02f)` 是 maintained `updateAllParticleEmitter(0.02f)` 的等价唯一入口，改为 `BU.ea(engineDelta / 1000f)`；没有对无法精确映射的粒子路径猜测修改。
+- 诊断：新增 `AnimationTimingDiagnostics`，仅在 SMEngine 实际推进时每秒最多记录一次 `ANIMATION_FRAME_DELTA`（异常 delta 例外），包含真实 / 引擎 delta、`fx`、uptime 和线程；既有 `UnlockAnimationXML` 的 `onStart/onComplete` 仅新增 `UNLOCK_ANIMATION_START/FINISH` 墙钟时长日志，不改变原始回调顺序或解锁业务。
+- 验证：`build.bat` 成功完成 Smali、Java `classes2.dex` 注入、zipalign 与签名；独立 `apksigner verify --verbose` 确认 v1/v2/v3 为 true，`zipalign -c -P 16 -v 4` 通过，`aapt2 dump xmltree --file AndroidManifest.xml` 确认最终二进制 Manifest 仍为 `com.smartisanos.launcher` 且 `ReloadTransitionActivity` 保持 `screenOrientation=portrait`。当前 `adb devices` 无连接设备。
+- 未改：`unlock9/12/16/20.xml`、原版缩放/颜色/插值、解锁广播触发、`USER_PRESENT` / 生命周期兜底、主题 / 宫格 / 冷重载链路均未修改。待同一小米设备在 60Hz 与 120Hz 各至少三次、并在 OPPO 复测解锁、翻页和主题动画；当前不能将真机结果标记为完成。
+
+#### 桌面上滑搜索与左右下滑系统面板（代码实现完成；构建与二进制 Manifest 验证完成；真机回归待验证）
+
+- 原下滑搜索入口：此前 `Launcher.dispatchTouchEvent(MotionEvent)` 在所有事件已交给 RootView/SMEngine 后，再调用 `MaintainedLauncherSettingsHost.handleLauncherSearchGesture()`；该旁路以向下 `dy` 判定并通过 `ThemeChooserActivity` 的 `launcher_show_search` extra 打开项目内搜索页。现已完整删除这个 Activity 级观察器、其状态字段和下滑方向判断，下滑不会再由这条链路进入搜索。
+- 上滑搜索：当前 APK 原本已有 `com.smartisanos.launcher.a.a.a`（source `FlingUpGesture.java`）；`com.smartisanos.smengine.v.1` 在 ACTION_DOWN / MOVE / UP 分别调用其 `a(MotionEvent)`、`b(MotionEvent)`、`c(MotionEvent)`。保留原版单指、500ms、150px、反向移动和横向 0.83 比例限制，并在成功后改为调用现有 `MaintainedLauncherSettingsHost.openLauncherSearchFromSwipeUp()`，仍由既有 `ThemeChooserActivity` / `launcher_show_search` 打开项目内搜索页，不新建或重写搜索页面。
+- 设置：原设置行保留原位置和 View ID，标题改为“上滑打开搜索页”，最终 key 为 `swipe_up_search_enabled`、默认 `true`。首次读取新 key 时，若不存在则一次性读取旧 `launcher_search_page_enabled` 并写入新 key；后续手势仅读取新 key。紧邻新增“下滑打开通知栏和控制中心”（`swipe_down_system_panels_enabled`，默认 `true`），两个开关写入现有 launcher settings 存储后立即生效，不冷重载、不杀进程。
+- 下滑系统面板：当前源码没有 maintained 的同名 `DragLayer`；实际等价入口仍是原版 `smengine/v.1` 的 ACTION_MOVE。首版错误地只在该 MOVE 读取延迟回写的 `v.LE`，而 `FlingUpGesture.b()` 已先调用 SystemPanelCompat；快速图标下拉会在 Cell touch-down 结果到达前打开 SystemUI，且 `ACTION_UP` 先清除 consumed 标记，随后仍投递原图标 click。现改为真实 Cell touch-down 立即阻断，Cell long-click/拖动同样阻断；候选额外等待 120ms 让 SMEngine 命中状态稳定。单指空白区下拉超过 150px、纵向大于横向才触发；成功后 consumed 状态保留到 `smengine/v.1` 消费同一 ACTION_UP，因此不再启动应用。多指、横向、设置关闭和反射失败继续原桌面触摸链。
+- 兼容调用：新增唯一 `SystemPanelCompat`，只通过 `context.getSystemService("statusbar")` 反射。左侧顺序为 `expandNotificationsPanel()` → `expand()`；右侧顺序为 `expandSettingsPanel()` → `expandNotificationsPanel()` → `expand()`。没有无障碍服务、常驻服务、厂商 Intent、Root、Shell、Shizuku 或 ROM 型号判断；所有反射失败均返回原触摸链，不抛出到 Launcher。
+- Manifest：文本 Manifest 原已含 `android.permission.EXPAND_STATUS_BAR`；本次未重复修改 AXML。构建后的最终二进制 Manifest 已用 `aapt2 dump xmltree --file AndroidManifest.xml build\\launcher-signed.apk` 确认保留该权限。
+- 验证：2026-07-17 已再次执行 `build.bat`，完成 maintained 资源、Smali、Java Compat、classes2.dex、zipalign 和签名；`apksigner verify --verbose` 确认 v1/v2/v3 为 true。当前 `D:\sdk\platform-tools\adb.exe devices` 未发现设备，不能声称真机通过。待在 OPPO/ColorOS、小米/HyperOS、接近 AOSP，以及 Android 11/13+/15+ 上验证左右空白区下滑、图标轻点后下拉、图标长按拖动、Dock、文件夹、编辑模式、横向翻页、多指、负一屏、12/20 宫格和连续快速操作。
+
+#### NEW 标记不再被通知使用权或角标提醒隐藏（代码实现完成；真机回归待验证）
+
+- 根因：原版 `view/a/g.1` 的 `SHOW_MESSAGE_FLAG` 是数字消息角标与新安装 NEW 共用的渲染位。通知使用权未授权时，maintained 设置宿主会按既定权限策略关闭“角标提醒”，并令该全局位为 `false`；这并非原版 NEW 安装判定依赖通知权限，却会把已经正确写入 `ItemInfo.isNewlyInstalled` 的 `newapp.png` 一并隐藏。
+- 原版对照：`g.bb()` 继续只在 `isNewlyInstalled=true` 且 `messagesNumber<=0` 时创建原版 `newapp.png`；真实消息数大于零时仍优先显示数字消息角标。安装入库、`newlyInstalled` 数据库字段、首次点击清除 NEW、通知监听服务、通知使用权申请与角标开关持久化均未修改。
+- 修复：仅在 `g.i(0x200, visible)` 与 `g.Zm()` 计算共享显示位时，为“新安装且没有数字消息”的原版条件补回可见性。关闭角标提醒、未授权或撤销通知使用权时，普通数字通知角标仍被隐藏；只有原版 NEW 保持显示，且有真实消息数时不会与数字角标叠加。
+- 验证：待本次完整构建后，以未授予通知使用权的新装应用验证 NEW 出现；再验证关闭角标提醒、授予/撤销通知使用权、带真实通知数的新装应用优先显示数字角标、首次打开清除 NEW，以及普通数字角标仍受开关控制。当前无 ADB 设备，不将真机结果标记为完成。
+
+#### 跨 ROM 新安装应用即时显示与原版 NEW 标记（代码实现完成；真机回归待验证）
+
+- 根因：原版 `LauncherReceiver` 的 `PACKAGE_ADDED` 直接调用 `Aa.c()`，而移植层 `SmartisanInstallManager` 的动态接收器又独立调用相同入口；两条链在不同 ROM 的 PackageManager 可见性与 Launcher 模型初始化之前竞争。移植层只进行 `0/300/600ms` 三次探测，第三次失败后直接丢弃，正好会遗漏 HyperOS 等延迟暴露 Launcher Activity 的新应用。该兼容路径没有把“真实新安装”语义带入原版入库，因此依赖系统应用分类的应用可能没有原版 NEW。
+- 原版对照：`Aa.c(Context, package)` 只负责收集真实 Launcher Activity 后投递 `DatabaseUpdater.Action.aaa`；`data/A.k()` 转入 `A.b(package, matches)`；`A.b()` 创建 `ItemInfo` 并在同一 `a/l.h(ItemInfo)` 入库前写入 `isNewlyInstalled`，`ItemInfo.toContentValues()` 同步写入 `newlyInstalled`。桌面 `view/a/g.1` 读取该原版字段绘制 NEW，首次点击后的原版 `clearFlagNew` 仍把同字段回写为 `0`。本轮未新增自定义 NEW、角标、Cell 刷新或数据库表。
+- 修复：现有 `SmartisanInstallManager` 成为唯一协调层。Manifest 接收器在保留主题包和 `PACKAGE_DATA_CLEARED` 原版处理的前提下，将普通 `ADDED/CHANGED/REMOVED/REPLACED` 转交管理器；动态 receiver、`LauncherApps.Callback` 与 `PackageInstaller.SessionCallback.onFinished()` 同样只入同一队列。事件以包名去重并写入 `SharedPreferences`，只有 `J.MESSAGE_COMPLETE` 调用 `onLauncherModelReady()` 后才回放；首次 model-ready 记录安装基线，不扫描或重排已有桌面数据库。
+- 就绪与 NEW：回放同时要求 PackageManager 可查询包和 `MAIN/CATEGORY_LAUNCHER` Activity；按 `0/100/250/500/1000/2000/4000ms` 有界重试，约 12 秒仍不可见时记录 `INSTALL_PENDING_RETAINED` 并保留落盘事件，不再永久删除。新安装由 `firstInstallTime == lastUpdateTime` 且晚于基线、并且非 replacing 判定；升级不会标 NEW，卸载会移除待处理标识，卸载后重装可重新满足新安装条件。原始 `A.b()` 仅在创建 ItemInfo 前读取该事件标识，确保 NEW 与原版同一次入库落盘；点击清除逻辑未改。
+- 验证：`build.bat` 已完成 apktool 回编译、二进制 Manifest 注入、Java 兼容层编译、`classes2.dex` 合并、zipalign 和签名；`apksigner verify --verbose` 确认 v1/v2/v3 为 true；`aapt2 dump xmltree --file AndroidManifest.xml` 确认最终 APK 的 `LauncherReceiver` 仍包含 `PACKAGE_ADDED/CHANGED/REMOVED/REPLACED` 与 `package` scheme。当前 ADB 无连接设备，未声称 OPPO/HyperOS 即时显示、NEW、升级、卸载重装、冷启动恢复、分身/多用户、连续安装或 Java/native 稳定性已完成真机验证。
+
+#### 动态天气/日历实时节点接入原版参数的安全软件阴影（代码实现完成；最终真机回归待完成）
+
+- 原版对照：`e/s.a(Bitmap, …)` 会调用 `data/L.a(Bitmap, 0|1|2)` 预生成三张外部阴影 Bitmap；`L` 对 mode `0/1` 使用 `Constants.ICON_SHADOW_RADIUS`，对 mode `2` 使用 `ICON_SHADOW_RADIUS_TRANSPARENT`，并统一取 `ICON_SHADOW_COLOR[mode]`。普通 Cell 不按主题名称决定颜色：透明模式取 `2`，其余模式由 `Constants.sGaussianResSuffix` 是否为 `_light` 选择 `1` 或 `0`；该后缀由原版壁纸明暗检测后 `Constants.initByTheme()` 更新。
+- 原先状态更正：动态缓存帧已读取原版阴影参数，实时动态节点阴影尚未接入。此前仅修改 `ActiveIconView.a(base, active)` 的缓存合成，实际桌面中的 `WeatherView(H)` 和 `CalendarView(m)` 是独立 SMEngine `SceneNode` 树，分别直接加载 `weather/weather_bg_*.png` 与 `calendar/bg.png`，不会调用该缓存合成入口；因此只调软件阴影参数不会改变实时桌面视觉。
+- 根因：移植层旧 `activeIconShadowSpec()` 自行读取 `launcher_grid_theme`、按资源名查数组，并在失败时回退到硬编码参数；同时最新缓存路径以 `Class.getField()` 读取 Constants，不能确保私有/改造字段可用。这两点均不能保证与原版普通 Cell 的运行时 mode 一致。
+- 修复：`LauncherSettingBridge` 统一使用 `getDeclaredField()+setAccessible(true)` 读取原版 `Constants.isTransparentTheme`、`sGaussianResSuffix`、`ICON_SHADOW_RADIUS*` 和 `ICON_SHADOW_COLOR`；缓存帧与实时节点共用 `createShadowOnlyBitmap()`。`WeatherView(H)` 与 `CalendarView(m)` 各自保留原版背景、数字和动画节点，额外挂入一个使用缓存 shadow-only PNG 的同父 `F` 节点，图层固定在原背景 `xP` 之下；不绘制静态完整底图、不动日期/天气前景、不恢复私有 `sc[27]` GL 阴影链。
+- 位图所有权：`composeActiveIconToBaseBounds()` 不再 recycle 调用方传入的 `base/active`，只回收自己创建的中间图；实时 shadow cache key 包含类型、原始背景路径、mode/radii/colors、图标大小百分比、density、基础尺寸和最终画布尺寸，主题/图标大小/冷启动重建可生成新条目，天气温度或日期变化不重新生成。
+- 诊断：Constants 成功/失败分别记录 `ICON_SHADOW_CONSTANTS_RESOLVED` / `ICON_SHADOW_CONSTANTS_RESOLVE_FAILED`；缓存合成记录三条一次性 compose 日志；实时路径记录 cache hit/miss、shadow bitmap、background texture 和 shadow node attach/visible。日志不放进逐帧天气/日历更新路径。
+- 验证：2026-07-17 已执行 `build.bat`，完成 apktool 回编译、Java 兼容宿主编译、dex 合并、zipalign 与签名；`apksigner verify --verbose` 确认 v1/v2/v3 为 true；`aapt2 dump badging` 确认当前产物为 `com.smartisanos.launcher v1.5.4 (29)`，二进制 Manifest 仍可解析并保留 `ReloadTransitionActivity` 的 `screenOrientation=portrait`。当前 ADB 无连接设备，不能声称普通/浅色毛玻璃/透明主题、12/20 宫格、图标尺寸和实时天气/日历阴影已经视觉验收。
 
 ### 2026-07-16
 

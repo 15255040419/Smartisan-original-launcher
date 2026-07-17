@@ -131,7 +131,7 @@
 .end method
 
 .method private static a(FFJFFJZZ)V
-    .locals 0
+    .locals 2
 
     sub-long/2addr p6, p2
 
@@ -169,7 +169,17 @@
 
     if-eqz p9, :cond_5
 
-    sget-boolean p2, Lcom/smartisanos/launcher/data/Constants;->FLING_DOWN_FOR_SEARCH:Z
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v0
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isSwipeUpSearchEnabled(Landroid/content/Context;)Z
+
+    move-result p2
 
     if-eqz p2, :cond_5
 
@@ -241,10 +251,17 @@
     :goto_0
     if-eqz p0, :cond_5
 
-    # The maintained port handles downward search gestures only in
-    # Launcher.dispatchTouchEvent. Keep the original SMEngine fling detector
-    # from opening the same page for an upward gesture.
-    goto :cond_4
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v0
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherSearchFromSwipeUp(Landroid/content/Context;)V
+
+    return-void
 
     .line 17
     :cond_4
@@ -267,7 +284,19 @@
 
     .line 2
     :cond_0
-    sget-boolean v0, Lcom/smartisanos/launcher/data/Constants;->FLING_DOWN_FOR_SEARCH:Z
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v0
+
+    invoke-static {v0, p0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onMotionEvent(Landroid/content/Context;Landroid/view/MotionEvent;)V
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isSwipeUpSearchEnabled(Landroid/content/Context;)Z
+
+    move-result v0
 
     if-nez v0, :cond_1
 
@@ -331,6 +360,16 @@
 
     .line 2
     :cond_0
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v0
+
+    invoke-static {v0, p0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onMotionEvent(Landroid/content/Context;Landroid/view/MotionEvent;)V
+
     sget-boolean v0, Lcom/smartisanos/launcher/a/a/a;->sk:Z
 
     const/4 v1, 0x0
@@ -360,7 +399,17 @@
 
     .line 6
     :cond_1
-    sget-boolean v0, Lcom/smartisanos/launcher/data/Constants;->FLING_DOWN_FOR_SEARCH:Z
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v0
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isSwipeUpSearchEnabled(Landroid/content/Context;)Z
+
+    move-result v0
 
     if-eqz v0, :cond_2
 
@@ -404,7 +453,19 @@
 
     .line 2
     :cond_0
-    sget-boolean v0, Lcom/smartisanos/launcher/data/Constants;->FLING_DOWN_FOR_SEARCH:Z
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v0
+
+    invoke-static {v0, p0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onMotionEvent(Landroid/content/Context;Landroid/view/MotionEvent;)V
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isSwipeUpSearchEnabled(Landroid/content/Context;)Z
+
+    move-result v0
 
     if-nez v0, :cond_1
 

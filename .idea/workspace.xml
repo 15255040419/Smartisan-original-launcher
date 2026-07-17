@@ -5,15 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="295b82c4-8572-45f1-add8-3c13ec0468e1" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build/launcher-aligned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-aligned.apk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build/launcher-unsigned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-unsigned.apk" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/development/DEVELOPMENT_LOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/development/DEVELOPMENT_LOG.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/icons/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/icons/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

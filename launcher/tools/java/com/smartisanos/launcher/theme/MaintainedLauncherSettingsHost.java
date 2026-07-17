@@ -163,14 +163,6 @@ public final class MaintainedLauncherSettingsHost {
     private static java.lang.Process sOperationLogcatProcess;
     private static Thread.UncaughtExceptionHandler sPreviousUncaughtExceptionHandler;
     private static boolean sOperationLogHandlerInstalled;
-    private static float sSearchGestureStartX;
-    private static float sSearchGestureStartY;
-    private static long sSearchGestureStartTime;
-    private static boolean sSearchGestureConsumed;
-    private static boolean sSearchGestureInvalid;
-    private static boolean sSearchGestureTracking;
-    private static boolean sSearchGestureSawMove;
-    private static long sSearchGestureLastOpenTime;
     private static final String SETTINGS_PKG = "com.smartisanos.home";
     private static final String QUICK_SEARCH_PKG = "com.smartisanos.quicksearch";
     private static final String QUICK_SEARCH_DOWNLOAD_URL =
@@ -194,7 +186,10 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_THEME_RELOAD_LOADING_PENDING = "launcher_theme_reload_loading_pending";
     private static final String PREF_THEME_RELOAD_LOADING_MESSAGE = "launcher_theme_reload_loading_message";
     private static final String PREF_IMPROVED_ICON_ENABLED = "launcher_improved_icon_enabled";
-    private static final String KEY_SEARCH_PAGE_ENABLED = "launcher_search_page_enabled";
+    private static final String KEY_LEGACY_SEARCH_PAGE_ENABLED = "launcher_search_page_enabled";
+    public static final String KEY_SWIPE_UP_SEARCH_ENABLED = "swipe_up_search_enabled";
+    public static final String KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED =
+            "swipe_down_system_panels_enabled";
     private static final String KEY_DYNAMIC_WEATHER_CALENDAR =
             "launcher_dynamic_weather_calendar_enabled";
     private static final int REQUEST_DYNAMIC_WEATHER_LOCATION = 2414;
@@ -1231,91 +1226,26 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    public static boolean handleLauncherSearchGesture(Activity activity, MotionEvent event) {
-        if (activity == null || event == null) {
-            return false;
-        }
-        int action = event.getActionMasked();
-        if (action == MotionEvent.ACTION_DOWN) {
-            sSearchGestureStartX = event.getX();
-            sSearchGestureStartY = event.getY();
-            sSearchGestureStartTime = event.getDownTime();
-            sSearchGestureConsumed = false;
-            sSearchGestureInvalid = false;
-            sSearchGestureTracking = event.getPointerCount() == 1;
-            sSearchGestureSawMove = false;
-            return false;
-        }
-        if (action == MotionEvent.ACTION_CANCEL
-                || action == MotionEvent.ACTION_POINTER_DOWN
-                || action == MotionEvent.ACTION_POINTER_UP) {
-            sSearchGestureInvalid = true;
-            sSearchGestureTracking = false;
-            return false;
-        }
-        if (!sSearchGestureTracking
-                || event.getPointerCount() != 1
-                || event.getDownTime() != sSearchGestureStartTime) {
-            sSearchGestureInvalid = true;
-            sSearchGestureTracking = false;
-            return false;
-        }
-        if (action != MotionEvent.ACTION_MOVE && action != MotionEvent.ACTION_UP) {
-            return false;
-        }
-        if (sSearchGestureConsumed) {
-            return action == MotionEvent.ACTION_UP;
-        }
-        float dx = event.getX() - sSearchGestureStartX;
-        float dy = event.getY() - sSearchGestureStartY;
-        float absDx = Math.abs(dx);
-        if (action == MotionEvent.ACTION_MOVE) {
-            sSearchGestureSawMove = true;
-        }
-        if (dy < -dp(activity, 12)
-                || absDx > Math.max(dp(activity, 48), Math.max(dy, 1f) * 0.70f)) {
-            sSearchGestureInvalid = true;
-        }
-        if (action != MotionEvent.ACTION_UP) {
-            return false;
-        }
-        long now = event.getEventTime();
-        long duration = now - event.getDownTime();
-        boolean validSequence = sSearchGestureTracking && sSearchGestureSawMove;
-        sSearchGestureTracking = false;
-        sSearchGestureSawMove = false;
-        if (!validSequence || sSearchGestureInvalid
-                || duration <= 0 || duration > 500
-                || now - sSearchGestureLastOpenTime < 1000) {
-            return false;
-        }
-        int height = activity.getResources().getDisplayMetrics().heightPixels;
-        boolean fromDesktop = sSearchGestureStartY > dp(activity, 96)
-                && sSearchGestureStartY < height - dp(activity, 280);
-        // The original launcher recognizes roughly 150 physical pixels within
-        // 500 ms. 48dp is the equivalent on the xxhdpi devices this port targets.
-        float minDistance = Math.max(dp(activity, 48), height * 0.055f);
-        boolean downward = dy > minDistance && absDx < dy * 0.55f;
-        if (fromDesktop && downward) {
-            if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, true)) {
-                return false;
-            }
-            sSearchGestureConsumed = true;
-            sSearchGestureLastOpenTime = now;
-            openLauncherSearch(activity);
-            return true;
-        }
-        return false;
-    }
-
-    private static void openLauncherSearch(Activity activity) {
-        openLauncherSearch((Context) activity);
-    }
-
     public static void openLauncherSearch(Context context) {
-        if (!readSystemBool(context, KEY_SEARCH_PAGE_ENABLED, true)) {
+        openLauncherSearchInternal(context);
+    }
+
+    public static boolean isSwipeUpSearchEnabled(Context context) {
+        migrateSearchGestureSetting(context);
+        return readSystemBool(context, KEY_SWIPE_UP_SEARCH_ENABLED, true);
+    }
+
+    public static void openLauncherSearchFromSwipeUp(Context context) {
+        if (!isSwipeUpSearchEnabled(context)) {
+            Log.i(LOG_TAG, "SWIPE_UP_SEARCH_DISABLED");
             return;
         }
+        Log.i(LOG_TAG, "SWIPE_UP_SEARCH_GESTURE_DETECTED");
+        openLauncherSearchInternal(context);
+        Log.i(LOG_TAG, "SWIPE_UP_SEARCH_LAUNCHED");
+    }
+
+    private static void openLauncherSearchInternal(Context context) {
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.setClassName(context.getPackageName(),
@@ -1333,10 +1263,6 @@ public final class MaintainedLauncherSettingsHost {
 
     public static void showSearchPage(final Activity activity) {
         logOperation(activity, "PAGE", "show_search");
-        if (!readSystemBool(activity, KEY_SEARCH_PAGE_ENABLED, true)) {
-            activity.finish();
-            return;
-        }
         final ArrayList<SearchEntry> all = new ArrayList<SearchEntry>();
         final ArrayList<SearchEntry> visible = new ArrayList<SearchEntry>();
         final SettingsResourceContext context;
@@ -4414,6 +4340,35 @@ public final class MaintainedLauncherSettingsHost {
         if ("launcher_hide_badge".equals(key)) {
             applyBadgeVisibility(context, next, true);
         }
+    }
+
+    private static void migrateSearchGestureSetting(Context context) {
+        if (context == null || hasBoolSetting(context, KEY_SWIPE_UP_SEARCH_ENABLED)) {
+            return;
+        }
+        boolean enabled = readSystemBool(context, KEY_LEGACY_SEARCH_PAGE_ENABLED, true);
+        writeBoolSetting(context, KEY_SWIPE_UP_SEARCH_ENABLED, enabled);
+        Log.i(LOG_TAG, "SWIPE_UP_SEARCH_SETTING_MIGRATED oldKey="
+                + KEY_LEGACY_SEARCH_PAGE_ENABLED + " value=" + enabled);
+    }
+
+    private static boolean hasBoolSetting(Context context, String key) {
+        try {
+            if (context.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE).contains(key)
+                    || context.getSharedPreferences("com.smartisanos.launcher_prefs",
+                    Context.MODE_PRIVATE).contains(key)) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            if (Settings.System.getString(context.getContentResolver(), key) != null
+                    || Settings.Global.getString(context.getContentResolver(), key) != null) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     /** Applies the original theme-changing Dialog dim to its owning settings window only. */
@@ -11400,7 +11355,11 @@ public final class MaintainedLauncherSettingsHost {
             bindBadgeVisibilitySwitch(activity, resources, root);
             bindBadgeSwipeCleanSwitch(activity, resources, root);
             bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
-            bindSwitch(activity, resources, root, "item_id_search_page_enabled", KEY_SEARCH_PAGE_ENABLED, true);
+            migrateSearchGestureSetting(activity);
+            bindSwitch(activity, resources, root, "item_id_search_page_enabled",
+                    KEY_SWIPE_UP_SEARCH_ENABLED, true);
+            bindSwitch(activity, resources, root, "item_id_swipe_down_system_panels",
+                    KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED, true);
             synchronizeBadgeSettingsWithNotificationAccess(activity,
                     com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity));
             tuneScrollBars(root);

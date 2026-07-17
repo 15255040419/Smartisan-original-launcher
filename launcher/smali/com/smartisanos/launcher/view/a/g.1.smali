@@ -6319,7 +6319,7 @@
 .end method
 
 .method public Zm()V
-    .locals 3
+    .locals 4
 
     const/16 v0, 0x200
 
@@ -6329,6 +6329,26 @@
     move-result v1
 
     sget-boolean v2, Lcom/smartisanos/launcher/data/Constants;->SHOW_MESSAGE_FLAG:Z
+
+    if-nez v2, :cond_new_badge_visibility_ready
+
+    iget-object v3, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    if-eqz v3, :cond_new_badge_visibility_ready
+
+    iget-boolean v3, v3, Lcom/smartisanos/launcher/data/ItemInfo;->isNewlyInstalled:Z
+
+    if-eqz v3, :cond_new_badge_visibility_ready
+
+    iget-object v3, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget v3, v3, Lcom/smartisanos/launcher/data/ItemInfo;->messagesNumber:I
+
+    if-gtz v3, :cond_new_badge_visibility_ready
+
+    const/4 v2, 0x1
+
+    :cond_new_badge_visibility_ready
 
     if-ne v1, v2, :cond_0
 
@@ -11807,7 +11827,29 @@
 .end method
 
 .method public i(IZ)V
-    .locals 0
+    .locals 2
+
+    if-nez p2, :cond_new_badge_visibility_ready
+
+    const/16 v0, 0x200
+
+    if-ne p1, v0, :cond_new_badge_visibility_ready
+
+    iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    if-eqz v0, :cond_new_badge_visibility_ready
+
+    iget-boolean v1, v0, Lcom/smartisanos/launcher/data/ItemInfo;->isNewlyInstalled:Z
+
+    if-eqz v1, :cond_new_badge_visibility_ready
+
+    iget v0, v0, Lcom/smartisanos/launcher/data/ItemInfo;->messagesNumber:I
+
+    if-gtz v0, :cond_new_badge_visibility_ready
+
+    const/4 p2, 0x1
+
+    :cond_new_badge_visibility_ready
 
     if-eqz p2, :cond_0
 

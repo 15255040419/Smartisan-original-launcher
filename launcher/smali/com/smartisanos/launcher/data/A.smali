@@ -9161,6 +9161,18 @@
 
     xor-int/lit8 v11, v3, 0x1
 
+    # A tokenized modern install may be a system package on another ROM.  Keep
+    # the original field and insertion path, but let its persisted event mark
+    # this new item before ItemInfo is inserted into the original database.
+    invoke-static {v0}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->shouldMarkNewlyInstalled(Ljava/lang/String;)Z
+
+    move-result v12
+
+    if-eqz v12, :original_newly_installed_value
+
+    const/4 v11, 0x1
+
+    :original_newly_installed_value
     .line 124
     iput-boolean v11, v9, Lcom/smartisanos/launcher/data/ItemInfo;->isNewlyInstalled:Z
 
