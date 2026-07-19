@@ -26,6 +26,7 @@ import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.smartisanos.launcher.diagnostics.StartupCompatibilityLogger;
 import com.smartisanos.launcher.theme.MaintainedLauncherSettingsHost;
 
 import java.io.File;
@@ -98,19 +99,33 @@ public final class SmartisanInstallManager {
 
     public static void ensure(Context context) {
         if (context == null) {
+            Log.w(TAG, "SYSTEM_SERVICE_MISSING module=install_manager context=null");
             return;
         }
-        synchronized (LOCK) {
-            if (sStarted) {
-                return;
+        StartupCompatibilityLogger.mark("INSTALL_MANAGER_INIT_BEGIN");
+        try {
+            synchronized (LOCK) {
+                if (sStarted) {
+                    return;
+                }
+                sStarted = true;
+                sAppContext = context.getApplicationContext() == null
+                        ? context : context.getApplicationContext();
+                sHandler = new Handler(Looper.getMainLooper());
+                sWorkerThread = new HandlerThread("SmartisanInstallManager");
+                sWorkerThread.start();
+                sWorkerHandler = new Handler(sWorkerThread.getLooper());
             }
-            sStarted = true;
-            sAppContext = context.getApplicationContext() == null
-                    ? context : context.getApplicationContext();
-            sHandler = new Handler(Looper.getMainLooper());
-            sWorkerThread = new HandlerThread("SmartisanInstallManager");
-            sWorkerThread.start();
-            sWorkerHandler = new Handler(sWorkerThread.getLooper());
+        } catch (Throwable t) {
+            synchronized (LOCK) {
+                sStarted = false;
+                sHandler = null;
+                sWorkerHandler = null;
+                sWorkerThread = null;
+                sAppContext = null;
+            }
+            StartupCompatibilityLogger.optionalModuleDisabled("install_manager", t);
+            return;
         }
         restorePendingEvents(sAppContext);
         registerPackageReceiver(sAppContext);
@@ -119,6 +134,7 @@ public final class SmartisanInstallManager {
         if (ENABLE_DOWNLOAD_ANIMATION) {
             scheduleSessionScan(0L);
         }
+        StartupCompatibilityLogger.mark("INSTALL_MANAGER_INIT_COMPLETE");
     }
 
     public static void onPackageInstalled(Context context, String packageName) {
@@ -159,12 +175,47 @@ public final class SmartisanInstallManager {
         processPendingEvents(context, "model_ready_reconcile");
     }
 
-    /** Read by the original ItemInfo creation path before the same-row database insert. */
+    /**
+     * Read by the original ItemInfo creation path before its same-row database insert.
+     *
+     * A real PACKAGE_ADDED event is authoritative for a package that is not
+     * already represented by the original launcher database.  The first-install
+     * timestamp remains a cold-start/recovery fallback only: some current ROMs
+     * report it before the launcher baseline has been persisted.
+     */
     public static boolean shouldMarkNewlyInstalled(String packageName) {
+        PendingPackageEvent event;
         synchronized (LOCK) {
-            PendingPackageEvent event = PENDING_PACKAGE_EVENTS.get(packageName);
-            return event != null && event.dispatched && event.newInstall;
+            event = PENDING_PACKAGE_EVENTS.get(packageName);
         }
+        if (event == null || !event.dispatched || !event.newInstall) {
+            Log.i(TAG, "INSTALL_NEW_MARK_RESERVED pkg=" + packageName
+                    + " reserved=false reason=no_pending_new_event");
+            return false;
+        }
+        boolean existing = hasExistingLauncherPackage(packageName);
+        Log.i(TAG, "INSTALL_NEW_MARK_RESERVED pkg=" + packageName
+                + " reserved=" + !existing + " existingDatabasePackage=" + existing
+                + " action=" + event.action + " replacing=" + event.replacing
+                + " user=" + event.userId + " dispatched=" + event.dispatched
+                + " new=" + event.newInstall);
+        return !existing;
+    }
+
+    /** Called from the original ItemInfo construction path immediately after the flag is set. */
+    public static void onNewlyInstalledItemInfoApplied(String packageName, boolean newlyInstalled) {
+        Log.i(TAG, "INSTALL_NEW_MARK_APPLIED pkg=" + packageName
+                + " itemInfoNew=" + newlyInstalled);
+        if (newlyInstalled) {
+            Log.i(TAG, "INSTALL_DATABASE_NEWLY_INSTALLED_WRITTEN pkg=" + packageName
+                    + " pendingEventRetained=true");
+        }
+    }
+
+    /** Called only when the original Cell creates its existing newapp.png node. */
+    public static void onNewBadgeNodeCreated(String packageName, int messagesNumber) {
+        Log.i(TAG, "INSTALL_NEW_NODE_CREATED pkg=" + packageName
+                + " messages=" + messagesNumber + " visible=true");
     }
 
     public static void onNotificationPosted(Context context, StatusBarNotification sbn) {
@@ -306,11 +357,11 @@ public final class SmartisanInstallManager {
             if (sLauncherAppsRegistered) {
                 return;
             }
-            sLauncherAppsRegistered = true;
         }
         try {
             LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
             if (apps == null) {
+                Log.w(TAG, "SYSTEM_SERVICE_MISSING service=launcher_apps fallback=package_receiver");
                 return;
             }
             apps.registerCallback(new LauncherApps.Callback() {
@@ -336,8 +387,11 @@ public final class SmartisanInstallManager {
                 @Override public void onPackagesUnavailable(String[] packages, UserHandle user,
                                                             boolean replacing) { }
             });
+            synchronized (LOCK) {
+                sLauncherAppsRegistered = true;
+            }
         } catch (Throwable t) {
-            Log.w(TAG, "register launcher apps callback failed", t);
+            StartupCompatibilityLogger.optionalModuleDisabled("launcher_apps_callback", t);
         }
     }
 
@@ -690,6 +744,11 @@ public final class SmartisanInstallManager {
             event.newInstall = isTrueNewInstall(context, event);
             persistPendingEvents(context);
         }
+        Log.i(TAG, "INSTALL_EVENT_CLASSIFIED pkg=" + event.packageName
+                + " action=" + event.action + " replacing=" + event.replacing
+                + " source=" + event.source + " new=" + event.newInstall
+                + " user=" + event.userId + " baseline="
+                + pendingPrefs(context).getLong(BASELINE_TIME, 0L));
         Log.i(TAG, "INSTALL_ORIGINAL_ADD_DISPATCH pkg=" + event.packageName
                 + " new=" + event.newInstall + " user=" + event.userId);
         Handler main = sHandler == null ? new Handler(Looper.getMainLooper()) : sHandler;
@@ -726,6 +785,9 @@ public final class SmartisanInstallManager {
         if (event.replacing) {
             return false;
         }
+        if (Intent.ACTION_PACKAGE_ADDED.equals(event.action)) {
+            return true;
+        }
         long baseline = pendingPrefs(context).getLong(BASELINE_TIME, 0L);
         try {
             PackageInfo info = context.getPackageManager().getPackageInfo(event.packageName, 0);
@@ -733,6 +795,29 @@ public final class SmartisanInstallManager {
                     && info.firstInstallTime == info.lastUpdateTime;
         } catch (Throwable ignored) {
             return false;
+        }
+    }
+
+    /**
+     * Query the original launcher rows through its existing database helper.
+     * This is deliberately package-wide and conservative: if an app already
+     * owns any launcher item, an activity refresh can never manufacture NEW.
+     */
+    private static boolean hasExistingLauncherPackage(String packageName) {
+        if (TextUtils.isEmpty(packageName)) {
+            return true;
+        }
+        try {
+            Class<?> helper = Class.forName("com.smartisanos.launcher.data.a.l");
+            Method query = helper.getMethod("V", String.class);
+            String safePackageName = packageName.replace("'", "''");
+            Object rows = query.invoke(null, "packageName='" + safePackageName + "'");
+            return rows instanceof List && !((List) rows).isEmpty();
+        } catch (Throwable error) {
+            // A failed database observation must not turn an uncertain package
+            // update into NEW.  The pending event remains available for retry.
+            Log.w(TAG, "INSTALL_DATABASE_EXISTING_CHECK_FAILED pkg=" + packageName, error);
+            return true;
         }
     }
 

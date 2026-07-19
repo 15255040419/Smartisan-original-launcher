@@ -52,7 +52,7 @@
     return-object v0
 .end method
 
-.method public registerActivityObserver(Landroid/app/ActivityManager;Landroid/app/IActivityObserver;)V
+.method public registerActivityObserver(Landroid/app/ActivityManager;Ljava/lang/Object;)V
     .locals 0
 
     return-void

@@ -1,5 +1,5 @@
 .class Lcom/smartisanos/launcher/ha;
-.super Landroid/app/IActivityObserver$Stub;
+.super Ljava/lang/Object;
 .source "ApplicationProxy.java"
 
 
@@ -14,7 +14,7 @@
     .line 1
     iput-object p1, p0, Lcom/smartisanos/launcher/ha;->this$0:Lcom/smartisanos/launcher/ja;
 
-    invoke-direct {p0}, Landroid/app/IActivityObserver$Stub;-><init>()V
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
 
     return-void
 .end method

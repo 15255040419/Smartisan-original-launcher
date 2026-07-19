@@ -24,12 +24,6 @@
 .method public j(Lcom/smartisanos/smengine/SceneNode;)Z
     .locals 5
 
-    # A Cell long-click is the original drag/edit entry.  It cannot become a
-    # system-panel pull-down after the user starts moving the icon.
-    const/4 v0, 0x1
-
-    invoke-static {v0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->setInteractionBlocked(Z)V
-
     .line 1
     sget-boolean v0, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
 

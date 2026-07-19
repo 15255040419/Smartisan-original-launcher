@@ -293,6 +293,14 @@
 
     invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/view/Eb;->dispatchTouchEvent(Lcom/smartisanos/smengine/va;)Z
 
+    iget-object v0, p0, Lcom/smartisanos/smengine/u;->xE:Lcom/smartisanos/smengine/va;
+
+    invoke-virtual {v0}, Lcom/smartisanos/smengine/va;->getAction()I
+
+    move-result v0
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onSmEngineDispatchCompleted(I)V
+
     .line 3
     iget-object p0, p0, Lcom/smartisanos/smengine/u;->xE:Lcom/smartisanos/smengine/va;
 

@@ -94,6 +94,10 @@
 .method protected onCreate(Landroid/os/Bundle;)V
     .locals 3
 
+    const-string v0, "LAUNCHER_ACTIVITY_CREATE_BEGIN"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
+
     invoke-static {p0}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->begin(Landroid/app/Activity;)V
 
     .line 1
@@ -134,12 +138,28 @@
 
     invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->mark(Ljava/lang/String;)V
 
+    const-string v0, "MODEL_INIT_BEGIN"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
+
+    const-string v0, "DATABASE_INIT_BEGIN"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
+
+    const-string v0, "MAIN_VIEW_INIT_BEGIN"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
+
     .line 3
     invoke-static {p0}, Lcom/smartisanos/launcher/J;->b(Landroid/app/Activity;)V
 
     const-string v0, "LAUNCH_ORIGINAL_INIT_END"
 
     invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/LauncherStartupDiagnostics;->mark(Ljava/lang/String;)V
+
+    const-string v0, "LAUNCHER_STARTUP_COMPLETE"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->scheduleLauncherPostFirstFrameTasks(Landroid/app/Activity;)V
 
@@ -170,7 +190,7 @@
 .end method
 
 .method protected onNewIntent(Landroid/content/Intent;)V
-    .locals 1
+    .locals 2
 
     .line 1
     invoke-super {p0, p1}, Landroid/app/Activity;->onNewIntent(Landroid/content/Intent;)V
@@ -194,37 +214,55 @@
     return-void
 
     :cond_1
-    const/4 p0, 0x0
+    const/4 v0, 0x0
 
-    :try_start_0
-    const-string v0, "android.intent.extra.FROM_HOME_KEY"
+    const-string v1, "android.intent.extra.FROM_HOME_KEY"
 
-    .line 3
-    invoke-virtual {p1, v0, p0}, Landroid/content/Intent;->getBooleanExtra(Ljava/lang/String;Z)Z
+    invoke-virtual {p1, v1, v0}, Landroid/content/Intent;->getBooleanExtra(Ljava/lang/String;Z)Z
 
-    move-result p0
-    :try_end_0
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
+    move-result v0
 
-    :catch_0
-    if-nez p0, :cond_2
+    if-nez v0, :cond_3
 
-    .line 4
-    sget-object p0, Lcom/smartisanos/launcher/Launcher;->log:Lcom/smartisanos/launcher/va;
+    invoke-virtual {p1}, Landroid/content/Intent;->getAction()Ljava/lang/String;
 
-    const-string p1, " onNewIntent fromHomeKey is false"
+    move-result-object v0
 
-    invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
+    const-string v1, "android.intent.action.MAIN"
 
-    return-void
+    invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
 
-    .line 5
-    :cond_2
+    move-result v0
+
+    if-eqz v0, :cond_2
+
+    const-string v0, "android.intent.category.HOME"
+
+    invoke-virtual {p1, v0}, Landroid/content/Intent;->hasCategory(Ljava/lang/String;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_2
+
+    :cond_3
+    invoke-static {p1}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeIntentReceived(Landroid/content/Intent;)V
+
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
 
     move-result-object p0
 
     invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/J;->a(Landroid/content/Intent;)V
+
+    return-void
+
+    :cond_2
+
+    .line 4
+    sget-object p0, Lcom/smartisanos/launcher/Launcher;->log:Lcom/smartisanos/launcher/va;
+
+    const-string p1, " onNewIntent is not a HOME intent"
+
+    invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     return-void
 .end method

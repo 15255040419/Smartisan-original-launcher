@@ -1714,9 +1714,9 @@
 
     .line 57
     :cond_3
-    invoke-static {}, Landroid/app/SmtPCUtils;->getExtDisplayId()I
-
-    move-result v0
+    # SmtPCUtils is absent on normal Android ROMs.  The primary display is
+    # always the safe Launcher startup fallback.
+    const/4 v0, 0x0
 
     sput v0, Lcom/smartisanos/launcher/data/Constants;->DISPLAY_ID:I
 
@@ -3292,7 +3292,7 @@
 .end method
 
 .method public a(Landroid/content/Intent;)V
-    .locals 7
+    .locals 8
 
     .line 18
     sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
@@ -3335,6 +3335,8 @@
 
     if-nez v0, :cond_3
 
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logPageViewNotReady()V
+
     .line 23
     sget-boolean p0, Lcom/smartisanos/launcher/va;->DBG:Z
 
@@ -3356,6 +3358,8 @@
     move-result-object v0
 
     if-nez v0, :cond_5
+
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logPageViewNotReady()V
 
     .line 25
     sget-boolean p0, Lcom/smartisanos/launcher/va;->DBG:Z
@@ -3410,9 +3414,15 @@
 
     .line 29
     :cond_7
+    invoke-static {p1}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->isStandardAndroidHome(Landroid/content/Intent;)Z
+
+    move-result v7
+
     invoke-virtual {p1}, Landroid/content/Intent;->getFlags()I
 
     move-result p1
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGateFlags(I)V
 
     const/high16 v0, 0x400000
 
@@ -3437,6 +3447,14 @@
 
     iget-boolean v0, v0, Lcom/smartisanos/launcher/J;->Oa:Z
 
+    const-string v3, "HOME_GATE_STANDARD_HOME"
+
+    invoke-static {v3, v7}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGate(Ljava/lang/String;Z)V
+
+    const-string v3, "HOME_GATE_ORIGINAL_FOCUS"
+
+    invoke-static {v3, v0}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGate(Ljava/lang/String;Z)V
+
     .line 31
     invoke-static {}, Ljava/lang/System;->currentTimeMillis()J
 
@@ -3455,11 +3473,21 @@
     move v1, v2
 
     :cond_9
-    if-eqz p1, :cond_e
+    const-string v3, "HOME_GATE_DEBOUNCED"
 
-    if-nez v1, :cond_e
+    invoke-static {v3, v1}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGate(Ljava/lang/String;Z)V
+
+    if-eqz p1, :cond_home_from_background
+
+    if-nez v1, :cond_home_debounced
+
+    if-nez v7, :cond_a
 
     if-nez v0, :cond_a
+
+    const-string v3, "HOME_BLOCKED_ORIGINAL_FOCUS"
+
+    invoke-static {v3}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGateEvent(Ljava/lang/String;)V
 
     goto :goto_1
 
@@ -3474,15 +3502,44 @@
     .line 33
     iget-object p1, p0, Lcom/smartisanos/launcher/J;->mContext:Landroid/content/Context;
 
+    if-eqz v7, :cond_home_smartisan_environment
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->isCurrentDefaultHome(Landroid/content/Context;)Z
+
+    move-result p1
+
+    goto :goto_home_environment_checked
+
+    :cond_home_smartisan_environment
     invoke-static {p1}, Lcom/smartisanos/launcher/e/s;->ia(Landroid/content/Context;)Z
 
     move-result p1
+
+    :goto_home_environment_checked
+    const-string v0, "HOME_GATE_DEFAULT_HOME"
+
+    invoke-static {v0, p1}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGate(Ljava/lang/String;Z)V
 
     if-eqz p1, :cond_c
 
     sget-boolean p1, Lcom/smartisanos/launcher/a/oa;->kk:Z
 
-    if-nez p1, :cond_c
+    if-eqz p1, :cond_b
+
+    if-eqz v7, :cond_home_uninstall_blocked
+
+    const-string p1, "HOME_GATE_UNINSTALL_STATE_BYPASSED_STANDARD_HOME"
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGateEvent(Ljava/lang/String;)V
+
+    goto :cond_b
+
+    :cond_home_uninstall_blocked
+    const-string p1, "HOME_GATE_UNINSTALL_STATE"
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGateEvent(Ljava/lang/String;)V
+
+    goto :cond_c
 
     .line 34
     sget-boolean p1, Lcom/smartisanos/launcher/va;->DBG:Z
@@ -3497,6 +3554,8 @@
 
     .line 35
     :cond_b
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logOriginalHomeAnimationRequested()V
+
     iput-boolean v2, p0, Lcom/smartisanos/launcher/J;->dg:Z
 
     .line 36
@@ -3538,6 +3597,20 @@
     return-void
 
     .line 40
+    :cond_home_from_background
+    const-string v3, "HOME_FROM_BACKGROUND"
+
+    invoke-static {v3}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGateEvent(Ljava/lang/String;)V
+
+    goto :goto_1
+
+    :cond_home_debounced
+    const-string v3, "HOME_DEBOUNCED"
+
+    invoke-static {v3}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGateEvent(Ljava/lang/String;)V
+
+    goto :goto_1
+
     :cond_e
     :goto_1
     sget-boolean p0, Lcom/smartisanos/launcher/va;->DBG:Z
@@ -3575,11 +3648,17 @@
     invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     :cond_f
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logOriginalHomeNoOp()V
+
     return-void
 
     .line 41
     :cond_10
     :goto_2
+    const-string p0, "HOME_GATE_WAITING_PAGE"
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGateEvent(Ljava/lang/String;)V
+
     invoke-static {}, Lcom/smartisanos/launcher/view/Eb;->getInstance()Lcom/smartisanos/launcher/view/Eb;
 
     move-result-object p0
@@ -3642,6 +3721,10 @@
     .line 44
     :cond_12
     :goto_3
+    const-string p0, "HOME_GATE_PAGE_ANIMATION_RUNNING"
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/gesture/LauncherHomeCompat;->logHomeGateEvent(Ljava/lang/String;)V
+
     sget-boolean p0, Lcom/smartisanos/launcher/va;->DBG:Z
 
     if-eqz p0, :cond_13

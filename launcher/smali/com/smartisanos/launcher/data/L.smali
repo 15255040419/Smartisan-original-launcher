@@ -477,6 +477,8 @@
 
     move-result-object v2
 
+    invoke-static {v2, v0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->reportFinalTexture(Landroid/graphics/Bitmap;I)V
+
     .line 60
     new-instance v3, Landroid/graphics/Paint;
 

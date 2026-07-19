@@ -1306,6 +1306,21 @@
     .line 287
     sget v3, Lcom/smartisanos/launcher/jb;->contact_shortcut:I
 
+    const-string v4, "com.tencent.mm"
+
+    .line 288
+    invoke-virtual {p2, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v4
+
+    if-eqz v4, :cond_wechat_not_match
+
+    .line 289
+    sget v3, Lcom/smartisanos/launcher/jb;->wechat_shortcut:I
+
+    goto :goto_0
+
+    :cond_wechat_not_match
     .line 288
     sget-object v4, Lcom/smartisanos/launcher/data/T;->PHONE:Lcom/smartisanos/launcher/data/S;
 
@@ -2160,12 +2175,9 @@
 
     :cond_icon_override_done
 
-    # Normalize every icon source at the common exit. This corrects differing
-    # transparent/opaque content bounds while leaving the later runtime
-    # LayoutProperty/icon_scale size adjustment intact.
-    invoke-static {v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->normalizeLauncherIcon(Landroid/graphics/drawable/Drawable;)Landroid/graphics/drawable/Drawable;
-
-    move-result-object v1
+    # Do not flatten a Drawable into its intrinsic-size normalized bitmap here.
+    # Aa persists this value as desktop source data; raster normalization belongs
+    # to the final physical texture path, not a 160/192-style intermediate.
 
     .line 231
     sget-boolean v2, Lcom/smartisanos/launcher/va;->DBG:Z
@@ -2597,7 +2609,7 @@
 .end method
 
 .method public static a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;Z)Lcom/smartisanos/smengine/Da;
-    .locals 9
+    .locals 10
 
     const/4 v0, 0x0
 
@@ -2612,6 +2624,10 @@
 
     .line 60
     :cond_1
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->hasEffectiveManagedIcon(Ljava/lang/Object;)Z
+
+    move-result v9
+
     invoke-static {}, Lcom/smartisanos/smengine/Ra;->getInstance()Lcom/smartisanos/smengine/Ra;
 
     move-result-object v1
@@ -2850,6 +2866,8 @@
 
     if-nez p0, :cond_9
 
+    if-nez v9, :cond_9
+
     if-nez v6, :cond_9
 
     if-eqz p2, :cond_9
@@ -2903,9 +2921,20 @@
 
     .line 87
     :goto_3
+    if-eqz v9, :cond_codex_original_texture
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->composeStaticIconTexture(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+
+    move-result-object p0
+
+    goto :goto_codex_texture_ready
+
+    :cond_codex_original_texture
     invoke-static {p0, v0}, Lcom/smartisanos/launcher/data/L;->a(Landroid/graphics/Bitmap;Z)Landroid/graphics/Bitmap;
 
     move-result-object p0
+
+    :goto_codex_texture_ready
 
     .line 88
     new-instance v0, Lcom/smartisanos/smengine/Da;
@@ -8431,9 +8460,32 @@
 
     :context_ready
 
+    # The caller has already confirmed a foreground HOME handoff.  The old
+    # Smartisan-only task/keyguard query is not available on ordinary Android;
+    # a live context is the safe equivalent for this optional scroll hint.
+    return v0
+
     .line 1
     :try_start_0
-    invoke-static {}, Landroid/app/ActivityManagerNative;->getDefault()Landroid/app/IActivityManager;
+    const-string v2, "android.app.ActivityManagerNative"
+
+    invoke-static {v2}, Ljava/lang/Class;->forName(Ljava/lang/String;)Ljava/lang/Class;
+
+    move-result-object v2
+
+    const-string v3, "getDefault"
+
+    new-array v4, v1, [Ljava/lang/Class;
+
+    invoke-virtual {v2, v3, v4}, Ljava/lang/Class;->getMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;
+
+    move-result-object v2
+
+    new-array v3, v1, [Ljava/lang/Object;
+
+    const/4 v4, 0x0
+
+    invoke-virtual {v2, v4, v3}, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
 
     move-result-object v2
 
@@ -8466,7 +8518,7 @@
 
     move-result v2
     :try_end_0
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
 
     move v3, v2
 
@@ -8490,7 +8542,7 @@
     invoke-virtual {v3, v4}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     .line 7
-    invoke-virtual {v2}, Ljava/lang/Exception;->printStackTrace()V
+    invoke-virtual {v2}, Ljava/lang/Throwable;->printStackTrace()V
 
     :cond_0
     move v2, v0
@@ -8508,6 +8560,8 @@
     move-result-object p0
 
     check-cast p0, Landroid/app/ActivityManager;
+
+    if-eqz p0, :cond_2
 
     .line 9
     invoke-virtual {p0, v0}, Landroid/app/ActivityManager;->getRunningTasks(I)Ljava/util/List;

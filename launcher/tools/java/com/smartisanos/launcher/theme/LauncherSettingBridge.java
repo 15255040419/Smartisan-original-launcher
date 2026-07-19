@@ -11,6 +11,7 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,7 +36,9 @@ public final class LauncherSettingBridge {
     private static final Object ACTIVE_ICON_SHADOW_LOCK = new Object();
     private static final Map<String, String> ACTIVE_ICON_LIVE_SHADOW_CACHE = new HashMap<>();
     private static final Set<String> LOGGED_CACHED_FRAME_COMPOSITIONS = new HashSet<>();
-    private static final String ACTIVE_ICON_SHADOW_CACHE_DIR = "active_icon_shadow_v1";
+    // v1 treated pb.path() values as filesystem paths.  They are normally theme-asset
+    // paths, so keep corrected products isolated from any stale cache entries.
+    private static final String ACTIVE_ICON_SHADOW_CACHE_DIR = "active_icon_shadow_v2";
     public static final String KEY_DYNAMIC_WEATHER_CALENDAR =
             "launcher_dynamic_weather_calendar_enabled";
 
@@ -380,7 +383,7 @@ public final class LauncherSettingBridge {
             }
             Log.d(TAG, "ACTIVE_ICON_LIVE_SHADOW_CACHE_MISS type=" + type
                     + " base=" + baseSize + " canvas=" + canvasSize + shadowLogSuffix(spec));
-            Bitmap source = BitmapFactory.decodeFile(sourcePath);
+            Bitmap source = decodeActiveIconShadowSource(sourcePath, type);
             if (source == null) {
                 Log.w(TAG, "ACTIVE_ICON_LIVE_SHADOW_BITMAP_CREATE_FAILED type=" + type
                         + " source=" + sourcePath);
@@ -431,13 +434,63 @@ public final class LauncherSettingBridge {
             String path = output.getAbsolutePath();
             ACTIVE_ICON_LIVE_SHADOW_CACHE.put(key, path);
             Log.d(TAG, "ACTIVE_ICON_LIVE_SHADOW_BITMAP_CREATED type=" + type
-                    + " width=" + canvasSize + " height=" + canvasSize + shadowLogSuffix(spec));
+                    + " width=" + canvasSize + " height=" + canvasSize
+                    + " outputBytes=" + output.length() + shadowLogSuffix(spec));
             Log.d(TAG, "ACTIVE_ICON_LIVE_BACKGROUND_TEXTURE_CREATED type=" + type
                     + " width=" + baseSize + " height=" + baseSize
                     + " shadowWidth=" + canvasSize + " shadowHeight=" + canvasSize
                     + shadowLogSuffix(spec));
             return path;
         }
+    }
+
+    /**
+     * pb.path() produces a path relative to the active theme.  Keep the dynamic-node
+     * shadow on the exact same asset loading path as the original Weather/Calendar
+     * nodes instead of assuming that value is a readable filesystem path.
+     */
+    private static Bitmap decodeActiveIconShadowSource(String sourcePath, String type) {
+        File sourceFile = new File(sourcePath);
+        Log.d(TAG, "ACTIVE_ICON_SHADOW_SOURCE_RESOLVED type=" + type
+                + " path=" + sourcePath + " exists=" + sourceFile.exists()
+                + " isFile=" + sourceFile.isFile() + " bytes=" + sourceFile.length());
+
+        Bitmap original = null;
+        String route = "theme_asset";
+        try {
+            Class<?> imageClass = Class.forName("com.smartisanos.smengine.s");
+            Method getBitmap = imageClass.getMethod("getBitmap", String.class);
+            Object result = getBitmap.invoke(null, sourcePath);
+            if (result instanceof Bitmap) {
+                original = (Bitmap) result;
+            }
+        } catch (Throwable error) {
+            route = "theme_asset_failed_" + error.getClass().getSimpleName();
+            Log.w(TAG, "ACTIVE_ICON_SHADOW_THEME_ASSET_DECODE_FAILED type=" + type
+                    + " path=" + sourcePath + " class=" + error.getClass().getSimpleName());
+        }
+        if (original == null && sourceFile.isFile()) {
+            route = "file";
+            original = BitmapFactory.decodeFile(sourcePath);
+        }
+        if (original == null) {
+            Log.w(TAG, "ACTIVE_ICON_SHADOW_SOURCE_DECODE_FAILED type=" + type
+                    + " path=" + sourcePath + " route=" + route);
+            return null;
+        }
+        try {
+            Bitmap copy = original.copy(Bitmap.Config.ARGB_8888, false);
+            if (copy != null) {
+                Log.d(TAG, "ACTIVE_ICON_SHADOW_SOURCE_DECODED type=" + type
+                        + " route=" + route + " width=" + copy.getWidth()
+                        + " height=" + copy.getHeight() + " hasAlpha=" + copy.hasAlpha());
+                return copy;
+            }
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_SHADOW_SOURCE_COPY_FAILED type=" + type
+                    + " class=" + error.getClass().getSimpleName());
+        }
+        return null;
     }
 
     public static void logActiveIconLiveShadowNodeAttached(
@@ -447,6 +500,28 @@ public final class LauncherSettingBridge {
                 + " path=" + path);
         Log.d(TAG, "ACTIVE_ICON_LIVE_SHADOW_NODE_VISIBLE type=" + type
                 + " backgroundSize=" + backgroundSize + " shadowSize=" + shadowSize);
+    }
+
+    /** Logs the real SMEngine placement after setImageName/addChild without a Java dependency on it. */
+    public static void logActiveIconLiveShadowNodeState(String type, Object node) {
+        if (node == null) {
+            Log.w(TAG, "ACTIVE_ICON_LIVE_SHADOW_NODE_STATE type=" + type + " node=null");
+            return;
+        }
+        try {
+            Class<?> clazz = node.getClass();
+            Object parent = clazz.getMethod("getParent").invoke(node);
+            Object layer = clazz.getMethod("getLayer").invoke(node);
+            Object queue = clazz.getMethod("getRenderQueue").invoke(node);
+            Object visible = clazz.getMethod("isVisible").invoke(node);
+            Log.d(TAG, "ACTIVE_ICON_LIVE_SHADOW_NODE_STATE type=" + type
+                    + " node=" + clazz.getName()
+                    + " parent=" + (parent == null ? "null" : parent.getClass().getName())
+                    + " layer=" + layer + " queue=" + queue + " visible=" + visible);
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_LIVE_SHADOW_NODE_STATE_FAILED type=" + type
+                    + " class=" + error.getClass().getSimpleName());
+        }
     }
 
     private static Context applicationContext() {
@@ -509,10 +584,10 @@ public final class LauncherSettingBridge {
 
     public static boolean isDynamicIconPackage(String packageName) {
         if (packageName == null) return false;
-        String value = packageName.toLowerCase(java.util.Locale.ROOT);
         return WeatherBridge.isWeatherPackage(packageName, null, null)
-                || value.contains("calendar")
-                || "com.smartisanos.calendar".equals(value);
+                || "com.android.calendar".equals(packageName)
+                || "com.smartisanos.calendar".equals(packageName)
+                || "com.smartisanos.clock".equals(packageName);
     }
 
     /** Dynamic/normal mode changes must bypass the launcher's APK-icon MD5 shortcut. */

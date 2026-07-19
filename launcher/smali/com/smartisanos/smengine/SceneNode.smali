@@ -6329,6 +6329,18 @@
     :cond_0
     iget-object v0, p0, Lcom/smartisanos/smengine/SceneNode;->mListenerInfo:Lcom/smartisanos/smengine/X;
 
+    invoke-virtual {p1}, Lcom/smartisanos/smengine/va;->getAction()I
+
+    move-result v2
+
+    if-nez v2, :cond_codex_listener_target_checked
+
+    if-eqz v0, :cond_codex_listener_target_checked
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onSmEngineInteractiveTarget(Ljava/lang/Object;)V
+
+    :cond_codex_listener_target_checked
+
     const/4 v1, 0x1
 
     if-eqz v0, :cond_1

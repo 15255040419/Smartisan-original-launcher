@@ -389,6 +389,29 @@
     .locals 2
 
     .line 1
+    iget-object v0, p0, Lcom/smartisanos/launcher/data/QuickLaunchItem;->intent:Landroid/content/Intent;
+
+    if-eqz v0, :cond_original_icon
+
+    const-string v1, "smartisan.shortcut.final_icon"
+
+    const/4 p1, 0x0
+
+    invoke-virtual {v0, v1, p1}, Landroid/content/Intent;->getBooleanExtra(Ljava/lang/String;Z)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_original_icon
+
+    iget-object p0, p0, Lcom/smartisanos/launcher/data/QuickLaunchItem;->icon:Landroid/graphics/Bitmap;
+
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/e/s;->b(Landroid/graphics/Bitmap;Z)[B
+
+    move-result-object p0
+
+    return-object p0
+
+    :cond_original_icon
     iget-object v0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
 
     iget-object v1, p0, Lcom/smartisanos/launcher/data/QuickLaunchItem;->shortcutId:Ljava/lang/String;
