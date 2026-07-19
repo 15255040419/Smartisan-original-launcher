@@ -7820,6 +7820,12 @@
 
     .line 14
     :cond_1
+    iget-object v2, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-object v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
+
+    invoke-static {v2, v5}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->onNewBadgeNodeCreated(Ljava/lang/String;I)V
+
     sget-object v1, Lcom/smartisanos/launcher/view/a/ha;->gz:[Ljava/lang/String;
 
     aget-object v1, v1, p1

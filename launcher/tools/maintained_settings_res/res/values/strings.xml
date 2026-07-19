@@ -160,6 +160,7 @@
     <string name="net_is_not_available">Net is not available</string>
     <string name="obsession_badge_swipe_clean">Swipe to Clean Icon Badges</string>
     <string name="obsession_badge_swipe_clean_tips">Swipe upward from the bottom edge to clear app notification badges.</string>
+    <string name="obsession_badge_reminder_tips">Allow notification badges in the upper-right corner of app icons.</string>
     <string name="obsession_badge_notification_access">Notification access is required for badges. Tap to configure.</string>
     <string name="obsession_badge_notification_access_action">Tap to configure</string>
     <string name="obsession_header_title">OCD Settings</string>

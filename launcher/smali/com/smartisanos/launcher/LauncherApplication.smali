@@ -171,6 +171,10 @@
 .method public onCreate()V
     .locals 6
 
+    const-string v0, "LAUNCHER_APP_CREATE_BEGIN"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
+
     .line 1
     invoke-static {}, Ljava/lang/System;->currentTimeMillis()J
 
@@ -214,8 +218,16 @@
     .line 4
     invoke-super {p0}, Landroid/app/Application;->onCreate()V
 
+    const-string v0, "INSTALL_MANAGER_INIT_BEGIN"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
+
     .line 4
     invoke-static {p0}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->ensure(Landroid/content/Context;)V
+
+    const-string v0, "APPLICATION_PROXY_CREATE_BEGIN"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
 
     .line 5
     new-instance v0, Lcom/smartisanos/launcher/ja;
@@ -226,6 +238,10 @@
 
     .line 6
     iget-object v0, p0, Lcom/smartisanos/launcher/LauncherApplication;->proxy:Lcom/smartisanos/launcher/ja;
+
+    const-string v1, "APPLICATION_PROXY_ONCREATE_BEGIN"
+
+    invoke-static {v1}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
 
     invoke-virtual {v0}, Lcom/smartisanos/launcher/ja;->onCreate()V
 

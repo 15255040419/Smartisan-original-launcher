@@ -255,8 +255,6 @@ public final class MaintainedLauncherSettingsHost {
     private static boolean sDoppelgangerBootstrapScheduled;
     private static boolean sDoppelgangerIconRefreshRunning;
     private static boolean sLauncherPausedForScreenOff;
-    private static long sLastLifecycleUnlockUptime;
-    private static long sLastOriginalUnlockUptime;
     private static long sThemeChangeGuardUntilUptime;
     private static boolean sProcessCompatApplied;
     private static Object sLastNavigationWindowToken;
@@ -2044,6 +2042,9 @@ public final class MaintainedLauncherSettingsHost {
                     if (power != null && !power.isInteractive()) {
                         sLauncherPausedForScreenOff = true;
                         android.util.Log.i(LOG_TAG, "launcher pause confirmed as screen-off");
+                        if (com.smartisanos.launcher.gesture.UnlockAnimationCoordinator.onRealScreenOff("LIFECYCLE", activity)) {
+                            dispatchOriginalLockAction(activity, "action_keyguard_on", false);
+                        }
                     }
                 } catch (Throwable error) {
                     android.util.Log.w(LOG_TAG, "unable to inspect screen-off pause", error);
@@ -2057,35 +2058,49 @@ public final class MaintainedLauncherSettingsHost {
             return;
         }
         if (!sLauncherPausedForScreenOff) {
+            com.smartisanos.launcher.gesture.UnlockAnimationCoordinator.logResumeNotARealUnlock("NOT_SCREEN_OFF_PAUSED");
             return;
         }
         sLauncherPausedForScreenOff = false;
-        final long now = android.os.SystemClock.uptimeMillis();
-        if (now - sLastLifecycleUnlockUptime < 1500L) {
+        if (shouldSkipUnlockAnimation()) {
+            android.util.Log.i(LOG_TAG, "lifecycle unlock fallback skipped: transient launcher UI state");
+            String reason = "RELOAD_IN_PROGRESS";
+            if (android.os.SystemClock.uptimeMillis() < sThemeChangeGuardUntilUptime) {
+                reason = "THEME_TRANSITION";
+            } else {
+                try {
+                    Class<?> themeHandler = Class.forName("com.smartisanos.launcher.theme.t");
+                    Object handler = themeHandler.getMethod("getInstance").invoke(null);
+                    if (handler != null && Boolean.TRUE.equals(themeHandler.getMethod("Wf").invoke(handler))) {
+                        reason = "THEME_TRANSITION";
+                    }
+                } catch (Throwable ignored) {
+                }
+                try {
+                    Class<?> mainView = Class.forName("com.smartisanos.launcher.view.Eb");
+                    Object view = mainView.getMethod("getInstance").invoke(null);
+                    if (view != null) {
+                        Object folderController = mainView.getMethod("Bh").invoke(view);
+                        if (folderController != null) {
+                            Object openFolder = folderController.getClass().getMethod("hh").invoke(folderController);
+                            if (openFolder != null) {
+                                reason = "FOLDER_OPEN";
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            com.smartisanos.launcher.gesture.UnlockAnimationCoordinator.logResumeNotARealUnlock(reason);
             return;
         }
-        sLastLifecycleUnlockUptime = now;
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (android.os.SystemClock.uptimeMillis() - sLastOriginalUnlockUptime < 1200L) {
-                    android.util.Log.i(LOG_TAG, "lifecycle unlock fallback skipped: original receiver handled unlock");
-                    return;
-                }
-                if (shouldSkipUnlockAnimation()) {
-                    android.util.Log.i(LOG_TAG, "lifecycle unlock fallback skipped: transient launcher UI state");
-                    return;
-                }
-                clearStalePendingThemeBeforeUnlock();
-                android.util.Log.i(LOG_TAG, "dispatching lifecycle unlock fallback");
-                dispatchOriginalLockAction(activity, "action_keyguard_on");
-                dispatchOriginalLockAction(activity, Intent.ACTION_USER_PRESENT);
-            }
-        }, 120L);
-    }
-
-    public static void noteOriginalUnlockBroadcast() {
-        sLastOriginalUnlockUptime = android.os.SystemClock.uptimeMillis();
+        if (com.smartisanos.launcher.gesture.UnlockAnimationCoordinator.requestLifecycleFallbackPlay(activity)) {
+            clearStalePendingThemeBeforeUnlock();
+            android.util.Log.i(LOG_TAG, "dispatching claimed lifecycle unlock fallback");
+            dispatchOriginalLockAction(activity, Intent.ACTION_USER_PRESENT, true);
+        } else {
+            com.smartisanos.launcher.gesture.UnlockAnimationCoordinator.logResumeNotARealUnlock("ALREADY_CLAIMED_OR_NOT_UNLOCKED");
+        }
     }
 
     public static boolean shouldSkipUnlockAnimation() {
@@ -2120,7 +2135,7 @@ public final class MaintainedLauncherSettingsHost {
         return false;
     }
 
-    private static void dispatchOriginalLockAction(Context context, String action) {
+    private static void dispatchOriginalLockAction(Context context, String action, boolean lifecycleClaimedPlay) {
         try {
             Class<?> proxyClass = Class.forName("com.smartisanos.launcher.ja");
             Object proxy = proxyClass.getMethod("getInstance").invoke(null);
@@ -2132,8 +2147,12 @@ public final class MaintainedLauncherSettingsHost {
             java.lang.reflect.Constructor<?> constructor = receiverClass.getDeclaredConstructor(proxyClass);
             constructor.setAccessible(true);
             Object receiver = constructor.newInstance(proxy);
+            Intent intent = new Intent(action);
+            if (lifecycleClaimedPlay) {
+                intent.putExtra(com.smartisanos.launcher.gesture.UnlockAnimationCoordinator.EXTRA_LIFECYCLE_CLAIMED_PLAY, true);
+            }
             receiverClass.getMethod("onReceive", Context.class, Intent.class)
-                    .invoke(receiver, context, new Intent(action));
+                    .invoke(receiver, context, intent);
         } catch (Throwable error) {
             android.util.Log.e(LOG_TAG, "unable to dispatch original lock action " + action, error);
         }
@@ -5991,7 +6010,7 @@ public final class MaintainedLauncherSettingsHost {
             ScrollView scroll = new ScrollView(context);
             final LinearLayout content = new LinearLayout(context);
             content.setOrientation(LinearLayout.VERTICAL);
-            content.setPadding(0, dp(context, 18), 0, dp(context, 28));
+            content.setPadding(0, settingDimen(resources, "settings_section_content_top", dp(context, 18)), 0, dp(context, 28));
             content.addView(privacySectionLabel(context, "系统可用的分身应用"));
             final TextView status = new TextView(context);
             status.setText("正在读取分身应用…");
@@ -6043,8 +6062,12 @@ public final class MaintainedLauncherSettingsHost {
                                 };
                                 bindSwitchControlOnly(item, click);
                                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-                                lp.topMargin = settingDimen(resources, "settings_item_top_bottom_margin",
-                                        dp(context, 20));
+                                // The first card follows the shared section header directly. Only
+                                // subsequent profile-app cards keep the normal inter-card spacing.
+                                if (i > 0) {
+                                    lp.topMargin = settingDimen(resources, "settings_item_top_bottom_margin",
+                                            dp(context, 20));
+                                }
                                 content.addView(item, lp);
                             }
                         }
@@ -6083,7 +6106,7 @@ public final class MaintainedLauncherSettingsHost {
 
             LinearLayout content = new LinearLayout(context);
             content.setOrientation(LinearLayout.VERTICAL);
-            content.setPadding(0, dp(activity, 18), 0, dp(activity, 14));
+            content.setPadding(0, settingDimen(resources, "settings_section_content_top", dp(activity, 18)), 0, dp(activity, 14));
             root.addView(content, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
@@ -6194,30 +6217,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static TextView privacySectionLabel(Context context, String text) {
-        Resources resources = context.getResources();
-        TextView label = new TextView(context);
-        label.setText(text);
-        int colorId = resources.getIdentifier("setting_item_tips_color", "color", SETTINGS_PKG);
-        if (colorId != 0) {
-            try {
-                label.setTextColor(resources.getColor(colorId));
-            } catch (Throwable ignored) {
-                label.setTextColor(0xff7e818b);
-            }
-        } else {
-            label.setTextColor(0xff7e818b);
-        }
-        label.setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                settingDimen(resources, "settings_item_tips_text_size", dp(context, 14)));
-        label.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        label.setPadding(settingDimen(resources, "settings_item_title_left_margin", dp(context, 30)),
-                0,
-                settingDimen(resources, "settings_item_title_right_margin", dp(context, 30)),
-                0);
-        label.setSingleLine(true);
-        label.setIncludeFontPadding(false);
-        label.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
-        return label;
+        return settingsSectionHeader(context, context.getResources(), text);
     }
 
     /** Route a dynamic-icon mode change through the original per-package update pipeline. */
@@ -10607,10 +10607,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void addAboutSectionTitle(Context context, LinearLayout parent, String title) {
-        TextView view = text(context, title, 18, 0xff666b76, true);
-        view.setGravity(Gravity.CENTER_VERTICAL);
-        view.setPadding(dp(context, 20), dp(context, 20), dp(context, 20), dp(context, 8));
-        parent.addView(view, new LinearLayout.LayoutParams(-1, dp(context, 64)));
+        parent.addView(settingsSectionHeader(context, context.getResources(), title));
     }
 
     private static TextView aboutActionButton(Context context, String label, int color) {
@@ -12815,7 +12812,10 @@ public final class MaintainedLauncherSettingsHost {
         synchronized (MaintainedLauncherSettingsHost.class) {
             generation = ++sImprovedIconGeneration;
         }
-        invalidateActiveIconAdapter();
+        // Turning the global switch off only moves the selected check back to the
+        // original preview. Keep the existing section rows stable to avoid a full
+        // reclassification and visible list hitch while the background reset runs.
+        invalidateActiveIconAdapter(enabled);
         new Thread(new Runnable() {
             public void run() {
                 final java.util.LinkedHashSet<String> changedPackages =
@@ -12880,7 +12880,7 @@ public final class MaintainedLauncherSettingsHost {
                             return;
                         }
                         applyIconChanges(app, changedPackages);
-                        invalidateActiveIconAdapter();
+                        invalidateActiveIconAdapter(enabled);
                     }
                 });
             }
@@ -12903,6 +12903,10 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static boolean invalidateActiveIconAdapter() {
+        return invalidateActiveIconAdapter(true);
+    }
+
+    private static boolean invalidateActiveIconAdapter(final boolean rebuildSections) {
         final AppIconAdapter adapter;
         synchronized (MaintainedLauncherSettingsHost.class) {
             adapter = sActiveAppIconAdapter == null ? null : sActiveAppIconAdapter.get();
@@ -12911,11 +12915,11 @@ public final class MaintainedLauncherSettingsHost {
             return false;
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            adapter.invalidateIconData();
+            adapter.invalidateIconData(rebuildSections);
         } else {
             new Handler(Looper.getMainLooper()).post(new Runnable() {
                 public void run() {
-                    adapter.invalidateIconData();
+                    adapter.invalidateIconData(rebuildSections);
                 }
             });
         }
@@ -13589,18 +13593,21 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static TextView settingsSectionHeader(Context context, Resources resources, String value) {
-        TextView header = text(context, value, 15, 0x80000000, false);
-        int left = dp(context, 30);
         try {
-            int id = resources == null ? 0 : resources.getIdentifier("theme_chooser_text_padding_left",
-                    "dimen", SETTINGS_PKG);
-            if (id != 0) {
-                left = resources.getDimensionPixelSize(id);
+            int layoutId = resources == null ? 0
+                    : resources.getIdentifier("settings_section_header", "layout", SETTINGS_PKG);
+            if (layoutId != 0) {
+                SettingsResourceContext settingsContext = new SettingsResourceContext(context, resources);
+                TextView header = (TextView) LayoutInflater.from(context).cloneInContext(settingsContext)
+                        .inflate(layoutId, null, false);
+                header.setText(value);
+                return header;
             }
         } catch (Throwable ignored) {
         }
+        TextView header = text(context, value, 15, 0x80000000, false);
         header.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        header.setPadding(left, dp(context, 11), 0, dp(context, 1));
+        header.setPadding(dp(context, 30), dp(context, 11), 0, dp(context, 1));
         header.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
         return header;
     }
@@ -14094,11 +14101,14 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static final class AppIconAdapter extends BaseAdapter {
+        private static final int TYPE_SECTION = 0;
+        private static final int TYPE_APP = 1;
         private final Activity activity;
         private final SettingsResourceContext context;
         private final Resources resources;
         private final IconManager iconManager;
         private final List<RedirectIconInfo> apps = new ArrayList<RedirectIconInfo>();
+        private final List<Object> rows = new ArrayList<Object>();
         private final LayoutInflater inflater;
         private long iconDataGeneration;
 
@@ -14109,6 +14119,7 @@ public final class MaintainedLauncherSettingsHost {
             this.inflater = LayoutInflater.from(activity).cloneInContext(context);
             this.iconManager = new IconManager(activity);
             this.apps.addAll(loadEntries(activity, this.iconManager));
+            rebuildRows();
         }
 
         AppIconAdapter(Activity activity, SettingsResourceContext context, Resources resources,
@@ -14126,6 +14137,7 @@ public final class MaintainedLauncherSettingsHost {
             if (entries != null) {
                 this.apps.addAll(entries);
             }
+            rebuildRows();
         }
 
         static List<RedirectIconInfo> loadEntries(Activity activity) {
@@ -14185,11 +14197,11 @@ public final class MaintainedLauncherSettingsHost {
         }
 
         public int getCount() {
-            return apps.size();
+            return rows.size();
         }
 
         public Object getItem(int position) {
-            return apps.get(position);
+            return rows.get(position);
         }
 
         public long getItemId(int position) {
@@ -14203,25 +14215,42 @@ public final class MaintainedLauncherSettingsHost {
 
         /** Invalidates bound rows; getView resolves RedirectIconDB again for every bind. */
         void invalidateIconData() {
+            invalidateIconData(true);
+        }
+
+        /** Refresh preview selection without regrouping after a global disable. */
+        void invalidateIconData(boolean rebuildSections) {
             if (isActivityInvalid()) {
                 return;
             }
             iconDataGeneration++;
+            if (rebuildSections) {
+                rebuildRows();
+            }
             notifyDataSetChanged();
             logOperation(activity, "ICON_ADAPTER_INVALIDATED",
-                    "generation=" + iconDataGeneration + ", count=" + apps.size());
+                    "generation=" + iconDataGeneration + ", count=" + apps.size()
+                            + ", rebuildSections=" + rebuildSections);
         }
 
         public View getView(int position, View convertView, android.view.ViewGroup parent) {
+            Object item = rows.get(position);
+            if (item instanceof IconSection) {
+                LinearLayout header = convertView instanceof LinearLayout ? (LinearLayout) convertView
+                        : createSectionHeader();
+                ((TextView) header.getChildAt(0)).setText(((IconSection) item).title);
+                return header;
+            }
             if (convertView == null) {
                 convertView = createIconRow(parent);
             }
             final View rowView = convertView;
-            RedirectIconInfo listed = apps.get(position);
+            RedirectIconInfo listed = (RedirectIconInfo) item;
             final RedirectIconInfo latest = RedirectIconDB.getRedirectIconInfo(activity,
                     listed.packageName, listed.componentName);
             final RedirectIconInfo info = latest == null ? listed : latest;
             convertView.setTag(info);
+            setBackground(convertView, resources, cardBackgroundFor(position));
             ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
             Drawable official = iconManager.getOfficialIcon(info);
             Drawable candidate = previewIconDrawable(activity, resolveInfo, resources);
@@ -14264,6 +14293,57 @@ public final class MaintainedLauncherSettingsHost {
                         : getString(resources, "official_icon", "可替换图标"));
             }
             return convertView;
+        }
+
+        public int getViewTypeCount() {
+            return 2;
+        }
+
+        public int getItemViewType(int position) {
+            return rows.get(position) instanceof IconSection ? TYPE_SECTION : TYPE_APP;
+        }
+
+        private void rebuildRows() {
+            rows.clear();
+            ArrayList<RedirectIconInfo> redrawn = new ArrayList<RedirectIconInfo>();
+            ArrayList<RedirectIconInfo> unredrawn = new ArrayList<RedirectIconInfo>();
+            for (RedirectIconInfo info : apps) {
+                ResolveInfo resolve = iconManager.getResolveInfo(info.packageName, info.componentName);
+                Drawable candidate = previewIconDrawable(activity, resolve, resources);
+                if (isImprovedSelected(info, candidate)) redrawn.add(info); else unredrawn.add(info);
+            }
+            if (!redrawn.isEmpty()) {
+                rows.add(new IconSection("已重绘"));
+                rows.addAll(redrawn);
+            }
+            if (!unredrawn.isEmpty()) {
+                rows.add(new IconSection("未重绘"));
+                rows.addAll(unredrawn);
+            }
+        }
+
+        private LinearLayout createSectionHeader() {
+            LinearLayout header = new LinearLayout(context);
+            header.setGravity(Gravity.CENTER_VERTICAL);
+            header.setOrientation(LinearLayout.VERTICAL);
+            header.setClickable(false);
+            header.setFocusable(false);
+            header.setBackgroundColor(0x00ffffff);
+            header.setPadding(0, 0, 0, 0);
+            header.setLayoutParams(new AbsListView.LayoutParams(-1, dp(activity, 42)));
+            TextView title = settingsSectionHeader(context, resources, "");
+            title.setClickable(false);
+            header.addView(title, new LinearLayout.LayoutParams(-1, -1));
+            return header;
+        }
+
+        private String cardBackgroundFor(int position) {
+            boolean first = position == 0 || rows.get(position - 1) instanceof IconSection;
+            boolean last = position == rows.size() - 1 || rows.get(position + 1) instanceof IconSection;
+            if (first && last) return "selector_setting_sub_item_bg_single";
+            if (first) return "selector_setting_sub_item_bg_top";
+            if (last) return "selector_setting_sub_item_bg_bottom";
+            return "selector_setting_sub_item_bg_middle";
         }
 
         private View createIconRow(android.view.ViewGroup parent) {
@@ -14663,6 +14743,8 @@ public final class MaintainedLauncherSettingsHost {
         private void bindChoiceIcon(final ImageView icon, final ProgressBar progress,
                                     final ImageView check,
                                     final RedirectIconInfo info, final IconChoice choice) {
+            final String requestKey = choiceRequestKey(info, choice);
+            icon.setTag(requestKey);
             Drawable drawable = iconDrawableForChoice(info, choice);
             if (drawable != null) {
                 progress.setVisibility(View.GONE);
@@ -14673,26 +14755,32 @@ public final class MaintainedLauncherSettingsHost {
             }
             progress.setVisibility(choice.type == IconChoice.TYPE_LIBRARY ? View.VISIBLE : View.GONE);
             icon.setVisibility(View.VISIBLE);
-            if (choice.type == IconChoice.TYPE_CUSTOM) {
-                icon.setImageDrawable(plusIcon(resources));
-            }
+            // A loading or unavailable library candidate must never inherit an
+            // empty ImageView. The plus tile is the stable NOT_AVAILABLE/LOADING
+            // presentation until a valid source has arrived.
+            icon.setImageDrawable(plusIcon(resources));
             if (choice.type == IconChoice.TYPE_LIBRARY) {
-                retryBindChoiceIcon(icon, progress, check, info, choice, 0);
+                retryBindChoiceIcon(icon, progress, check, info, choice, requestKey, 0);
             }
         }
 
         private void retryBindChoiceIcon(final ImageView icon, final ProgressBar progress,
                                          final ImageView check,
                                          final RedirectIconInfo info, final IconChoice choice,
-                                         final int attempt) {
+                                         final String requestKey, final int attempt) {
             final long[] delays = new long[]{80L, 180L, 320L, 600L, 1000L, 1600L};
             if (attempt >= delays.length) {
                 progress.setVisibility(View.GONE);
-                icon.setVisibility(View.INVISIBLE);
+                icon.setImageDrawable(plusIcon(resources));
+                icon.setVisibility(View.VISIBLE);
                 return;
             }
             new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
                 public void run() {
+                    if (isActivityInvalid() || !requestKey.equals(icon.getTag())) {
+                        logOperation(activity, "ICON_ASYNC_STALE_DROPPED", "requestKey=" + requestKey);
+                        return;
+                    }
                     Drawable retry = iconDrawableForChoice(info, choice);
                     if (retry != null) {
                         progress.setVisibility(View.GONE);
@@ -14700,10 +14788,18 @@ public final class MaintainedLauncherSettingsHost {
                         icon.setVisibility(View.VISIBLE);
                         check.setVisibility(isChoiceSelected(info, choice) ? View.VISIBLE : View.GONE);
                     } else {
-                        retryBindChoiceIcon(icon, progress, check, info, choice, attempt + 1);
+                        retryBindChoiceIcon(icon, progress, check, info, choice, requestKey, attempt + 1);
                     }
                 }
             }, delays[attempt]);
+        }
+
+        private String choiceRequestKey(RedirectIconInfo info, IconChoice choice) {
+            String pkg = info == null || info.packageName == null ? "" : info.packageName;
+            String component = info == null || info.componentName == null ? "" : info.componentName;
+            String candidate = choice == null || choice.name == null ? "" : choice.name;
+            int type = choice == null ? -1 : choice.type;
+            return pkg + ':' + component + ':' + type + ':' + candidate + ':' + iconDataGeneration;
         }
 
         private Drawable iconDrawableForChoice(RedirectIconInfo info, IconChoice choice) {
@@ -14865,12 +14961,19 @@ public final class MaintainedLauncherSettingsHost {
             }
         }
 
-        private GradientDrawable choiceIconBackground(Context context, boolean selected) {
-            GradientDrawable bg = new GradientDrawable();
-            bg.setColor(Color.TRANSPARENT);
-            bg.setCornerRadius(dp(context, 5));
-            bg.setStroke(1, 0x18000000);
-            return bg;
+        private Drawable choiceIconBackground(Context context, boolean selected) {
+            Drawable visual = safeDrawable(resources,
+                    drawable(resources, "icon_preview_frame_visual"));
+            if (visual != null) {
+                return visual.mutate();
+            }
+            // The resource is normally present in the maintained settings APK.
+            // Keep the existing visual as a compatibility fallback if that APK is stale.
+            GradientDrawable fallback = new GradientDrawable();
+            fallback.setColor(Color.TRANSPARENT);
+            fallback.setCornerRadius(dp(context, 5));
+            fallback.setStroke(1, 0x12000000);
+            return fallback;
         }
 
         private void pickCustomIcon(RedirectIconInfo info, int returnScrollY) {
@@ -14932,8 +15035,8 @@ public final class MaintainedLauncherSettingsHost {
 
         private void setIcon(View root, Resources resources, String idName, Drawable icon) {
             ImageView view = (ImageView) byId(root, resources, idName);
-            if (view != null && icon != null) {
-                view.setImageDrawable(icon);
+            if (view != null) {
+                view.setImageDrawable(icon == null ? plusIcon(resources) : icon);
             }
         }
 
@@ -14945,6 +15048,14 @@ public final class MaintainedLauncherSettingsHost {
             }
         }
 
+    }
+
+    private static final class IconSection {
+        final String title;
+
+        IconSection(String title) {
+            this.title = title;
+        }
     }
 
     private static boolean shouldShowIconEntry(ResolveInfo info) {
@@ -15119,15 +15230,6 @@ public final class MaintainedLauncherSettingsHost {
                 return onlineSystemIcon;
             }
         }
-        // The bundled weather/calendar drawables are active-icon base frames,
-        // not complete normal icons. With dynamic mode off we still want the
-        // downloaded improved icon; only skip that incomplete local fallback.
-        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)
-                && LauncherSettingBridge.isDynamicIconPackage(packageName)) {
-            String resourceName = WeatherBridge.isWeatherPackage(packageName, null, null)
-                    ? "static_icon_weather" : "static_icon_calendar";
-            return maintainedResourceIcon(context, resources, resourceName);
-        }
         Drawable local = maintainedResourceIcon(context, resources, smartisanIconNameFor(context, info));
         if (local != null) {
             return local;
@@ -15144,13 +15246,6 @@ public final class MaintainedLauncherSettingsHost {
         if (systemAlias != null) {
             Drawable alias = libraryIconDrawableNonBlocking(context, resources, systemAlias);
             if (alias != null) return alias;
-        }
-        if (!LauncherSettingBridge.dynamicWeatherCalendarEnabled(context)
-                && LauncherSettingBridge.isDynamicIconPackage(packageName)) {
-            String resourceName = WeatherBridge.isWeatherPackage(packageName, null, null)
-                    ? "static_icon_weather" : "static_icon_calendar";
-            Drawable dynamicFallback = maintainedResourceIcon(context, resources, resourceName);
-            if (dynamicFallback != null) return dynamicFallback;
         }
         Drawable local = maintainedResourceIcon(context, resources, smartisanIconNameFor(context, info));
         if (local != null) return local;
@@ -15181,8 +15276,14 @@ public final class MaintainedLauncherSettingsHost {
         synchronized (sSmartisanIconCache) {
             cached = sSmartisanIconCache.get(name);
         }
-        if (cached != null) {
+        if (isUsableIconBitmap(cached)) {
             return new android.graphics.drawable.BitmapDrawable(context.getResources(), cached);
+        }
+        if (cached != null) {
+            synchronized (sSmartisanIconCache) {
+                sSmartisanIconCache.remove(name);
+            }
+            Log.w(LOG_TAG, "ICON_EMPTY_RESULT_REJECTED memory key=" + name);
         }
         // The choice grid is built from libraryIconStored(), which also sees
         // the persistent cache. Reload that local PNG here after a process
@@ -15621,7 +15722,11 @@ public final class MaintainedLauncherSettingsHost {
         }
         synchronized (sSmartisanIconCache) {
             Bitmap memoryCached = sSmartisanIconCache.get(packageName);
-            if (memoryCached != null) return memoryCached;
+            if (isUsableIconBitmap(memoryCached)) return memoryCached;
+            if (memoryCached != null) {
+                sSmartisanIconCache.remove(packageName);
+                Log.w(LOG_TAG, "ICON_CACHE_WRITE_REJECTED memory recycled_or_transparent key=" + packageName);
+            }
         }
         Bitmap cached = readCachedSmartisanIcon(context, packageName);
         if (cached != null) {
@@ -15673,8 +15778,11 @@ public final class MaintainedLauncherSettingsHost {
                     }
                     in = conn.getInputStream();
                     byte[] data = readAllBytes(in, 512 * 1024);
-                    Bitmap decoded = BitmapFactory.decodeByteArray(data, 0, data.length);
-                    if (decoded != null && decoded.getWidth() >= 48 && decoded.getHeight() >= 48
+                    BitmapFactory.Options options = new BitmapFactory.Options();
+                    options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                    options.inScaled = false;
+                    Bitmap decoded = BitmapFactory.decodeByteArray(data, 0, data.length, options);
+                    if (isUsableIconBitmap(decoded) && decoded.getWidth() >= 48 && decoded.getHeight() >= 48
                             && decoded.getWidth() <= 1024 && decoded.getHeight() <= 1024) {
                         bitmap = decoded;
                         writeCachedSmartisanIcon(context, packageName, bitmap);
@@ -15806,9 +15914,14 @@ public final class MaintainedLauncherSettingsHost {
             if (file == null || !file.exists()) {
                 return null;
             }
-            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
-            if (bitmap == null) {
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            options.inScaled = false;
+            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+            if (!isUsableIconBitmap(bitmap)) {
                 file.delete();
+                Log.w(LOG_TAG, "ICON_EMPTY_RESULT_REJECTED disk key=" + packageName);
+                return null;
             }
             return bitmap;
         } catch (Throwable ignored) {
@@ -15836,10 +15949,12 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void writeCachedSmartisanIcon(Context context, String packageName, Bitmap bitmap) {
-        if (bitmap == null) {
+        if (!isUsableIconBitmap(bitmap)) {
+            Log.w(LOG_TAG, "ICON_CACHE_WRITE_REJECTED disk invalid key=" + packageName);
             return;
         }
         FileOutputStream out = null;
+        File temp = null;
         try {
             File file = smartisanIconCacheFile(context, packageName);
             if (file == null) {
@@ -15849,8 +15964,17 @@ public final class MaintainedLauncherSettingsHost {
             if (dir != null && !dir.exists()) {
                 dir.mkdirs();
             }
-            out = new FileOutputStream(file);
+            temp = new File(file.getParentFile(), file.getName() + ".tmp");
+            out = new FileOutputStream(temp);
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            out.flush();
+            out.close();
+            out = null;
+            if (!temp.renameTo(file)) {
+                temp.delete();
+                Log.w(LOG_TAG, "ICON_CACHE_WRITE_REJECTED atomic_rename key=" + packageName);
+                return;
+            }
             context.getSharedPreferences(SMARTISAN_ICON_CACHE_PREFS, Context.MODE_PRIVATE).edit()
                     .remove("miss." + packageName).apply();
         } catch (Throwable ignored) {
@@ -15861,7 +15985,54 @@ public final class MaintainedLauncherSettingsHost {
                 } catch (Throwable ignored) {
                 }
             }
+            if (temp != null && temp.exists()) {
+                temp.delete();
+            }
         }
+    }
+
+    /**
+     * Resolves the source that is effective now, rather than asking whether a
+     * candidate exists on disk.  Smali uses this as the single split between
+     * the original APK path and the managed replacement path.
+     */
+    public static boolean hasEffectiveManagedIcon(Object itemInfo) {
+        if (itemInfo == null) return false;
+        try {
+            java.lang.reflect.Field packageField = itemInfo.getClass().getField("packageName");
+            java.lang.reflect.Field componentField = itemInfo.getClass().getField("componentName");
+            String packageName = String.valueOf(packageField.get(itemInfo));
+            String componentName = String.valueOf(componentField.get(itemInfo));
+            Context context = currentApplicationContext();
+            if (context == null || TextUtils.isEmpty(packageName)) return false;
+            ResolveInfo info = resolveLauncherActivity(context.getPackageManager(), packageName, componentName);
+            boolean managed = info != null && iconOverrideDrawable(info, context.getPackageManager()) != null;
+            android.util.Log.i("LauncherIconRaster", "EFFECTIVE_ICON_SOURCE packageName=" + packageName
+                    + " componentName=" + componentName + " sourceType="
+                    + (managed ? "MANAGED_OVERRIDE" : "DEFAULT_APK"));
+            return managed;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isUsableIconBitmap(Bitmap bitmap) {
+        if (bitmap == null || bitmap.isRecycled() || bitmap.getWidth() <= 0 || bitmap.getHeight() <= 0) {
+            return false;
+        }
+        try {
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            int[] row = new int[width];
+            for (int y = 0; y < height; y++) {
+                bitmap.getPixels(row, 0, width, 0, y, width, 1);
+                for (int x = 0; x < width; x++) {
+                    if ((row[x] >>> 24) != 0) return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     private static void scheduleSmartisanIconRefresh(Context context,

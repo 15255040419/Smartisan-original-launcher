@@ -11069,7 +11069,11 @@
 .end method
 
 .method public onPause()V
-    .locals 1
+    .locals 3
+
+    const-wide/16 v1, 0x0
+
+    iput-wide v1, p0, Lcom/smartisanos/launcher/view/Eb;->mStartTime:J
 
     .line 1
     sget-boolean v0, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
@@ -11103,7 +11107,11 @@
 .end method
 
 .method public onResume()V
-    .locals 1
+    .locals 3
+
+    const-wide/16 v1, 0x0
+
+    iput-wide v1, p0, Lcom/smartisanos/launcher/view/Eb;->mStartTime:J
 
     const/4 v0, 0x1
 

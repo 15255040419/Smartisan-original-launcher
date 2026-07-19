@@ -9176,6 +9176,8 @@
     .line 124
     iput-boolean v11, v9, Lcom/smartisanos/launcher/data/ItemInfo;->isNewlyInstalled:Z
 
+    invoke-static {v0, v11}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->onNewlyInstalledItemInfoApplied(Ljava/lang/String;Z)V
+
     .line 125
     invoke-static {v9}, Lcom/smartisanos/launcher/data/a/l;->h(Lcom/smartisanos/launcher/data/ItemInfo;)J
 

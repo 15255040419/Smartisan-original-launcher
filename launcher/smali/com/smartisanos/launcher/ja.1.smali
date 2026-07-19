@@ -100,7 +100,7 @@
 
 .field private mh:Ljava/lang/String;
 
-.field private final nh:Landroid/app/IActivityObserver$Stub;
+.field private final nh:Ljava/lang/Object;
 
 .field private final oh:Landroid/content/BroadcastReceiver;
 
@@ -232,7 +232,7 @@
     iput-object v1, p0, Lcom/smartisanos/launcher/ja;->mh:Ljava/lang/String;
 
     .line 15
-    iput-object v1, p0, Lcom/smartisanos/launcher/ja;->nh:Landroid/app/IActivityObserver$Stub;
+    iput-object v1, p0, Lcom/smartisanos/launcher/ja;->nh:Ljava/lang/Object;
 
     .line 16
     new-instance v0, Lcom/smartisanos/launcher/ia;
@@ -1035,37 +1035,12 @@
     iput-object v0, p0, Lcom/smartisanos/launcher/ja;->gh:Landroid/database/ContentObserver;
 
     .line 27
-    :try_start_0
-    iget-object v0, p0, Lcom/smartisanos/launcher/ja;->Jg:Landroid/app/Application;
+    const-string p0, "SMARTISAN_API_UNAVAILABLE module=activity_observer fallback=disabled"
 
-    const-string v1, "activity"
+    sget-object v0, Lcom/smartisanos/launcher/ja;->log:Lcom/smartisanos/launcher/va;
 
-    invoke-virtual {v0, v1}, Landroid/app/Application;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+    invoke-virtual {v0, p0}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
-    move-result-object v0
-
-    check-cast v0, Landroid/app/ActivityManager;
-
-    .line 28
-    invoke-static {}, Lsmartisanos/api/ActivityManagerSmt;->getInstance()Lsmartisanos/api/ActivityManagerSmt;
-
-    move-result-object v1
-
-    iget-object p0, p0, Lcom/smartisanos/launcher/ja;->nh:Landroid/app/IActivityObserver$Stub;
-
-    invoke-virtual {v1, v0, p0}, Lsmartisanos/api/ActivityManagerSmt;->registerActivityObserver(Landroid/app/ActivityManager;Landroid/app/IActivityObserver;)V
-    :try_end_0
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
-
-    goto :goto_1
-
-    :catch_0
-    move-exception p0
-
-    .line 29
-    invoke-virtual {p0}, Ljava/lang/Exception;->printStackTrace()V
-
-    :goto_1
     return-void
 .end method
 
@@ -2446,6 +2421,13 @@
 
 .method public onCreate()V
     .locals 4
+
+    const-string v0, "APPLICATION_PROXY_ONCREATE_BEGIN"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
+
+    # Reset UnlockAnimationCoordinator state
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/UnlockAnimationCoordinator;->resetForProcessStart()V
 
     .line 1
     invoke-static {}, Landroid/os/Process;->myTid()I

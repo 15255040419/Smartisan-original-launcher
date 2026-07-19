@@ -4096,6 +4096,10 @@
     :goto_3
     if-eqz p1, :cond_8
 
+    # The original drag target has accepted the Cell. Only now can this
+    # gesture supersede a pending system-panel pull-down.
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onDragStarted()V
+
     .line 33
     iput-boolean p3, p0, Lcom/smartisanos/launcher/view/Ha;->jM:Z
 
@@ -4603,6 +4607,9 @@
 
     .line 61
     invoke-virtual {p0, p1, v0}, Lcom/smartisanos/launcher/view/Ha;->m(IZ)V
+
+    # The original editor drag state is now established.
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onDragStarted()V
 
     return v0
 .end method

@@ -795,7 +795,7 @@
 .end method
 
 .method public static b(Lcom/smartisanos/launcher/data/QuickLaunchItem;)V
-    .locals 2
+    .locals 3
 
     if-nez p0, :cond_0
 
@@ -803,6 +803,37 @@
 
     .line 8
     :cond_0
+    iget-object v0, p0, Lcom/smartisanos/launcher/data/QuickLaunchItem;->intent:Landroid/content/Intent;
+
+    if-eqz v0, :cond_original
+
+    const-string v1, "smartisan.shortcut.launch_via_activity"
+
+    const/4 v2, 0x0
+
+    invoke-virtual {v0, v1, v2}, Landroid/content/Intent;->getBooleanExtra(Ljava/lang/String;Z)Z
+
+    move-result v1
+
+    if-eqz v1, :cond_original
+
+    sget-object v2, Lcom/smartisanos/launcher/d/j;->mContext:Landroid/content/Context;
+
+    if-eqz v2, :cond_original
+
+    new-instance v1, Landroid/content/Intent;
+
+    invoke-direct {v1, v0}, Landroid/content/Intent;-><init>(Landroid/content/Intent;)V
+
+    const/high16 v0, 0x10000000
+
+    invoke-virtual {v1, v0}, Landroid/content/Intent;->addFlags(I)Landroid/content/Intent;
+
+    invoke-virtual {v2, v1}, Landroid/content/Context;->startActivity(Landroid/content/Intent;)V
+
+    return-void
+
+    :cond_original
     sget-object v0, Lcom/smartisanos/launcher/d/j;->_s:Landroid/content/pm/LauncherApps;
 
     if-nez v0, :cond_1
@@ -912,7 +943,7 @@
     return-void
 .end method
 
-.method private static c(Lcom/smartisanos/launcher/d/k;)Lcom/smartisanos/launcher/data/QuickLaunchItem;
+.method public static c(Lcom/smartisanos/launcher/d/k;)Lcom/smartisanos/launcher/data/QuickLaunchItem;
     .locals 3
 
     if-nez p0, :cond_0

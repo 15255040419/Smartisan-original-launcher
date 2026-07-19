@@ -1344,6 +1344,16 @@
     <style name="ThemeOverlay.AppCompat.Dialog" parent="@style/Base.ThemeOverlay.AppCompat.Dialog" />
     <style name="ThemeOverlay.AppCompat.Dialog.Alert" parent="@style/Base.ThemeOverlay.AppCompat.Dialog.Alert" />
     <style name="ThemeOverlay.AppCompat.Light" parent="@style/Base.ThemeOverlay.AppCompat.Light" />
+    <style name="SettingsSectionHeader">
+        <item name="android:textSize">@dimen/settings_section_header_text_size</item>
+        <item name="android:textColor">#80000000</item>
+        <item name="android:minHeight">@dimen/settings_section_header_min_height</item>
+        <item name="android:gravity">left|center_vertical</item>
+        <item name="android:paddingLeft">@dimen/theme_chooser_text_padding_left</item>
+        <item name="android:paddingTop">@dimen/settings_section_header_padding_top</item>
+        <item name="android:paddingBottom">@dimen/settings_section_header_padding_bottom</item>
+        <item name="android:includeFontPadding">true</item>
+    </style>
     <style name="TitleStyle">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>

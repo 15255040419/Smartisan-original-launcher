@@ -5143,6 +5143,10 @@
 
     invoke-static {v0, v3, v1, v2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->logActiveIconLiveShadowNodeAttached(Ljava/lang/String;FFLjava/lang/String;)V
 
+    iget-object v4, p0, Lcom/smartisanos/launcher/view/activeicon/H;->activeIconShadowNode:Lcom/smartisanos/smengine/F;
+
+    invoke-static {v0, v4}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->logActiveIconLiveShadowNodeState(Ljava/lang/String;Ljava/lang/Object;)V
+
     :cond_live_shadow_done
 
     return-void

@@ -162,6 +162,7 @@
     <string name="net_is_not_available">无网络连接</string>
     <string name="obsession_badge_swipe_clean">紧贴屏幕横扫清除角标</string>
     <string name="obsession_badge_swipe_clean_tips">紧贴屏幕底部向上横扫，以清除应用通知角标</string>
+    <string name="obsession_badge_reminder_tips">允许应用图标右上角显示通知角标</string>
     <string name="obsession_badge_notification_access">显示通知角标需要授予通知使用权，点击前往设置</string>
     <string name="obsession_badge_notification_access_action">前往设置</string>
     <string name="obsession_header_title">强迫症选项</string>

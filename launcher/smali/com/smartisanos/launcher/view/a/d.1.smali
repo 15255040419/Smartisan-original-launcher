@@ -27,11 +27,11 @@
 .method public a(Lcom/smartisanos/smengine/va;Lcom/smartisanos/smengine/SceneNode;)Z
     .locals 1
 
-    # This listener only belongs to a real desktop Cell.  Mark it before the
-    # asynchronous SMEngine input dispatcher evaluates a pull-down candidate.
-    const/4 v0, 0x1
+    # This listener belongs to a real desktop Cell.  The original SMEngine
+    # dispatch has now resolved the target, so it owns this gesture.
+    iget-object v0, p0, Lcom/smartisanos/launcher/view/a/d;->this$0:Lcom/smartisanos/launcher/view/a/g;
 
-    invoke-static {v0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->setInteractionBlocked(Z)V
+    invoke-static {v0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onSmEngineInteractiveTarget(Ljava/lang/Object;)V
 
     .line 1
     invoke-static {}, Lcom/smartisanos/launcher/d/i;->Of()Z

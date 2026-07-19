@@ -103,11 +103,13 @@
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
     </activity-alias>
-    <activity android:theme="@android:01030010" android:name="com.smartisanos.launcher.PinShortcutActivity" android:exported="true">
+    <activity android:theme="@android:01030010" android:name="com.smartisanos.launcher.PinShortcutConfirmActivity" android:exported="true" android:excludeFromRecents="true" android:launchMode="singleTop">
       <intent-filter>
         <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+        <category android:name="android.intent.category.DEFAULT" />
       </intent-filter>
     </activity>
+    <activity android:theme="@android:01030010" android:name="com.smartisanos.launcher.ShortcutLaunchActivity" android:exported="false" android:excludeFromRecents="true" />
     <activity android:theme="@android:style/Theme.NoTitleBar.Fullscreen" android:name="com.smartisanos.launcher.ConfirmPasswordActivity" android:exported="true" android:taskAffinity="smartisanos.task.launcher.confirm" android:multiprocess="true" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" android:configChanges="0x00002480">
       <intent-filter>
         <action android:name="com.smartisanos.launcher.verify_password" />

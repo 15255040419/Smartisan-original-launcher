@@ -6,7 +6,6 @@
 # static fields
 .field public static EFFECT_REMOVE_BADGE:I
 
-.field private static Sf:Landroid/view/IWindowManager;
 
 .field private static final log:Lcom/smartisanos/launcher/va;
 
@@ -479,7 +478,7 @@
     .line 37
     invoke-virtual {p0, p1, v0, v1}, Landroid/content/pm/PackageManager;->deletePackage(Ljava/lang/String;Landroid/content/pm/IPackageDeleteObserver;I)V
     :try_end_0
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
+    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0
 
     goto :goto_0
 
@@ -634,22 +633,6 @@
     .line 9
     invoke-virtual {p0, v1}, Landroid/view/Window;->setStatusBarColor(I)V
 
-    .line 10
-    iget v1, v0, Landroid/view/WindowManager$LayoutParams;->privateFlags:I
-
-    const/high16 v2, 0x10000000
-
-    or-int/2addr v1, v2
-
-    iput v1, v0, Landroid/view/WindowManager$LayoutParams;->privateFlags:I
-
-    .line 11
-    iget v1, v0, Landroid/view/WindowManager$LayoutParams;->privateFlags:I
-
-    or-int/lit8 v1, v1, 0x8
-
-    iput v1, v0, Landroid/view/WindowManager$LayoutParams;->privateFlags:I
-
     goto :goto_0
 
     .line 12
@@ -693,19 +676,6 @@
 
     .line 14
     invoke-virtual {p0, v0}, Landroid/view/Window;->setAttributes(Landroid/view/WindowManager$LayoutParams;)V
-
-    const-string p0, "window"
-
-    .line 15
-    invoke-static {p0}, Landroid/os/ServiceManager;->getService(Ljava/lang/String;)Landroid/os/IBinder;
-
-    move-result-object p0
-
-    invoke-static {p0}, Landroid/view/IWindowManager$Stub;->asInterface(Landroid/os/IBinder;)Landroid/view/IWindowManager;
-
-    move-result-object p0
-
-    sput-object p0, Lcom/smartisanos/launcher/ua;->Sf:Landroid/view/IWindowManager;
 
     return-void
 .end method
@@ -1179,7 +1149,7 @@
     .line 2
     invoke-virtual {v0, v2, v1}, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
     :try_end_1
-    .catch Ljava/lang/Exception; {:try_start_1 .. :try_end_1} :catch_0
+    .catch Ljava/lang/Throwable; {:try_start_1 .. :try_end_1} :catch_0
 
     goto :goto_0
 
@@ -1572,14 +1542,13 @@
 .end method
 
 .method public static getAnimationScale(I)F
-    .locals 1
+    .locals 0
 
-    .line 1
-    sget-object v0, Lcom/smartisanos/launcher/ua;->Sf:Landroid/view/IWindowManager;
-
-    invoke-interface {v0, p0}, Landroid/view/IWindowManager;->getAnimationScale(I)F
-
-    move-result p0
+    # Global animation scale is an optional visual preference.  Accessing the
+    # hidden IWindowManager binder makes the core Launcher class unverifiable
+    # on recent Android releases, so retain the original default when it is
+    # unavailable.
+    const/high16 p0, 0x3f800000    # 1.0f
 
     return p0
 .end method
@@ -1587,10 +1556,8 @@
 .method public static getDesktopMode(I)I
     .locals 0
 
-    .line 1
-    invoke-static {p0}, Landroid/app/SmtPCUtils;->getDesktopMode(I)I
-
-    move-result p0
+    # SmtPCUtils is Smartisan-only.  Normal phones use the regular display.
+    const/4 p0, 0x0
 
     return p0
 .end method
@@ -1773,102 +1740,14 @@
 .end method
 
 .method public static hasNavigationBar()Z
-    .locals 7
+    .locals 1
 
+    # The old WindowManagerGlobal/IWindowManager reflection is blocked by
+    # hidden-API policy on current Android releases.  The existing Launcher
+    # fallback is the no-navigation-bar layout; let public WindowInsets own
+    # the actual system-bar handling at runtime.
     const/4 v0, 0x0
 
-    .line 1
-    :try_start_0
-    invoke-static {}, Landroid/view/WindowManagerGlobal;->getWindowManagerService()Landroid/view/IWindowManager;
-
-    move-result-object v1
-
-    .line 2
-    sget v2, Landroid/os/Build$VERSION;->SDK_INT:I
-    :try_end_0
-    .catch Ljava/lang/Exception; {:try_start_0 .. :try_end_0} :catch_0
-
-    const/16 v3, 0x1d
-
-    const-string v4, "hasNavigationBar"
-
-    if-lt v2, v3, :cond_0
-
-    .line 3
-    :try_start_1
-    invoke-virtual {v1}, Ljava/lang/Object;->getClass()Ljava/lang/Class;
-
-    move-result-object v2
-
-    const/4 v3, 0x1
-
-    new-array v5, v3, [Ljava/lang/Class;
-
-    sget-object v6, Ljava/lang/Integer;->TYPE:Ljava/lang/Class;
-
-    aput-object v6, v5, v0
-
-    invoke-virtual {v2, v4, v5}, Ljava/lang/Class;->getDeclaredMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;
-
-    move-result-object v2
-
-    new-array v3, v3, [Ljava/lang/Object;
-
-    .line 4
-    invoke-static {v0}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
-
-    move-result-object v4
-
-    aput-object v4, v3, v0
-
-    invoke-virtual {v2, v1, v3}, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
-
-    move-result-object v1
-
-    check-cast v1, Ljava/lang/Boolean;
-
-    invoke-virtual {v1}, Ljava/lang/Boolean;->booleanValue()Z
-
-    move-result v0
-
-    goto :goto_0
-
-    .line 5
-    :cond_0
-    invoke-virtual {v1}, Ljava/lang/Object;->getClass()Ljava/lang/Class;
-
-    move-result-object v2
-
-    new-array v3, v0, [Ljava/lang/Class;
-
-    invoke-virtual {v2, v4, v3}, Ljava/lang/Class;->getDeclaredMethod(Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;
-
-    move-result-object v2
-
-    new-array v3, v0, [Ljava/lang/Object;
-
-    .line 6
-    invoke-virtual {v2, v1, v3}, Ljava/lang/reflect/Method;->invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
-
-    move-result-object v1
-
-    check-cast v1, Ljava/lang/Boolean;
-
-    invoke-virtual {v1}, Ljava/lang/Boolean;->booleanValue()Z
-
-    move-result v0
-    :try_end_1
-    .catch Ljava/lang/Exception; {:try_start_1 .. :try_end_1} :catch_0
-
-    goto :goto_0
-
-    :catch_0
-    move-exception v1
-
-    .line 7
-    invoke-virtual {v1}, Ljava/lang/Exception;->printStackTrace()V
-
-    :goto_0
     return v0
 .end method
 
@@ -2320,15 +2199,10 @@
 .end method
 
 .method public static setAnimationScale(IF)V
-    .locals 1
+    .locals 0
 
-    return-void
-
-    .line 1
-    sget-object v0, Lcom/smartisanos/launcher/ua;->Sf:Landroid/view/IWindowManager;
-
-    invoke-interface {v0, p0, p1}, Landroid/view/IWindowManager;->setAnimationScale(IF)V
-
+    # Setting the global animation scale was never required for Launcher
+    # startup and uses a hidden binder API.  Keep this optional hook inert.
     return-void
 .end method
 

@@ -72,6 +72,14 @@
 .method public onComplete()V
     .locals 8
 
+    # Get unlock generation
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/UnlockAnimationCoordinator;->getUnlockGeneration()J
+
+    move-result-wide v0
+
+    # Notify UnlockAnimationCoordinator
+    invoke-static {v0, v1}, Lcom/smartisanos/launcher/gesture/UnlockAnimationCoordinator;->onAnimationFinished(J)V
+
     invoke-static {}, Lcom/smartisanos/launcher/diagnostics/AnimationTimingDiagnostics;->onUnlockAnimationFinished()V
 
     .line 1
@@ -774,6 +782,22 @@
 
 .method public onStart()V
     .locals 2
+
+    # Get unlock generation
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/UnlockAnimationCoordinator;->getUnlockGeneration()J
+
+    move-result-wide v0
+
+    # Notify UnlockAnimationCoordinator
+    invoke-static {v0, v1}, Lcom/smartisanos/launcher/gesture/UnlockAnimationCoordinator;->onAnimationStarted(J)Z
+
+    move-result v0
+
+    if-nez v0, :cond_codex_unlock_start_allowed
+
+    return-void
+
+    :cond_codex_unlock_start_allowed
 
     invoke-static {}, Lcom/smartisanos/launcher/diagnostics/AnimationTimingDiagnostics;->onUnlockAnimationStarted()V
 

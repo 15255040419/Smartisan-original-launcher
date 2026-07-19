@@ -1827,9 +1827,24 @@
     .locals 7
 
     .line 27
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->hasEffectiveManagedIcon(Ljava/lang/Object;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_codex_original_icon_source
+
+    invoke-static {p4}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->sourceBitmap(Landroid/graphics/drawable/Drawable;)Landroid/graphics/Bitmap;
+
+    move-result-object v4
+
+    goto :goto_codex_icon_source_ready
+
+    :cond_codex_original_icon_source
     invoke-static {p4}, Lcom/smartisanos/launcher/e/s;->a(Landroid/graphics/drawable/Drawable;)Landroid/graphics/Bitmap;
 
     move-result-object v4
+
+    :goto_codex_icon_source_ready
 
     if-nez v4, :cond_0
 
@@ -1915,107 +1930,19 @@
 
     move-result v1
 
-    if-nez v1, :cond_codex_dynamic_icons_enabled
+    if-eqz v1, :cond_3
 
     invoke-static {p1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->isDynamicIconPackage(Ljava/lang/String;)Z
 
     move-result v1
 
-    if-nez v1, :cond_3
-
-    :cond_codex_dynamic_icons_enabled
-    invoke-static {p1}, Lcom/smartisanos/launcher/data/T;->Q(Ljava/lang/String;)Z
-
-    move-result v1
-
-    const/4 v2, 0x1
-
-    if-nez v1, :cond_codex_active_icon_package
-
-    const/4 v1, 0x0
-
-    invoke-static {p1, v1, v1}, Lcom/smartisanos/launcher/theme/WeatherBridge;->isWeatherPackage(Ljava/lang/String;Ljava/lang/String;Ljava/lang/CharSequence;)Z
-
-    move-result v1
-
     if-eqz v1, :cond_3
 
-    :cond_codex_active_icon_package
-    const/4 v1, 0x0
+    # The original active-icon controller owns its background, foreground and
+    # dynamic content.  Do not replace its source with a logical-size PNG here.
+    invoke-static {p1}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->reportActiveIconRawBypass(Ljava/lang/String;)V
 
-    .line 91
-    sget-object v3, Lcom/smartisanos/launcher/data/T;->CALENDAR:Lcom/smartisanos/launcher/data/S;
-
-    iget-object v3, v3, Lcom/smartisanos/launcher/data/S;->pkg:Ljava/lang/String;
-
-    invoke-virtual {p1, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
-
-    move-result v3
-
-    if-eqz v3, :cond_0
-
-    const-string v1, "calendar/bg.png"
-
-    .line 92
-    invoke-static {v1}, Lcom/smartisanos/launcher/pb;->path(Ljava/lang/String;)Ljava/lang/String;
-
-    move-result-object v1
-
-    invoke-static {v1}, Lcom/smartisanos/smengine/s;->getBitmap(Ljava/lang/String;)Landroid/graphics/Bitmap;
-
-    move-result-object v1
-
-    goto :goto_0
-
-    .line 93
-    :cond_0
-    const/4 v3, 0x0
-
-    invoke-static {p1, v3, v3}, Lcom/smartisanos/launcher/theme/WeatherBridge;->isWeatherPackage(Ljava/lang/String;Ljava/lang/String;Ljava/lang/CharSequence;)Z
-
-    move-result v3
-
-    if-eqz v3, :cond_1
-
-    const-string v1, "weather/weather_bg.png"
-
-    .line 94
-    invoke-static {v1}, Lcom/smartisanos/launcher/pb;->path(Ljava/lang/String;)Ljava/lang/String;
-
-    move-result-object v1
-
-    invoke-static {v1}, Lcom/smartisanos/smengine/s;->getBitmap(Ljava/lang/String;)Landroid/graphics/Bitmap;
-
-    move-result-object v1
-
-    :cond_1
-    :goto_0
-    if-eqz v1, :cond_2
-
-    .line 95
-    invoke-virtual {v1}, Landroid/graphics/Bitmap;->getWidth()I
-
-    move-result v3
-
-    if-eq v3, v0, :cond_2
-
-    .line 96
-    invoke-static {v1, v0, v0, v2}, Landroid/graphics/Bitmap;->createScaledBitmap(Landroid/graphics/Bitmap;IIZ)Landroid/graphics/Bitmap;
-
-    move-result-object v3
-
-    .line 97
-    invoke-virtual {v1}, Landroid/graphics/Bitmap;->recycle()V
-
-    move-object v1, v3
-
-    :cond_2
-    if-eqz v1, :cond_3
-
-    .line 98
-    invoke-virtual {p0}, Landroid/graphics/Bitmap;->recycle()V
-
-    move-object p0, v1
+    return-object p0
 
     .line 99
     :cond_3
