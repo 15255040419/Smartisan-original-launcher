@@ -529,6 +529,8 @@ online_icon_cache_v3 -> online_icon_cache_v4
 
 不要只改画布尺寸而忽略实际视觉大小。
 
+* **桌面设置按钮（齿轮）的高清逻辑**：桌面设置按钮使用内存合成纹理 `***settingbuttonup***` / `***settingbuttondown***`。不能仅依靠 `SceneNode.setImageName()` 的路径过滤机制来提供高清化；必须在 `Ec.wz()` 使用 `LayoutProperty.setting_button` 逻辑尺寸和 `NormalIconRasterSpec.rasterScale` 缩放合成，否则会产生缩放模糊。
+
 ---
 
 ## 系统应用识别记忆
