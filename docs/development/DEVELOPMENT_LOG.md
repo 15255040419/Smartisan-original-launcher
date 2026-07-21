@@ -17,7 +17,9 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-07-18）
+## 当前状态总览（2026-07-21）
+
+- 桌面设置“桌面设置”齿轮按钮高清物理纹理合成修复已完成：`Ec.wz()` 使用 `LayoutProperty.setting_button` 逻辑画布大小和 `NormalIconRasterSpec` 的 `rasterScale` 物理缩放比例合成 high-res 纹理。按下状态下支持 60 度齿轮旋转和内阴影，且在合成异常或未就绪时能够安全回退到原版低分辨率流程。2026-07-21 已在 12 宫格、20 宫格和主题切换等场景下通过打包、签名和 aapt 校验，真机回归及截图验证待进行。
 
 - 启动兼容性审计已完成首轮可执行收敛：`LauncherApplication -> ja -> Launcher -> J` 启动主链不再直接校验 `IActivityObserver`、`ActivityManagerNative`、`IWindowManager` 或 `SmtPCUtils` 的隐藏类型；锤子专属 Activity 观察、外接屏、全局动画缩放与锁屏位置查询均降级为不影响桌面启动的默认行为。`SmartisanInstallManager` 初始化或 `LauncherApps` 服务不可用时只禁用安装/下载协作功能并输出完整诊断，不中断 Application。2026-07-18 已在 Android 12 Google 模拟器完成覆盖安装、冷启动与首帧日志检查；小米、OPPO、vivo、三星、摩托罗拉、华为、一加及 Android 6/8/11/13/15/16 真机回归待验证。
 - SMEngine 动画时间推进已从每个渲染帧固定 `20.0f` 改为真实 `uptimeMillis` 帧间隔，并按原帧基准折算为 `realDelta * 20 / 16.6667`、单帧上限 100ms；因此不依赖设备报告的刷新率，90/120Hz 会自然缩短单帧逻辑推进以保持总时长。`Ra.T(float)` 的唯一明确粒子入口也已由固定 `0.02f` 改为本帧引擎 delta / 1000。高刷新率修复本身未改动 unlock XML、冷重载或原版解锁视觉资源；60/90/120Hz 真机回归待验证。
@@ -57,6 +59,21 @@
 4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
 
 ## 每日修复记录（倒序）
+
+### 2026-07-21
+
+#### 桌面设置“桌面设置”齿轮按钮高清物理纹理合成修复（构建与签名验证完成）
+
+- **根因**：桌面静止时显示的不是 `setting_button/` 路径下的原始资源，而是 `Ec.wz()` 在运行时合成并注册的两个内存纹理 `***settingbuttonup***` 和 `***settingbuttondown***`。而原版的 `Ec.wz()` 使用了背景 PNG 原始尺寸生成这两个合成纹理，然后由 SMEngine 放大显示，从而绕过了普通图标的物理 RasterSpec，造成明显的缩放发虚和模糊。
+- **修复**：
+  1. 在 `IconRasterDiagnostics.java` 中增加高清合成方法 `composeSettingButtonTexture`，结合当前 `LayoutProperty.setting_button` 逻辑大小与普通图标的物理 `rasterScale` 计算出目标物理纹理像素大小。
+  2. 实现单次采样物理纹理缩放绘制，并保留原版按下状态下 60 度齿轮旋转和内阴影的多图层顺序。
+  3. 修改 `Ec.smali`，在 `Ec.wz()` 中先动态读取当前页面模式 and 逻辑 `setting_button` 大小，然后分别调用 `composeSettingButtonTexture` 生成抬起和按下状态的位图并注册，若 helper 失败则通过 `:cond_fallback` 安全回退到原版旧低清合成流程。
+- **文件**：
+  - `launcher/tools/java/com/smartisanos/launcher/theme/IconRasterDiagnostics.java`
+  - `launcher/smali/com/smartisanos/launcher/view/Ec.smali`
+- **验证**：执行 `build.bat` 成功重新编译 Java 兼容层及 smali 代码，重新打包并使用 v1/v2/v3 成功签名。通过 `aapt2 dump badging` 验证包信息为 `com.smartisanos.launcher` (versionCode=29, versionName=v1.5.4) 且完全无安装和解析异常。
+- **风险**：主题资源异常或反射/冷启动状态不可达时，会捕获异常并返回 null，安全走 fallback 回退机制，不影响主 Launcher 的正常启动。
 
 ### 2026-07-19
 

@@ -359,4 +359,139 @@ public final class IconRasterDiagnostics {
             return fallback;
         }
     }
+
+    public static Bitmap composeSettingButtonTexture(
+            Bitmap background,
+            Bitmap gear,
+            Bitmap innerShadow,
+            boolean pressed,
+            float logicalSettingButtonSize) {
+
+        if (background == null || background.isRecycled()
+                || gear == null || gear.isRecycled()
+                || logicalSettingButtonSize <= 0f) {
+            logFallback(pressed, logicalSettingButtonSize, background, gear, innerShadow);
+            return null;
+        }
+
+        NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
+        if (spec == null || spec.rasterScale <= 0f) {
+            logFallback(pressed, logicalSettingButtonSize, background, gear, innerShadow);
+            return null;
+        }
+
+        int targetPx = Math.max(
+                1,
+                (int) Math.ceil(logicalSettingButtonSize * spec.rasterScale));
+
+        Bitmap output = null;
+        try {
+            output = Bitmap.createBitmap(
+                    targetPx,
+                    targetPx,
+                    Bitmap.Config.ARGB_8888);
+        } catch (Throwable t) {
+            Log.e(TAG, "SETTING_BUTTON_RASTER createBitmap failed", t);
+            logFallback(pressed, logicalSettingButtonSize, background, gear, innerShadow);
+            return null;
+        }
+
+        Canvas canvas = new Canvas(output);
+
+        Paint paint = new Paint(
+                Paint.ANTI_ALIAS_FLAG
+                        | Paint.FILTER_BITMAP_FLAG
+                        | Paint.DITHER_FLAG);
+
+        RectF fullRect = new RectF(
+                0f,
+                0f,
+                targetPx,
+                targetPx);
+
+        // background
+        drawBitmapFitFull(canvas, background, fullRect, paint);
+
+        if (pressed) {
+            canvas.save();
+            canvas.rotate(
+                    60.0f,
+                    targetPx * 0.5f,
+                    targetPx * 0.5f);
+            drawBitmapFitFull(canvas, gear, fullRect, paint);
+            canvas.restore();
+
+            if (innerShadow != null && !innerShadow.isRecycled()) {
+                drawBitmapFitFull(
+                        canvas,
+                        innerShadow,
+                        fullRect,
+                        paint);
+            }
+        } else {
+            drawBitmapFitFull(
+                    canvas,
+                    gear,
+                    fullRect,
+                    paint);
+        }
+
+        // Print diagnostic log
+        int pageMode = currentPageMode();
+        DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
+        Log.i(TAG, "SETTING_BUTTON_RASTER"
+                + " mode=" + pageMode
+                + " logicalSettingButton=" + Math.round(logicalSettingButtonSize)
+                + " rasterScale=" + spec.rasterScale
+                + " sourceBg=" + background.getWidth() + "x" + background.getHeight()
+                + " sourceGear=" + gear.getWidth() + "x" + gear.getHeight()
+                + " sourceShadow=" + (innerShadow != null ? innerShadow.getWidth() + "x" + innerShadow.getHeight() : "null")
+                + " finalTexture=" + targetPx + "x" + targetPx
+                + " surface=" + metrics.widthPixels + "x" + metrics.heightPixels
+                + " pressed=" + pressed
+                + " fallback=false");
+
+        return output;
+    }
+
+    private static void drawBitmapFitFull(
+            Canvas canvas,
+            Bitmap bitmap,
+            RectF destination,
+            Paint paint) {
+
+        if (canvas == null
+                || bitmap == null
+                || bitmap.isRecycled()) {
+            return;
+        }
+
+        Rect source = new Rect(
+                0,
+                0,
+                bitmap.getWidth(),
+                bitmap.getHeight());
+
+        canvas.drawBitmap(
+                bitmap,
+                source,
+                destination,
+                paint);
+    }
+
+    private static void logFallback(boolean pressed, float logicalSettingButtonSize, Bitmap background, Bitmap gear, Bitmap innerShadow) {
+        DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
+        int pageMode = currentPageMode();
+        Log.w(TAG, "SETTING_BUTTON_RASTER"
+                + " mode=" + pageMode
+                + " logicalSettingButton=" + Math.round(logicalSettingButtonSize)
+                + " rasterScale=0.0"
+                + " sourceBg=" + (background != null && !background.isRecycled() ? background.getWidth() + "x" + background.getHeight() : "null")
+                + " sourceGear=" + (gear != null && !gear.isRecycled() ? gear.getWidth() + "x" + gear.getHeight() : "null")
+                + " sourceShadow=" + (innerShadow != null && !innerShadow.isRecycled() ? innerShadow.getWidth() + "x" + innerShadow.getHeight() : "null")
+                + " finalTexture=0x0"
+                + " surface=" + metrics.widthPixels + "x" + metrics.heightPixels
+                + " pressed=" + pressed
+                + " fallback=true");
+    }
 }
