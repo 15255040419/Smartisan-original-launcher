@@ -16,6 +16,7 @@ public class SettingItemTextVertical extends RelativeLayout {
     private final ImageView icon;
     private final ImageView iconFrame;
     private final ImageView arrow;
+    private TextView title;
     private TextView subTitle;
 
     public SettingItemTextVertical(Context context) {
@@ -98,7 +99,7 @@ public class SettingItemTextVertical extends RelativeLayout {
         textLp.addRule(RelativeLayout.RIGHT_OF, frameLayout.getId());
         textLp.addRule(RelativeLayout.CENTER_VERTICAL);
         texts.setPadding(0, 0, 0, 0);
-        TextView title = new TextView(context);
+        title = new TextView(context);
         title.setTextSize(18);
         title.setTextColor(0xff454a5c);
         title.setSingleLine(true);
@@ -116,6 +117,12 @@ public class SettingItemTextVertical extends RelativeLayout {
         subTitle = sub;
         texts.addView(sub, new LinearLayout.LayoutParams(-1, -2));
         addView(texts, textLp);
+    }
+
+    public void setTitle(CharSequence text) {
+        if (title != null) {
+            title.setText(text == null ? "" : text);
+        }
     }
 
     public void setIconBitmap(Bitmap bitmap) {

@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout android:background="@android:color/white" android:layout_width="match_parent" android:layout_height="match_parent"
-  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:smartisanos="http://schemas.android.com/apk/res/smartisanos">
-    <smartisanos.widget.TitleBar android:id="@id/view_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_alignParentTop="true" smartisanos:shadowVisible="true" smartisanos:title_bar_center_text="@string/title_user_license_argeement" />
-    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/view_title" android:overScrollMode="always">
-        <LinearLayout android:orientation="vertical" android:id="@id/webview_container" android:layout_width="match_parent" android:layout_height="wrap_content" />
-    </ScrollView>
-</RelativeLayout>

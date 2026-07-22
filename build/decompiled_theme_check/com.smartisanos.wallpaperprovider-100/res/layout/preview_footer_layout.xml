@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout android:id="@id/pop_view_container" android:background="@drawable/preview_bg" android:layout_width="@dimen/wallpaper_preview_item_width" android:layout_height="@dimen/wallpaper_preview_item_height" android:layout_marginLeft="2.0dp" android:layout_marginRight="4.0dp"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <ImageView android:layout_gravity="center" android:id="@id/load_view" android:visibility="invisible" android:layout_width="16.0dp" android:layout_height="16.0dp" android:src="@drawable/loading" />
-    <ProgressBar android:layout_gravity="center" android:id="@id/loading_progress" android:layout_width="16.0dp" android:layout_height="16.0dp" android:indeterminate="true" android:indeterminateDrawable="@drawable/progress_bar" />
-</FrameLayout>

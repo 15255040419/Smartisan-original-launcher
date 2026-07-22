@@ -14397,6 +14397,21 @@
 
     .line 16
     :cond_4
+    # The original launcher only expected one user-10 clone and skipped every
+    # later profile item.  Modern ROMs can expose several apps for one clone
+    # user; only the same package in the same user is a duplicate.
+    iget-object v9, v7, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
+
+    invoke-virtual {v2, v9}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result v9
+
+    if-eqz v9, :cond_7
+
+    iget v9, v7, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I
+
+    if-ne v9, v13, :cond_7
+
     invoke-interface {v3, v8, v7}, Ljava/util/Map;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
     goto :goto_4

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:id="@id/search_btn_layout" android:layout_width="match_parent" android:layout_height="48.0dp" android:layout_marginTop="@dimen/status_bar_h"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:layout_width="match_parent" android:layout_height="wrap_content" android:src="@drawable/search_bg" android:scaleType="fitXY" android:layout_centerInParent="true" />
+    <ImageView android:id="@id/search_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="12.0dp" android:src="@drawable/search_ic" android:layout_centerVertical="true" android:layout_alignParentStart="true" />
+    <TextView android:textSize="15.0sp" android:textColor="#26000000" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="6.0dp" android:text="@string/search" android:layout_centerVertical="true" android:layout_toEndOf="@id/search_icon" />
+</RelativeLayout>

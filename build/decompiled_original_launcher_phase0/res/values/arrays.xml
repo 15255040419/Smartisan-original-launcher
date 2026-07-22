@@ -1,0 +1,935 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="PHONE">
+        <item>com.android.contacts;com.android.contacts.activities.DialtactsActivity</item>
+    </string-array>
+    <string-array name="BROWSER">
+        <item>com.android.browser;com.android.browser.BrowserActivity</item>
+    </string-array>
+    <string-array name="MMS">
+        <item>com.android.mms;com.android.mms.ui.ConversationList</item>
+    </string-array>
+    <string-array name="APP_STORE">
+        <item>com.smartisanos.appstore;com.smartisanos.appstore.AppStoreActivity</item>
+    </string-array>
+    <string-array name="CAMERA">
+        <item>com.android.camera2;com.android.camera.CameraLauncher</item>
+    </string-array>
+    <string-array name="GALLERY">
+        <item>com.android.gallery3d;com.android.gallery3d.app.Gallery</item>
+    </string-array>
+    <string-array name="NOTE">
+        <item>com.smartisanos.notes;com.smartisanos.notes.NotesActivity</item>
+    </string-array>
+    <string-array name="CALENDAR">
+        <item>com.android.calendar;com.android.calendar.AllInOneActivity</item>
+    </string-array>
+    <string-array name="CLOCK">
+        <item>com.smartisanos.clock;com.smartisanos.clock.activity.ClockActivity</item>
+    </string-array>
+    <string-array name="MUSIC">
+        <item>com.smartisanos.music;com.smartisanos.music.activities.MusicMain</item>
+    </string-array>
+    <string-array name="SETTINGS">
+        <item>com.android.settings;com.android.settings.Settings</item>
+    </string-array>
+    <string-array name="EMAIL">
+        <item>com.android.email;com.android.email.activity.Welcome</item>
+    </string-array>
+    <string-array name="CALCULATOR">
+        <item>com.smartisanos.calculator;com.smartisanos.calculator.Calculator</item>
+    </string-array>
+    <string-array name="RECORDER">
+        <item>com.smartisanos.recorder;com.smartisanos.recorder.activity.EmptyActivity</item>
+    </string-array>
+    <string-array name="WEATHER">
+        <item>com.smartisanos.weather;com.smartisanos.weather.CityWeather</item>
+    </string-array>
+    <string-array name="SEARCH">
+        <item>com.smartisanos.quicksearch;com.android.quicksearchbox.SearchActivity</item>
+        <item>com.android.quicksearchbox;com.android.quicksearchbox.SearchActivity</item>
+    </string-array>
+    <string-array name="WIZARD">
+        <item>com.smartisanos.setupwizard;com.smartisanos.setupwizard.launcherguidance.LauncherGuidanceActivity</item>
+    </string-array>
+    <string-array name="CLOUD_SYNC">
+        <item>com.smartisanos.cloudsync;com.smartisanos.cloudsync.AccountsActivityLauncher</item>
+        <item>com.smartisanos.cloudsync;com.smartisanos.accounts.AccountsActivity</item>
+    </string-array>
+    <string-array name="DOWNLOAD">
+        <item>com.android.providers.downloads.ui;com.android.providers.downloads.ui.SplashActivity</item>
+    </string-array>
+    <string-array name="GAME_STORE">
+        <item>com.smartisanos.gamestore;com.smartisanos.gamestore.GameStoreActivity</item>
+    </string-array>
+    <string-array name="SARA">
+        <item>com.smartisanos.sara;com.smartisanos.sara.SpeechNowActivity</item>
+    </string-array>
+    <string-array name="SECURITY_CENTER">
+        <item>com.smartisanos.securitycenter;com.smartisanos.securitycenter.SecurityCenterActivity</item>
+    </string-array>
+    <string-array name="SHOU_JI_GUAN_LI">
+        <item>com.smartisanos.security;com.smartisanos.securitycenter.MainActivity</item>
+    </string-array>
+    <string-array name="REMOTE_ASSISTANCE">
+        <item>com.smartisanos.handinhand;com.smartisanos.handinhand.activity.HomeActivity</item>
+    </string-array>
+    <string-array name="DRIVING_MODE">
+        <item>com.smartisanos.drivingmode;com.smartisanos.drivingmode.MainActivity</item>
+    </string-array>
+    <string-array name="SMARTISAN_FILE_MANAGER">
+        <item>com.smartisanos.filemanager;com.smartisan.filemanager.MainActivity</item>
+    </string-array>
+    <string-array name="FM_RADIO">
+        <item>com.android.fmradio;com.android.fmradio.FmRadio</item>
+    </string-array>
+    <string-array name="SMARTISAN_SCREEN_RECORDER">
+        <item>com.smartisanos.screenrecorder;com.smartisanos.screenrecorder.EmptyActivity</item>
+    </string-array>
+    <string-array name="WALLET">
+        <item>com.smartisanos.wallet;com.smartisanos.wallet.WalletMainActivity</item>
+    </string-array>
+    <string-array name="SIDEBAR">
+        <item>com.smartisanos.sidebar;com.smartisanos.sidebar.setting.SettingActivity</item>
+    </string-array>
+    <string-array name="SUPPORT">
+        <item>com.smartisanos.support;com.smartisanos.support.activity.MainActivity</item>
+    </string-array>
+    <string-array name="AOA">
+        <item>com.smartisanos.smartfolder.aoa;com.smartisanos.smartfolder.aoa.MainActivity</item>
+    </string-array>
+    <string-array name="HANDBOOK">
+        <item>com.smartisanos.handbook;com.smartisanos.handbook.activity.MainActivity</item>
+    </string-array>
+    <string-array name="SMARTHOME">
+        <item>com.smartisan.smarthome;com.smartisan.smarthome.app.main.MainActivity</item>
+    </string-array>
+    <string-array name="SMARTISAN_PERSPECTIVE">
+        <item>com.smartisanos.perspective;com.smartisanos.perspective.settings.SettingActivity</item>
+    </string-array>
+    <string-array name="SMARTISAN_COMPASS">
+        <item>com.smartisanos.compass;com.smartisanos.compass.view.CompassActivity</item>
+    </string-array>
+    <string-array name="SMARTISAN_STORE">
+        <item>com.smartisan.smartisanstore;com.smartisan.smartisanstore.activities.MainActivity_</item>
+    </string-array>
+    <string-array name="GALLERY_MOVIE">
+        <item>com.smartisanos.videoplayerproject;com.smartisanos.videoplayerproject.MainActivity</item>
+    </string-array>
+    <string-array name="Get_Google_Play">
+        <item>com.smartisanos.storeselector;com.smartisanos.interactive.ui.GooglePlayActivity</item>
+    </string-array>
+    <string-array name="Get_Yandex_Store">
+        <item>com.smartisanos.storeselector;com.smartisanos.interactive.ui.YandexStoreActivity</item>
+    </string-array>
+    <string-array name="Get_Aptoide_Store">
+        <item>com.smartisanos.storeselector;com.smartisanos.interactive.ui.AptoideStoreActivity</item>
+    </string-array>
+    <string-array name="SMARTISAN_READER">
+        <item>com.smartisan.reader;com.smartisan.reader.activities.MainActivity_</item>
+    </string-array>
+    <string-array name="SMARTISAN_BBS">
+        <item>com.smartisan.bbs;com.smartisan.bbs.activity.MainActivity_</item>
+    </string-array>
+    <string-array name="DAXIANG">
+        <item>org.idaxiang.android;org.idaxiang.android.ui.SplashActivity</item>
+    </string-array>
+    <string-array name="MOMO">
+        <item>com.immomo.momo;com.immomo.momo.android.activity.WelcomeActivity</item>
+    </string-array>
+    <string-array name="WEIBO">
+        <item>com.sina.weibo;com.sina.weibo.SplashActivity</item>
+    </string-array>
+    <string-array name="WECHAT">
+        <item>com.tencent.mm;com.tencent.mm.ui.LauncherUI</item>
+    </string-array>
+    <string-array name="YOUKU">
+        <item>com.youku.phone;com.youku.phone.ActivityWelcomeCopy</item>
+    </string-array>
+    <string-array name="AUTO_NAVI">
+        <item>com.autonavi.minimap;com.autonavi.map.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="OFFICE_SUITE">
+        <item>com.mobisystems.office;com.mobisystems.office.splashScreen.SplashScreenActivity</item>
+    </string-array>
+    <string-array name="AIRDROID">
+        <item>com.sand.airdroid;com.sand.airdroid.ui.splash.SplashActivity_</item>
+    </string-array>
+    <string-array name="YOUDAO">
+        <item>com.youdao.dict;com.youdao.dict.activity.DictSplashActivity</item>
+    </string-array>
+    <string-array name="DXY">
+        <item>cn.dxy.android.aspirin;cn.dxy.android.aspirin.ui.activity.StartupActivity</item>
+    </string-array>
+    <string-array name="QUNAR">
+        <item>com.Qunar;com.mqunar.splash.SplashActivity</item>
+    </string-array>
+    <string-array name="ROADBOOK">
+        <item>com.mfw.roadbook;com.mfw.roadbook.main.StartActivity</item>
+    </string-array>
+    <string-array name="DOUBAN">
+        <item>com.douban.frodo;com.douban.frodo.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="IREADER">
+        <item>com.chaozh.iReaderFree;com.chaozh.iReader.ui.activity.WelcomeActivity</item>
+    </string-array>
+    <string-array name="DIANPING">
+        <item>com.dianping.v1;com.dianping.base.permission.PermissionActivity</item>
+    </string-array>
+    <string-array name="WPS">
+        <item>cn.wps.moffice_eng;cn.wps.moffice.documentmanager.PreStartActivity</item>
+    </string-array>
+    <string-array name="ES_FILE">
+        <item>com.estrongs.android.pop;com.estrongs.android.pop.view.FileExplorerActivity</item>
+    </string-array>
+    <string-array name="NETEASE_NEWS">
+        <item>com.netease.newsreader.activity;com.netease.nr.biz.ad.AdActivity</item>
+    </string-array>
+    <string-array name="QQ_LIVE">
+        <item>com.tencent.qqlive;com.tencent.qqlive.activity.WelcomeActivity</item>
+    </string-array>
+    <string-array name="DIDI">
+        <item>com.sdu.didi.psnger;com.didi.frame.SplashActivity</item>
+    </string-array>
+    <string-array name="MEITUAN">
+        <item>com.sankuai.meituan;com.sankuai.meituan.activity.Welcome</item>
+    </string-array>
+    <string-array name="QUICKPIC">
+        <item>com.alensw.PicFolder;com.alensw.PicFolder.GalleryActivity</item>
+    </string-array>
+    <string-array name="XUEQIU">
+        <item>com.xueqiu.android;com.xueqiu.android.view.WelcomeActivityAlias</item>
+    </string-array>
+    <string-array name="JIE_MIAN">
+        <item>com.jiemian.news;com.jiemian.news.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="QQ_READER">
+        <item>com.qq.reader;com.qq.reader.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="XI_MA_LA_YA_FM">
+        <item>com.ximalaya.ting.android;com.ximalaya.ting.android.activity.login.WelcomeActivity</item>
+    </string-array>
+    <string-array name="WEI_PING_HUI">
+        <item>com.achievo.vipshop;com.achievo.vipshop.activity.LodingActivity</item>
+    </string-array>
+    <string-array name="XIE_CHENG_LV_XING">
+        <item>ctrip.android.view;ctrip.android.view.home.CtripSplashActivity</item>
+    </string-array>
+    <string-array name="JIN_RI_TOU_TIAO">
+        <item>com.ss.android.article.news;com.ss.android.article.news.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="DOU_YU">
+        <item>air.tv.douyu.android;tv.douyu.view.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="SHU_QI_XIAO_SHUO">
+        <item>com.shuqi.controller;com.shuqi.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="SAO_MIAO_QUAN_NENG_WANG">
+        <item>com.intsig.camscanner;com.intsig.camscanner.WelcomeActivity</item>
+    </string-array>
+    <string-array name="JING_DONG">
+        <item>com.jingdong.app.mall;com.jingdong.app.mall.main.MainActivity</item>
+    </string-array>
+    <string-array name="TOU_TIAO_SHI_PIN">
+        <item>com.ss.android.article.video;com.ss.android.article.video.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="JI_KE">
+        <item>com.ruguoapp.jike;com.ruguoapp.jike.business.main.ui.SplashActivity</item>
+    </string-array>
+    <string-array name="AI_QI_YI">
+        <item>com.qiyi.video;com.qiyi.video.WelcomeActivity</item>
+    </string-array>
+    <string-array name="TIAN_MAO">
+        <item>com.tmall.wireless;com.tmall.wireless.splash.TMSplashActivity</item>
+    </string-array>
+    <string-array name="DE_DAO">
+        <item>com.luojilab.player;com.luojilab.business.WelcomeActivity</item>
+    </string-array>
+    <string-array name="MIAO_PAI">
+        <item>com.yixia.videoeditor;com.yixia.videoeditor.ui.login.SplashActivity</item>
+    </string-array>
+    <string-array name="GAI_DE_PAI_HANG">
+        <item>com.icloudoor.bizranking;com.icloudoor.bizranking.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="XI_GUA_SHI_PIN">
+        <item>com.ss.android.article.video;com.ss.android.article.video.activity.SplashActivity</item>
+    </string-array>
+    <string-array name="DOU_YIN_DUAN_SHI_PIN">
+        <item>com.ss.android.ugc.aweme;com.ss.android.ugc.aweme.splash.SplashActivity</item>
+    </string-array>
+    <string-array name="NOMO">
+        <item>com.blink.academy.nomo;com.blink.academy.nomo.ui.activity.splash.NomoSplashActivity</item>
+    </string-array>
+    <string-array name="KU_WO_YIN_YUE">
+        <item>cn.kuwo.player;cn.kuwo.player.activities.EntryActivity</item>
+    </string-array>
+    <string-array name="JIAN_YING">
+        <item>com.lemon.lv;com.vega.launcher.PreInstallConfirmActivity</item>
+    </string-array>
+    <string-array name="FEI_SHU">
+        <item>com.ss.android.lark;com.ss.android.lark.main.app.MainActivity</item>
+    </string-array>
+    <string-array name="GOOGLE_PLAY_VIDEOS">
+        <item>com.google.android.videos;com.google.android.youtube.videos.EntryPoint</item>
+    </string-array>
+    <string-array name="GOOGLE_PHOTOS">
+        <item>com.google.android.apps.photos;com.google.android.apps.photos.home.HomeActivity</item>
+    </string-array>
+    <string-array name="GOOGLE_PLAY_MUSIC">
+        <item>com.google.android.music;com.android.music.activitymanagement.TopLevelActivity</item>
+    </string-array>
+    <string-array name="GOOGLE_CM_FILE_MANAGER">
+        <item>com.cyanogenmod.filemanager;com.cyanogenmod.filemanager.activities.NavigationActivity</item>
+    </string-array>
+    <string-array name="GOOGLE_ASUS_SOUND_RECORDER">
+        <item>com.asus.soundrecorder;com.asus.soundrecorder.AsusRecorder</item>
+    </string-array>
+    <string-array name="GOOGLE_SEARCH_VOICE">
+        <item>com.google.android.googlequicksearchbox;com.google.android.googlequicksearchbox.VoiceSearchActivity</item>
+    </string-array>
+    <string-array name="GOOGLE_SEARCH_GOOGLE">
+        <item>com.google.android.googlequicksearchbox;com.google.android.googlequicksearchbox.SearchActivity</item>
+    </string-array>
+    <string-array name="GOOGLE_DESK_CLOCK">
+        <item>com.google.android.deskclock;com.android.deskclock.DeskClock</item>
+    </string-array>
+    <string-array name="GOOGLE_CHROME">
+        <item>com.android.chrome;com.google.android.apps.chrome.Main</item>
+    </string-array>
+    <string-array name="GOOGLE_GMAIL">
+        <item>com.google.android.gm;com.google.android.gm.ConversationListActivityGmail</item>
+    </string-array>
+    <string-array name="GOOGLE_CALENDAR">
+        <item>com.google.android.calendar;com.android.calendar.AllInOneActivity</item>
+    </string-array>
+    <string-array name="GOOGLE_PLAY">
+        <item>com.android.vending;com.android.vending.AssetBrowserActivity</item>
+    </string-array>
+    <string-array name="SYSTEM_APPS">
+        <item>PHONE</item>
+        <item>BROWSER</item>
+        <item>MMS</item>
+        <item>APP_STORE</item>
+        <item>CAMERA</item>
+        <item>GALLERY</item>
+        <item>NOTE</item>
+        <item>CALENDAR</item>
+        <item>CLOCK</item>
+        <item>MUSIC</item>
+        <item>SETTINGS</item>
+        <item>EMAIL</item>
+        <item>CALCULATOR</item>
+        <item>RECORDER</item>
+        <item>WEATHER</item>
+        <item>SEARCH</item>
+        <item>WIZARD</item>
+        <item>CLOUD_SYNC</item>
+        <item>DOWNLOAD</item>
+        <item>SMARTISAN_FILE_MANAGER</item>
+    </string-array>
+    <string-array name="app_display_order_12">
+        <item>PAGE_1_12</item>
+        <item>PAGE_2_12</item>
+        <item>PAGE_3_12</item>
+        <item>PAGE_4_12</item>
+    </string-array>
+    <string-array name="dock_apps_12">
+        <item>PHONE</item>
+        <item>BROWSER</item>
+        <item>MMS</item>
+    </string-array>
+    <string-array name="PAGE_1_12">
+        <item>APP_STORE</item>
+        <item>CAMERA</item>
+        <item>GALLERY</item>
+        <item>NOTE</item>
+        <item>CALENDAR</item>
+        <item>CLOCK</item>
+        <item>MUSIC</item>
+        <item>SETTINGS</item>
+        <item>EMAIL</item>
+        <item>SHOU_JI_GUAN_LI</item>
+        <item>SARA</item>
+        <item>CALCULATOR</item>
+    </string-array>
+    <string-array name="PAGE_2_12">
+        <item>SMARTISAN_BBS</item>
+        <item>RECORDER</item>
+        <item>WEATHER</item>
+        <item>SMARTISAN_FILE_MANAGER</item>
+        <item>SMARTISAN_READER</item>
+        <item>SIDEBAR</item>
+        <item>WALLET</item>
+        <item>SMARTISAN_COMPASS</item>
+        <item>GAME_STORE</item>
+        <item>CLOUD_SYNC</item>
+        <item>GALLERY_MOVIE</item>
+        <item>SEARCH</item>
+    </string-array>
+    <string-array name="PAGE_3_12">
+        <item>SMARTISAN_SCREEN_RECORDER</item>
+        <item>SMARTISAN_STORE</item>
+        <item>REMOTE_ASSISTANCE</item>
+        <item>AOA</item>
+    </string-array>
+    <string-array name="PAGE_4_12">
+        <item>DOU_YIN_DUAN_SHI_PIN</item>
+        <item>JIN_RI_TOU_TIAO</item>
+        <item>WEI_PING_HUI</item>
+        <item>JIAN_YING</item>
+        <item>FEI_SHU</item>
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+        <item>WEIBO</item>
+        <item>QUNAR</item>
+        <item>KU_WO_YIN_YUE</item>
+        <item>AUTO_NAVI</item>
+    </string-array>
+    <string-array name="app_display_order_12_exp">
+        <item>PAGE_1_12_exp</item>
+        <item>PAGE_2_12_exp</item>
+        <item>PAGE_3_12_exp</item>
+        <item>PAGE_4_12_exp</item>
+    </string-array>
+    <string-array name="dock_apps_12_exp">
+        <item>PHONE</item>
+        <item>BROWSER</item>
+        <item>MMS</item>
+    </string-array>
+    <string-array name="PAGE_1_12_exp">
+        <item>APP_STORE</item>
+        <item>CAMERA</item>
+        <item>GALLERY</item>
+        <item>NOTE</item>
+        <item>CALENDAR</item>
+        <item>CLOCK</item>
+        <item>MUSIC</item>
+        <item>SETTINGS</item>
+        <item>EMAIL</item>
+        <item>SHOU_JI_GUAN_LI</item>
+        <item>SARA</item>
+        <item>CALCULATOR</item>
+    </string-array>
+    <string-array name="PAGE_2_12_exp">
+        <item>SMARTISAN_READER</item>
+        <item>SIDEBAR</item>
+        <item>SMARTISAN_FILE_MANAGER</item>
+        <item>REMOTE_ASSISTANCE</item>
+        <item>CLOUD_SYNC</item>
+        <item>GAME_STORE</item>
+        <item>HANDBOOK</item>
+        <item>RECORDER</item>
+        <item>SMARTISAN_BBS</item>
+        <item>AOA</item>
+        <item>CHANG_HU_XI</item>
+        <item>folder_page_1_exp</item>
+    </string-array>
+    <string-array name="PAGE_3_12_exp">
+        <item>JIN_RI_TOU_TIAO</item>
+        <item>XIE_CHENG_LV_XING</item>
+        <item>MEITUAN</item>
+        <item>DXY</item>
+        <item>NETEASE_NEWS</item>
+        <item>DIANPING</item>
+        <item>WEIBO</item>
+        <item>AUTO_NAVI</item>
+        <item>JI_KE</item>
+        <item>DE_DAO</item>
+        <item>JING_DONG</item>
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+    </string-array>
+    <string-array name="PAGE_4_12_exp">
+        <item>XI_MA_LA_YA_FM</item>
+        <item>SHU_QI_XIAO_SHUO</item>
+        <item>MIAO_PAI</item>
+        <item>AI_QI_YI</item>
+        <item>JIE_MIAN</item>
+    </string-array>
+    <string-array name="app_display_order_12_oversea">
+        <item>PAGE_1_12_oversea</item>
+        <item>PAGE_2_12_oversea</item>
+    </string-array>
+    <string-array name="dock_apps_12_oversea">
+        <item>PHONE</item>
+        <item>BROWSER</item>
+        <item>MMS</item>
+    </string-array>
+    <string-array name="PAGE_1_12_oversea">
+        <item>GALLERY</item>
+        <item>CALENDAR</item>
+        <item>WEATHER</item>
+        <item>CLOCK</item>
+        <item>CAMERA</item>
+        <item>SETTINGS</item>
+        <item>MUSIC</item>
+        <item>SMARTISAN_FILE_MANAGER</item>
+        <item>CALCULATOR</item>
+        <item>SARA</item>
+        <item>RECORDER</item>
+        <item>NOTE</item>
+    </string-array>
+    <string-array name="PAGE_2_12_oversea">
+        <item>SIDEBAR</item>
+        <item>EMAIL</item>
+        <item>AOA</item>
+        <item>SHOU_JI_GUAN_LI</item>
+        <item>GOOGLE_PLAY</item>
+        <item>GOOGLE_CHROME</item>
+        <item>SMARTISAN_SCREEN_RECORDER</item>
+        <item>folder_page_1_oversea</item>
+        <item>GOOGLE_ASUS_SOUND_RECORDER</item>
+        <item>SEARCH</item>
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+    </string-array>
+    <string-array name="app_display_order_16">
+        <item>PAGE_1_16</item>
+        <item>PAGE_2_16</item>
+        <item>PAGE_3_16</item>
+    </string-array>
+    <string-array name="dock_apps_16">
+        <item>PHONE</item>
+        <item>BROWSER</item>
+        <item>MMS</item>
+        <item>SIDEBAR</item>
+    </string-array>
+    <string-array name="PAGE_1_16">
+        <item>APP_STORE</item>
+        <item>GALLERY</item>
+        <item>MUSIC</item>
+        <item>CAMERA</item>
+        <item>CALENDAR</item>
+        <item>SETTINGS</item>
+        <item>CALCULATOR</item>
+        <item>GAME_STORE</item>
+        <item>RECORDER</item>
+        <item>EMAIL</item>
+        <item>CLOCK</item>
+        <item>WEATHER</item>
+        <item>SMARTISAN_READER</item>
+        <item>SMARTISAN_FILE_MANAGER</item>
+        <item>SMARTISAN_BBS</item>
+        <item>NOTE</item>
+    </string-array>
+    <string-array name="PAGE_2_16">
+        <item>CLOUD_SYNC</item>
+        <item>SEARCH</item>
+        <item>REMOTE_ASSISTANCE</item>
+        <item>SHOU_JI_GUAN_LI</item>
+        <item>SMARTISAN_SCREEN_RECORDER</item>
+        <item>HANDBOOK</item>
+        <item>AOA</item>
+    </string-array>
+    <string-array name="PAGE_3_16">
+        <item>JIN_RI_TOU_TIAO</item>
+        <item>SHU_QI_XIAO_SHUO</item>
+        <item>WEIBO</item>
+        <item>MEITUAN</item>
+        <item>DXY</item>
+        <item>DIANPING</item>
+        <item>AI_QI_YI</item>
+        <item>JING_DONG</item>
+        <item>JIE_MIAN</item>
+        <item>AUTO_NAVI</item>
+        <item>TOU_TIAO_SHI_PIN</item>
+        <item>XIE_CHENG_LV_XING</item>
+        <item>JI_KE</item>
+        <item>XI_MA_LA_YA_FM</item>
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+    </string-array>
+    <string-array name="app_display_order_20">
+        <item>PAGE_1_20</item>
+        <item>PAGE_2_20</item>
+        <item>PAGE_3_20</item>
+    </string-array>
+    <string-array name="dock_apps_20">
+        <item>PHONE</item>
+        <item>BROWSER</item>
+        <item>MMS</item>
+        <item>SIDEBAR</item>
+    </string-array>
+    <string-array name="PAGE_1_20">
+        <item>APP_STORE</item>
+        <item>GALLERY</item>
+        <item>MUSIC</item>
+        <item>CAMERA</item>
+        <item>CALENDAR</item>
+        <item>SETTINGS</item>
+        <item>CALCULATOR</item>
+        <item>GAME_STORE</item>
+        <item>RECORDER</item>
+        <item>EMAIL</item>
+        <item>CLOCK</item>
+        <item>WEATHER</item>
+        <item>SMARTISAN_READER</item>
+        <item>CLOUD_SYNC</item>
+        <item>SARA</item>
+        <item>WALLET</item>
+        <item>SHOU_JI_GUAN_LI</item>
+        <item>NOTE</item>
+        <item>SMARTISAN_BBS</item>
+        <item>SMARTISAN_FILE_MANAGER</item>
+    </string-array>
+    <string-array name="PAGE_2_20">
+        <item>SEARCH</item>
+        <item>SMARTISAN_SCREEN_RECORDER</item>
+        <item>AOA</item>
+        <item>SMARTISAN_STORE</item>
+        <item>GALLERY_MOVIE</item>
+        <item>SMARTISAN_COMPASS</item>
+        <item>REMOTE_ASSISTANCE</item>
+    </string-array>
+    <string-array name="PAGE_3_20">
+        <item>DOU_YIN_DUAN_SHI_PIN</item>
+        <item>JIN_RI_TOU_TIAO</item>
+        <item>WEI_PING_HUI</item>
+        <item>JIAN_YING</item>
+        <item>FEI_SHU</item>
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+        <item>WEIBO</item>
+        <item>QUNAR</item>
+        <item>KU_WO_YIN_YUE</item>
+        <item>AUTO_NAVI</item>
+    </string-array>
+    <string-array name="app_display_order_20_exp">
+        <item>PAGE_1_20_exp</item>
+        <item>PAGE_2_20_exp</item>
+        <item>PAGE_3_20_exp</item>
+    </string-array>
+    <string-array name="dock_apps_20_exp">
+        <item>PHONE</item>
+        <item>BROWSER</item>
+        <item>MMS</item>
+        <item>SIDEBAR</item>
+    </string-array>
+    <string-array name="PAGE_1_20_exp">
+        <item>APP_STORE</item>
+        <item>GALLERY</item>
+        <item>MUSIC</item>
+        <item>CAMERA</item>
+        <item>CALENDAR</item>
+        <item>SETTINGS</item>
+        <item>CALCULATOR</item>
+        <item>GAME_STORE</item>
+        <item>RECORDER</item>
+        <item>EMAIL</item>
+        <item>CLOCK</item>
+        <item>SMARTISAN_READER</item>
+        <item>CLOUD_SYNC</item>
+        <item>SARA</item>
+        <item>HANDBOOK</item>
+        <item>SHOU_JI_GUAN_LI</item>
+        <item>NOTE</item>
+        <item>SMARTISAN_FILE_MANAGER</item>
+        <item>SMARTISAN_BBS</item>
+        <item>AOA</item>
+    </string-array>
+    <string-array name="PAGE_2_20_exp">
+        <item>REMOTE_ASSISTANCE</item>
+        <item>CHANG_HU_XI</item>
+        <item>folder_page_1_exp</item>
+    </string-array>
+    <string-array name="PAGE_3_20_exp">
+        <item>JIN_RI_TOU_TIAO</item>
+        <item>MEITUAN</item>
+        <item>DXY</item>
+        <item>NETEASE_NEWS</item>
+        <item>DIANPING</item>
+        <item>AUTO_NAVI</item>
+        <item>JIE_MIAN</item>
+        <item>XIE_CHENG_LV_XING</item>
+        <item>JI_KE</item>
+        <item>AI_QI_YI</item>
+        <item>DE_DAO</item>
+        <item>XI_MA_LA_YA_FM</item>
+        <item>JING_DONG</item>
+        <item>MIAO_PAI</item>
+        <item>WEIBO</item>
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+        <item>SHU_QI_XIAO_SHUO</item>
+    </string-array>
+    <string-array name="app_display_order_20_oversea">
+        <item>PAGE_1_20_oversea</item>
+        <item>PAGE_2_20_oversea</item>
+    </string-array>
+    <string-array name="dock_apps_20_oversea">
+        <item>PHONE</item>
+        <item>BROWSER</item>
+        <item>MMS</item>
+        <item>SIDEBAR</item>
+    </string-array>
+    <string-array name="PAGE_1_20_oversea">
+        <item>GALLERY</item>
+        <item>MUSIC</item>
+        <item>CAMERA</item>
+        <item>SETTINGS</item>
+        <item>CALCULATOR</item>
+        <item>RECORDER</item>
+        <item>CLOCK</item>
+        <item>WEATHER</item>
+        <item>SARA</item>
+        <item>CALENDAR</item>
+        <item>SMARTISAN_SCREEN_RECORDER</item>
+        <item>NOTE</item>
+        <item>EMAIL</item>
+        <item>GOOGLE_PLAY</item>
+        <item>GOOGLE_CHROME</item>
+        <item>SHOU_JI_GUAN_LI</item>
+        <item>SEARCH</item>
+        <item>SMARTISAN_FILE_MANAGER</item>
+        <item>AOA</item>
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+    </string-array>
+    <string-array name="PAGE_2_20_oversea">
+        <item>folder_page_1_oversea</item>
+        <item>GOOGLE_ASUS_SOUND_RECORDER</item>
+    </string-array>
+    <string-array name="app_display_order_20_plan_a">
+        <item>PAGE_1_20</item>
+        <item>PAGE_2_20</item>
+        <item>PAGE_3_20_plan_a</item>
+    </string-array>
+    <string-array name="PAGE_3_20_plan_a">
+        <item>DOU_YIN_DUAN_SHI_PIN</item>
+        <item>JIN_RI_TOU_TIAO</item>
+        <item>NOMO</item>
+        <item>KU_WO_YIN_YUE</item>
+        <item>DIANPING</item>
+        <item>JIAN_YING</item>
+        <item>AUTO_NAVI</item>
+        <item>XI_GUA_SHI_PIN</item>
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+        <item>XIE_CHENG_LV_XING</item>
+        <item>QUNAR</item>
+        <item>WEI_PING_HUI</item>
+        <item>AI_QI_YI</item>
+        <item>WEIBO</item>
+    </string-array>
+    <string-array name="app_display_order_20_plan_b">
+        <item>PAGE_1_20</item>
+        <item>PAGE_2_20</item>
+        <item>PAGE_3_20_plan_b</item>
+    </string-array>
+    <string-array name="PAGE_3_20_plan_b">
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+        <item>DOU_YIN_DUAN_SHI_PIN</item>
+        <item>QUNAR</item>
+        <item>NOMO</item>
+        <item>XIE_CHENG_LV_XING</item>
+        <item>JIN_RI_TOU_TIAO</item>
+        <item>AI_QI_YI</item>
+        <item>JIAN_YING</item>
+        <item>DIANPING</item>
+        <item>AUTO_NAVI</item>
+        <item>XI_GUA_SHI_PIN</item>
+        <item>WEI_PING_HUI</item>
+        <item>KU_WO_YIN_YUE</item>
+        <item>WEIBO</item>
+    </string-array>
+    <string-array name="app_display_order_20_plan_c">
+        <item>PAGE_1_20</item>
+        <item>PAGE_2_20</item>
+        <item>PAGE_3_20_plan_c</item>
+    </string-array>
+    <string-array name="PAGE_3_20_plan_c">
+        <item>NOMO</item>
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+        <item>AI_QI_YI</item>
+        <item>QUNAR</item>
+        <item>DIANPING</item>
+        <item>DOU_YIN_DUAN_SHI_PIN</item>
+        <item>WEI_PING_HUI</item>
+        <item>JIN_RI_TOU_TIAO</item>
+        <item>AUTO_NAVI</item>
+        <item>KU_WO_YIN_YUE</item>
+        <item>JIAN_YING</item>
+        <item>XIE_CHENG_LV_XING</item>
+        <item>XI_GUA_SHI_PIN</item>
+        <item>WEIBO</item>
+    </string-array>
+    <string-array name="app_display_order_9">
+        <item>PAGE_1_9</item>
+        <item>PAGE_2_9</item>
+        <item>PAGE_3_9</item>
+        <item>PAGE_4_9</item>
+        <item>PAGE_5_9</item>
+    </string-array>
+    <string-array name="dock_apps_9">
+        <item>PHONE</item>
+        <item>BROWSER</item>
+        <item>MMS</item>
+    </string-array>
+    <string-array name="PAGE_1_9">
+        <item>APP_STORE</item>
+        <item>CAMERA</item>
+        <item>GALLERY</item>
+        <item>NOTE</item>
+        <item>CALENDAR</item>
+        <item>CLOCK</item>
+        <item>MUSIC</item>
+        <item>SETTINGS</item>
+        <item>EMAIL</item>
+    </string-array>
+    <string-array name="PAGE_2_9">
+        <item>CALCULATOR</item>
+        <item>GAME_STORE</item>
+        <item>WEATHER</item>
+        <item>SMARTISAN_READER</item>
+        <item>SHOU_JI_GUAN_LI</item>
+        <item>SMARTISAN_BBS</item>
+        <item>SIDEBAR</item>
+        <item>SMARTISAN_FILE_MANAGER</item>
+        <item>HANDBOOK</item>
+    </string-array>
+    <string-array name="PAGE_3_9">
+        <item>CLOUD_SYNC</item>
+        <item>RECORDER</item>
+        <item>REMOTE_ASSISTANCE</item>
+        <item>SMARTISAN_SCREEN_RECORDER</item>
+        <item>SEARCH</item>
+        <item>AOA</item>
+    </string-array>
+    <string-array name="PAGE_4_9">
+        <item>JIN_RI_TOU_TIAO</item>
+        <item>MEITUAN</item>
+        <item>WEIBO</item>
+        <item>JI_KE</item>
+        <item>JING_DONG</item>
+        <item>AI_QI_YI</item>
+        <item>DIANPING</item>
+        <item>AUTO_NAVI</item>
+        <item>XI_MA_LA_YA_FM</item>
+    </string-array>
+    <string-array name="PAGE_5_9">
+        <item>SAO_MIAO_QUAN_NENG_WANG</item>
+        <item>TOU_TIAO_SHI_PIN</item>
+        <item>DXY</item>
+        <item>JIE_MIAN</item>
+        <item>SHU_QI_XIAO_SHUO</item>
+        <item>XIE_CHENG_LV_XING</item>
+    </string-array>
+    <string-array name="folder_order_exp">
+        <item>folder_page_1_exp</item>
+    </string-array>
+    <string-array name="folder_page_1_exp">
+        <item>WEATHER</item>
+        <item>SMARTISAN_SCREEN_RECORDER</item>
+        <item>SEARCH</item>
+    </string-array>
+    <string-array name="folder_order_oversea">
+        <item>folder_page_1_oversea</item>
+    </string-array>
+    <string-array name="folder_page_1_oversea">
+        <item>GOOGLE_PLAY_VIDEOS</item>
+        <item>GOOGLE_PHOTOS</item>
+        <item>GOOGLE_PLAY_MUSIC</item>
+        <item>GOOGLE_SEARCH_VOICE</item>
+        <item>GOOGLE_GMAIL</item>
+        <item>GOOGLE_SEARCH_GOOGLE</item>
+        <item>GOOGLE_CALENDAR</item>
+        <item>GOOGLE_CM_FILE_MANAGER</item>
+        <item>GOOGLE_DESK_CLOCK</item>
+    </string-array>
+    <string-array name="shortcut_browser_names">
+        <item>android</item>
+        <item>com.opera.mini.android</item>
+        <item>com.opera.browser.classic</item>
+        <item>com.opera.browser</item>
+        <item>com.UCMobile</item>
+        <item>com.UCMobile.intl</item>
+        <item>com.uc.browser.en</item>
+        <item>com.tencent.mtt</item>
+        <item>org.mozilla.firefox</item>
+        <item>cn.mozilla.firefox</item>
+        <item>com.mx.browser</item>
+        <item>com.dolphin.browser.xf</item>
+        <item>com.ijinshan.browser</item>
+    </string-array>
+    <integer-array name="icon_shadow_radius">
+        <item>9</item>
+        <item>3</item>
+    </integer-array>
+    <integer-array name="icon_shadow_color">
+        <item>0x2f000000</item>
+        <item>0x3f000000</item>
+    </integer-array>
+    <integer-array name="icon_shadow_color_transparent">
+        <item>0xb000000</item>
+        <item>0xf000000</item>
+    </integer-array>
+    <string-array name="page_scroll_anim_item">
+        <item>Default animation</item>
+        <item>Rotate icon animation</item>
+        <item>Split icon animation</item>
+        <item>Rotate page animation</item>
+        <item>Louver animation</item>
+        <item>Gather icon animation</item>
+        <item>Switch card animation</item>
+    </string-array>
+    <string-array name="pre_title_list">
+        <item>Games</item>
+        <item>Utilities</item>
+        <item>News</item>
+        <item>Tools</item>
+        <item>Transportation</item>
+        <item>Media</item>
+        <item>Productivity</item>
+        <item>Education</item>
+        <item>Communication</item>
+        <item>Parenting</item>
+        <item>Finance</item>
+        <item>Readings</item>
+    </string-array>
+    <string-array name="pre_folder_title_list">
+        <item>Games</item>
+        <item>Utilities</item>
+        <item>News</item>
+        <item>Tools</item>
+        <item>Transportation</item>
+        <item>Media</item>
+        <item>Productivity</item>
+        <item>Education</item>
+        <item>Communication</item>
+        <item>Parenting</item>
+        <item>Finance</item>
+        <item>Readings</item>
+    </string-array>
+    <string-array name="theme_display_order">
+        <item>BLACK</item>
+        <item>LIGHT_BLUE</item>
+        <item>AERO</item>
+        <item>TRANS</item>
+        <item>COPPER_RED</item>
+        <item>GRID</item>
+        <item>LEAF</item>
+        <item>LAKE</item>
+        <item>BAMBOO</item>
+        <item>RAVEN</item>
+        <item>DARK_GRAY</item>
+        <item>DEEP_BLUE</item>
+        <item>GINTAMA</item>
+        <item>LIGHT_GOLD</item>
+        <item>WINE_RED</item>
+        <item>BLUE_GREEN</item>
+        <item>INDIGO</item>
+        <item>LEATHER</item>
+        <item>DARK_WOOD</item>
+        <item>LIGHT_WOOD</item>
+        <item>STRIP</item>
+        <item>COLOR_RED</item>
+        <item>COLOR_ORANGE</item>
+        <item>COLOR_YELLOW</item>
+        <item>COLOR_GREEN</item>
+        <item>COLOR_CYAN</item>
+        <item>COLOR_BLUE</item>
+        <item>COLOR_PURPLE</item>
+        <item>CLAY</item>
+        <item>FIBRE</item>
+        <item>LiteraryWhite</item>
+        <item>LiteraryBrown</item>
+        <item>LiteraryRed</item>
+        <item>LiteraryPink</item>
+        <item>LiteraryYellow</item>
+        <item>LiteraryGreen</item>
+        <item>LiteraryCyan</item>
+        <item>LiteraryPurple</item>
+    </string-array>
+</resources>

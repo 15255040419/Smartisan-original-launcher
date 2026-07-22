@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout android:id="@id/pop_view_container" android:background="@drawable/history_info_fullscreen_background" android:layout_width="match_parent" android:layout_height="match_parent"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <LinearLayout android:layout_gravity="center_vertical" android:paddingLeft="8.0dp" android:paddingRight="8.0dp" android:layout_width="match_parent" android:layout_height="30.399994dp">
-        <TextView android:textSize="15.0sp" android:textColor="@color/copyright_info_color" android:layout_gravity="center_vertical" android:id="@id/desc_info_tv" android:layout_width="wrap_content" android:layout_height="wrap_content" android:singleLine="true" />
-    </LinearLayout>
-</FrameLayout>

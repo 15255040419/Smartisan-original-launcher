@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<set
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <translate android:interpolator="@anim/curves_standard" android:duration="@integer/unlocker_keyboard_slide_duration" android:fromYDelta="0.0" android:toYDelta="50.0%p" />
-    <alpha android:interpolator="@anim/curves_standard" android:duration="@integer/unlocker_keyboard_slide_duration" android:fromAlpha="1.0" android:toAlpha="0.0" />
-</set>

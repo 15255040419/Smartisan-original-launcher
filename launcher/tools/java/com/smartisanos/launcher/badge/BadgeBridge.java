@@ -33,7 +33,14 @@ public final class BadgeBridge {
         if (TextUtils.isEmpty(enabled)) {
             return false;
         }
-        String packageName = context.getPackageName();
+        // Settings pages use a resource Context whose package is
+        // com.smartisanos.home.  Notification access, however, belongs to the
+        // real Launcher APK.  Comparing against the wrapped resource package
+        // makes an already granted listener look revoked and turns the badge
+        // switch back off on resume.
+        Context application = context.getApplicationContext();
+        String packageName = application == null
+                ? context.getPackageName() : application.getPackageName();
         for (String value : enabled.split(":")) {
             ComponentName component = ComponentName.unflattenFromString(value);
             if (component != null && packageName.equals(component.getPackageName())) {

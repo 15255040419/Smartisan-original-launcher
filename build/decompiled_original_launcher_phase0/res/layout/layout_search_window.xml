@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:id="@id/view_cover" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:gravity="center_vertical" android:orientation="vertical" android:id="@id/top" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="30.0dp" android:layout_alignParentTop="true">
+        <EditText android:id="@id/editText1" android:layout_width="match_parent" android:layout_height="30.0dp" />
+        <TextView android:textSize="22.0dp" android:textColor="@color/text_white" android:gravity="center" android:id="@id/timezone_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/search_text" />
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:id="@id/bottom_button_bar" android:paddingTop="33.0dp" android:visibility="invisible" android:layout_width="match_parent" android:layout_height="146.0dp" android:layout_alignParentBottom="true">
+        <ImageView android:id="@id/imageView1" android:layout_width="0.0dp" android:layout_height="wrap_content" android:src="@drawable/icon_contact_bg" android:layout_weight="1.0" />
+        <ImageView android:id="@id/imageView2" android:layout_width="0.0dp" android:layout_height="wrap_content" android:src="@drawable/icon_app_bg" android:layout_weight="1.0" />
+        <ImageView android:id="@id/imageView3" android:layout_width="0.0dp" android:layout_height="wrap_content" android:src="@drawable/icon_music_bg" android:layout_weight="1.0" />
+    </LinearLayout>
+</RelativeLayout>

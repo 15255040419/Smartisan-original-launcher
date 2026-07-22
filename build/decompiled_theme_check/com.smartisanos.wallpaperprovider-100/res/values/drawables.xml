@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <drawable name="notification_template_icon_bg">#3333b5e5</drawable>
-    <drawable name="notification_template_icon_low_bg">#0cffffff</drawable>
-    <drawable name="preview_bg">#ffffff</drawable>
-    <drawable name="preview_icon_default">#ffe1e1e1</drawable>
-    <drawable name="transparent_drawable">@android:color/transparent</drawable>
-</resources>

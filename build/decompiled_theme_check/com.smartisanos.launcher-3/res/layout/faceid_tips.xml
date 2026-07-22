@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<merge android:gravity="center|top" android:orientation="vertical" android:background="@android:color/transparent" android:layout_width="wrap_content" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <ImageView android:layout_gravity="center" android:id="@id/faceid_image" android:layout_width="@dimen/unlocker_faceid_img_size" android:layout_height="@dimen/unlocker_faceid_img_size" android:src="@drawable/face_loop_00" />
-</merge>

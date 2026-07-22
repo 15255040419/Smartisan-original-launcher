@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:id="@id/btn_download" android:background="@drawable/theme_download_button" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView android:layout_gravity="center" android:background="@drawable/theme_download_icon" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+</LinearLayout>

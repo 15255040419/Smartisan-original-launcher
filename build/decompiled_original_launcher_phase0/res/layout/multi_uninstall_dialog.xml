@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GridView android:gravity="center" android:id="@id/gridview_icons" android:paddingLeft="29.0dp" android:paddingTop="24.0dp" android:paddingRight="29.0dp" android:paddingBottom="24.0dp" android:scrollbars="none" android:layout_width="match_parent" android:layout_height="wrap_content" android:listSelector="#00000000" android:horizontalSpacing="23.0dp" android:verticalSpacing="24.0dp" android:numColumns="3"
+  xmlns:android="http://schemas.android.com/apk/res/android" />

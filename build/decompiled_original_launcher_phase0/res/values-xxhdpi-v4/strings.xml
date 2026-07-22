@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cloudid_message">To unlock, please input your password of Smiling Cloud.</string>
+    <string name="cloudid_message_with_account">To unlock, please input your password of Smiling Cloud(%1$s).</string>
+    <string name="cloudid_title">Unlock by Smiling Cloud</string>
+    <string name="description_0">0</string>
+    <string name="description_1">1</string>
+    <string name="description_2">2</string>
+    <string name="description_3">3</string>
+    <string name="description_4">4</string>
+    <string name="description_5">5</string>
+    <string name="description_6">6</string>
+    <string name="description_7">7</string>
+    <string name="description_8">8</string>
+    <string name="description_9">9</string>
+    <string name="description_back">Back</string>
+    <string name="description_cancel">Cancel</string>
+    <string name="description_fp">Fingerprint</string>
+    <string name="faceid_retry">Tap to Retry</string>
+    <string name="faceid_unavailable">Face ID Unavailable, Please Enter Password</string>
+    <string name="fingerprint_unavailable">Fingerprint ID Unavailable, Please Enter Password</string>
+    <string name="fp_retry">Tap to Retry</string>
+    <string name="unlocker_cancel">Cancel</string>
+    <string name="unlocker_enter_password">Enter Password</string>
+    <string name="unlocker_invalid_password">Incorrect Password</string>
+    <string name="unlocker_unlock_app">Unlock %1$s</string>
+    <string name="unlocker_unlock_by_cloud">   Unlock by Smiling Cloud ></string>
+    <string name="unlocker_use_fingerprint">Fingerprint</string>
+    <string name="unlocker_verify_lockout">Try Again in %1$d Seconds</string>
+    <string name="texture_path">t/pack1080/pack</string>
+    <string name="texture_path_base16">t/pack1080/pack16</string>
+    <string name="icon_scale_9_16">0.71875</string>
+    <string name="layout_path">values-xxhdpi</string>
+    <string name="icon_resize_area">0.09</string>
+    <string name="icon_resize_radius">11</string>
+</resources>

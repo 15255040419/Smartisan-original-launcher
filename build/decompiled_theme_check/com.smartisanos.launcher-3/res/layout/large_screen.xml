@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<com.smartisanos.launcher.widget.LandscapeFrameLayout android:id="@id/large_screen_bg" android:background="@android:color/transparent" android:layout_width="match_parent" android:layout_height="match_parent"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <com.smartisanos.launcher.view.RootView android:layout_gravity="bottom" android:id="@id/landscapeRootView" android:background="@android:color/transparent" android:layout_width="match_parent" android:layout_height="match_parent">
-        <com.smartisanos.launcher.view.SMGLSurfaceView android:id="@id/landscapeGlView" android:background="@android:color/transparent" android:layout_width="match_parent" android:layout_height="match_parent" />
-    </com.smartisanos.launcher.view.RootView>
-</com.smartisanos.launcher.widget.LandscapeFrameLayout>

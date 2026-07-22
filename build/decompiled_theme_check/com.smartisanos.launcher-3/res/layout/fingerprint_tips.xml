@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<merge android:gravity="center" android:orientation="vertical" android:background="@android:color/transparent" android:layout_width="match_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <TextView android:textSize="@dimen/unlocker_fp_tips_text_size" android:textStyle="bold" android:textColor="@color/unlocker_fp_tips" android:layout_gravity="center_horizontal" android:id="@id/fp_tips" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/fp_retry" />
-    <ImageView android:layout_gravity="center_horizontal" android:id="@id/fp_image" android:layout_width="@dimen/unlocker_fp_tips_logo_size" android:layout_height="@dimen/unlocker_fp_tips_logo_size" android:layout_marginTop="@dimen/unlocker_fp_tips_space" android:src="@drawable/unlocker_fingerprint_logo" />
-</merge>

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<merge android:gravity="center_vertical" android:layout_width="match_parent" android:layout_height="51.0dp" android:layout_centerVertical="true"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <ImageView android:id="@id/cancel_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/selector_bottom_confirm_bar_cancel" android:layout_alignParentLeft="true" />
-    <ImageView android:id="@id/ok_btn" android:layout_width="wrap_content" android:layout_height="wrap_content" android:src="@drawable/selector_bottom_confirm_bar_apply" android:layout_alignParentRight="true" />
-    <TextView android:textSize="15.0sp" android:textColor="#99000000" android:gravity="center" android:id="@id/title" android:paddingLeft="2.0dp" android:paddingRight="2.0dp" android:layout_width="match_parent" android:layout_height="wrap_content" android:singleLine="true" android:layout_toLeftOf="@id/ok_btn" android:layout_toRightOf="@id/cancel_btn" android:layout_centerVertical="true" />
-</merge>

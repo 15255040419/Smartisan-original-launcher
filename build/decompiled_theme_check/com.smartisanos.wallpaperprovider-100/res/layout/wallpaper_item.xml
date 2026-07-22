@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:foreground="@drawable/selector_wallpaper_grid_view"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <ImageView android:id="@id/preview" android:layout_width="@dimen/wallpaper_preview_icon_width" android:layout_height="@dimen/wallpaper_preview_icon_height" android:scaleType="centerCrop" />
-    <ImageView android:id="@id/cloud_icon" android:visibility="gone" android:layout_width="@dimen/wallpaper_preview_icon_width" android:layout_height="@dimen/wallpaper_preview_icon_height" android:src="@drawable/cloud_icon" android:scaleType="centerCrop" />
-    <smartisanos.widget.DownloadProgressView android:layout_gravity="right|bottom" android:id="@id/download" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="@dimen/wallpaper_progress_margin" android:layout_marginBottom="@dimen/wallpaper_progress_margin" />
-</FrameLayout>

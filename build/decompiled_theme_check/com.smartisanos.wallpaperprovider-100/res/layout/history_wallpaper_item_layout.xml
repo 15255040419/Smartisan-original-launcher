@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<merge android:layout_width="wrap_content" android:layout_height="wrap_content" android:foreground="@drawable/selector_wallpaper_grid_view"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <ImageView android:id="@id/snapshot" android:layout_width="@dimen/wallpaper_preview_icon_width" android:layout_height="@dimen/wallpaper_preview_icon_height" android:scaleType="centerCrop" />
-    <ImageView android:id="@id/selected_icon" android:visibility="invisible" android:layout_width="@dimen/wallpaper_preview_icon_width" android:layout_height="@dimen/wallpaper_preview_icon_height" android:src="@drawable/photo_selected" android:scaleType="fitXY" />
-</merge>
