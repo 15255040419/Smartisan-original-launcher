@@ -46,6 +46,18 @@
     return-void
 .end method
 
+.method public dispatchTouchEvent(Landroid/view/MotionEvent;)Z
+    .locals 0
+
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/gesture/LauncherSearchGestureCompat;->onLauncherTouch(Landroid/app/Activity;Landroid/view/MotionEvent;)V
+
+    invoke-super {p0, p1}, Landroid/app/Activity;->dispatchTouchEvent(Landroid/view/MotionEvent;)Z
+
+    move-result p0
+
+    return p0
+.end method
+
 .method public onActivityResult(IILandroid/content/Intent;)V
     .locals 0
 
@@ -273,10 +285,6 @@
     .line 1
     invoke-super {p0}, Landroid/app/Activity;->onPause()V
 
-    # Queue the original cancellation on the GL thread before the public
-    # package installer covers this activity.
-    invoke-static {}, Lcom/smartisanos/launcher/a/oa;->fd()V
-
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->onLauncherPausedForUnlock(Landroid/app/Activity;)V
 
     .line 2
@@ -362,6 +370,12 @@
     invoke-super {p0, p1}, Landroid/app/Activity;->onWindowFocusChanged(Z)V
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyNavigationBarIfChanged(Landroid/app/Activity;)V
+
+    if-eqz p1, :cond_request_launcher_frame_done
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->requestLauncherFrameOnWindowFocus(Landroid/app/Activity;)V
+
+    :cond_request_launcher_frame_done
 
     .line 2
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;

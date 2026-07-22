@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="29" android:versionName="v1.5.4" package="com.smartisanos.launcher">
   <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="28" />
   <uses-feature android:glEsVersion="0x00020000" />
@@ -199,5 +199,14 @@
     <service android:name="com.squareup.leakcanary.DisplayLeakService" android:enabled="false" android:process=":leakcanary" />
     <service android:name="com.squareup.leakcanary.SmartisanLeakService" android:enabled="false" android:process=":leakcanary" />
     <activity android:label="displayleak" android:name="com.squareup.leakcanary.internal.DisplayLeakActivity" android:enabled="false" android:taskAffinity="com.squareup.leakcanary.com.smartisanos.launcher" />
+    <activity android:name="com.smartisanos.launcher.settings.SettingsMainActivity" android:exported="false" android:theme="@0x7f0c015f" android:taskAffinity="com.android.settings" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" />
+    <activity android:name="com.smartisanos.launcher.settings.AboutActivity" android:exported="false" android:theme="@0x7f0c015f" android:taskAffinity="com.android.settings" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" />
+    <activity android:name="com.smartisanos.launcher.settings.AdditionalFeaturesActivity" android:exported="false" android:theme="@0x7f0c015f" android:taskAffinity="com.android.settings" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" />
+    <activity android:name="com.smartisanos.launcher.settings.ThemeWallpaperActivity" android:exported="false" android:theme="@0x7f0c015f" android:taskAffinity="com.android.settings" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" />
+    <activity android:name="com.smartisanos.launcher.settings.AppIconsActivity" android:exported="false" android:theme="@0x7f0c015f" android:taskAffinity="com.android.settings" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" />
+    <activity android:name="com.smartisanos.launcher.settings.DynamicIconSettingsActivity" android:exported="false" android:theme="@0x7f0c015f" android:taskAffinity="com.android.settings" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" />
+    <activity android:name="com.smartisanos.launcher.settings.ProfileAppsSettingsActivity" android:exported="false" android:theme="@0x7f0c015f" android:taskAffinity="com.android.settings" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" />
+    <activity android:name="com.smartisanos.launcher.settings.PrivacySettingsActivity" android:exported="false" android:theme="@0x7f0c015f" android:taskAffinity="com.android.settings" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" />
+    <activity android:name="com.smartisanos.launcher.settings.PageFlipSettingsActivity" android:exported="false" android:theme="@0x7f0c015f" android:taskAffinity="com.android.settings" android:excludeFromRecents="true" android:launchMode="1" android:screenOrientation="1" />
   </application>
 </manifest>

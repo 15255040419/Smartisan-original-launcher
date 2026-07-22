@@ -3732,7 +3732,7 @@
 .end method
 
 .method public Gm()V
-    .locals 0
+    .locals 4
 
     .line 1
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->Fm()V
@@ -3742,6 +3742,33 @@
 
     .line 3
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->Dm()V
+
+    # A profile item can be inserted after its Cell has already created the
+    # cached message/NEW node at index 5.  Reuse the original node and its
+    # original Fl/Gl anchor whenever this Cell's geometry is recomputed.
+    iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
+
+    const/4 v1, 0x5
+
+    aget-object v0, v0, v1
+
+    if-eqz v0, :cond_new_badge_anchor_done
+
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->Fl()F
+
+    move-result v1
+
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->Gl()F
+
+    move-result v2
+
+    const/4 v3, 0x0
+
+    invoke-virtual {v0, v1, v2, v3}, Lcom/smartisanos/smengine/SceneNode;->setTranslate(FFF)V
+
+    invoke-virtual {v0}, Lcom/smartisanos/smengine/SceneNode;->updateGeometricState()V
+
+    :cond_new_badge_anchor_done
 
     return-void
 .end method

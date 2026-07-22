@@ -26,13 +26,37 @@
 
 
 # virtual methods
+.method public onBackPressed()V
+    .locals 1
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->handleModernSettingsBack(Landroid/app/Activity;)Z
+
+    move-result v0
+
+    if-nez v0, :handled
+
+    invoke-super {p0}, Landroid/app/Activity;->onBackPressed()V
+
+    :handled
+    return-void
+.end method
+
 .method protected onCreate(Landroid/os/Bundle;)V
-    .locals 0
+    .locals 1
 
     invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 
     sput-object p0, Lcom/smartisanos/launcher/theme/ThemeChooserActivity;->db:Lcom/smartisanos/launcher/theme/ThemeChooserActivity;
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/settings/SettingsRouter;->route(Landroid/app/Activity;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_0
+
+    return-void
+
+    :cond_0
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->show(Landroid/app/Activity;)V
 
     return-void
@@ -51,12 +75,21 @@
 .end method
 
 .method protected onNewIntent(Landroid/content/Intent;)V
-    .locals 0
+    .locals 1
 
     invoke-super {p0, p1}, Landroid/app/Activity;->onNewIntent(Landroid/content/Intent;)V
 
     invoke-virtual {p0, p1}, Landroid/app/Activity;->setIntent(Landroid/content/Intent;)V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/settings/SettingsRouter;->route(Landroid/app/Activity;)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_0
+
+    return-void
+
+    :cond_0
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->show(Landroid/app/Activity;)V
 
     return-void

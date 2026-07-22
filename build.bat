@@ -256,6 +256,16 @@ rem ============================================================
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
 
 rem ============================================================
+rem 6.5 Patch binary Manifest with modern settings activities
+rem ============================================================
+
+echo [extra] Patching binary manifest for modern settings activities...
+python "%ROOT%tools\patch_modern_settings_manifest.py"
+if errorlevel 1 (
+  echo [warn] patch_modern_settings_manifest.py failed, continuing with existing manifest.
+)
+
+rem ============================================================
 rem 7. Build maintained settings resources
 rem ============================================================
 

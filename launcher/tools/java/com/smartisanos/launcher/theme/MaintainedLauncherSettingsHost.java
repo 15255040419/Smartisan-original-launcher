@@ -1,5 +1,7 @@
 package com.smartisanos.launcher.theme;
 
+import com.smartisanos.launcher.settings.SettingsUiFlags;
+
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlarmManager;
@@ -151,6 +153,8 @@ public final class MaintainedLauncherSettingsHost {
     private static File sSettingsApk;
     private static Dialog sLauncherReloadDialog;
     private static final String SETTINGS_ASSET = "settings_maintained/maintained-settings-res.apk";
+    // Retained only for source compatibility with the retired operation-log helper.
+    // No current UI or code path starts, resumes, or writes this feature.
     private static final String OPERATION_LOG_PREFS = "launcher_operation_log_prefs";
     private static final String PREF_OPERATION_LOG_ACTIVE = "operation_log_active";
     private static final String PREF_OPERATION_LOG_FILE = "operation_log_file";
@@ -163,6 +167,11 @@ public final class MaintainedLauncherSettingsHost {
     private static java.lang.Process sOperationLogcatProcess;
     private static Thread.UncaughtExceptionHandler sPreviousUncaughtExceptionHandler;
     private static boolean sOperationLogHandlerInstalled;
+    // ThemeChooser keeps several modern settings pages in one Activity. Android
+    // can only pop Activities for a system back gesture, so retain the visible
+    // in-page parent until that page is left.
+    private static final Map<Activity, Runnable> sModernSettingsBackActions =
+            Collections.synchronizedMap(new WeakHashMap<Activity, Runnable>());
     private static final String SETTINGS_PKG = "com.smartisanos.home";
     private static final String QUICK_SEARCH_PKG = "com.smartisanos.quicksearch";
     private static final String QUICK_SEARCH_DOWNLOAD_URL =
@@ -268,6 +277,118 @@ public final class MaintainedLauncherSettingsHost {
     private static boolean sDeferredLauncherTasksPosted;
     private static final Map<Activity, PasswordPageExit> sPasswordPageExits =
             new WeakHashMap<Activity, PasswordPageExit>();
+
+    public static void pickWallpaperPublic(Activity activity) {
+        pickWallpaper(activity);
+    }
+
+    public static void restoreDefaultWallpaperPublic(Activity activity) {
+        restoreDefaultWallpaper(activity);
+    }
+
+    public static void showThemePagePublic(Activity activity) {
+        showThemePage(activity);
+    }
+
+    public static void showWallpaperPagePublic(Activity activity) {
+        showWallpaperPage(activity);
+    }
+
+    public static void showIconPagePublic(Activity activity) {
+        showIconPage(activity);
+    }
+
+    public static void showOcdOptionsPagePublic(Activity activity) {
+        showOcdOptionsPage(activity);
+    }
+
+    /**
+     * Modern landing-page drill-downs stay in one Activity, just like the
+     * original settings host.  This keeps both pages attached for the same
+     * horizontal transition instead of exposing an intermediate window.
+     */
+    public static void showMainSettingsPagePublic(Activity activity, boolean animateBack) {
+        if (activity == null) {
+            return;
+        }
+        setModernSettingsBackAction(activity, null);
+        show(activity, -1, animateBack);
+    }
+
+    public static void setModernSettingsParentBackActionPublic(Activity activity,
+            Runnable action) {
+        setModernSettingsBackAction(activity, action);
+    }
+
+    public static void showPageFlipPagePublic(Activity activity) {
+        showPageFlipPage(activity);
+    }
+
+    public static void showProfileAppsPageInSettingsPublic(Activity activity) {
+        showProfileAppsPage(activity);
+    }
+
+    public static void showPrivacyPasswordPageInSettingsPublic(Activity activity) {
+        showPrivacyPasswordPagePublic(activity);
+    }
+
+    public static void showDynamicWeatherPageInSettingsPublic(Activity activity) {
+        showDynamicWeatherPage(activity);
+    }
+
+    public static void showAboutPagePublic(Activity activity) {
+        showAboutPage(activity);
+    }
+
+    /** Binds the original OCD settings behavior to a modern Activity-owned view. */
+    public static void bindOcdOptionsPagePublic(Activity activity, View root) {
+        if (activity == null || root == null) {
+            return;
+        }
+        Resources resources = activity.getResources();
+        bindBackTitle(activity, resources, root, "view_title",
+                getString(resources, "obsession_header_title", "OCD Settings"));
+        bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
+        bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
+        bindBadgeVisibilitySwitch(activity, resources, root);
+        bindBadgeSwipeCleanSwitch(activity, resources, root);
+        bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
+        migrateSearchGestureSetting(activity);
+        bindSwitch(activity, resources, root, "item_id_search_page_enabled",
+                KEY_SWIPE_UP_SEARCH_ENABLED, true);
+        bindSwitch(activity, resources, root, "item_id_swipe_down_system_panels",
+                KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED, true);
+        synchronizeBadgeSettingsWithNotificationAccess(activity,
+                com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity));
+        tuneScrollBars(root);
+    }
+
+    public static void bindMainSettingsPagePublic(Activity activity, View root) {
+        try {
+            SettingsResourceContext context = createSettingsContext(activity);
+            Resources resources = context.getResources();
+            bindPage(activity, resources, root);
+        } catch (Throwable t) {
+            Log.e(LOG_TAG, "Failed to bind main settings page", t);
+        }
+    }
+
+    public static int readLauncherModePublic(Context context) {
+        try {
+            SharedPreferences sp = context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE);
+            return sp.getInt("prefs_key_launcher_mode", 12);
+        } catch (Throwable t) {
+            return 12;
+        }
+    }
+
+    public static boolean shouldShowLauncherWallpaperSettingPublic(Context context) {
+        try {
+            return shouldShowLauncherWallpaperSetting(context);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
     public static volatile boolean sLauncherFrameReportPending;
     private static final String SMARTISAN_ICON_CACHE_PREFS = "online_icon_cache_v3";
     private static final String SMARTISAN_ICON_CACHE_DIR = "online_icon_cache_v3";
@@ -355,7 +476,6 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void show(Activity activity, int restoreScrollY, boolean animateBack) {
         try {
-            resumeOperationLogIfNeeded(activity);
             cancelScheduledLauncherRestart(activity);
             Intent intent = activity.getIntent();
             if (intent != null && UPDATE_INSTALL_ACTION.equals(intent.getAction())) {
@@ -380,6 +500,30 @@ public final class MaintainedLauncherSettingsHost {
                 showSearchPage(activity);
                 return;
             }
+            if (intent != null && intent.hasExtra("target_page")) {
+                String target = intent.getStringExtra("target_page");
+                intent.removeExtra("target_page");
+                tuneWindow(activity);
+                if ("page_flip".equals(target)) {
+                    showPageFlipPage(activity);
+                    return;
+                } else if ("profile_apps".equals(target)) {
+                    showProfileAppsPage(activity);
+                    return;
+                } else if ("privacy_password".equals(target)) {
+                    showSettingsPagePasswordEntry(activity);
+                    return;
+                } else if ("dynamic_weather".equals(target)) {
+                    showDynamicWeatherPage(activity);
+                    return;
+                }
+            }
+            if (SettingsUiFlags.isModernUiEnabled(activity)) {
+                if (!("com.smartisanos.launcher.settings.SettingsMainActivity".equals(activity.getClass().getName()))) {
+                    finishOrReturnToModernSettings(activity);
+                    return;
+                }
+            }
             armSettingsClickGuard();
             tuneWindow(activity);
             SettingsResourceContext context = createSettingsContext(activity);
@@ -395,6 +539,79 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    public static void finishOrReturnToModernSettings(Activity activity) {
+        if (activity == null || activity.isFinishing()) {
+            return;
+        }
+        if (activity.isTaskRoot()) {
+            try {
+                Intent intent = new Intent(activity, Class.forName("com.smartisanos.launcher.settings.SettingsMainActivity"));
+                activity.startActivity(intent);
+            } catch (Throwable ignored) {
+            }
+        }
+        activity.finish();
+        applySettingsBackTransition(activity);
+    }
+
+    /** Handles a title-bar or system back gesture for a modern hosted page. */
+    public static boolean handleModernSettingsBack(Activity activity) {
+        if (activity == null || !SettingsUiFlags.isModernUiEnabled(activity)) {
+            return false;
+        }
+        Runnable action = sModernSettingsBackActions.remove(activity);
+        if (action != null) {
+            action.run();
+            return true;
+        }
+        if ("com.smartisanos.launcher.theme.ThemeChooserActivity"
+                .equals(activity.getClass().getName())) {
+            returnToModernSettingsMain(activity);
+            return true;
+        }
+        return false;
+    }
+
+    private static void setModernSettingsBackAction(Activity activity, Runnable action) {
+        if (activity == null || !SettingsUiFlags.isModernUiEnabled(activity)) {
+            return;
+        }
+        if (action == null) {
+            sModernSettingsBackActions.remove(activity);
+        } else {
+            sModernSettingsBackActions.put(activity, action);
+        }
+    }
+
+    /** Keeps the original grid confirmation and migration flow for modern UI cards. */
+    public static void confirmLauncherModePublic(Activity activity, int mode) {
+        if (activity != null) {
+            confirmLauncherMode(activity, mode);
+        }
+    }
+
+    private static void returnToModernSettingsMain(Activity activity) {
+        Intent up = new Intent();
+        up.setClassName("com.smartisanos.launcher",
+                "com.smartisanos.launcher.settings.SettingsMainActivity");
+        up.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        activity.startActivity(up);
+        activity.finish();
+        applySettingsBackTransition(activity);
+    }
+
+    private static void applySettingsBackTransition(Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        Context application = activity.getApplicationContext();
+        Resources resources = application == null ? activity.getResources()
+                : application.getResources();
+        int enter = resources.getIdentifier("slide_in_from_left", "anim", "com.smartisanos.launcher");
+        int exit = resources.getIdentifier("slide_out_to_right", "anim", "com.smartisanos.launcher");
+        activity.overridePendingTransition(enter, exit);
+    }
+
     private static void scheduleInitialSettingsMigrationsIfIdle(Context context) {
         if (context == null) {
             return;
@@ -402,7 +619,7 @@ public final class MaintainedLauncherSettingsHost {
         final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             public void run() {
-                if (app == null || isOperationLogActive(app)) {
+                if (app == null) {
                     return;
                 }
                 new Thread(new Runnable() {
@@ -907,19 +1124,21 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static File copySettingsResources(Context context) throws Exception {
-        File out = new File(context.getCacheDir(), "maintained-settings-res.apk");
+        Context app = (context != null && context.getApplicationContext() != null)
+                ? context.getApplicationContext() : context;
+        File out = new File(app.getCacheDir(), "maintained-settings-res.apk");
         long updateTime = 0L;
         try {
-            updateTime = context.getPackageManager()
-                    .getPackageInfo(context.getPackageName(), 0).lastUpdateTime;
+            updateTime = app.getPackageManager()
+                    .getPackageInfo(app.getPackageName(), 0).lastUpdateTime;
         } catch (Throwable ignored) {
         }
-        SharedPreferences prefs = context.getSharedPreferences("maintained_settings_res", Context.MODE_PRIVATE);
+        SharedPreferences prefs = app.getSharedPreferences("maintained_settings_res", Context.MODE_PRIVATE);
         long copiedUpdateTime = prefs.getLong("copied_last_update_time", -1L);
         if (out.exists() && out.length() > 0 && copiedUpdateTime == updateTime) {
             return out;
         }
-        InputStream in = context.getAssets().open(SETTINGS_ASSET);
+        InputStream in = app.getAssets().open(SETTINGS_ASSET);
         try {
             FileOutputStream fos = new FileOutputStream(out);
             try {
@@ -3161,11 +3380,18 @@ public final class MaintainedLauncherSettingsHost {
             settingItem.setIconFrameVisible(false);
             Bitmap bitmap = themePreviewBitmap(context, currentTheme(context));
             if (bitmap == null) {
-                int drawableId = drawable(resources, readLauncherMode(context) == 20
-                        ? "thumbnail_settings_16" : "thumbnail_settings");
-                bitmap = drawableBitmap(resources, drawableId);
+                Resources appRes = (context != null && context.getApplicationContext() != null)
+                        ? context.getApplicationContext().getResources() : (context != null ? context.getResources() : resources);
+                String drawableName = readLauncherMode(context) == 20 ? "thumbnail_settings_16" : "thumbnail_settings";
+                int drawableId = appRes.getIdentifier(drawableName, "drawable", "com.smartisanos.launcher");
+                if (drawableId == 0 && context != null) {
+                    drawableId = appRes.getIdentifier(drawableName, "drawable", context.getPackageName());
+                }
+                bitmap = drawableBitmap(appRes, drawableId);
             }
-            settingItem.setPreviewIconBitmap(thumbnailFramedPreviewBitmap(resources, bitmap));
+            if (bitmap != null) {
+                settingItem.setPreviewIconBitmap(thumbnailFramedPreviewBitmap(resources, bitmap));
+            }
         }
     }
 
@@ -3213,8 +3439,10 @@ public final class MaintainedLauncherSettingsHost {
             stopThemePagePolling();
             tuneScrollBars(root);
             // Follow the maintained ThemeChooserActivity ordering: attach the adapters and
-            // begin preview work immediately.  setSettingsContentView() waits for this root's
-            // first layout while it is off-screen, then starts the slide.
+            // begin preview work immediately. Original ThemeChooser has preview resources
+            // ready before its first cells are shown; warm the visible rows first so the
+            // phone-frame placeholder never flashes before the real preview.
+            warmInitialThemePreviews(activity);
             bindThemeGridContent(activity, context, resources, root, installed, notInstalled,
                     restoreScrollY);
             setSettingsContentView(activity, context, resources, root, forward);
@@ -3258,6 +3486,17 @@ public final class MaintainedLauncherSettingsHost {
         restoreScroll(root, restoreScrollY);
     }
 
+    private static void warmInitialThemePreviews(Context context) {
+        List<ThemeEntry> entries = themeEntriesFor(context, true);
+        int visible = Math.min(entries == null ? 0 : entries.size(), 4);
+        for (int i = 0; i < visible; i++) {
+            ThemeEntry entry = entries.get(i);
+            if (entry != null) {
+                themePreviewBitmap(context, entry.id);
+            }
+        }
+    }
+
     private static void startThemePagePolling(final Activity activity,
                                               final ThemePreviewAdapter installedAdapter,
                                               final ThemePreviewAdapter onlineAdapter) {
@@ -3297,6 +3536,12 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void showThemeItemPage(final Activity activity, final ThemeEntry initialEntry) {
         try {
+            setModernSettingsBackAction(activity, new Runnable() {
+                @Override
+                public void run() {
+                    showThemePage(activity, sThemePageScrollY, false);
+                }
+            });
             tuneWindow(activity);
             final SettingsResourceContext context = createSettingsContext(activity);
             final Resources resources = context.getResources();
@@ -3725,7 +3970,13 @@ public final class MaintainedLauncherSettingsHost {
             btnBack.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
                     stopThemePagePolling();
-                    show(activity, sMainSettingsScrollY, true);
+                    if (SettingsUiFlags.isModernUiEnabled(activity)) {
+                        if (!handleModernSettingsBack(activity)) {
+                            activity.onBackPressed();
+                        }
+                    } else {
+                        show(activity, sMainSettingsScrollY, true);
+                    }
                 }
             });
         }
@@ -3739,7 +3990,13 @@ public final class MaintainedLauncherSettingsHost {
             smartisanTitle.setTitle(titleText);
             smartisanTitle.setBackClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY, true);
+                    if (SettingsUiFlags.isModernUiEnabled(activity)) {
+                        if (!handleModernSettingsBack(activity)) {
+                            activity.onBackPressed();
+                        }
+                    } else {
+                        show(activity, sMainSettingsScrollY, true);
+                    }
                 }
             });
         }
@@ -4527,7 +4784,10 @@ public final class MaintainedLauncherSettingsHost {
     private static void applyDynamicWeatherCalendarSetting(Context context,
             SettingItemSwitch item, boolean oldEnabled, boolean enabled) {
         Log.i(LOG_TAG, "DYNAMIC_ICON_ENABLE_REQUEST old=" + oldEnabled + " new=" + enabled);
-        if (!persistDynamicWeatherCalendarSetting(context, enabled)) {
+        com.smartisanos.launcher.settings.SettingsApplyResult result =
+                com.smartisanos.launcher.settings.OriginalSettingsBridge
+                        .setDynamicWeatherCalendar(context, oldEnabled, enabled);
+        if (result != com.smartisanos.launcher.settings.SettingsApplyResult.SUCCESS) {
             Log.w(LOG_TAG, "DYNAMIC_ICON_CONFIG_COMMIT_FAILED requested=" + enabled);
             Toast.makeText(context, "动态天气和日历设置保存失败", Toast.LENGTH_SHORT).show();
             return;
@@ -4548,11 +4808,8 @@ public final class MaintainedLauncherSettingsHost {
                 ? "已启用动态天气和日历"
                 : "已关闭动态图标，正在恢复普通图标",
                 Toast.LENGTH_SHORT).show();
-        Log.i(LOG_TAG, "DYNAMIC_ICON_RELOAD_REQUESTED reason=ACTIVE_ICON_SETTINGS_CHANGE"
-                + " old=" + oldEnabled + " new=" + enabled);
-        if (!LauncherColdReloadCoordinator.beginActiveIconReload(context, oldEnabled, enabled)) {
-            Toast.makeText(context, "桌面重新载入未启动，请重试", Toast.LENGTH_SHORT).show();
-        }
+        Log.i(LOG_TAG, "DYNAMIC_ICON_RELOAD_STARTED_BY_BRIDGE old=" + oldEnabled
+                + " new=" + enabled);
     }
 
     private static boolean persistDynamicWeatherCalendarSetting(Context context, boolean enabled) {
@@ -4683,7 +4940,7 @@ public final class MaintainedLauncherSettingsHost {
                 });
     }
 
-    private static void writeBoolSetting(Context context, String key, boolean value) {
+    public static void writeBoolSetting(Context context, String key, boolean value) {
         int intValue = value ? 1 : 0;
         try {
             Settings.System.putInt(context.getContentResolver(), key, intValue);
@@ -4809,7 +5066,7 @@ public final class MaintainedLauncherSettingsHost {
         return false;
     }
 
-    private static void applyLauncherSettingChange(Context context, String key) {
+    public static void applyLauncherSettingChange(Context context, String key) {
         try {
             Intent intent = new Intent("com.smartisanos.launcher.setting_changed");
             intent.putExtra("key", key);
@@ -4822,6 +5079,57 @@ public final class MaintainedLauncherSettingsHost {
             applyShowAppName(!readSystemBool(context, key, false));
         }
     }
+    // ─── Public wrappers for settings package ─────────────────────────────────
+    // These thin wrappers expose private methods to AdditionalFeaturesActivity
+    // without changing the private methods themselves.
+
+    /** @see #migrateSearchGestureSetting(Context) */
+    public static void migrateSearchGestureSettingPublic(Context context) {
+        migrateSearchGestureSetting(context);
+    }
+
+    /** @see #synchronizeBadgeSettingsWithNotificationAccess(Activity, boolean) */
+    public static void synchronizeBadgeSettingsWithNotificationAccessPublic(Activity activity, boolean hasAccess) {
+        synchronizeBadgeSettingsWithNotificationAccess(activity, hasAccess);
+    }
+
+    /** @see #readSystemBool(Context, String, boolean) */
+    public static boolean readSystemBoolPublic(Context context, String key, boolean def) {
+        return readSystemBool(context, key, def);
+    }
+
+    /**
+     * Keep the original profile-app content and data path, but host it in a
+     * real settings Activity so Android's Back stack (including edge gestures)
+     * returns to the settings landing page instead of exposing Launcher.
+     */
+    public static void showProfileAppsPagePublic(Activity activity) {
+        showProfileAppsPage(activity);
+    }
+
+    /** Reuses the original privacy-password flow without duplicating its keys. */
+    public static void showPrivacyPasswordPagePublic(Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        // This is the settings entry point, not the already-authorized page.
+        // The original route asks for the existing password, or asks the user
+        // to create one when none exists, before exposing privacy management.
+        showSettingsPagePasswordEntry(activity);
+    }
+
+    /** Reuses the original active-icon page and its permission prompt flow. */
+    public static void showDynamicWeatherPagePublic(Activity activity) {
+        showDynamicWeatherPage(activity);
+    }
+
+    /** Reuses the existing update checker instead of returning to legacy settings. */
+    public static void checkForUpdatesPublic(Activity activity) {
+        if (activity != null) {
+            checkForUpdates(activity);
+        }
+    }
+
 
     private static void applyBadgeVisibility(Context context, boolean hidden, boolean refresh) {
         setBadgeRuntimeVisibility(context, hidden);
@@ -5509,10 +5817,16 @@ public final class MaintainedLauncherSettingsHost {
             params.add(Integer.valueOf(entry.userId));
             if (enabled) {
                 postDatabaseUserPackageAdded(params);
+                // EVENT_USER_PACKAGE_ADDED updates the original database entry,
+                // while EVENT_REFRESH rebuilds the in-memory Cell from that entry.
+                // Drawing a frame alone can otherwise leave NEW waiting for an
+                // unrelated later model refresh.
+                postDatabaseRefreshEvent();
                 logOperation(context, "PROFILE_NATIVE_ITEM", "add package=" + entry.packageName
                         + ", userId=" + entry.userId);
             } else {
                 postDatabaseUserPackageRemoved(params);
+                postDatabaseRefreshEvent();
                 logOperation(context, "PROFILE_NATIVE_ITEM", "remove package=" + entry.packageName
                         + ", userId=" + entry.userId);
             }
@@ -6002,7 +6316,11 @@ public final class MaintainedLauncherSettingsHost {
             View title = inflate(activity, context, "title_layout");
             bindTitleBar(activity, resources, title, "应用分身", new View.OnClickListener() {
                 public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY, true);
+                    if (SettingsUiFlags.isModernUiEnabled(activity)) {
+                        activity.onBackPressed();
+                    } else {
+                        show(activity, sMainSettingsScrollY, true);
+                    }
                 }
             });
             root.addView(title, new LinearLayout.LayoutParams(-1, -2));
@@ -6098,7 +6416,11 @@ public final class MaintainedLauncherSettingsHost {
             View title = inflate(activity, context, "title_layout");
             bindTitleBar(activity, resources, title, "隐私密码", new View.OnClickListener() {
                 public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY, true);
+                    if (SettingsUiFlags.isModernUiEnabled(activity)) {
+                        activity.onBackPressed();
+                    } else {
+                        show(activity, sMainSettingsScrollY, true);
+                    }
                 }
             });
             root.addView(title, new LinearLayout.LayoutParams(
@@ -6452,6 +6774,8 @@ public final class MaintainedLauncherSettingsHost {
                 public void onClick(View v) {
                     if (backToPrivacyPage) {
                         showPrivacyPasswordPage(activity, false);
+                    } else if (SettingsUiFlags.isModernUiEnabled(activity)) {
+                        activity.onBackPressed();
                     } else {
                         show(activity, sMainSettingsScrollY, true);
                     }
@@ -6485,6 +6809,7 @@ public final class MaintainedLauncherSettingsHost {
             final Runnable reset = new Runnable() {
                 @Override
                 public void run() {
+                    playPasswordErrorFeedback(dots);
                     input.setLength(0);
                     updatePasswordDots(dots, 0, false);
                 }
@@ -6502,6 +6827,19 @@ public final class MaintainedLauncherSettingsHost {
             t.printStackTrace();
             show(activity, sMainSettingsScrollY);
         }
+    }
+
+    /** Keep the original password-control's visible wrong-input feedback. */
+    private static void playPasswordErrorFeedback(View dots) {
+        if (dots == null) {
+            return;
+        }
+        android.view.animation.TranslateAnimation shake =
+                new android.view.animation.TranslateAnimation(-12, 12, 0, 0);
+        shake.setDuration(55L);
+        shake.setRepeatCount(3);
+        shake.setRepeatMode(android.view.animation.Animation.REVERSE);
+        dots.startAnimation(shake);
     }
 
     public static void showLauncherPasswordActivity(final Activity activity) {
@@ -7369,53 +7707,7 @@ public final class MaintainedLauncherSettingsHost {
     public static void migrateLauncherModeAndRestart(final Context context,
                                                      final int oldPageMode,
                                                      final int newPageMode) {
-        if (oldPageMode == newPageMode) {
-            logOperation(context, "GRID_MIGRATION", "skip_same_mode=" + newPageMode);
-            return;
-        }
-        try {
-            Class<?> databaseHandler = Class.forName("com.smartisanos.launcher.data.A");
-            java.lang.reflect.Field workerField = databaseHandler.getDeclaredField("mWorker");
-            workerField.setAccessible(true);
-            Handler worker = (Handler) workerField.get(null);
-            if (worker == null) {
-                throw new IllegalStateException("DatabaseHandler worker is null");
-            }
-            boolean posted = worker.post(new Runnable() {
-                public void run() {
-                    try {
-                        Class<?> preferences = Class.forName("com.smartisanos.launcher.data.N");
-                        Object instance = preferences.getMethod("getInstance").invoke(null);
-                        preferences.getMethod("d", Context.class, Integer.TYPE)
-                                .invoke(instance, context, newPageMode);
-                        // Keep the original mode conversion intact.  On a
-                        // 12 -> 20 change F.i only refreshes page metadata;
-                        // it leaves every item in its existing board and cell.
-                        // On a 20 -> 12 change it performs the stock splitter.
-                        Class.forName("com.smartisanos.launcher.data.F")
-                                .getMethod("i", Integer.TYPE, Integer.TYPE)
-                                .invoke(null, oldPageMode, newPageMode);
-                        logOperation(context, "GRID_MIGRATION", "complete old=" + oldPageMode
-                                + ", new=" + newPageMode);
-                    } catch (Throwable t) {
-                        logOperation(context, "GRID_MIGRATION", "failed old=" + oldPageMode
-                                + ", new=" + newPageMode + ", error=" + shortError(t));
-                    }
-                    new Handler(Looper.getMainLooper()).post(new Runnable() {
-                        public void run() {
-                            restartLauncherAfterGridMigration(context);
-                        }
-                    });
-                }
-            });
-            if (!posted) {
-                throw new IllegalStateException("DatabaseHandler rejected migration");
-            }
-        } catch (Throwable t) {
-            logOperation(context, "GRID_MIGRATION", "schedule_failed old=" + oldPageMode
-                    + ", new=" + newPageMode + ", error=" + shortError(t));
-            restartLauncherAfterGridMigration(context);
-        }
+        com.smartisanos.launcher.settings.OriginalSettingsBridge.switchGridMode(context, oldPageMode, newPageMode);
     }
 
     /** Grid migration is complete; use the verified cold-scene fallback. */
@@ -8340,45 +8632,19 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void applyTheme(Activity activity, String id, String pkg, String name) {
-        logOperation(activity, "ACTION", "apply_theme id=" + id + ", pkg=" + pkg + ", name=" + name
-                + ", before=" + themeDiagnosticState(activity)
-                + ", package_installed=" + packageInstalled(activity, pkg));
-        sThemeChangeGuardUntilUptime = android.os.SystemClock.uptimeMillis() + 4000L;
-        sPendingThemeLoadingThemeId = id;
-        pkg = normalizeThemePackage(activity, id, pkg);
         if ("smartisan_theme_trans".equals(id)) {
-            applyTransparentThemeSetting(activity, true, true);
-            return;
+            com.smartisanos.launcher.settings.OriginalSettingsBridge.setTransparentTheme(activity, true);
         } else {
-            // A regular theme selection must always remain on the original
-            // ChangeThemeHandler path.  launcher_grid_theme is an overlay
-            // state, not the requested theme identity; routing this branch
-            // through the transparent-theme reload made a normal selection
-            // show ReloadTransitionActivity whenever stale overlay state was
-            // present.
-            boolean transparentOverlayWasEnabled = isTransparentThemeEnabled(activity);
-            writeTransparentModeSetting(activity, false);
-            writeOriginalBoolIntSetting(activity, KEY_TRANSPARENT_WALLPAPER_BLUR, false);
-            applyTransparentThemeRuntimeFlags(activity, false);
-            if (transparentOverlayWasEnabled) {
-                logOperation(activity, "THEME",
-                        "normal_theme_cleared_transparent_overlay_without_cold_reload id=" + id);
+            com.smartisanos.launcher.settings.SettingsApplyResult result =
+                    com.smartisanos.launcher.settings.OriginalSettingsBridge
+                            .applyTheme(activity, id, pkg, name);
+            if (result == com.smartisanos.launcher.settings.SettingsApplyResult.SUCCESS) {
+                Toast.makeText(activity, "正在应用主题：" + name, Toast.LENGTH_SHORT).show();
+                returnToLauncherForOriginalThemeTransition(activity);
+            } else {
+                Toast.makeText(activity, "主题应用失败", Toast.LENGTH_SHORT).show();
             }
         }
-        // The original ThemeManager/ChangeThemeHandler owns the normal path.
-        // Only synthesize its pending message after that stack explicitly fails
-        // to persist the selected theme.
-        boolean originalApplied = applyThemeViaOriginalStack(activity, id, pkg);
-        boolean fallbackQueued = false;
-        if (!originalApplied) {
-            storeThemeSelection(activity, id);
-            fallbackQueued = queueThemeChangeForLauncher(activity, id);
-        }
-        logOperation(activity, "THEME", "dispatch id=" + id
-                + ", original=" + originalApplied + ", fallback=" + fallbackQueued
-                + ", after=" + themeDiagnosticState(activity));
-        Toast.makeText(activity, "正在应用：" + name, Toast.LENGTH_SHORT).show();
-        returnToLauncherForOriginalThemeTransition(activity);
     }
 
     private static void returnToLauncherForOriginalThemeTransition(final Activity activity) {
@@ -10032,6 +10298,18 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    /**
+     * Request a render only after the Launcher window gains focus.
+     *
+     * The original renderer remains responsible for scene creation and drawing.
+     * This only makes its already-created Surface visible again on ROMs that
+     * keep the previous window buffer after an APK replacement or first HOME
+     * handoff.
+     */
+    public static void requestLauncherFrameOnWindowFocus(Activity activity) {
+        requestLauncherFrame(activity);
+    }
+
     private static void updateDownloadProgressUi(Activity activity, UpdateDownloadProgress ui,
                                                  int status, int downloaded, int total) {
         if (ui == null || ui.message == null || ui.progress == null) {
@@ -10385,7 +10663,6 @@ public final class MaintainedLauncherSettingsHost {
             bindBackTitle(activity, resources, root, "view_title",
                     getString(resources, "setting_about_us", "关于我们"));
             hide(resources, root, "setting_more_product");
-            bindOperationLogSection(activity, root, resources);
             tuneScrollBars(root);
             setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
@@ -10455,7 +10732,19 @@ public final class MaintainedLauncherSettingsHost {
         parent.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 92)));
     }
 
-    private static void bindOperationLogSection(final Activity activity, View root, Resources resources) {
+    public static void refreshAbout(Activity activity) {
+        if (activity.getClass().getName().endsWith("AboutActivity")) {
+            try {
+                activity.getClass().getMethod("refresh").invoke(activity);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else {
+            showAboutPage(activity);
+        }
+    }
+
+    public static void bindOperationLogSection(final Activity activity, View root, Resources resources) {
         LinearLayout content = aboutContent(root, resources);
         if (content == null) {
             return;
@@ -10480,7 +10769,7 @@ public final class MaintainedLauncherSettingsHost {
                     startOperationLog(activity);
                     Toast.makeText(activity, "已开始记录操作日志", Toast.LENGTH_SHORT).show();
                 }
-                showAboutPage(activity);
+                refreshAbout(activity);
             }
         });
         actions.addView(toggle, new LinearLayout.LayoutParams(0, dp(activity, 48), 1.0f));
@@ -10488,7 +10777,7 @@ public final class MaintainedLauncherSettingsHost {
         TextView refresh = aboutActionButton(activity, "刷新列表", 0xff555d6d);
         refresh.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                showAboutPage(activity);
+                refreshAbout(activity);
             }
         });
         LinearLayout.LayoutParams refreshLp = new LinearLayout.LayoutParams(0, dp(activity, 48), 1.0f);
@@ -10665,7 +10954,7 @@ public final class MaintainedLauncherSettingsHost {
                 } else {
                     Toast.makeText(activity, "删除失败", Toast.LENGTH_SHORT).show();
                 }
-                showAboutPage(activity);
+                refreshAbout(activity);
             }
         });
         LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(dp(activity, 62), dp(activity, 42));
@@ -10831,25 +11120,8 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void logOperation(Context context, String event, String detail) {
-        if (context == null || !isOperationLogActive(context)) {
-            return;
-        }
-        synchronized (OPERATION_LOG_LOCK) {
-            try {
-                if (sOperationLogWriter == null) {
-                    File active = activeOperationLogFile(context);
-                    if (active == null) {
-                        return;
-                    }
-                    sOperationLogFile = active;
-                    sOperationLogWriter = new BufferedWriter(new OutputStreamWriter(
-                            new FileOutputStream(active, true), "UTF-8"));
-                    writeOperationLogLocked("RESUME", "writer_reopened");
-                }
-                writeOperationLogLocked(event, detail);
-            } catch (Throwable ignored) {
-            }
-        }
+        // Operation log was removed by product decision.  Keep existing callers
+        // inert so an active preference left by an older build cannot reopen a file.
     }
 
     private static void writeOperationLogLocked(String event, String detail) {
@@ -11345,21 +11617,7 @@ public final class MaintainedLauncherSettingsHost {
             final SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
             View root = inflate(activity, context, "setting_ocd_options");
-            bindBackTitle(activity, resources, root, "view_title",
-                    getString(resources, "obsession_header_title", "OCD Settings"));
-            bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
-            bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
-            bindBadgeVisibilitySwitch(activity, resources, root);
-            bindBadgeSwipeCleanSwitch(activity, resources, root);
-            bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
-            migrateSearchGestureSetting(activity);
-            bindSwitch(activity, resources, root, "item_id_search_page_enabled",
-                    KEY_SWIPE_UP_SEARCH_ENABLED, true);
-            bindSwitch(activity, resources, root, "item_id_swipe_down_system_panels",
-                    KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED, true);
-            synchronizeBadgeSettingsWithNotificationAccess(activity,
-                    com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity));
-            tuneScrollBars(root);
+            bindOcdOptionsPagePublic(activity, root);
             setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
             showInfoDialog(activity, "OCD Settings", "Unable to open OCD settings");
@@ -11534,7 +11792,10 @@ public final class MaintainedLauncherSettingsHost {
 
     private static Bitmap assetBitmap(Context context, String name) {
         try {
-            InputStream in = context.getAssets().open(name);
+            AssetManager assets = (context != null && context.getApplicationContext() != null)
+                    ? context.getApplicationContext().getAssets() : (context != null ? context.getAssets() : null);
+            if (assets == null) return null;
+            InputStream in = assets.open(name);
             try {
                 return BitmapFactory.decodeStream(in);
             } finally {
@@ -11555,9 +11816,12 @@ public final class MaintainedLauncherSettingsHost {
         }
         InputStream in = null;
         try {
+            AssetManager assets = (context != null && context.getApplicationContext() != null)
+                    ? context.getApplicationContext().getAssets() : (context != null ? context.getAssets() : null);
+            if (assets == null) return null;
             BitmapFactory.Options bounds = new BitmapFactory.Options();
             bounds.inJustDecodeBounds = true;
-            in = context.getAssets().open(name);
+            in = assets.open(name);
             BitmapFactory.decodeStream(in, null, bounds);
             try {
                 in.close();
@@ -11567,7 +11831,7 @@ public final class MaintainedLauncherSettingsHost {
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight, targetW, targetH);
             options.inPreferredConfig = Bitmap.Config.RGB_565;
-            in = context.getAssets().open(name);
+            in = assets.open(name);
             Bitmap bitmap = BitmapFactory.decodeStream(in, null, options);
             if (bitmap != null) {
                 synchronized (sThemePreviewCache) {
@@ -11613,12 +11877,19 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static String[] themePreviewCandidates(Context context, String themeId) {
+        if (themeId == null || "smartisan_theme_default".equals(themeId) || themeId.isEmpty()) {
+            themeId = "smartisan_theme_black";
+        }
         int mode = readLauncherMode(context);
         return new String[]{
                 "theme_preview/" + themeId + "/" + mode + "/trident_S.jpg",
                 "theme_preview/" + themeId + "/12/trident_S.jpg",
                 "theme_preview/" + themeId + "/20/trident_S.jpg",
                 "theme_preview/" + themeId + "/" + mode + "/delta_L.jpg",
+                "theme_preview/" + themeId + "/12/delta_L.jpg",
+                "theme_preview/" + themeId + "/20/delta_L.jpg",
+                "theme_preview/" + themeId + "/thumbnail_settings" + (mode == 20 ? "_16" : "") + ".png",
+                "theme_preview/" + themeId + "/thumbnail_settings.png",
         };
     }
 
@@ -14433,6 +14704,12 @@ public final class MaintainedLauncherSettingsHost {
         private void showIconChoicePage(final View row, final RedirectIconInfo info, final int returnScrollY) {
             final ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
             try {
+                setModernSettingsBackAction(activity, new Runnable() {
+                    @Override
+                    public void run() {
+                        showIconPage(activity, returnScrollY, false);
+                    }
+                });
                 tuneWindow(activity);
                 final View page = inflate(activity, context, "app_icon_settings_layout");
                 bindBackTitle(activity, resources, page, "view_title", "替换图标");

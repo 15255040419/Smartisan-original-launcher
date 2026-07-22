@@ -636,7 +636,7 @@ Activity.recreate() 处理宫格
 
 # 10. 阶段 5：透明主题
 
-状态：进行中（2026-07-15）。本阶段复用阶段 4 的 `ReloadTransitionActivity`、`LauncherColdReloadCoordinator`、`ReloadProtocol`、reloadToken、旧主 PID 精确终止、`FIRST_FRAME_READY` 与失败手动重试；不携带任何宫格迁移状态。
+状态：已完成（2026-07-22）。透明主题切换复用阶段 4 冷重载协调器；跨包 Resources/Assets 加载路径已修正，真机测试通过。
 
 ## 原版 Settings
 
@@ -740,7 +740,7 @@ Constants.isTransparentTheme
 
 # 11. 阶段 6：普通主题
 
-状态：进行中（2026-07-15）。普通主题只使用原版 ThemeManager、`ChangeThemeHandler.RequireChangeFrom.SETTING`、过渡截图和 Launcher 返回后的单条原版消息；仅当原版持久化明确失败时，才写一条兼容 pending 消息。
+状态：已完成（2026-07-22）。普通主题选择列表已全量修复，各主题（经典黑、格子、蓝色、经典蓝、暖橙、竹青等）渲染各自独特的高精度原版 12 宫格预览图，选择与返回栈平滑顺畅，真机截图验证通过。
 
 ## 原版参考
 

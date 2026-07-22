@@ -147,8 +147,8 @@
     <string name="lockscreen_wallpaper_setting_sub_text">设置锁屏界面的壁纸</string>
     <string name="lockscreen_wallpaper_setting_text">锁屏壁纸</string>
     <string name="mode_android_original_launcher">安卓原生</string>
-    <string name="mode_smartisan_launcher_16_grids">十六宫格</string>
-    <string name="mode_smartisan_launcher_9_grids">九宫格</string>
+    <string name="mode_smartisan_launcher_16_grids">二十宫格</string>
+    <string name="mode_smartisan_launcher_9_grids">十二宫格</string>
     <string name="more">更多</string>
     <string name="more_check_upgradation">检查更新</string>
     <string name="more_info">更多</string>

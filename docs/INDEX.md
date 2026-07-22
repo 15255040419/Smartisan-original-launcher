@@ -12,6 +12,8 @@
 
 - [DEVELOPMENT_LOG.md](development/DEVELOPMENT_LOG.md)：BUG 根因、修复方式、验证过程、回归注意和倒序每日记录。
 - [LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md](development/LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md)：Launcher 启动、重载、宫格和主题专项的阶段计划与验收条件。
+- [SETTINGS_MODERNIZATION_PLAN.md](development/SETTINGS_MODERNIZATION_PLAN.md)：设置系统现代化的分阶段施工计划、依赖、验证和回退条件。
+- [ORIGINAL_SETTINGS_BEHAVIOR_MATRIX.md](development/ORIGINAL_SETTINGS_BEHAVIOR_MATRIX.md)：设置项当前链路、原版行为、Launcher 接收入口与 UNKNOWN 清单。
 - [CLEANUP.md](development/CLEANUP.md)：清理和归档候选项。记录候选，不代表可以直接删除。
 
 ## 构建
@@ -21,6 +23,7 @@
 ## 架构与资源
 
 - [APK_STRUCTURE.md](architecture/APK_STRUCTURE.md)：原版 APK、反编译目录、主题包身份、构建产物和 Release 资产规则。
+- [SETTINGS_ARCHITECTURE.md](architecture/SETTINGS_ARCHITECTURE.md)：设置 UI、原版 Bridge、Launcher Core 与平台兼容层的稳定边界。
 - [icons/README.md](../icons/README.md)：在线图标命名、资源要求、加载顺序和索引生成规则。
 
 ## 参考目录
