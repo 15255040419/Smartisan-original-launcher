@@ -268,6 +268,8 @@ public final class MaintainedLauncherSettingsHost {
     private static boolean sDeferredLauncherTasksPosted;
     private static final Map<Activity, PasswordPageExit> sPasswordPageExits =
             new WeakHashMap<Activity, PasswordPageExit>();
+    private static final Object SETTINGS_BACK_LOCK = new Object();
+    private static SettingsBackEntry sSettingsBackEntry;
     public static volatile boolean sLauncherFrameReportPending;
     private static final String SMARTISAN_ICON_CACHE_PREFS = "online_icon_cache_v3";
     private static final String SMARTISAN_ICON_CACHE_DIR = "online_icon_cache_v3";
@@ -345,6 +347,94 @@ public final class MaintainedLauncherSettingsHost {
     private MaintainedLauncherSettingsHost() {
     }
 
+    private static final class SettingsBackEntry {
+        final WeakReference<Activity> owner;
+        final String page;
+        final Runnable action;
+        boolean dispatching;
+
+        SettingsBackEntry(Activity activity, String page, Runnable action) {
+            owner = new WeakReference<Activity>(activity);
+            this.page = page == null ? "unknown" : page;
+            this.action = action;
+        }
+    }
+
+    public static void registerSettingsBackActionPublic(Activity activity, String page,
+                                                         Runnable action) {
+        if (activity == null) return;
+        synchronized (SETTINGS_BACK_LOCK) {
+            if (action == null) {
+                SettingsBackEntry current = sSettingsBackEntry;
+                Activity owner = current == null ? null : current.owner.get();
+                if (owner == null || owner == activity) sSettingsBackEntry = null;
+                Log.i("SettingsNavigation", "SETTINGS_BACK_CLEAR page=" + page
+                        + " activity=" + activity.getClass().getSimpleName());
+                return;
+            }
+            sSettingsBackEntry = new SettingsBackEntry(activity, page, action);
+        }
+        Log.i("SettingsNavigation", "SETTINGS_BACK_REGISTER page=" + page
+                + " activity=" + activity.getClass().getSimpleName());
+    }
+
+    public static boolean handleSettingsBackPublic(Activity activity) {
+        if (activity == null) return false;
+        final SettingsBackEntry entry;
+        synchronized (SETTINGS_BACK_LOCK) {
+            entry = sSettingsBackEntry;
+            if (entry == null) {
+                Log.i("SettingsNavigation", "SETTINGS_BACK_NO_ACTION activity="
+                        + activity.getClass().getSimpleName());
+                return false;
+            }
+            Activity owner = entry.owner.get();
+            if (owner != activity) {
+                Log.w("SettingsNavigation", "SETTINGS_BACK_OWNER_MISMATCH expected="
+                        + (owner == null ? "null" : owner.getClass().getSimpleName())
+                        + " actual=" + activity.getClass().getSimpleName());
+                if (owner == null) sSettingsBackEntry = null;
+                return false;
+            }
+            if (entry.action == null) return false;
+            if (entry.dispatching) {
+                Log.w("SettingsNavigation", "SETTINGS_BACK_DUPLICATE_BLOCKED page=" + entry.page);
+                return true;
+            }
+            entry.dispatching = true;
+        }
+        try {
+            Log.i("SettingsNavigation", "SETTINGS_BACK_DISPATCH page=" + entry.page
+                    + " source=activity_back");
+            entry.action.run();
+            Log.i("SettingsNavigation", "SETTINGS_BACK_HANDLED page=" + entry.page);
+            return true;
+        } catch (Throwable error) {
+            Log.e("SettingsNavigation", "SETTINGS_BACK_ACTION_FAILED page=" + entry.page, error);
+            return true;
+        } finally {
+            synchronized (SETTINGS_BACK_LOCK) {
+                entry.dispatching = false;
+            }
+        }
+    }
+
+    public static void clearSettingsBackActionPublic(Activity activity) {
+        if (activity == null) return;
+        synchronized (SETTINGS_BACK_LOCK) {
+            if (sSettingsBackEntry != null && sSettingsBackEntry.owner.get() == activity) {
+                sSettingsBackEntry = null;
+            }
+        }
+        Log.i("SettingsNavigation", "SETTINGS_BACK_DESTROY_CLEAR activity="
+                + activity.getClass().getSimpleName());
+    }
+
+    public static void logSettingsBackFallbackPublic(Activity activity) {
+        Log.i("SettingsNavigation", "SETTINGS_BACK_FALLBACK_FINISH page=MAIN activity="
+                + (activity == null ? "null" : activity.getClass().getSimpleName()));
+    }
+
     public static void show(Activity activity) {
         show(activity, -1, false);
     }
@@ -388,6 +478,7 @@ public final class MaintainedLauncherSettingsHost {
             bindPage(activity, resources, root);
             tuneScrollBars(root);
             setSettingsContentView(activity, context, resources, root, !animateBack, animateBack);
+            registerSettingsBackActionPublic(activity, "MAIN", null);
             restoreScroll(root, restoreScrollY);
             scheduleInitialSettingsMigrationsIfIdle(activity);
         } catch (Throwable t) {
@@ -3197,7 +3288,8 @@ public final class MaintainedLauncherSettingsHost {
             final SettingsResourceContext context = createSettingsContext(activity);
             final Resources resources = context.getResources();
             final View root = inflate(activity, context, "theme_preview_gridview");
-            bindBackTitle(activity, resources, root, "view_title", getString(resources, "launcher_theme_text", "桌面主题"));
+            bindBackTitle(activity, resources, root, "view_title", getString(resources, "launcher_theme_text", "桌面主题"),
+                    "THEME_LIST", new Runnable() { public void run() { stopThemePagePolling(); show(activity, sMainSettingsScrollY, true); } });
             final GridView installed = asGrid(find(resources, root, "installed_list"));
             if (installed != null) {
                 installed.setSelector(android.R.color.transparent);
@@ -3310,14 +3402,11 @@ public final class MaintainedLauncherSettingsHost {
             final View statusIcon = find(resources, root, "status_icon_view");
             final LinearLayout dots = (LinearLayout) find(resources, root, "horizontal_linear_layout");
 
+            registerSettingsBackActionPublic(activity, "THEME_DETAIL", new Runnable() {
+                public void run() { showThemePage(activity, sThemePageScrollY, false); }
+            });
             TextView btnBack = (TextView) find(resources, root, "btn_back");
-            if (btnBack != null) {
-                btnBack.setOnClickListener(new View.OnClickListener() {
-                    public void onClick(View v) {
-                        showThemePage(activity, sThemePageScrollY, false);
-                    }
-                });
-            }
+            if (btnBack != null) btnBack.setOnClickListener(settingsTitleBackClick(activity, "THEME_DETAIL"));
             if (statusIcon != null) {
                 statusIcon.setVisibility(View.GONE);
             }
@@ -3410,7 +3499,8 @@ public final class MaintainedLauncherSettingsHost {
             SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
             View root = inflate(activity, context, "app_icon_settings_layout");
-            bindBackTitle(activity, resources, root, "view_title", getString(resources, "launcher_wallpaper_setting_text", "桌面壁纸"));
+            bindBackTitle(activity, resources, root, "view_title", getString(resources, "launcher_wallpaper_setting_text", "桌面壁纸"),
+                    "WALLPAPER", backToMainAction(activity));
             ListView list = asList(find(resources, root, "icons_list_view"));
             if (list != null) {
                 final SimpleTextAdapter adapter = new SimpleTextAdapter(activity, resources,
@@ -3481,7 +3571,8 @@ public final class MaintainedLauncherSettingsHost {
             Resources resources = context.getResources();
             
             View root = inflate(activity, context, "launcher_anim_chooser_layout");
-            bindBackTitle(activity, resources, root, "view_title", getString(resources, "flip_anim_title", "桌面翻页动画"));
+            bindBackTitle(activity, resources, root, "view_title", getString(resources, "flip_anim_title", "桌面翻页动画"),
+                    "PAGE_FLIP", backToMainAction(activity));
             GridView grid = asGrid(find(resources, root, "grid_view"));
             if (grid != null) {
                 final PageFlipAdapter adapter = new PageFlipAdapter(activity, context, resources);
@@ -3528,7 +3619,8 @@ public final class MaintainedLauncherSettingsHost {
             SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
             View root = inflate(activity, context, "app_icon_settings_layout");
-            bindBackTitle(activity, resources, root, "view_title", getString(resources, "icon_setting_text", "应用图标"));
+            bindBackTitle(activity, resources, root, "view_title", getString(resources, "icon_setting_text", "应用图标"),
+                    "ICON_LIST", backToMainAction(activity));
             root.setFocusableInTouchMode(true);
             root.requestFocus();
             ListView list = asList(find(resources, root, "icons_list_view"));
@@ -3719,15 +3811,27 @@ public final class MaintainedLauncherSettingsHost {
         return data;
     }
 
-    private static void bindBackTitle(final Activity activity, Resources resources, View root, String idName, String titleText) {
+    private static Runnable backToMainAction(final Activity activity) {
+        return new Runnable() {
+            public void run() { show(activity, sMainSettingsScrollY, true); }
+        };
+    }
+
+    private static View.OnClickListener settingsTitleBackClick(final Activity activity, final String page) {
+        return new View.OnClickListener() {
+            public void onClick(View v) {
+                Log.i("SettingsNavigation", "SETTINGS_TITLE_BACK_CLICK page=" + page);
+                activity.onBackPressed();
+            }
+        };
+    }
+
+    private static void bindBackTitle(final Activity activity, Resources resources, View root, String idName,
+                                      String titleText, String page, Runnable backAction) {
+        registerSettingsBackActionPublic(activity, page, backAction);
         TextView btnBack = (TextView) find(resources, root, "btn_back");
         if (btnBack != null) {
-            btnBack.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    stopThemePagePolling();
-                    show(activity, sMainSettingsScrollY, true);
-                }
-            });
+            btnBack.setOnClickListener(settingsTitleBackClick(activity, page));
         }
         TextView tvTitle = (TextView) find(resources, root, "tv_title");
         if (tvTitle != null) {
@@ -3737,11 +3841,7 @@ public final class MaintainedLauncherSettingsHost {
         if (title instanceof Title) {
             Title smartisanTitle = (Title) title;
             smartisanTitle.setTitle(titleText);
-            smartisanTitle.setBackClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY, true);
-                }
-            });
+            smartisanTitle.setBackClickListener(settingsTitleBackClick(activity, page));
         }
     }
 
@@ -6000,11 +6100,7 @@ public final class MaintainedLauncherSettingsHost {
             setBackground(root, resources, "background");
 
             View title = inflate(activity, context, "title_layout");
-            bindTitleBar(activity, resources, title, "应用分身", new View.OnClickListener() {
-                public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY, true);
-                }
-            });
+            bindTitleBar(activity, resources, title, "应用分身", "PROFILE_APPS", backToMainAction(activity));
             root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
             ScrollView scroll = new ScrollView(context);
@@ -6096,11 +6192,7 @@ public final class MaintainedLauncherSettingsHost {
             setBackground(root, resources, "background");
 
             View title = inflate(activity, context, "title_layout");
-            bindTitleBar(activity, resources, title, "隐私密码", new View.OnClickListener() {
-                public void onClick(View v) {
-                    show(activity, sMainSettingsScrollY, true);
-                }
-            });
+            bindTitleBar(activity, resources, title, "隐私密码", "PRIVACY_SETTINGS", backToMainAction(activity));
             root.addView(title, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -6160,10 +6252,8 @@ public final class MaintainedLauncherSettingsHost {
             root.setOrientation(LinearLayout.VERTICAL);
             setBackground(root, resources, "background");
             View title = inflate(activity, context, "title_layout");
-            bindTitleBar(activity, resources, title, "桌面板块锁", new View.OnClickListener() {
-                public void onClick(View v) {
-                    showPrivacyPasswordPage(activity, false);
-                }
+            bindTitleBar(activity, resources, title, "桌面板块锁", "BLOCK_LOCK_INFO", new Runnable() {
+                public void run() { showPrivacyPasswordPage(activity, false); }
             });
             root.addView(title, new LinearLayout.LayoutParams(-1, -2));
             LinearLayout content = new LinearLayout(context);
@@ -6197,10 +6287,11 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void bindTitleBar(final Activity activity, Resources resources, View root,
-            String titleText, View.OnClickListener backClick) {
+            String titleText, String page, Runnable backAction) {
+        registerSettingsBackActionPublic(activity, page, backAction);
         TextView btnBack = (TextView) find(resources, root, "btn_back");
         if (btnBack != null) {
-            btnBack.setOnClickListener(backClick);
+            btnBack.setOnClickListener(settingsTitleBackClick(activity, page));
         }
         TextView tvTitle = (TextView) find(resources, root, "tv_title");
         if (tvTitle != null) {
@@ -6448,8 +6539,9 @@ public final class MaintainedLauncherSettingsHost {
             setBackground(page, resources, "background");
 
             View title = inflate(activity, context, "title_layout");
-            bindTitleBar(activity, resources, title, titleText, new View.OnClickListener() {
-                public void onClick(View v) {
+            bindTitleBar(activity, resources, title, titleText,
+                    backToPrivacyPage ? "PASSWORD_SET" : "PASSWORD_VERIFY", new Runnable() {
+                public void run() {
                     if (backToPrivacyPage) {
                         showPrivacyPasswordPage(activity, false);
                     } else {
@@ -10383,7 +10475,7 @@ public final class MaintainedLauncherSettingsHost {
             Resources resources = context.getResources();
             View root = inflate(activity, context, "setting_about_us");
             bindBackTitle(activity, resources, root, "view_title",
-                    getString(resources, "setting_about_us", "关于我们"));
+                    getString(resources, "setting_about_us", "关于我们"), "ABOUT", backToMainAction(activity));
             hide(resources, root, "setting_more_product");
             bindOperationLogSection(activity, root, resources);
             tuneScrollBars(root);
@@ -11030,7 +11122,8 @@ public final class MaintainedLauncherSettingsHost {
             final SettingsResourceContext context = createSettingsContext(activity);
             final Resources resources = context.getResources();
             final View root = inflate(activity, context, "setting_dynamic_weather");
-            bindBackTitle(activity, resources, root, "view_title", "动态天气");
+            bindBackTitle(activity, resources, root, "view_title", "动态天气",
+                    "DYNAMIC_WEATHER", backToMainAction(activity));
             View automaticView = find(resources, root, "weather_auto_location");
             final SettingItemSwitch automatic = automaticView instanceof SettingItemSwitch
                     ? (SettingItemSwitch) automaticView : null;
@@ -11346,7 +11439,7 @@ public final class MaintainedLauncherSettingsHost {
             Resources resources = context.getResources();
             View root = inflate(activity, context, "setting_ocd_options");
             bindBackTitle(activity, resources, root, "view_title",
-                    getString(resources, "obsession_header_title", "OCD Settings"));
+                    getString(resources, "obsession_header_title", "OCD Settings"), "OCD_OPTIONS", backToMainAction(activity));
             bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
             bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
             bindBadgeVisibilitySwitch(activity, resources, root);
@@ -14435,14 +14528,12 @@ public final class MaintainedLauncherSettingsHost {
             try {
                 tuneWindow(activity);
                 final View page = inflate(activity, context, "app_icon_settings_layout");
-                bindBackTitle(activity, resources, page, "view_title", "替换图标");
+                bindBackTitle(activity, resources, page, "view_title", "替换图标", "ICON_CHOICE", new Runnable() {
+                    public void run() { showIconPage(activity, returnScrollY, false); }
+                });
                 TextView back = (TextView) find(resources, page, "btn_back");
                 if (back != null) {
-                    back.setOnClickListener(new View.OnClickListener() {
-                        public void onClick(View v) {
-                            showIconPage(activity, returnScrollY, false);
-                        }
-                    });
+                    back.setOnClickListener(settingsTitleBackClick(activity, "ICON_CHOICE"));
                 }
                 ListView list = asList(find(resources, page, "icons_list_view"));
                 if (list != null && list.getParent() instanceof ViewGroup) {

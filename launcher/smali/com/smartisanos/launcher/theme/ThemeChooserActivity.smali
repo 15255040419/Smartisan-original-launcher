@@ -85,6 +85,8 @@
 .method protected onDestroy()V
     .locals 1
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->clearSettingsBackActionPublic(Landroid/app/Activity;)V
+
     invoke-super {p0}, Landroid/app/Activity;->onDestroy()V
 
     sget-object v0, Lcom/smartisanos/launcher/theme/ThemeChooserActivity;->db:Lcom/smartisanos/launcher/theme/ThemeChooserActivity;
@@ -96,5 +98,24 @@
     sput-object v0, Lcom/smartisanos/launcher/theme/ThemeChooserActivity;->db:Lcom/smartisanos/launcher/theme/ThemeChooserActivity;
 
     :cond_0
+    return-void
+.end method
+
+.method public onBackPressed()V
+    .locals 1
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->handleSettingsBackPublic(Landroid/app/Activity;)Z
+
+    move-result v0
+
+    if-eqz v0, :fallback_finish
+
+    return-void
+
+    :fallback_finish
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->logSettingsBackFallbackPublic(Landroid/app/Activity;)V
+
+    invoke-super {p0}, Landroid/app/Activity;->onBackPressed()V
+
     return-void
 .end method
