@@ -445,6 +445,10 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
     }
 
     public Drawable loadImprovedIconDrawableCachedOnly(String sourceId) {
+        return loadImprovedIconDrawableCachedOnly(sourceId, 0);
+    }
+
+    public Drawable loadImprovedIconDrawableCachedOnly(String sourceId, int targetPixelSize) {
         if (TextUtils.isEmpty(sourceId)) return null;
         // 1. Built-in resources
         String resName = sourceId.replace('.', '_').replace('-', '_');
@@ -460,7 +464,7 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
         File diskFile = new File(dir, sourceId + ".png");
         if (diskFile.exists() && diskFile.length() > 0) {
             try {
-                Bitmap decoded = android.graphics.BitmapFactory.decodeFile(diskFile.getAbsolutePath());
+                Bitmap decoded = IconBitmapDecoder.decodeFileNearTarget(diskFile, targetPixelSize);
                 if (decoded != null) return new BitmapDrawable(app.getResources(), decoded);
             } catch (Throwable ignored) {}
         }
@@ -482,10 +486,10 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
         if (inMemory != null) {
             return inMemory;
         }
-        return loadImprovedIconDrawableCachedOnly(candidate.sourceId);
+        return loadImprovedIconDrawableCachedOnly(candidate.sourceId, targetPixelSize);
     }
 
-    public void requestDesktopImprovedIcon(String packageName, String componentName, long userSerial, int targetPixelSize, final Callback callback) {
+    public void requestDesktopImprovedIcon(final String packageName, final String componentName, final long userSerial, final int targetPixelSize, final Callback callback) {
         final ImprovedCandidate candidate = resolveImprovedCandidate(packageName, componentName);
         if (!candidate.exists || TextUtils.isEmpty(candidate.sourceId)) {
             if (callback != null) callback.onIconReady("", null);
@@ -499,12 +503,16 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
                 versionStamp, targetPixelSize, app.getResources().getDisplayMetrics().densityDpi, 1);
         request(key, Priority.P1_ADJACENT, new DrawableLoader() {
             public Drawable load() throws Exception {
-                return loadImprovedIconDrawable(candidate.sourceId);
+                return loadImprovedIconDrawable(candidate.sourceId, targetPixelSize);
             }
         }, callback);
     }
 
     public Drawable loadImprovedIconDrawable(String sourceId) {
+        return loadImprovedIconDrawable(sourceId, 0);
+    }
+
+    public Drawable loadImprovedIconDrawable(String sourceId, int targetPixelSize) {
         if (TextUtils.isEmpty(sourceId)) return null;
         // 1. Built-in resources
         String resName = sourceId.replace('.', '_').replace('-', '_');
@@ -520,12 +528,12 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
         File diskFile = new File(dir, sourceId + ".png");
         if (diskFile.exists() && diskFile.length() > 0) {
             try {
-                Bitmap decoded = android.graphics.BitmapFactory.decodeFile(diskFile.getAbsolutePath());
+                Bitmap decoded = IconBitmapDecoder.decodeFileNearTarget(diskFile, targetPixelSize);
                 if (decoded != null) return new BitmapDrawable(app.getResources(), decoded);
             } catch (Throwable ignored) {}
         }
         // 3. Online download from mirror
-        Bitmap downloaded = downloadOnlineIcon(sourceId);
+        Bitmap downloaded = downloadOnlineIcon(sourceId, targetPixelSize);
         if (downloaded != null) {
             return new BitmapDrawable(app.getResources(), downloaded);
         }
@@ -533,6 +541,10 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
     }
 
     private Bitmap downloadOnlineIcon(String sourceId) {
+        return downloadOnlineIcon(sourceId, 0);
+    }
+
+    private Bitmap downloadOnlineIcon(String sourceId, int targetPixelSize) {
         if (TextUtils.isEmpty(sourceId) || !sourceId.matches("[A-Za-z0-9._-]+")) {
             return null;
         }
@@ -564,9 +576,7 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
                     bytes.write(buffer, 0, read);
                 }
                 byte[] data = bytes.toByteArray();
-                android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
-                options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-                Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length, options);
+                Bitmap bitmap = IconBitmapDecoder.decodeByteArrayNearTarget(data, targetPixelSize);
                 if (bitmap != null && bitmap.getWidth() >= 32 && bitmap.getHeight() >= 32) {
                     saveToDiskCache(sourceId, data);
                     return bitmap;

@@ -41,6 +41,7 @@ import android.graphics.RectF;
 import android.graphics.Point;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
+import com.smartisanos.home.settings.icons.IconBitmapDecoder;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
@@ -16480,10 +16481,7 @@ public final class MaintainedLauncherSettingsHost {
             if (file == null || !file.exists()) {
                 return null;
             }
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-            options.inScaled = false;
-            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+            Bitmap bitmap = IconBitmapDecoder.decodeFileNearTarget(file, 256);
             if (!isUsableIconBitmap(bitmap)) {
                 file.delete();
                 Log.w(LOG_TAG, "ICON_EMPTY_RESULT_REJECTED disk key=" + packageName);
