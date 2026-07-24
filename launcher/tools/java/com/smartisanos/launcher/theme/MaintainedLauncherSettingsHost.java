@@ -3775,6 +3775,8 @@ public final class MaintainedLauncherSettingsHost {
                                            Resources resources, ListView list, LinearLayout footer,
                                            IconPageData data, int restorePosition) {
         try {
+            long startMs = android.os.SystemClock.elapsedRealtime();
+            IconPreviewRepository.logPerf("ICON_PAGE_BUILD_BEGIN", "", "", 0, "PAGE", 0, 0);
             AppIconAdapter adapter = new AppIconAdapter(activity, context, resources,
                     data.entries, data.iconManager);
             synchronized (MaintainedLauncherSettingsHost.class) {
@@ -3784,6 +3786,7 @@ public final class MaintainedLauncherSettingsHost {
             footer.addView(iconPageFooter(activity, context, resources),
                     new LinearLayout.LayoutParams(-1, -2));
             list.setAdapter(adapter);
+            IconPreviewRepository.logPerf("ICON_PAGE_BUILD_END", "", "", 0, "PAGE", 0, android.os.SystemClock.elapsedRealtime() - startMs);
             list.setOnScrollListener(new AbsListView.OnScrollListener() {
                 public void onScrollStateChanged(AbsListView view, int state) {
                     if (state == AbsListView.OnScrollListener.SCROLL_STATE_IDLE) {
@@ -3803,6 +3806,7 @@ public final class MaintainedLauncherSettingsHost {
             });
             list.post(new Runnable() {
                 public void run() {
+                    IconPreviewRepository.logPerf("ICON_PAGE_FIRST_VISIBLE", "", "", 0, "PAGE", 0, 0);
                     adapter.requestVisibleRange(list.getFirstVisiblePosition(),
                             Math.max(1, list.getChildCount()), IconPreviewRepository.Priority.P0_VISIBLE);
                 }

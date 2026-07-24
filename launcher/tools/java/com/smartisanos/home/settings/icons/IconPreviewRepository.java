@@ -202,6 +202,17 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
         return key.toString();
     }
 
+    public static void logPerf(String tag, String packageName, String componentName, long userSerial,
+                               String sourceType, int targetPx, long durationMs) {
+        android.util.Log.d("SmartisanPerf", tag + " | pkg=" + (packageName == null ? "" : packageName)
+                + " | cmp=" + (componentName == null ? "" : componentName)
+                + " | user=" + userSerial
+                + " | type=" + (sourceType == null ? "" : sourceType)
+                + " | targetPx=" + targetPx
+                + " | thread=" + Thread.currentThread().getName()
+                + " | durationMs=" + durationMs);
+    }
+
     public void request(final IconRenderKey key, final Priority priority, final DrawableLoader loader,
                         Callback callback) {
         if (key == null || loader == null) return;
@@ -209,9 +220,11 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
         synchronized (knownKeys) { knownKeys.put(key.toString(), key); }
         Bitmap ready = cache.get(key);
         if (ready != null) {
+            logPerf("ICON_CACHE_HIT", key.packageName, key.componentName, key.userSerial, key.sourceType, key.targetPixelSize, 0);
             if (callback != null) callback.onIconReady(key.toString(), ready);
             return;
         }
+        logPerf("ICON_CACHE_MISS", key.packageName, key.componentName, key.userSerial, key.sourceType, key.targetPixelSize, 0);
         synchronized (pending) {
             ArrayList<Callback> callbacks = pending.get(key);
             if (callbacks != null) {
@@ -311,8 +324,16 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
         }
         public void run() {
             Bitmap bitmap = null;
+            long startMs = android.os.SystemClock.elapsedRealtime();
+            if (key != null) {
+                logPerf("ICON_DECODE_BEGIN", key.packageName, key.componentName, key.userSerial, key.sourceType, key.targetPixelSize, 0);
+            }
             try { if (key != null) bitmap = drawableToBitmap(loader.load(), key.targetPixelSize); }
             catch (Throwable ignored) { }
+            long durationMs = android.os.SystemClock.elapsedRealtime() - startMs;
+            if (key != null) {
+                logPerf("ICON_DECODE_END", key.packageName, key.componentName, key.userSerial, key.sourceType, key.targetPixelSize, durationMs);
+            }
             if (key != null && bitmap != null) cache.put(key, bitmap);
             if (key != null) finish(key, bitmap);
         }
