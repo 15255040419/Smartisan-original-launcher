@@ -197,7 +197,13 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
     private final ThreadPoolExecutor decodePool;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<IconRenderKey, ArrayList<PendingCallback>> pending = new HashMap<IconRenderKey, ArrayList<PendingCallback>>();
-    private final Map<String, IconRenderKey> knownKeys = new HashMap<String, IconRenderKey>();
+    private final LruCache<String, IconRenderKey> knownKeys = new LruCache<String, IconRenderKey>(512) {
+        @Override protected void entryRemoved(boolean evicted, String key, IconRenderKey oldValue, IconRenderKey newValue) {
+            if (evicted) {
+                android.util.Log.d("SmartisanPerf", "ICON_KEY_CACHE_EVICT | key=" + key + " | thread=" + Thread.currentThread().getName());
+            }
+        }
+    };
     private final AtomicLong sequence = new AtomicLong();
     private final AtomicLong sessionSequence = new AtomicLong();
     private final java.util.Set<RequestSession> activeSessions = java.util.Collections.synchronizedSet(new java.util.HashSet<RequestSession>());
@@ -440,6 +446,9 @@ public final class IconPreviewRepository implements ComponentCallbacks2 {
             pauseP2 = true;
             cache.trimToSize(cache.maxSize() / 2);
         }
+        try {
+            IconPackManager.trimMemory(app, level);
+        } catch (Throwable ignored) {}
     }
 
     /** Low-priority maintenance after a completed online-icon write, never on page open. */
