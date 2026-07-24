@@ -3603,6 +3603,17 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    private static IconPreviewRepository.RequestSession sCurrentIconPageSession;
+
+    private static void cancelCurrentIconPageSession(Context context) {
+        if (sCurrentIconPageSession != null) {
+            try {
+                IconPreviewRepository.get(context).cancelSession(sCurrentIconPageSession);
+            } catch (Throwable ignored) {}
+            sCurrentIconPageSession = null;
+        }
+    }
+
     private static void showIconPage(final Activity activity) {
         showIconPage(activity, -1);
     }
@@ -3613,6 +3624,8 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void showIconPage(final Activity activity, int restoreScrollY, boolean forward) {
         try {
+            cancelCurrentIconPageSession(activity);
+            sCurrentIconPageSession = IconPreviewRepository.get(activity).openSession("APP_ICON_LIST");
             sRestoreIconPageScrollY = restoreScrollY;
             try {
                 Class.forName("com.smartisanos.home.settings.icons.IconPackManager")
@@ -3879,7 +3892,10 @@ public final class MaintainedLauncherSettingsHost {
 
     private static Runnable backToMainAction(final Activity activity) {
         return new Runnable() {
-            public void run() { show(activity, sMainSettingsScrollY, true); }
+            public void run() {
+                cancelCurrentIconPageSession(activity);
+                show(activity, sMainSettingsScrollY, true);
+            }
         };
     }
 
@@ -14769,7 +14785,7 @@ public final class MaintainedLauncherSettingsHost {
             holder.boundComponentName = info.componentName;
             holder.bindGeneration = (int) iconDataGeneration;
             final int bindGeneration = holder.bindGeneration;
-            previews.request(officialKey, IconPreviewRepository.Priority.P0_VISIBLE,
+            previews.request(sCurrentIconPageSession, officialKey, IconPreviewRepository.Priority.P0_VISIBLE,
                     new IconPreviewRepository.DrawableLoader() {
                         public Drawable load() {
                             return resolveInfo == null ? null
@@ -14843,7 +14859,7 @@ public final class MaintainedLauncherSettingsHost {
                     } else {
                         setIcon(convertView, resources, "unofficial_icon", null);
                         final String finalMode = mode;
-                        previews.request(candidateKey, IconPreviewRepository.Priority.P0_VISIBLE,
+                        previews.request(sCurrentIconPageSession, candidateKey, IconPreviewRepository.Priority.P0_VISIBLE,
                                 new IconPreviewRepository.DrawableLoader() {
                                     public Drawable load() {
                                         if (RedirectIconDB.MODE_CUSTOM.equals(finalMode)) {
