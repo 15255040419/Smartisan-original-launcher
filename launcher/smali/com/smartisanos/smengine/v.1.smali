@@ -584,6 +584,8 @@
 
     invoke-static {}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onOriginalTargetCancelled()V
 
+    invoke-static {}, Lcom/smartisanos/launcher/a/a/a;->resetAfterSystemPanelGestureMoveConsumed()V
+
     return v0
 
     :cond_7_system_panel_not_consumed
@@ -738,6 +740,8 @@
     if-eqz p1, :cond_e_system_panel_not_consumed
 
     invoke-static {}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->finishSystemPanelGesture()V
+
+    invoke-static {}, Lcom/smartisanos/launcher/a/a/a;->resetAfterSystemPanelGesture()V
 
     return v0
 

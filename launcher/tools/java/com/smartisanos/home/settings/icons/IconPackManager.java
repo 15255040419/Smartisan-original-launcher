@@ -114,6 +114,28 @@ public final class IconPackManager {
         return drawable == null ? null : drawableFor(context, iconPackPackage, drawable);
     }
 
+    /** Reads only a map that was already parsed by a background preload. */
+    public static Drawable getPackedIconNonBlocking(Context context, String iconPackPackage,
+                                                    String packageName, String className) {
+        if (context == null || TextUtils.isEmpty(iconPackPackage) || TextUtils.isEmpty(packageName)) return null;
+        if (iconPackPackage.equals(getSelectedIconPackPackage(context))) {
+            return getPackedIconNonBlocking(context, packageName, className);
+        }
+        PackMap map;
+        synchronized (sPackMapCache) {
+            map = sPackMapCache.get(iconPackPackage);
+        }
+        if (map == null) {
+            preloadIconPackAsync(context, iconPackPackage);
+            return null;
+        }
+        String drawable = !TextUtils.isEmpty(className)
+                ? map.componentToDrawable.get(flatten(packageName, className)) : null;
+        if (TextUtils.isEmpty(drawable) && isDialerComponent(className)) return null;
+        if (TextUtils.isEmpty(drawable)) drawable = map.packageToDrawable.get(packageName);
+        return TextUtils.isEmpty(drawable) ? null : drawableFor(context, iconPackPackage, drawable);
+    }
+
     private static boolean isDialerComponent(String className) {
         if (TextUtils.isEmpty(className)) {
             return false;
@@ -229,6 +251,24 @@ public final class IconPackManager {
                         .onSelectedIconPackPreloaded(app);
             }
         }, "selected-icon-pack-preload").start();
+    }
+
+    public static void preloadIconPackAsync(Context context, final String iconPackPackage) {
+        if (context == null || TextUtils.isEmpty(iconPackPackage)) return;
+        final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        synchronized (sPackMapCache) {
+            if (sPackMapCache.containsKey(iconPackPackage)) return;
+            sPackMapCache.put(iconPackPackage, new PackMap());
+        }
+        new Thread(new Runnable() {
+            public void run() {
+                PackMap loaded = new PackMap();
+                loadPackMap(app, iconPackPackage, loaded.packageToDrawable, loaded.componentToDrawable);
+                synchronized (sPackMapCache) {
+                    sPackMapCache.put(iconPackPackage, loaded);
+                }
+            }
+        }, "icon-pack-preload").start();
     }
 
     /** Returns only appfilter targets already parsed for the selected pack. */

@@ -147,6 +147,8 @@
     .line 12
     check-cast p1, Lcom/smartisanos/launcher/data/QuickLaunchItem;
 
+    move-object v2, p1
+
     .line 13
     new-instance p0, Ljava/util/ArrayList;
 
@@ -159,6 +161,16 @@
     sget-object p1, Lcom/smartisanos/launcher/data/DatabaseUpdater$Action;->naa:Lcom/smartisanos/launcher/data/DatabaseUpdater$Action;
 
     invoke-static {p1, v1, p0}, Lcom/smartisanos/launcher/data/F;->b(Lcom/smartisanos/launcher/data/DatabaseUpdater$Action;Ljava/util/List;Ljava/util/ArrayList;)V
+
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
+
+    move-result-object v1
+
+    invoke-virtual {v1}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v1
+
+    invoke-static {v1, v2}, Lcom/smartisanos/launcher/ShortcutCompatBridge;->onShortcutDelete(Landroid/content/Context;Ljava/lang/Object;)V
 
     return-void
 

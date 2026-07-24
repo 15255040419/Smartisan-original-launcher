@@ -129,7 +129,12 @@ public final class PinShortcutConfirmActivity extends Activity {
                 return;
             }
             Log.i(TAG, "PIN_SHORTCUT_ACCEPT_SUCCESS package=" + shortcut.getPackage() + " shortcutId=" + shortcut.getId());
-            databaseDispatched = ShortcutCompatBridge.dispatchInstall(item);
+            boolean dispatched = ShortcutCompatBridge.dispatchInstall(item);
+            databaseDispatched = dispatched;
+            if (!dispatched) {
+                Log.e(TAG, "PIN_SHORTCUT_DATABASE_FAILED package=" + shortcut.getPackage()
+                        + " shortcutId=" + shortcut.getId());
+            }
         } catch (RuntimeException e) {
             Log.e(TAG, "PIN_SHORTCUT_ACCEPT_FAILED type=" + e.getClass().getSimpleName(), e);
         }

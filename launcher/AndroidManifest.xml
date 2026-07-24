@@ -103,7 +103,7 @@
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
     </activity-alias>
-    <activity android:theme="@android:01030010" android:name="com.smartisanos.launcher.PinShortcutConfirmActivity" android:exported="true" android:excludeFromRecents="true" android:launchMode="singleTop">
+    <activity android:theme="@android:style/Theme.Translucent.NoTitleBar" android:name="com.smartisanos.launcher.PinShortcutConfirmActivity" android:exported="true" android:excludeFromRecents="true" android:launchMode="singleTop">
       <intent-filter>
         <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
         <category android:name="android.intent.category.DEFAULT" />

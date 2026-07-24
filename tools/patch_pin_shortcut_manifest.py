@@ -13,6 +13,8 @@ OLD_ACTIVITY = "com.smartisanos.launcher.PinShortcutActivity"
 CONFIRM_ACTIVITY = "com.smartisanos.launcher.PinShortcutConfirmActivity"
 LAUNCH_ACTIVITY = "com.smartisanos.launcher.ShortcutLaunchActivity"
 ACTION_CONFIRM = "android.content.pm.action.CONFIRM_PIN_SHORTCUT"
+VISIBLE_CONFIRM_THEME = 0x01030010  # @android:style/Theme.Translucent.NoTitleBar
+TYPE_REFERENCE = 0x01
 
 
 def main():
@@ -36,6 +38,7 @@ def main():
     exported_attr = index("exported")
     exclude_attr = index("excludeFromRecents")
     launch_mode_attr = index("launchMode")
+    theme_attr = index("theme")
     old_activity = index(OLD_ACTIVITY)
     confirm_activity = index(CONFIRM_ACTIVITY)
     launch_activity = index(LAUNCH_ACTIVITY)
@@ -78,15 +81,27 @@ def main():
     # Keep the exported protocol owner out of recents and serialise onNewIntent requests.
     attrs, size, count = confirm_start + 36, u16(rebuilt, confirm_start + 26), u16(rebuilt, confirm_start + 28)
     present = {u32(rebuilt, attrs + offset * size + 4) for offset in range(count)}
+    theme_patched = False
     for offset in range(count):
         current = attrs + offset * size
-        if u32(rebuilt, current + 4) == launch_mode_attr:
+        attr_name = u32(rebuilt, current + 4)
+        if attr_name == theme_attr:
+            # The original component was a no-display transit activity.  The
+            # confirmation implementation owns an AlertDialog, so it needs a
+            # visible translucent window instead.
+            struct.pack_into("<I", rebuilt, current + 8, NO_INDEX)
+            rebuilt[current + 15] = TYPE_REFERENCE
+            struct.pack_into("<I", rebuilt, current + 16, VISIBLE_CONFIRM_THEME)
+            theme_patched = True
+        if attr_name == launch_mode_attr:
             # android:launchMode is an enum. A raw string looks valid to
             # aapt2 dump but Android's package parser rejects it on install.
             struct.pack_into("<I", rebuilt, current + 8, single_top)
             rebuilt[current + 15] = 0x10
             struct.pack_into("<I", rebuilt, current + 16, 1)
     additions = []
+    if not theme_patched:
+        additions.append(attribute(android_ns, theme_attr, NO_INDEX, TYPE_REFERENCE, VISIBLE_CONFIRM_THEME))
     if exclude_attr not in present:
         additions.append(attribute(android_ns, exclude_attr, true_value, 0x12, 0xFFFFFFFF))
     if launch_mode_attr not in present:

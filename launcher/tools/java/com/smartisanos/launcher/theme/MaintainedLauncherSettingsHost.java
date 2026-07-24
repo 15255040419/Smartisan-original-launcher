@@ -87,7 +87,6 @@ import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
-import android.widget.RadioButton;
 import android.widget.RelativeLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -101,6 +100,9 @@ import com.smartisanos.home.settings.PreviewSettingItemView;
 import com.smartisanos.home.settings.SettingItemSwitch;
 import com.smartisanos.home.settings.SettingItemTextVertical;
 import com.smartisanos.home.settings.icons.IconManager;
+import com.smartisanos.home.settings.icons.IconPreviewRepository;
+import com.smartisanos.home.settings.icons.IconPackManager;
+import com.smartisanos.home.settings.icons.IconSourceManager;
 import com.smartisanos.home.widget.sys.Title;
 import com.smartisanos.launcher.data.redirectIcon.RedirectIconDB;
 import com.smartisanos.launcher.data.redirectIcon.RedirectIconInfo;
@@ -229,6 +231,7 @@ public final class MaintainedLauncherSettingsHost {
     private static boolean sIconSizeAppliedThisProcess;
     private static int sRestoreIconPageScrollY = -1;
     private static int sIconPageLoadGeneration;
+    private static int sIconPreviewGeneration;
     private static IconPageData sIconPageDataCache;
     private static long sIconPageDataCacheUptime;
     private static java.lang.ref.WeakReference<AppIconAdapter> sActiveAppIconAdapter;
@@ -2283,14 +2286,14 @@ public final class MaintainedLauncherSettingsHost {
         try {
             SettingsResourceContext settings = createSettingsContext(context);
             Resources resources = settings.getResources();
-            if (isContactsLabel(normalizedTitle)) {
+            if (com.smartisanos.home.settings.icons.IconManager.isContactsLabel(normalizedTitle)) {
                 Drawable online = smartisanNetworkIconDrawable(context, "com.android.contacts");
                 Drawable contact = online != null ? online
                         : maintainedResourceIcon(context, resources, "source_contactcommon_icon");
                 if (contact != null) {
                     return normalizeLauncherIcon(contact);
                 }
-            } else if (isDialerLabel(normalizedTitle)) {
+            } else if (com.smartisanos.home.settings.icons.IconManager.isDialerLabel(normalizedTitle)) {
                 Drawable phone = maintainedResourceIcon(context, resources, "app_icon_phone");
                 if (phone != null) {
                     return normalizeLauncherIcon(phone);
@@ -3781,6 +3784,29 @@ public final class MaintainedLauncherSettingsHost {
             footer.addView(iconPageFooter(activity, context, resources),
                     new LinearLayout.LayoutParams(-1, -2));
             list.setAdapter(adapter);
+            list.setOnScrollListener(new AbsListView.OnScrollListener() {
+                public void onScrollStateChanged(AbsListView view, int state) {
+                    if (state == AbsListView.OnScrollListener.SCROLL_STATE_IDLE) {
+                        int first = list.getFirstVisiblePosition();
+                        int visible = Math.max(1, list.getChildCount());
+                        adapter.requestVisibleRange(first, visible,
+                                IconPreviewRepository.Priority.P0_VISIBLE);
+                        adapter.requestVisibleRange(Math.max(0, first - visible), visible * 3,
+                                IconPreviewRepository.Priority.P1_ADJACENT);
+                        adapter.requestImprovedDiskPreparation();
+                    }
+                }
+                public void onScroll(AbsListView view, int first, int visible, int total) {
+                    adapter.requestVisibleRange(first, visible,
+                            IconPreviewRepository.Priority.P0_VISIBLE);
+                }
+            });
+            list.post(new Runnable() {
+                public void run() {
+                    adapter.requestVisibleRange(list.getFirstVisiblePosition(),
+                            Math.max(1, list.getChildCount()), IconPreviewRepository.Priority.P0_VISIBLE);
+                }
+            });
             if (restorePosition > 0) {
                 list.setSelection(restorePosition);
             }
@@ -3803,12 +3829,37 @@ public final class MaintainedLauncherSettingsHost {
         }
         IconManager manager = new IconManager(activity);
         List<RedirectIconInfo> entries = AppIconAdapter.loadEntries(activity, manager);
-        IconPageData data = new IconPageData(manager, entries);
+        ArrayList<IconPreviewRepository.AppIconRowModel> snapshotRows =
+                new ArrayList<IconPreviewRepository.AppIconRowModel>();
+        Map<String, List<String>> variants = loadIconVariantMap(activity);
+        for (RedirectIconInfo entry : entries) {
+            ResolveInfo resolved = manager.getResolveInfo(entry.packageName, entry.componentName);
+            ActivityInfo ai = resolved == null ? null : resolved.activityInfo;
+            List<String> names = variants == null ? null : variants.get(entry.packageName);
+            String candidate = names == null || names.isEmpty() ? "" : names.get(0);
+            String mode = RedirectIconDB.modeOf(entry);
+            snapshotRows.add(new IconPreviewRepository.AppIconRowModel(entry.packageName,
+                    entry.componentName, entry.ownerId,
+                    manager.getLableForPackage(entry.packageName, entry.componentName), mode,
+                    RedirectIconDB.resourceNameOf(entry), !TextUtils.isEmpty(candidate), candidate,
+                    false, "", "", packageVersionStamp(activity, entry.packageName)));
+        }
+        IconPageData data = new IconPageData(manager, entries,
+                new IconPreviewRepository.AppIconSnapshot(snapshotRows));
         synchronized (MaintainedLauncherSettingsHost.class) {
             sIconPageDataCache = data;
             sIconPageDataCacheUptime = android.os.SystemClock.uptimeMillis();
         }
         return data;
+    }
+
+    private static long packageVersionStamp(Context context, String packageName) {
+        if (context == null || TextUtils.isEmpty(packageName)) return 0L;
+        try {
+            return context.getPackageManager().getPackageInfo(packageName, 0).lastUpdateTime;
+        } catch (Throwable ignored) {
+            return 0L;
+        }
     }
 
     private static Runnable backToMainAction(final Activity activity) {
@@ -10922,6 +10973,13 @@ public final class MaintainedLauncherSettingsHost {
         sOperationLogHandlerInstalled = true;
     }
 
+    public static void logFlingUpReset(String reason, boolean rk, boolean sk, boolean tk) {
+        String detail = "reason=" + reason + " beforeRk=" + rk + " beforeSk=" + sk + " beforeTk=" + tk
+                + " afterRk=false afterSk=false afterTk=false";
+        logOperation(null, "FLING_UP_STATE_RESET", detail);
+        android.util.Log.d("FlingUpGesture", "FLING_UP_STATE_RESET " + detail);
+    }
+
     private static void logOperation(Context context, String event, String detail) {
         if (context == null || !isOperationLogActive(context)) {
             return;
@@ -12188,14 +12246,14 @@ public final class MaintainedLauncherSettingsHost {
     private static View iconPageHeader(final Activity activity, SettingsResourceContext context, Resources resources) {
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setLayoutParams(new AbsListView.LayoutParams(-1, dp(context, 168)));
+        root.setLayoutParams(new AbsListView.LayoutParams(-1, dp(context, 112)));
 
-        root.addView(iconHeaderRow(activity, context, resources, "改进版图标", null,
+        root.addView(iconHeaderRow(activity, context, resources, "图标样式", iconSourceSubtitle(activity),
                 "selector_setting_sub_item_bg_top", new View.OnClickListener() {
             public void onClick(View v) {
-                toggleImprovedIcon(activity);
+                showGlobalIconSourceDialog(activity);
             }
-        }, true),
+        }, false),
                 new LinearLayout.LayoutParams(-1, dp(context, 56)));
 
         View.OnClickListener iconSizeClick = new View.OnClickListener() {
@@ -12204,17 +12262,10 @@ public final class MaintainedLauncherSettingsHost {
             }
         };
         View iconSizeRow = iconHeaderRow(activity, context, resources, "桌面图标大小", iconSizeSubtitle(activity),
-                "selector_setting_sub_item_bg_middle", iconSizeClick, false);
+                "selector_setting_sub_item_bg_bottom", iconSizeClick, false);
         iconSizeRow.setClickable(true);
         iconSizeRow.setOnClickListener(iconSizeClick);
         root.addView(iconSizeRow, new LinearLayout.LayoutParams(-1, dp(context, 56)));
-
-        root.addView(iconHeaderRow(activity, context, resources, "图标包", iconPackSubtitle(activity),
-                "selector_setting_sub_item_bg_bottom", new View.OnClickListener() {
-            public void onClick(View v) {
-                chooseIconPack(activity);
-            }
-        }, false), new LinearLayout.LayoutParams(-1, dp(context, 56)));
         return root;
     }
 
@@ -12256,8 +12307,8 @@ public final class MaintainedLauncherSettingsHost {
         texts.addView(title, new LinearLayout.LayoutParams(-2, -1));
 
         boolean iconSizeRow = "桌面图标大小".equals(titleText);
-        boolean iconPackRow = "图标包".equals(titleText);
-        if (iconSizeRow || iconPackRow) {
+        boolean iconSourceRow = "图标样式".equals(titleText);
+        if (iconSizeRow || iconSourceRow) {
             ImageView arrow = new ImageView(context);
             int arrowId = resources.getIdentifier("setting_next", "drawable", SETTINGS_PKG);
             if (arrowId != 0) {
@@ -12281,16 +12332,368 @@ public final class MaintainedLauncherSettingsHost {
             RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(-2, -1);
             lp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
             lp.addRule(RelativeLayout.CENTER_VERTICAL);
-            lp.rightMargin = (iconSizeRow || iconPackRow) ? dp(context, 58) : dp(context, 24);
+            lp.rightMargin = (iconSizeRow || iconSourceRow) ? dp(context, 58) : dp(context, 24);
             row.addView(subtitle, lp);
             if (iconSizeRow) {
                 subtitle.setTag(TAG_ICON_SIZE_SUBTITLE);
-            } else if (iconPackRow) {
+            } else if (iconSourceRow) {
                 subtitle.setTag(TAG_ICON_PACK_SUBTITLE);
             }
             subtitle.setContentDescription(subtitleText);
         }
         return row;
+    }
+
+    private static String iconSourceSubtitle(Context context) {
+        return IconSourceManager.label(context, IconSourceManager.get(context));
+    }
+
+    /** Shows a transactional global-source chooser. Nothing is persisted until Apply is tapped. */
+    private static void showGlobalIconSourceDialog(final Activity activity) {
+        if (activity == null || activity.isFinishing()) return;
+        final SettingsResourceContext context;
+        try {
+            context = createSettingsContext(activity);
+        } catch (Exception error) {
+            Log.w(LOG_TAG, "GLOBAL_ICON_SOURCE_DIALOG_CONTEXT_FAILED", error);
+            return;
+        }
+        final Resources resources = context.getResources();
+        final IconSourceManager.Selection[] temporary = new IconSourceManager.Selection[]{IconSourceManager.get(activity)};
+        final Dialog dialog = new Dialog(activity);
+        final LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        prepareSmartisanDialogRoot(activity, root);
+
+        TextView title = text(context, "选择图标样式", 18, 0xff333333, true);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(context, 54)));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+        final LinearLayout preview = new LinearLayout(context);
+        preview.setGravity(Gravity.CENTER);
+        preview.setOrientation(LinearLayout.HORIZONTAL);
+        preview.setPadding(dp(context, 18), dp(context, 12), dp(context, 18), dp(context, 12));
+        root.addView(preview, new LinearLayout.LayoutParams(-1, dp(context, 104)));
+
+        final LinearLayout choices = new LinearLayout(context);
+        choices.setOrientation(LinearLayout.VERTICAL);
+        final ScrollView choiceScroll = new ScrollView(context);
+        choiceScroll.setFillViewport(false);
+        choiceScroll.setVerticalScrollBarEnabled(false);
+        choiceScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        choiceScroll.addView(choices, new ScrollView.LayoutParams(-1, -2));
+        root.addView(choiceScroll, new LinearLayout.LayoutParams(-1, dp(context, 113)));
+        final TextView scanning = text(context, "正在读取图标包…", 14, 0xff9d9fa6, false);
+        scanning.setGravity(Gravity.CENTER);
+        root.addView(scanning, new LinearLayout.LayoutParams(-1, dp(context, 42)));
+
+        final ArrayList<IconSourceOption> options = new ArrayList<IconSourceOption>();
+        options.add(new IconSourceOption(IconSourceManager.Selection.defaultIcon(), "默认图标"));
+        options.add(new IconSourceOption(IconSourceManager.Selection.improved(), "改进版图标"));
+        rebuildGlobalIconSourceOptions(activity, context, resources, choices, choiceScroll, preview,
+                temporary, options);
+        refreshGlobalIconPreview(activity, context, resources, preview, temporary[0]);
+
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+        LinearLayout buttons = new LinearLayout(context);
+        buttons.setGravity(Gravity.CENTER);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        TextView cancel = smartisanDialogActionButton(context, "取消", false, -1);
+        cancel.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { dialog.dismiss(); } });
+        TextView apply = smartisanDialogActionButton(context, "应用", true, 1);
+        apply.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                applyGlobalIconSource(activity, temporary[0]);
+                dialog.dismiss();
+            }
+        });
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(context, 56), 1));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(context, 56)));
+        buttons.addView(apply, new LinearLayout.LayoutParams(0, dp(context, 56), 1));
+        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(context, 56)));
+        dialog.setContentView(root);
+        Window window = dialog.getWindow();
+        if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
+        dialog.show();
+        window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(Math.min(dp(context, 420),
+                    activity.getResources().getDisplayMetrics().widthPixels - dp(context, 32)),
+                    WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+
+        new Thread(new Runnable() {
+            public void run() {
+                final ArrayList<String> packs = IconPackManager.getIconPackPackages(activity.getApplicationContext());
+                new Handler(Looper.getMainLooper()).post(new Runnable() {
+                    public void run() {
+                        if (activity.isFinishing() || !dialog.isShowing()) return;
+                        scanning.setVisibility(View.GONE);
+                        for (int i = 0; i < packs.size(); i++) {
+                            String packageName = packs.get(i);
+                            options.add(new IconSourceOption(IconSourceManager.Selection.pack(packageName),
+                                    IconPackManager.getIconPackLabel(activity, packageName)));
+                        }
+                        rebuildGlobalIconSourceOptions(activity, context, resources, choices, choiceScroll,
+                                preview, temporary, options);
+                    }
+                });
+            }
+        }, "icon-source-pack-scan").start();
+    }
+
+    private static void rebuildGlobalIconSourceOptions(final Activity activity, final Context context,
+                                                        final Resources resources, LinearLayout choices,
+                                                        ScrollView choiceScroll, final LinearLayout preview,
+                                                        final IconSourceManager.Selection[] temporary,
+                                                        final List<IconSourceOption> options) {
+        choices.removeAllViews();
+        for (int i = 0; i < options.size(); i++) {
+            final IconSourceOption option = options.get(i);
+            final boolean selected = sameIconSource(temporary[0], option.selection);
+            RelativeLayout row = new RelativeLayout(context);
+            String background = i == 0 ? (options.size() == 1
+                    ? "selector_setting_sub_item_bg_single" : "selector_setting_sub_item_bg_top")
+                    : (i == options.size() - 1 ? "selector_setting_sub_item_bg_bottom"
+                    : "selector_setting_sub_item_bg_middle");
+            int backgroundId = resources.getIdentifier(background, "drawable", SETTINGS_PKG);
+            row.setBackgroundDrawable(backgroundId == 0 ? smartisanDialogListRowBackground()
+                    : resources.getDrawable(backgroundId));
+            row.setClickable(true);
+            row.setFocusable(true);
+            row.setClipChildren(false);
+            row.setClipToPadding(false);
+
+            TextView label = new TextView(context);
+            label.setText(option.label);
+            label.setTextSize(17);
+            label.setTextColor(0xff454545);
+            label.setGravity(Gravity.CENTER_VERTICAL);
+            label.setSingleLine(true);
+            label.setEllipsize(TextUtils.TruncateAt.END);
+            RelativeLayout.LayoutParams labelLp = new RelativeLayout.LayoutParams(-1, -1);
+            labelLp.leftMargin = dp(context, 24);
+            labelLp.rightMargin = dp(context, 56);
+            row.addView(label, labelLp);
+
+            ImageView selectedMark = new ImageView(context);
+            selectedMark.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            selectedMark.setImageDrawable(safeDrawable(resources,
+                    drawable(resources, "preview_picture_selected")));
+            selectedMark.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
+            RelativeLayout.LayoutParams markLp = new RelativeLayout.LayoutParams(dp(context, 22), dp(context, 22));
+            markLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+            markLp.addRule(RelativeLayout.CENTER_VERTICAL);
+            markLp.rightMargin = dp(context, 24);
+            row.addView(selectedMark, markLp);
+
+            final IconSourceManager.Selection selection = option.selection;
+            row.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                temporary[0] = selection;
+                if (selection.type == IconSourceManager.Type.PACK) {
+                    IconPackManager.preloadIconPackAsync(activity, selection.packageName);
+                }
+                rebuildGlobalIconSourceOptions(activity, context, resources, choices, choiceScroll,
+                        preview, temporary, options);
+                refreshGlobalIconPreview(activity, context, resources, preview, selection);
+                for (int attempt = 1; attempt <= 4; attempt++) {
+                    preview.postDelayed(new Runnable() {
+                        public void run() {
+                            if (sameIconSource(temporary[0], selection)) {
+                                refreshGlobalIconPreview(activity, context, resources, preview, selection);
+                            }
+                        }
+                    }, attempt * 260L);
+                }
+            }
+            });
+            if (i < options.size() - 1) {
+                View divider = smartisanDivider(context);
+                RelativeLayout.LayoutParams dividerLp = new RelativeLayout.LayoutParams(-1, 1);
+                dividerLp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+                dividerLp.leftMargin = dp(context, 24);
+                dividerLp.rightMargin = dp(context, 24);
+                row.addView(divider, dividerLp);
+            }
+            choices.addView(row, new LinearLayout.LayoutParams(-1, dp(context, 54)));
+        }
+        ViewGroup.LayoutParams current = choiceScroll.getLayoutParams();
+        if (current instanceof LinearLayout.LayoutParams) {
+            int available = activity.getResources().getDisplayMetrics().heightPixels - dp(context, 300);
+            int max = Math.max(dp(context, 112), Math.min(dp(context, 280), available));
+            current.height = Math.min(max, Math.max(dp(context, 54), options.size() * dp(context, 54)));
+            choiceScroll.setLayoutParams(current);
+        }
+    }
+
+    private static final class IconSourceOption {
+        final IconSourceManager.Selection selection;
+        final String label;
+
+        IconSourceOption(IconSourceManager.Selection selection, String label) {
+            this.selection = selection;
+            this.label = label;
+        }
+    }
+
+    private static boolean sameIconSource(IconSourceManager.Selection one, IconSourceManager.Selection two) {
+        if (one == null || two == null || one.type != two.type) return false;
+        return one.type != IconSourceManager.Type.PACK
+                || TextUtils.equals(one.packageName, two.packageName);
+    }
+
+    private static void refreshGlobalIconPreview(final Activity activity, final Context context, final Resources resources,
+                                                 final LinearLayout preview, final IconSourceManager.Selection temporary) {
+        preview.removeAllViews();
+        final int generation = ++sIconPreviewGeneration;
+        preview.setTag(Integer.valueOf(generation));
+        final IconPreviewRepository repository = IconPreviewRepository.get(activity);
+        List<ResolveInfo> apps = previewSampleApps(activity, temporary);
+        for (int i = 0; i < apps.size(); i++) {
+            final ResolveInfo info = apps.get(i);
+            LinearLayout cell = new LinearLayout(context);
+            cell.setGravity(Gravity.CENTER);
+            cell.setOrientation(LinearLayout.VERTICAL);
+            final ImageView icon = new ImageView(context);
+            icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            icon.setImageDrawable(safeDrawable(resources, drawable(resources, "ic_add_icon_plus")));
+            cell.addView(icon, new LinearLayout.LayoutParams(dp(context, 52), dp(context, 52)));
+            TextView name = text(context, String.valueOf(info.loadLabel(activity.getPackageManager())), 11, 0xff6d7079, false);
+            name.setSingleLine(true);
+            name.setGravity(Gravity.CENTER);
+            cell.addView(name, new LinearLayout.LayoutParams(dp(context, 82), dp(context, 28)));
+            preview.addView(cell, new LinearLayout.LayoutParams(0, -1, 1f));
+            final ActivityInfo ai = info == null ? null : info.activityInfo;
+            if (ai == null) continue;
+            IconSourceManager.Selection selection = temporary == null
+                    ? IconSourceManager.get(activity) : temporary;
+            String type = selection.type == IconSourceManager.Type.PACK ? "PACK"
+                    : selection.type == IconSourceManager.Type.IMPROVED ? "IMPROVED" : "DEFAULT";
+            IconPreviewRepository.ImprovedCandidate candidate =
+                    repository.resolveImprovedCandidate(ai.packageName, ai.name);
+            String sourceId = selection.type == IconSourceManager.Type.IMPROVED
+                    ? candidate.sourceId
+                    : (selection.packageName == null ? "" : selection.packageName);
+            IconPreviewRepository.IconRenderKey key = new IconPreviewRepository.IconRenderKey(
+                    ai.packageName, ai.name, 0L, type, sourceId,
+                    packageVersionStamp(activity, ai.packageName), dp(context, 52),
+                    activity.getResources().getDisplayMetrics().densityDpi, 1);
+            final java.lang.ref.WeakReference<ImageView> iconRef = new java.lang.ref.WeakReference<ImageView>(icon);
+            final java.lang.ref.WeakReference<LinearLayout> previewRef = new java.lang.ref.WeakReference<LinearLayout>(preview);
+            repository.request(key, IconPreviewRepository.Priority.P0_VISIBLE,
+                    new IconPreviewRepository.DrawableLoader() {
+                        public Drawable load() {
+                            return effectiveIconDrawable(activity.getApplicationContext(), info, resources, temporary);
+                        }
+                    }, new IconPreviewRepository.Callback() {
+                        public void onIconReady(String resultKey, Bitmap bitmap) {
+                            LinearLayout targetPreview = previewRef.get();
+                            ImageView targetIcon = iconRef.get();
+                            Object tag = targetPreview == null ? null : targetPreview.getTag();
+                            if (!(tag instanceof Integer) || ((Integer) tag).intValue() != generation
+                                    || targetIcon == null || bitmap == null) return;
+                            targetIcon.setImageBitmap(bitmap);
+                        }
+                    });
+        }
+    }
+
+    private static List<ResolveInfo> previewSampleApps(Context context, IconSourceManager.Selection temporary) {
+        ArrayList<ResolveInfo> result = new ArrayList<ResolveInfo>();
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.addCategory(Intent.CATEGORY_LAUNCHER);
+        List<ResolveInfo> apps = queryLauncherActivitiesWithProfiles(context.getPackageManager(), intent, 0);
+
+        String[][] targetCategories = new String[][]{
+                new String[]{"dialtacts", "dialer", "phoneactivity", "com.android.phone", "com.android.contacts", "com.smartisanos.phone"},
+                new String[]{"mms", "messaging", "message", "com.android.mms"},
+                new String[]{"notes", "notepad", "memo", "note", "com.smartisanos.notes", "com.coloros.note"}
+        };
+
+        for (int cat = 0; cat < targetCategories.length && result.size() < 3; cat++) {
+            String[] tokens = targetCategories[cat];
+            for (int i = 0; apps != null && i < apps.size(); i++) {
+                ResolveInfo info = apps.get(i);
+                ActivityInfo ai = info == null ? null : info.activityInfo;
+                if (ai == null || !shouldShowIconEntry(info) || hasManualIconOverride(context, ai)) continue;
+                if (containsActivity(result, ai)) continue;
+                String key = (ai.packageName + " " + ai.name).toLowerCase(Locale.US);
+                String label = "";
+                try {
+                    CharSequence loaded = info.loadLabel(context.getPackageManager());
+                    label = loaded == null ? "" : loaded.toString().trim().toLowerCase(Locale.US);
+                } catch (Throwable ignored) {}
+                boolean match = false;
+                for (String token : tokens) {
+                    if (key.contains(token) || label.contains(token)) {
+                        match = true;
+                        break;
+                    }
+                }
+                if (match) {
+                    result.add(info);
+                    break;
+                }
+            }
+        }
+
+        if (result.size() < 3 && apps != null) {
+            for (int i = 0; i < apps.size() && result.size() < 3; i++) {
+                ResolveInfo info = apps.get(i);
+                ActivityInfo ai = info == null ? null : info.activityInfo;
+                if (ai != null && shouldShowIconEntry(info) && !hasManualIconOverride(context, ai) && !containsActivity(result, ai)) {
+                    result.add(info);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static boolean containsActivity(List<ResolveInfo> infos, ActivityInfo wanted) {
+        for (int i = 0; i < infos.size(); i++) {
+            ActivityInfo current = infos.get(i) == null ? null : infos.get(i).activityInfo;
+            if (current != null && TextUtils.equals(current.packageName, wanted.packageName)
+                    && TextUtils.equals(current.name, wanted.name)) return true;
+        }
+        return false;
+    }
+
+    private static void applyGlobalIconSource(final Context context, final IconSourceManager.Selection selection) {
+        if (context == null) return;
+        final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        IconSourceManager.set(app, selection);
+        invalidateActiveIconAdapter(true);
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    if (selection != null && selection.type == IconSourceManager.Type.PACK) {
+                        IconPackManager.preloadSelectedIconPack(app);
+                    }
+                    Intent intent = new Intent(Intent.ACTION_MAIN);
+                    intent.addCategory(Intent.CATEGORY_LAUNCHER);
+                    List<ResolveInfo> apps = queryLauncherActivitiesWithProfiles(app.getPackageManager(), intent, 0);
+                    java.util.LinkedHashSet<String> changed = new java.util.LinkedHashSet<String>();
+                    for (int i = 0; apps != null && i < apps.size(); i++) {
+                        ActivityInfo ai = apps.get(i) == null ? null : apps.get(i).activityInfo;
+                        if (ai != null && shouldShowIconEntry(apps.get(i))) changed.add(ai.packageName);
+                    }
+                    new Handler(Looper.getMainLooper()).post(new Runnable() {
+                        public void run() {
+                            if (context instanceof Activity) {
+                                refreshIconPackSubtitle((Activity) context);
+                            }
+                            applyIconChanges(app, changed);
+                            invalidateActiveIconAdapter(true);
+                        }
+                    });
+                } catch (Throwable error) {
+                    Log.w(LOG_TAG, "GLOBAL_ICON_SOURCE_APPLY_FAILED", error);
+                }
+            }
+        }, "global-icon-source-apply").start();
     }
 
     private static String iconSizeSubtitle(Context context) {
@@ -12858,20 +13261,13 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static boolean isImprovedIconEnabled(Context context) {
-        try {
-            return context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
-                    .getBoolean(PREF_IMPROVED_ICON_ENABLED, false);
-        } catch (Throwable ignored) {
-            return false;
-        }
+        return IconSourceManager.get(context).type == IconSourceManager.Type.IMPROVED;
     }
 
     private static void setImprovedIconEnabled(Context context, boolean enabled) {
-        try {
-            context.getSharedPreferences("com.smartisanos.launcher_prefs", Context.MODE_PRIVATE)
-                    .edit().putBoolean(PREF_IMPROVED_ICON_ENABLED, enabled).apply();
-        } catch (Throwable ignored) {
-        }
+        IconSourceManager.set(context, enabled
+                ? IconSourceManager.Selection.improved()
+                : IconSourceManager.Selection.defaultIcon());
     }
 
     private static void toggleImprovedIcon(Context context) {
@@ -13246,7 +13642,7 @@ public final class MaintainedLauncherSettingsHost {
     private static void refreshIconPackSubtitle(Activity activity) {
         if (activity == null) return;
         refreshTaggedText(activity.getWindow().getDecorView(), TAG_ICON_PACK_SUBTITLE,
-                iconPackSubtitle(activity));
+                iconSourceSubtitle(activity));
     }
 
     private static Drawable smartisanDialogListRowBackground() {
@@ -13590,7 +13986,7 @@ public final class MaintainedLauncherSettingsHost {
             throw new IllegalArgumentException("decodeStream returned null");
         }
         Bitmap icon = squareIcon(source, 192);
-        File dir = new File(context.getFilesDir(), "custom_icons");
+        File dir = new File(context.getFilesDir(), "redirect_icons");
         if (!dir.exists() && !dir.mkdirs()) {
             throw new IllegalStateException("mkdirs failed: " + dir);
         }
@@ -14338,26 +14734,155 @@ public final class MaintainedLauncherSettingsHost {
                 convertView = createIconRow(parent);
             }
             final View rowView = convertView;
+            IconRowHolder existingHolder = convertView.getTag() instanceof IconRowHolder
+                    ? (IconRowHolder) convertView.getTag() : null;
+            final IconRowHolder holder = existingHolder == null ? new IconRowHolder(convertView) : existingHolder;
+            if (existingHolder == null) convertView.setTag(holder);
             RedirectIconInfo listed = (RedirectIconInfo) item;
-            final RedirectIconInfo latest = RedirectIconDB.getRedirectIconInfo(activity,
-                    listed.packageName, listed.componentName);
-            final RedirectIconInfo info = latest == null ? listed : latest;
-            convertView.setTag(info);
+            RedirectIconInfo latestDb = RedirectIconDB.getRedirectIconInfo(activity, listed.packageName, listed.componentName);
+            final RedirectIconInfo info = latestDb != null ? latestDb : listed;
             setBackground(convertView, resources, cardBackgroundFor(position));
-            ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
-            Drawable official = iconManager.getOfficialIcon(info);
-            Drawable candidate = previewIconDrawable(activity, resolveInfo, resources);
+            final ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
+            final int iconPx = dp(activity, 52);
+            final long versionStamp = packageVersionStamp(activity, info.packageName);
+            final IconPreviewRepository previews = IconPreviewRepository.get(activity);
+            final IconPreviewRepository.IconRenderKey officialKey = new IconPreviewRepository.IconRenderKey(
+                    info.packageName, info.componentName, info.ownerId, "DEFAULT", "", versionStamp,
+                    iconPx, activity.getResources().getDisplayMetrics().densityDpi, 1);
+            holder.boundOfficialKey = officialKey;
+            holder.boundPackageName = info.packageName;
+            holder.boundComponentName = info.componentName;
+            holder.bindGeneration = (int) iconDataGeneration;
+            final int bindGeneration = holder.bindGeneration;
+            previews.request(officialKey, IconPreviewRepository.Priority.P0_VISIBLE,
+                    new IconPreviewRepository.DrawableLoader() {
+                        public Drawable load() {
+                            return resolveInfo == null ? null
+                                    : resolveInfo.loadIcon(activity.getApplicationContext().getPackageManager());
+                        }
+                    },
+                    new IconPreviewRepository.Callback() {
+                        public void onIconReady(String key, Bitmap bitmap) {
+                            if (!key.equals(String.valueOf(holder.boundOfficialKey))
+                                    || bindGeneration != holder.bindGeneration) return;
+                            if (holder.officialIcon != null && bitmap != null) holder.officialIcon.setImageBitmap(bitmap);
+                        }
+                    });
+            Drawable official = previews.cachedDrawable(officialKey);
             setIcon(convertView, resources, "official_icon", official);
-            setIcon(convertView, resources, "unofficial_icon", candidate == null ? plusIcon(resources) : candidate);
+
+            final IconPreviewRepository.ImprovedCandidate candidateInfo =
+                    previews.resolveImprovedCandidate(info.packageName, info.componentName);
+            final String mode = RedirectIconDB.modeOf(info);
+            final IconSourceManager.Selection global = IconSourceManager.get(activity);
+
+            final boolean hasManualOverride = RedirectIconDB.MODE_CUSTOM.equals(mode)
+                    || RedirectIconDB.MODE_RESOURCE.equals(mode)
+                    || RedirectIconDB.MODE_PACK.equals(mode);
+
+            final boolean hasCandidate = candidateInfo.exists || hasManualOverride;
+
+            final boolean isRightSelected = (hasManualOverride
+                    || (RedirectIconDB.MODE_AUTO.equals(mode) && global.type != IconSourceManager.Type.DEFAULT))
+                    && !RedirectIconDB.MODE_ORIGINAL.equals(mode);
+
+            if (hasCandidate) {
+                String candidateType = "IMPROVED";
+                String sourceId = candidateInfo.sourceId;
+                if (RedirectIconDB.MODE_CUSTOM.equals(mode)) {
+                    candidateType = "CUSTOM";
+                    sourceId = "custom";
+                } else if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
+                    candidateType = "RESOURCE";
+                    sourceId = RedirectIconDB.resourceNameOf(info);
+                } else if (RedirectIconDB.MODE_PACK.equals(mode)) {
+                    candidateType = "PACK";
+                    sourceId = RedirectIconDB.packNameOf(info);
+                }
+
+                final IconPreviewRepository.IconRenderKey candidateKey = new IconPreviewRepository.IconRenderKey(
+                        info.packageName, info.componentName, 0L, candidateType, sourceId == null ? "" : sourceId,
+                        versionStamp, iconPx, activity.getResources().getDisplayMetrics().densityDpi, 1);
+                holder.boundEffectiveKey = candidateKey;
+                Drawable cachedCandidate = previews.cachedDrawable(candidateKey);
+                if (cachedCandidate != null) {
+                    setIcon(convertView, resources, "unofficial_icon", cachedCandidate);
+                } else {
+                    Drawable immediate = null;
+                    if (RedirectIconDB.MODE_CUSTOM.equals(mode)) {
+                        byte[] data = RedirectIconDB.getRedirectIcon(activity, info.packageName, info.componentName);
+                        if (data != null) {
+                            Bitmap b = BitmapFactory.decodeByteArray(data, 0, data.length);
+                            if (b != null) immediate = new BitmapDrawable(resources, b);
+                        }
+                    } else if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
+                        immediate = libraryIconDrawableNonBlocking(activity, resources, RedirectIconDB.resourceNameOf(info));
+                    } else if (RedirectIconDB.MODE_PACK.equals(mode)) {
+                        immediate = packedIconFromPackage(activity, RedirectIconDB.packNameOf(info), resolveInfo);
+                    } else if (candidateInfo.exists) {
+                        immediate = previews.loadImprovedIconDrawable(candidateInfo.sourceId);
+                    }
+
+                    if (immediate != null) {
+                        setIcon(convertView, resources, "unofficial_icon", immediate);
+                    } else {
+                        setIcon(convertView, resources, "unofficial_icon", null);
+                        final String finalMode = mode;
+                        previews.request(candidateKey, IconPreviewRepository.Priority.P0_VISIBLE,
+                                new IconPreviewRepository.DrawableLoader() {
+                                    public Drawable load() {
+                                        if (RedirectIconDB.MODE_CUSTOM.equals(finalMode)) {
+                                            byte[] data = RedirectIconDB.getRedirectIcon(activity, info.packageName, info.componentName);
+                                            if (data != null) {
+                                                Bitmap b = BitmapFactory.decodeByteArray(data, 0, data.length);
+                                                if (b != null) return new BitmapDrawable(resources, b);
+                                            }
+                                            return null;
+                                        }
+                                        if (RedirectIconDB.MODE_RESOURCE.equals(finalMode)) {
+                                            return libraryIconDrawableNonBlocking(activity, resources, RedirectIconDB.resourceNameOf(info));
+                                        }
+                                        if (RedirectIconDB.MODE_PACK.equals(finalMode)) {
+                                            return packedIconFromPackage(activity, RedirectIconDB.packNameOf(info), resolveInfo);
+                                        }
+                                        return previews.loadImprovedIconDrawable(candidateInfo.sourceId);
+                                    }
+                                }, new IconPreviewRepository.Callback() {
+                                    public void onIconReady(String key, Bitmap bitmap) {
+                                        if (!key.equals(String.valueOf(holder.boundEffectiveKey))
+                                                || bindGeneration != holder.bindGeneration) return;
+                                        if (holder.unofficialIcon != null) {
+                                            if (bitmap != null) {
+                                                holder.unofficialIcon.setImageBitmap(bitmap);
+                                            } else {
+                                                View layout = byId(rowView, resources, "unofficial_icon_layout");
+                                                if (layout != null) layout.setVisibility(View.GONE);
+                                                View officialF = byId(rowView, resources, "official_icon_frame");
+                                                if (officialF != null) officialF.setVisibility(View.VISIBLE);
+                                                View unofficialF = byId(rowView, resources, "unofficial_icon_frame");
+                                                if (unofficialF != null) unofficialF.setVisibility(View.GONE);
+                                            }
+                                        }
+                                    }
+                                });
+                    }
+                }
+            } else {
+                setIcon(convertView, resources, "unofficial_icon", null);
+            }
 
             View officialFrame = byId(convertView, resources, "official_icon_frame");
             View unofficialFrame = byId(convertView, resources, "unofficial_icon_frame");
-            boolean improved = isImprovedSelected(info, candidate);
-            if (officialFrame != null) {
-                officialFrame.setVisibility(improved ? View.GONE : View.VISIBLE);
-            }
-            if (unofficialFrame != null) {
-                unofficialFrame.setVisibility(improved ? View.VISIBLE : View.GONE);
+            View unofficialLayout = byId(convertView, resources, "unofficial_icon_layout");
+
+            if (hasCandidate) {
+                if (unofficialLayout != null) unofficialLayout.setVisibility(View.VISIBLE);
+                if (officialFrame != null) officialFrame.setVisibility(isRightSelected ? View.GONE : View.VISIBLE);
+                if (unofficialFrame != null) unofficialFrame.setVisibility(isRightSelected ? View.VISIBLE : View.GONE);
+            } else {
+                if (unofficialLayout != null) unofficialLayout.setVisibility(View.GONE);
+                if (officialFrame != null) officialFrame.setVisibility(View.VISIBLE);
+                if (unofficialFrame != null) unofficialFrame.setVisibility(View.GONE);
             }
 
             bindIconClick(convertView, info, "official_icon_layout", new View.OnClickListener() {
@@ -14382,8 +14907,8 @@ public final class MaintainedLauncherSettingsHost {
                 name.setText(iconManager.getLableForPackage(info.packageName, info.componentName));
             }
             if (author != null) {
-                author.setText(improved ? getString(resources, "unofficial_icon", "改进版图标")
-                        : getString(resources, "official_icon", "可替换图标"));
+                author.setText(isRightSelected ? getString(resources, "unofficial_icon", "改进版图标")
+                        : getString(resources, "official_icon", "默认图标"));
             }
             return convertView;
         }
@@ -14400,10 +14925,21 @@ public final class MaintainedLauncherSettingsHost {
             rows.clear();
             ArrayList<RedirectIconInfo> redrawn = new ArrayList<RedirectIconInfo>();
             ArrayList<RedirectIconInfo> unredrawn = new ArrayList<RedirectIconInfo>();
+            IconPreviewRepository repository = IconPreviewRepository.get(activity);
             for (RedirectIconInfo info : apps) {
-                ResolveInfo resolve = iconManager.getResolveInfo(info.packageName, info.componentName);
-                Drawable candidate = previewIconDrawable(activity, resolve, resources);
-                if (isImprovedSelected(info, candidate)) redrawn.add(info); else unredrawn.add(info);
+                RedirectIconInfo latest = RedirectIconDB.getRedirectIconInfo(activity, info.packageName, info.componentName);
+                RedirectIconInfo effective = latest != null ? latest : info;
+                String mode = RedirectIconDB.modeOf(effective);
+                IconPreviewRepository.ImprovedCandidate candidate =
+                        repository.resolveImprovedCandidate(effective.packageName, effective.componentName);
+                boolean hasManual = RedirectIconDB.MODE_CUSTOM.equals(mode)
+                        || RedirectIconDB.MODE_RESOURCE.equals(mode)
+                        || RedirectIconDB.MODE_PACK.equals(mode);
+                if (candidate.exists || hasManual) {
+                    redrawn.add(effective);
+                } else {
+                    unredrawn.add(effective);
+                }
             }
             if (!redrawn.isEmpty()) {
                 rows.add(new IconSection("已重绘"));
@@ -14474,6 +15010,74 @@ public final class MaintainedLauncherSettingsHost {
                 }
             }
             return row;
+        }
+
+        /** Scroll callbacks only enqueue bounded work; no bitmap work or UI refresh happens here. */
+        void requestVisibleRange(int first, int count, IconPreviewRepository.Priority priority) {
+            if (isActivityInvalid() || count <= 0) return;
+            final IconPreviewRepository previews = IconPreviewRepository.get(activity);
+            int end = Math.min(rows.size(), Math.max(0, first) + count);
+            for (int position = Math.max(0, first); position < end; position++) {
+                Object item = rows.get(position);
+                if (!(item instanceof RedirectIconInfo)) continue;
+                final RedirectIconInfo info = (RedirectIconInfo) item;
+                final ResolveInfo resolved = iconManager.getResolveInfo(info.packageName, info.componentName);
+                if (resolved == null) continue;
+                int px = dp(activity, 52);
+                long version = packageVersionStamp(activity, info.packageName);
+                IconPreviewRepository.IconRenderKey official = new IconPreviewRepository.IconRenderKey(
+                        info.packageName, info.componentName, info.ownerId, "DEFAULT", "", version, px,
+                        activity.getResources().getDisplayMetrics().densityDpi, 1);
+                previews.request(official, priority, new IconPreviewRepository.DrawableLoader() {
+                    public Drawable load() { return resolved.loadIcon(activity.getPackageManager()); }
+                }, null);
+                String mode = RedirectIconDB.modeOf(info);
+                IconSourceManager.Selection global = IconSourceManager.get(activity);
+                boolean defaults = RedirectIconDB.MODE_ORIGINAL.equals(mode)
+                        || (RedirectIconDB.MODE_AUTO.equals(mode)
+                        && global.type == IconSourceManager.Type.DEFAULT);
+                if (defaults) continue;
+                IconPreviewRepository.IconRenderKey effective = new IconPreviewRepository.IconRenderKey(
+                        info.packageName, info.componentName, info.ownerId, iconSourceType(mode, global),
+                        iconSourceId(info, global), version, px,
+                        activity.getResources().getDisplayMetrics().densityDpi, 1);
+                previews.request(effective, priority, new IconPreviewRepository.DrawableLoader() {
+                    public Drawable load() {
+                        return previewIconDrawable(activity.getApplicationContext(), resolved, resources);
+                    }
+                }, null);
+            }
+        }
+
+        /** P2 never rasterizes; cached-only resolution schedules the existing online fetch path. */
+        void requestImprovedDiskPreparation() {
+            if (isActivityInvalid() || IconSourceManager.get(activity).type != IconSourceManager.Type.IMPROVED) return;
+            final IconPreviewRepository previews = IconPreviewRepository.get(activity);
+            for (final RedirectIconInfo info : apps) {
+                if (!RedirectIconDB.MODE_AUTO.equals(RedirectIconDB.modeOf(info))) continue;
+                final ResolveInfo resolved = iconManager.getResolveInfo(info.packageName, info.componentName);
+                if (resolved == null || iconVariantNames(activity, info.packageName).isEmpty()) continue;
+                previews.schedule(IconPreviewRepository.Priority.P2_IDLE, new Runnable() {
+                    public void run() {
+                        smartisanIconDrawableCachedOnly(activity.getApplicationContext(), resolved, resources);
+                    }
+                });
+            }
+        }
+
+        private final class IconRowHolder {
+            final ImageView officialIcon;
+            final ImageView unofficialIcon;
+            IconPreviewRepository.IconRenderKey boundOfficialKey;
+            IconPreviewRepository.IconRenderKey boundEffectiveKey;
+            String boundPackageName;
+            String boundComponentName;
+            int bindGeneration;
+
+            IconRowHolder(View row) {
+                officialIcon = (ImageView) byId(row, resources, "official_icon");
+                unofficialIcon = (ImageView) byId(row, resources, "unofficial_icon");
+            }
         }
 
         private Drawable plusIcon(Resources resources) {
@@ -14835,8 +15439,17 @@ public final class MaintainedLauncherSettingsHost {
                                     final ImageView check,
                                     final RedirectIconInfo info, final IconChoice choice) {
             final String requestKey = choiceRequestKey(info, choice);
-            icon.setTag(requestKey);
-            Drawable drawable = iconDrawableForChoice(info, choice);
+            final int px = dp(activity, 72);
+            final String sourceType = choice.type == IconChoice.TYPE_ORIGINAL ? "DEFAULT"
+                    : choice.type == IconChoice.TYPE_LIBRARY ? "RESOURCE"
+                    : choice.type == IconChoice.TYPE_PACKED ? "PACK" : "CUSTOM";
+            final IconPreviewRepository.IconRenderKey renderKey = new IconPreviewRepository.IconRenderKey(
+                    info.packageName, info.componentName, info.ownerId, sourceType,
+                    choice.name == null ? "" : choice.name,
+                    packageVersionStamp(activity, info.packageName), px,
+                    activity.getResources().getDisplayMetrics().densityDpi, 1);
+            icon.setTag(renderKey);
+            Drawable drawable = IconPreviewRepository.get(activity).cachedDrawable(renderKey);
             if (drawable != null) {
                 progress.setVisibility(View.GONE);
                 icon.setImageDrawable(drawable);
@@ -14844,15 +15457,45 @@ public final class MaintainedLauncherSettingsHost {
                 check.setVisibility(isChoiceSelected(info, choice) ? View.VISIBLE : View.GONE);
                 return;
             }
-            progress.setVisibility(choice.type == IconChoice.TYPE_LIBRARY ? View.VISIBLE : View.GONE);
+            progress.setVisibility(View.GONE);
             icon.setVisibility(View.VISIBLE);
-            // A loading or unavailable library candidate must never inherit an
-            // empty ImageView. The plus tile is the stable NOT_AVAILABLE/LOADING
-            // presentation until a valid source has arrived.
-            icon.setImageDrawable(plusIcon(resources));
-            if (choice.type == IconChoice.TYPE_LIBRARY) {
-                retryBindChoiceIcon(icon, progress, check, info, choice, requestKey, 0);
+            if (choice.type == IconChoice.TYPE_CUSTOM) {
+                icon.setImageDrawable(plusIcon(resources));
+                check.setVisibility(isChoiceSelected(info, choice) ? View.VISIBLE : View.GONE);
+            } else {
+                icon.setImageDrawable(null);
+                check.setVisibility(View.GONE);
             }
+            final java.lang.ref.WeakReference<ImageView> iconRef = new java.lang.ref.WeakReference<ImageView>(icon);
+            final java.lang.ref.WeakReference<ImageView> checkRef = new java.lang.ref.WeakReference<ImageView>(check);
+            IconPreviewRepository.get(activity).request(renderKey, IconPreviewRepository.Priority.P0_VISIBLE,
+                    new IconPreviewRepository.DrawableLoader() {
+                        public Drawable load() { return iconDrawableForChoice(info, choice); }
+                    }, new IconPreviewRepository.Callback() {
+                        public void onIconReady(String key, Bitmap bitmap) {
+                            ImageView target = iconRef.get();
+                            ImageView targetCheck = checkRef.get();
+                            if (target == null || !key.equals(String.valueOf(target.getTag()))) return;
+                            if (bitmap != null) {
+                                target.setImageBitmap(bitmap);
+                                if (targetCheck != null) {
+                                    targetCheck.setVisibility(isChoiceSelected(info, choice) ? View.VISIBLE : View.GONE);
+                                }
+                            } else {
+                                if (choice.type == IconChoice.TYPE_CUSTOM) {
+                                    target.setImageDrawable(plusIcon(resources));
+                                    if (targetCheck != null) {
+                                        targetCheck.setVisibility(isChoiceSelected(info, choice) ? View.VISIBLE : View.GONE);
+                                    }
+                                } else {
+                                    target.setImageDrawable(null);
+                                    if (targetCheck != null) {
+                                        targetCheck.setVisibility(View.GONE);
+                                    }
+                                }
+                            }
+                        }
+                    });
         }
 
         private void retryBindChoiceIcon(final ImageView icon, final ProgressBar progress,
@@ -14907,15 +15550,18 @@ public final class MaintainedLauncherSettingsHost {
                 return packedIconFromPackage(activity, choice.name, iconManager.getResolveInfo(info.packageName, info.componentName));
             }
             if (choice.type == IconChoice.TYPE_CUSTOM) {
-                byte[] iconData = RedirectIconDB.getRedirectIcon(activity,
-                        info.packageName, info.componentName);
+                RedirectIconInfo latest = RedirectIconDB.getRedirectIconInfo(activity, info.packageName, info.componentName);
+                byte[] iconData = latest == null ? null : latest.iconData;
+                if (iconData == null) {
+                    iconData = RedirectIconDB.getRedirectIcon(activity, info.packageName, info.componentName);
+                }
                 if (iconData != null) {
                     Bitmap bitmap = BitmapFactory.decodeByteArray(iconData, 0, iconData.length);
                     if (bitmap != null) {
                         return new BitmapDrawable(activity.getResources(), bitmap);
                     }
                 }
-                return plusIcon(resources);
+                return null;
             }
             return null;
         }
@@ -14923,9 +15569,24 @@ public final class MaintainedLauncherSettingsHost {
         private List<IconChoice> iconChoicesFor(RedirectIconInfo info) {
             ArrayList<IconChoice> out = new ArrayList<IconChoice>();
             ArrayList<String> names = new ArrayList<String>();
+            IconPreviewRepository repository = IconPreviewRepository.get(activity);
+            IconPreviewRepository.ImprovedCandidate mainCandidate =
+                    repository.resolveImprovedCandidate(info.packageName, info.componentName);
+            if (mainCandidate.exists && !names.contains(mainCandidate.sourceId)) {
+                names.add(mainCandidate.sourceId);
+            }
+            List<String> repoVariants = repository.getVariantsForPackage(info.packageName);
+            if (repoVariants != null) {
+                for (String v : repoVariants) {
+                    if (!TextUtils.isEmpty(v) && !names.contains(v)) names.add(v);
+                }
+            }
             List<String> variants = iconVariantNames(activity, info.packageName);
             if (variants != null) {
-                names.addAll(variants);
+                for (String v : variants) {
+                    String name = stripPng(v);
+                    if (!TextUtils.isEmpty(name) && !names.contains(name)) names.add(name);
+                }
             }
             String baseName = info.packageName;
             if (!names.contains(baseName)) {
@@ -14938,8 +15599,10 @@ public final class MaintainedLauncherSettingsHost {
             HashMap<String, Boolean> seen = new HashMap<String, Boolean>();
             for (int i = 0; i < names.size(); i++) {
                 String name = stripPng(names.get(i));
-                if (name == null || name.length() == 0 || seen.containsKey(name)
-                        || !libraryIconStored(activity, resources, name)) {
+                if (name == null || name.length() == 0 || seen.containsKey(name)) {
+                    continue;
+                }
+                if (!libraryIconStored(activity, resources, name)) {
                     continue;
                 }
                 seen.put(name, Boolean.TRUE);
@@ -14998,15 +15661,10 @@ public final class MaintainedLauncherSettingsHost {
         }
 
         private String automaticLibraryChoiceName(RedirectIconInfo info) {
-            ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
-            String alias = smartisanSystemIconAlias(activity, resolveInfo);
-            if (alias != null && libraryIconStored(activity, resources, alias)) {
-                return alias;
-            }
-            if (libraryIconStored(activity, resources, info.packageName)) {
-                return info.packageName;
-            }
-            return null;
+            if (info == null) return null;
+            IconPreviewRepository.ImprovedCandidate candidate =
+                    IconPreviewRepository.get(activity).resolveImprovedCandidate(info.packageName, info.componentName);
+            return candidate.exists ? candidate.sourceId : null;
         }
 
         private void applyChoice(View row, RedirectIconInfo info, IconChoice choice, int returnScrollY) {
@@ -15099,14 +15757,14 @@ public final class MaintainedLauncherSettingsHost {
             String mode = RedirectIconDB.modeOf(latest);
             if (RedirectIconDB.MODE_CUSTOM.equals(mode) || RedirectIconDB.MODE_RESOURCE.equals(mode)
                     || RedirectIconDB.MODE_PACK.equals(mode)) {
-                return true;
+                ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
+                return resolveManagedIcon(activity, resolveInfo, resources, null) != null;
             }
-            if (RedirectIconDB.MODE_ORIGINAL.equals(mode) || !latest.useImprovedAppIcon) {
+            if (RedirectIconDB.MODE_ORIGINAL.equals(mode)) {
                 return false;
             }
             ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
-            if (packedIcon(activity, resolveInfo) != null) return true;
-            return isImprovedIconEnabled(activity);
+            return resolveManagedIcon(activity, resolveInfo, resources, null) != null;
         }
 
         private Drawable packedIcon(Context context, ResolveInfo info) {
@@ -15129,6 +15787,34 @@ public final class MaintainedLauncherSettingsHost {
             if (view != null) {
                 view.setImageDrawable(icon == null ? plusIcon(resources) : icon);
             }
+        }
+
+        private static long packageVersionStamp(Context context, String packageName) {
+            if (context == null || TextUtils.isEmpty(packageName)) return 0L;
+            try {
+                return context.getPackageManager().getPackageInfo(packageName, 0).lastUpdateTime;
+            } catch (Throwable ignored) {
+                return 0L;
+            }
+        }
+
+        private static String iconSourceType(String mode, IconSourceManager.Selection global) {
+            if (RedirectIconDB.MODE_CUSTOM.equals(mode)) return "CUSTOM";
+            if (RedirectIconDB.MODE_RESOURCE.equals(mode)) return "RESOURCE";
+            if (RedirectIconDB.MODE_PACK.equals(mode)) return "PACK";
+            if (global == null || global.type == IconSourceManager.Type.DEFAULT) return "DEFAULT";
+            return global.type == IconSourceManager.Type.PACK ? "PACK" : "IMPROVED";
+        }
+
+        private static String iconSourceId(RedirectIconInfo info, IconSourceManager.Selection global) {
+            String mode = RedirectIconDB.modeOf(info);
+            if (RedirectIconDB.MODE_RESOURCE.equals(mode)) return String.valueOf(RedirectIconDB.resourceNameOf(info));
+            if (RedirectIconDB.MODE_PACK.equals(mode)) return String.valueOf(RedirectIconDB.packNameOf(info));
+            if (RedirectIconDB.MODE_CUSTOM.equals(mode)) {
+                byte[] data = info == null ? null : info.iconData;
+                return "custom_" + (data == null ? 0 : data.length);
+            }
+            return global == null || global.packageName == null ? "" : global.packageName;
         }
 
         private Drawable safeDrawable(Resources resources, int resId) {
@@ -15160,22 +15846,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static Drawable selectedIconDrawable(Context context, ResolveInfo info, CharSequence label, Resources resources) {
-        if (context == null || info == null || info.activityInfo == null) {
-            return null;
-        }
-        ActivityInfo ai = info.activityInfo;
-        RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, ai.packageName, ai.name);
-        if (redirect == null) {
-            return candidateIconDrawable(context, info, resources);
-        }
-        if (!redirect.useImprovedAppIcon) {
-            return null;
-        }
-        String mode = RedirectIconDB.modeOf(redirect);
-        if (RedirectIconDB.MODE_ORIGINAL.equals(mode)) {
-            return null;
-        }
-        return candidateIconDrawable(context, info, resources);
+        return resolveManagedIcon(context, info, resources, null);
     }
 
     /**
@@ -15185,18 +15856,60 @@ public final class MaintainedLauncherSettingsHost {
      * icon instead of replacing the right-hand candidate with the plus tile.
      */
     private static Drawable previewIconDrawable(Context context, ResolveInfo info, Resources resources) {
-        Drawable selected = candidateIconDrawable(context, info, resources);
-        if (selected != null) {
-            return selected;
+        return effectiveIconDrawable(context, info, resources, null);
+    }
+
+    private static Drawable previewIconDrawable(Context context, ResolveInfo info, Resources resources,
+                                                IconSourceManager.Selection temporary) {
+        if (context == null || info == null || info.activityInfo == null || temporary == null) {
+            return info == null ? null : info.loadIcon(context.getPackageManager());
         }
-        Drawable packed = packedIcon(context, info);
-        if (packed != null) {
-            return packed;
+        ActivityInfo ai = info.activityInfo;
+        if (temporary.type == IconSourceManager.Type.DEFAULT) {
+            try {
+                return info.loadIcon(context.getPackageManager());
+            } catch (Throwable ignored) {
+                return null;
+            }
         }
-        return smartisanIconDrawableCachedOnly(context, info, resources);
+        if (temporary.type == IconSourceManager.Type.PACK) {
+            Drawable packIcon = packedIconFromPackage(context, temporary.packageName, info);
+            if (packIcon != null) return packIcon;
+            try {
+                return info.loadIcon(context.getPackageManager());
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+        if (temporary.type == IconSourceManager.Type.IMPROVED) {
+            com.smartisanos.home.settings.icons.IconPreviewRepository repository =
+                    com.smartisanos.home.settings.icons.IconPreviewRepository.get(context);
+            com.smartisanos.home.settings.icons.IconPreviewRepository.ImprovedCandidate candidate =
+                    repository.resolveImprovedCandidate(ai.packageName, ai.name);
+            if (candidate != null && candidate.exists) {
+                Drawable loaded = repository.loadImprovedIconDrawable(candidate.sourceId);
+                if (loaded != null) return loaded;
+            }
+            try {
+                return info.loadIcon(context.getPackageManager());
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+        try {
+            return info.loadIcon(context.getPackageManager());
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private static Drawable candidateIconDrawable(Context context, ResolveInfo info, Resources resources) {
+        return resolveManagedIcon(context, info, resources, null);
+    }
+
+    /** One source decision for desktop, list previews and the temporary chooser preview. */
+    private static Drawable resolveManagedIcon(Context context, ResolveInfo info, Resources resources,
+                                               IconSourceManager.Selection temporaryGlobal) {
         if (context == null || info == null || info.activityInfo == null) {
             return null;
         }
@@ -15204,58 +15917,89 @@ public final class MaintainedLauncherSettingsHost {
         ActivityInfo ai = info.activityInfo;
         RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, ai.packageName, ai.name);
         String mode = RedirectIconDB.modeOf(redirect);
-        if (RedirectIconDB.MODE_CUSTOM.equals(mode) && redirect != null && redirect.iconData != null) {
-            Bitmap bitmap = BitmapFactory.decodeByteArray(redirect.iconData, 0, redirect.iconData.length);
-            if (bitmap != null) {
-                return new android.graphics.drawable.BitmapDrawable(context.getResources(), bitmap);
+        // Manual sources are always terminal. A missing manual source deliberately falls back
+        // to the APK icon below; it must never borrow the active global source.
+        if (RedirectIconDB.MODE_ORIGINAL.equals(mode)) return null;
+        if (RedirectIconDB.MODE_CUSTOM.equals(mode)) {
+            if (redirect != null && redirect.iconData != null) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(redirect.iconData, 0, redirect.iconData.length);
+                if (bitmap != null) {
+                    return new android.graphics.drawable.BitmapDrawable(context.getResources(), bitmap);
+                }
             }
+            return null;
         }
         if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
             Drawable custom = libraryIconDrawable(context, resources, RedirectIconDB.resourceNameOf(redirect));
-            if (custom != null) {
-                return custom;
-            }
+            return custom;
         }
         if (RedirectIconDB.MODE_PACK.equals(mode)) {
             String pack = RedirectIconDB.packNameOf(redirect);
             return pack == null ? null : com.smartisanos.home.settings.icons.IconPackManager
                     .getPackedIcon(context, pack, ai.packageName, ai.name);
         }
-        boolean useImproved = redirect == null
-                ? isImprovedIconEnabled(context)
-                : redirect.useImprovedAppIcon && RedirectIconDB.MODE_AUTO.equals(mode);
-        // Explicit icon-pack component mappings outrank improved icons. The
-        // pack manager separately blocks a dialer Activity from falling back
-        // to a contacts package-level mapping, so phone/contacts stay distinct.
-        Drawable packed = packedIcon(context, info);
-        if (packed != null) {
-            return packed;
+        IconSourceManager.Selection global = temporaryGlobal == null
+                ? IconSourceManager.get(context) : temporaryGlobal;
+        if (global.type == IconSourceManager.Type.PACK) {
+            return packedIconFromPackage(context, global.packageName, info);
         }
-        if (useImproved && smartisanSystemIconAlias(context, info) != null) {
-            Drawable systemCategory = smartisanIconDrawable(context, info, resources);
-            if (systemCategory != null) {
-                return systemCategory;
+        if (global.type == IconSourceManager.Type.IMPROVED) {
+            com.smartisanos.home.settings.icons.IconPreviewRepository repository =
+                    com.smartisanos.home.settings.icons.IconPreviewRepository.get(context);
+            int iconPx = dp(context, 52);
+            Drawable cached = repository.resolveDesktopImprovedIconCachedOnly(ai.packageName, ai.name, 0L, iconPx);
+            if (cached != null) {
+                android.util.Log.i("LauncherIconRaster", "DESKTOP_IMPROVED_CANDIDATE package=" + ai.packageName
+                        + " candidate=" + ai.packageName + " cacheState=MEMORY_OR_DISK");
+                return cached;
             }
-        }
-        if (redirect != null && redirect.useImprovedAppIcon && RedirectIconDB.MODE_AUTO.equals(mode)) {
-            Drawable smartisan = smartisanIconDrawable(context, info, resources);
-            if (smartisan != null) {
-                return smartisan;
+            com.smartisanos.home.settings.icons.IconPreviewRepository.ImprovedCandidate candidate =
+                    repository.resolveImprovedCandidate(ai.packageName, ai.name);
+            if (candidate != null && candidate.exists) {
+                android.util.Log.i("LauncherIconRaster", "DESKTOP_IMPROVED_REQUESTED package=" + ai.packageName
+                        + " candidate=" + candidate.sourceId);
+                final String pkgName = ai.packageName;
+                final String candidateId = candidate.sourceId;
+                final Context appContext = context.getApplicationContext() == null ? context : context.getApplicationContext();
+                repository.requestDesktopImprovedIcon(ai.packageName, ai.name, 0L, iconPx,
+                        new com.smartisanos.home.settings.icons.IconPreviewRepository.Callback() {
+                            public void onIconReady(String key, Bitmap bitmap) {
+                                if (bitmap != null && isImprovedIconEnabled(appContext)) {
+                                    android.util.Log.i("LauncherIconRaster", "DESKTOP_IMPROVED_READY package=" + pkgName + " candidate=" + candidateId);
+                                    scheduleSmartisanIconRefresh(appContext, java.util.Collections.singletonList(pkgName));
+                                }
+                            }
+                        });
             }
-        }
-        if (redirect == null && isImprovedIconEnabled(context)) {
-            Drawable smartisan = smartisanIconDrawable(context, info, resources);
-            if (smartisan != null) {
-                return smartisan;
-            }
+            return smartisanIconDrawableCachedOnly(context, info, resources);
         }
         return null;
+    }
+
+    private static Drawable effectiveIconDrawable(Context context, ResolveInfo info, Resources resources,
+                                                  IconSourceManager.Selection temporaryGlobal) {
+        Drawable managed = resolveManagedIcon(context, info, resources, temporaryGlobal);
+        if (managed != null) return managed;
+        try {
+            return info == null ? null : info.loadIcon(context.getPackageManager());
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean hasManualIconOverride(Context context, ActivityInfo activityInfo) {
+        if (context == null || activityInfo == null) return false;
+        RedirectIconInfo info = RedirectIconDB.getRedirectIconInfo(context,
+                activityInfo.packageName, activityInfo.name);
+        String mode = RedirectIconDB.modeOf(info);
+        return RedirectIconDB.MODE_CUSTOM.equals(mode) || RedirectIconDB.MODE_RESOURCE.equals(mode)
+                || RedirectIconDB.MODE_PACK.equals(mode) || RedirectIconDB.MODE_ORIGINAL.equals(mode);
     }
 
     private static Drawable packedIconFromPackage(Context context, String pack, ResolveInfo info) {
         ActivityInfo ai = info == null ? null : info.activityInfo;
         return ai == null ? null : com.smartisanos.home.settings.icons.IconPackManager
-                .getPackedIcon(context, pack, ai.packageName, ai.name);
+                .getPackedIconNonBlocking(context, pack, ai.packageName, ai.name);
     }
 
     public static Drawable currentLauncherIconDrawable(Context context, String packageName) {
@@ -15425,220 +16169,12 @@ public final class MaintainedLauncherSettingsHost {
         if (ai == null) {
             return null;
         }
-        String pkg = ai.packageName == null ? "" : ai.packageName.toLowerCase();
-        String cls = ai.name == null ? "" : ai.name.toLowerCase();
-        String key = pkg + " " + cls;
-        String label = "";
+        CharSequence label = null;
         try {
-            CharSequence loaded = context == null ? null : info.loadLabel(context.getPackageManager());
-            label = loaded == null ? "" : loaded.toString().trim().toLowerCase();
+            label = context == null ? null : info.loadLabel(context.getPackageManager());
         } catch (Throwable ignored) {
         }
-        boolean allowPackageMatch = isSystemApp(ai) || isKnownVendorSystemPackage(pkg);
-
-        // Some ROMs publish dialer and contacts as two launcher activities of
-        // the same package. Activity identity must win over the package name.
-        if (isDialerActivity(info, label)) {
-            return null;
-        }
-        if (isContactsActivity(info, label)) {
-            return "com.android.contacts";
-        }
-
-        // File managers often use an Activity containing "browser".  Check the
-        // visible file-management identity before the broad browser rule.
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"filemanager", "fileexplorer", "file.manager", "file_manager", "documentsui"},
-                new String[]{"文件管理", "文件管理器", "文件浏览器", "files"})) {
-            return "com.smartisanos.filemanager";
-        }
-        // Use the original Smartisan video-player artwork for vendor system
-        // players. Keep the older cross-ROM artwork selectable as a variant.
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"videoplayer", "video.player", "video", "movie"},
-                new String[]{"视频", "视频播放器", "video", "movies"})) {
-            return "com.smartisanos.videoplayerproject";
-        }
-        // Do not force a category icon onto vendor device-search activities.
-        if ("设备搜索".equals(label) || "device search".equals(label)) {
-            return null;
-        }
-
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"camera", "com.oplus.camera", "com.coloros.camera", "com.miui.camera", "com.vivo.camera", "com.huawei.camera", "com.sec.android.app.camera"},
-                new String[]{"相机", "照相机", "camera"})) {
-            return "com.android.camera2";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"gallery", "photos", "album", "com.coloros.gallery3d", "com.miui.gallery", "com.vivo.gallery", "com.huawei.photos"},
-                new String[]{"相册", "图库", "照片", "gallery", "photos"})) {
-            return "com.android.gallery3d";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"browser", "com.heytap.browser", "com.android.chrome", "com.sec.android.app.sbrowser"},
-                new String[]{"浏览器", "browser", "internet"})) {
-            return "com.android.browser";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"mms", "messaging", "message"},
-                new String[]{"短信", "信息", "消息", "messages"})) {
-            return "com.android.mms";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"email", "mail"},
-                new String[]{"邮件", "邮箱", "email", "mail"})) {
-            return "com.android.email";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"appstore", "app.market", "market", "store"},
-                new String[]{"软件商店", "应用商店", "应用市场", "软件商城", "商店", "app market", "app store"})) {
-            return "com.smartisanos.appstore";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"cloudservice", "cloud.service", "cloudsync", "cloudspace"},
-                new String[]{"云服务", "云空间", "云同步", "cloud service", "cloud"})) {
-            return "com.smartisanos.cloudsync";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"security", "safecenter", "securitycenter", "phone.manager", "phonemanager", "mobilemanager"},
-                new String[]{"手机管家", "安全中心", "系统管家", "安全", "phone manager", "security"})) {
-            return "com.smartisanos.security";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"wallet", "pay.wallet"},
-                new String[]{"钱包", "卡包", "wallet"})) {
-            return "com.smartisanos.wallet";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"calculator", "calc"},
-                new String[]{"计算器", "calculator"})) {
-            return "com.smartisanos.calculator";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"compass"},
-                new String[]{"指南针", "compass"})) {
-            return "com.smartisanos.compass";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"soundrecorder", "voicerecorder", "recorder"},
-                new String[]{"录音", "录音机", "录音器", "recorder"})) {
-            return "com.smartisanos.recorder";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"music", "audio.player"},
-                new String[]{"音乐", "music"})) {
-            return "com.smartisanos.music";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"weather"},
-                new String[]{"天气", "weather"})) {
-            return "com.smartisanos.weather";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"notes", "notepad", "memo"},
-                new String[]{"便签", "笔记", "备忘录", "notes"})) {
-            return "com.smartisanos.notes";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"assistant", "voiceassist", "breeno", "xiaobu"},
-                new String[]{"小布助手", "语音助手", "智能助理", "assistant"})) {
-            return "com.smartisanos.voice";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"settings"},
-                new String[]{"设置", "settings"})) {
-            return "com.android.settings";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{"packageinstaller", "permissioncontroller"},
-                new String[]{"软件包安装程序", "安装程序", "package installer"})) {
-            return "com.android.packageinstaller";
-        }
-        if (isSystemIconCategory(key, label, allowPackageMatch,
-                new String[]{".stk", "simtoolkit"},
-                new String[]{"sim卡应用", "sim toolkit"})) {
-            return "com.android.stk";
-        }
-        return null;
-    }
-
-    private static boolean isSystemIconCategory(String key, String label, boolean allowPackageMatch,
-                                                String[] keyTokens, String[] labels) {
-        if (labels != null) {
-            for (String candidate : labels) {
-                if (candidate != null && candidate.equals(label)) {
-                    return true;
-                }
-            }
-        }
-        if (allowPackageMatch && keyTokens != null) {
-            for (String token : keyTokens) {
-                if (token != null && token.length() > 0 && key.contains(token)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static boolean isDialerActivity(ResolveInfo info, String label) {
-        ActivityInfo ai = info == null ? null : info.activityInfo;
-        String cls = ai == null || ai.name == null ? "" : ai.name.toLowerCase();
-        String normalizedLabel = label == null ? "" : label.trim().toLowerCase();
-        // Vendor aliases occasionally retain a dialer-like target class while
-        // exposing a contacts-labelled launcher entry. The visible launcher
-        // label is the only reliable discriminator in that case.
-        if (isContactsLabel(normalizedLabel)) {
-            return false;
-        }
-        if (isDialerLabel(normalizedLabel)) {
-            return true;
-        }
-        return cls.contains("dialtacts") || cls.contains("dialer")
-                || cls.contains("dialpad") || cls.contains("phoneactivity");
-    }
-
-    private static boolean isContactsActivity(ResolveInfo info, String label) {
-        ActivityInfo ai = info == null ? null : info.activityInfo;
-        String cls = ai == null || ai.name == null ? "" : ai.name.toLowerCase();
-        String normalizedLabel = label == null ? "" : label.trim().toLowerCase();
-        if (isDialerLabel(normalizedLabel)) {
-            return false;
-        }
-        if (isContactsLabel(normalizedLabel)) {
-            return true;
-        }
-        return cls.contains("peopleactivity") || cls.contains("contactactivity")
-                || cls.contains("contactsactivity") || cls.contains("people");
-    }
-
-    private static boolean isDialerLabel(String label) {
-        return "拨号".equals(label) || "电话".equals(label)
-                || "dialer".equals(label) || "phone".equals(label);
-    }
-
-    private static boolean isContactsLabel(String label) {
-        return "联系人".equals(label) || "通讯录".equals(label)
-                || "电话本".equals(label) || "contacts".equals(label)
-                || "contact".equals(label) || "people".equals(label);
-    }
-
-    private static boolean isKnownVendorSystemPackage(String pkg) {
-        if (pkg == null) {
-            return false;
-        }
-        String[] prefixes = new String[]{
-                "com.android.", "com.google.android.", "com.smartisanos.",
-                "com.oplus.", "com.coloros.", "com.heytap.", "com.oneplus.", "com.realme.",
-                "com.miui.", "com.xiaomi.", "com.vivo.", "com.bbk.",
-                "com.huawei.", "com.hihonor.", "com.sec.android.", "com.samsung."
-        };
-        for (String prefix : prefixes) {
-            if (pkg.startsWith(prefix)) {
-                return true;
-            }
-        }
-        return false;
+        return com.smartisanos.home.settings.icons.IconManager.resolveSmartisanSystemIconName(ai.packageName, ai.name, label);
     }
 
     private static String smartisanIconNameFor(Context context, ResolveInfo info) {
@@ -15646,90 +16182,12 @@ public final class MaintainedLauncherSettingsHost {
         if (ai == null) {
             return null;
         }
-        String pkg = ai.packageName == null ? "" : ai.packageName;
-        String cls = ai.name == null ? "" : ai.name;
-        String key = (pkg + " " + cls).toLowerCase();
-        String label = "";
+        CharSequence label = null;
         try {
-            CharSequence loaded = context == null ? null : info.loadLabel(context.getPackageManager());
-            label = loaded == null ? "" : loaded.toString();
+            label = context == null ? null : info.loadLabel(context.getPackageManager());
         } catch (Throwable ignored) {
         }
-        if ("com.smartisanos.weather".equals(pkg) || "com.android.weather".equals(pkg)
-                || (isSystemApp(ai) && (key.contains("weather") || "天气".equals(label)))) {
-            return "app_icon_weather";
-        }
-        if ("com.smartisanos.appstore".equals(pkg) || "com.android.vending".equals(pkg)
-                || "com.sec.android.app.samsungapps".equals(pkg)
-                || key.contains("appstore")
-                || "应用商店".equals(label) || "应用市场".equals(label)) {
-            return "app_icon_app_store";
-        }
-        if ("com.smartisanos.reader".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("reader"))
-                || "阅读".equals(label)) {
-            return "app_icon_reader";
-        }
-        if ("com.google.android.googlequicksearchbox".equals(pkg)
-                || (isSystemApp(ai) && key.contains("googlequicksearchbox"))
-                || "搜索".equals(label)) {
-            return "app_icon_search";
-        }
-        if ("com.smartisanos.notes".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("note"))
-                || "便签".equals(label)
-                || "笔记".equals(label)) {
-            return "app_icon_notes";
-        }
-        if ("com.smartisanos.gamecenter".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("gamecenter"))
-                || "游戏中心".equals(label)) {
-            return "app_icon_game_center";
-        }
-        if ("com.smartisanos.cloudsync".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("cloudsync"))
-                || "欢喜云".equals(label)) {
-            return "app_icon_smile_cloud";
-        }
-        if ("com.smartisanos.bbs".equals(pkg) || (isSmartisanPackage(pkg) && key.contains("bbs"))
-                || "锤子论坛".equals(label)) {
-            return "app_icon_bbs";
-        }
-
-        if (!isSystemApp(ai)) {
-            return null;
-        }
-        // Resolve the exact launcher Activity before package-wide fallbacks.
-        if (isDialerActivity(info, label)) {
-            return "app_icon_phone";
-        }
-        if (isContactsActivity(info, label)) {
-            return "source_contactcommon_icon";
-        }
-        if ("com.android.dialer".equals(pkg) || "com.android.phone".equals(pkg)
-                || "com.google.android.dialer".equals(pkg) || "com.smartisanos.phone".equals(pkg)
-                || key.contains("dialer")
-                || "电话".equals(label) || "拨号".equals(label)) {
-            return "app_icon_phone";
-        }
-        if ("com.android.mms".equals(pkg) || "com.google.android.apps.messaging".equals(pkg)
-                || key.contains("mms") || key.contains("messaging")
-                || "短信".equals(label) || "信息".equals(label)) {
-            return "app_icon_mms";
-        }
-        if ("com.android.contacts".equals(pkg) || "com.google.android.contacts".equals(pkg)
-                || "com.smartisanos.contacts".equals(pkg)) {
-            return "source_contactcommon_icon";
-        }
-        if ("com.android.calendar".equals(pkg) || "com.google.android.calendar".equals(pkg)
-                || "com.smartisanos.calendar".equals(pkg) || key.contains("calendar") || "日历".equals(label)) {
-            return "calendar";
-        }
-        if ("com.android.deskclock".equals(pkg) || "com.google.android.deskclock".equals(pkg)
-                || "com.smartisanos.clock".equals(pkg) || key.contains("clock") || "时钟".equals(label)) {
-            return "clock";
-        }
-        if ("com.android.settings".equals(pkg) || "com.smartisanos.settings".equals(pkg)
-                || key.contains("settings") || "设置".equals(label)) {
-            return null;
-        }
-        return null;
+        return com.smartisanos.home.settings.icons.IconManager.resolveSmartisanSystemIconName(ai.packageName, ai.name, label);
     }
 
     private static boolean isSmartisanPackage(String pkg) {
@@ -15759,27 +16217,30 @@ public final class MaintainedLauncherSettingsHost {
         return tag == null || entry.pkg.equals(tag);
     }
 
+    public static String candidateIdToDrawableName(String candidateId) {
+        if (TextUtils.isEmpty(candidateId)) return "";
+        return candidateId.replace('.', '_').replace('-', '_');
+    }
+
     private static Drawable maintainedResourceIcon(Context context, Resources resources, String name) {
-        Drawable icon = safeDrawable(resources, drawable(resources, name));
-        if (icon != null || name == null) {
+        if (TextUtils.isEmpty(name)) return null;
+        String resourceName = candidateIdToDrawableName(name);
+        Drawable icon = safeDrawable(resources, drawable(resources, resourceName));
+        if (icon != null) {
             return icon;
         }
-        // Online-library keys are package names, while Android drawable
-        // resource names use underscores.  Core system-category artwork
-        // may be bundled as an offline fallback under that legal name.
-        String resourceName = name.replace('.', '_').replace('-', '_');
-        icon = safeDrawable(resources, drawable(resources, resourceName));
+        icon = safeDrawable(resources, drawable(resources, name));
         if (icon != null || context == null) {
             return icon;
         }
         try {
             Resources appResources = context.getResources();
             icon = safeDrawable(appResources,
-                    appResources.getIdentifier(name, "drawable", context.getPackageName()));
+                    appResources.getIdentifier(resourceName, "drawable", context.getPackageName()));
             if (icon != null) {
                 return icon;
             }
-            return safeDrawable(appResources, appResources.getIdentifier(resourceName,
+            return safeDrawable(appResources, appResources.getIdentifier(name,
                     "drawable", context.getPackageName()));
         } catch (Throwable ignored) {
             return null;
@@ -16609,11 +17070,15 @@ public final class MaintainedLauncherSettingsHost {
     private static final class IconPageData {
         final IconManager iconManager;
         final List<RedirectIconInfo> entries;
+        final IconPreviewRepository.AppIconSnapshot snapshot;
 
-        IconPageData(IconManager iconManager, List<RedirectIconInfo> entries) {
+        IconPageData(IconManager iconManager, List<RedirectIconInfo> entries,
+                     IconPreviewRepository.AppIconSnapshot snapshot) {
             this.iconManager = iconManager;
             this.entries = entries == null
                     ? new ArrayList<RedirectIconInfo>() : entries;
+            this.snapshot = snapshot == null
+                    ? new IconPreviewRepository.AppIconSnapshot(null) : snapshot;
         }
     }
 

@@ -433,6 +433,14 @@
 
     if-eqz v0, :cond_system_uninstall_continue
 
+    # QuickLaunchItem is a desktop shortcut, not an uninstallable package.
+    # Preserve the original confirmation and EVENT_UNINSTALL_SHORTCUT path.
+    iget-byte v1, v0, Lcom/smartisanos/launcher/data/ItemInfo;->itemType:B
+
+    const/4 v2, 0x1
+
+    if-eq v1, v2, :cond_system_uninstall_continue
+
     iget-object v0, v0, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
 
     if-eqz v0, :cond_system_uninstall_continue
@@ -1247,9 +1255,28 @@
     .line 69
     :cond_23
     :goto_7
+    iget v2, p0, Lcom/smartisanos/launcher/a/na;->ck:I
+
+    if-ne v2, v5, :cond_default_dialog_title
+
+    iget-object v2, p0, Lcom/smartisanos/launcher/a/na;->_j:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-byte v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->itemType:B
+
+    if-ne v2, v5, :cond_default_dialog_title
+
+    const-string v2, "删除快捷方式"
+
+    invoke-virtual {v0, v2}, Landroid/app/AlertDialog$Builder;->setTitle(Ljava/lang/CharSequence;)Landroid/app/AlertDialog$Builder;
+
+    goto :goto_shortcut_dialog_title_ready
+
+    :cond_default_dialog_title
     sget v2, Lcom/smartisanos/launcher/ob;->uninstall_app_dialog_title:I
 
     invoke-virtual {v0, v2}, Landroid/app/AlertDialog$Builder;->setTitle(I)Landroid/app/AlertDialog$Builder;
+
+    :goto_shortcut_dialog_title_ready
 
     .line 70
     iget v2, p0, Lcom/smartisanos/launcher/a/na;->ck:I
@@ -1315,6 +1342,39 @@
 
     .line 78
     :cond_24
+    iget-object v2, p0, Lcom/smartisanos/launcher/a/na;->_j:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-byte v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->itemType:B
+
+    if-ne v2, v5, :cond_default_shortcut_message
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/a/na;->c(Lcom/smartisanos/launcher/a/na;)Lcom/smartisanos/launcher/data/ItemInfo;
+
+    move-result-object v2
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/ShortcutCompatBridge;->onShortcutDeleteDialogRequested(Ljava/lang/Object;)V
+
+    new-instance v1, Ljava/lang/StringBuilder;
+
+    const-string v2, "是否删除“"
+
+    invoke-direct {v1, v2}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
+
+    iget-object v2, p0, Lcom/smartisanos/launcher/a/na;->_j:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-object v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->title:Ljava/lang/String;
+
+    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    const-string v2, "”？"
+
+    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v1
+
+    :cond_default_shortcut_message
     invoke-virtual {v0, v1}, Landroid/app/AlertDialog$Builder;->setMessage(Ljava/lang/CharSequence;)Landroid/app/AlertDialog$Builder;
 
     .line 79
@@ -1327,6 +1387,19 @@
     invoke-direct {v1, p0, v2, v3}, Lcom/smartisanos/launcher/a/ia;-><init>(Lcom/smartisanos/launcher/a/na;Lcom/smartisanos/launcher/data/ItemInfo;Z)V
 
     .line 80
+    iget-object v2, p0, Lcom/smartisanos/launcher/a/na;->_j:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-byte v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->itemType:B
+
+    if-ne v2, v5, :cond_default_shortcut_positive
+
+    const-string v2, "删除"
+
+    invoke-virtual {v0, v2, v1}, Landroid/app/AlertDialog$Builder;->setPositiveButton(Ljava/lang/CharSequence;Landroid/content/DialogInterface$OnClickListener;)Landroid/app/AlertDialog$Builder;
+
+    goto :goto_8
+
+    :cond_default_shortcut_positive
     sget v2, Lcom/smartisanos/launcher/ob;->ok:I
 
     invoke-virtual {v0, v2, v1}, Landroid/app/AlertDialog$Builder;->setPositiveButton(ILandroid/content/DialogInterface$OnClickListener;)Landroid/app/AlertDialog$Builder;
@@ -1398,6 +1471,8 @@
     sget-object p0, Lcom/smartisanos/launcher/a/oa;->jk:Landroid/app/AlertDialog;
 
     invoke-virtual {p0}, Landroid/app/AlertDialog;->show()V
+
+    invoke-static {}, Lcom/smartisanos/launcher/ShortcutCompatBridge;->onShortcutDeleteDialogShown()V
 
     return-void
 

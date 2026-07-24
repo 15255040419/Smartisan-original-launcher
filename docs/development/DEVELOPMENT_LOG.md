@@ -17,7 +17,21 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-07-21）
+## 当前状态总览（2026-07-24）
+
+- 桌面下滑打开系统面板与上滑搜索之间的手势状态冲突已定位并修复：`FlingUpGesture.b()` 在向下 MOVE 过程会将静态标志 `sk` 设为 `true`；由于系统面板在 `ACTION_MOVE` 阶段取得焦点后 Launcher 不会收到后续 `ACTION_UP`/`ACTION_CANCEL`，导致 `sk=true` 残留至下一次手势并拦截第一次上滑搜索。现已在 `v.1.smali` 的 `ACTION_MOVE` 已确认消费分支及 `ACTION_UP`/`ACTION_CANCEL` 兜底分支中调用 `FlingUpGesture.resetAfterSystemPanelGestureMoveConsumed()` / `resetAfterSystemPanelGesture()`，立即重置 `rk`/`sk`/`tk` 并记录 `FLING_UP_STATE_RESET` 日志。
+
+- 单应用自定义上传图标无法显示的目录与刷新问题已修复：`saveCustomIcon()` 之前写入 `custom_icons/` 目录，而 `RedirectIconDB.readCustomBytes()` 从 `redirect_icons/` 读取，导致数据源不匹配；`AppIconAdapter.getView()` 与 `rebuildRows()` 之前使用了预载的内存 `RedirectIconInfo` 对象，未能及时反映数据库变更。现已统一写入 `"redirect_icons"` 目录，自动迁移旧图片，并在列表/单应用页面绑定时实时获取最新数据库记录；同时修正 `iconDrawableForChoice` 缺失图片时不将 `+` 号当合法 Icon 写入 `IconPreviewRepository` LRU 缓存。
+
+- 应用图标全局来源已从可叠加的“改进版开关 + 图标包”收敛为 `DEFAULT`、`IMPROVED`、`PACK:<package>` 单选状态，并以 `launcher_global_icon_source_v2` 保存及同步旧字段。普通应用统一按“单应用手动覆盖 → 当前全局来源 → PackageManager 原图”解析；手动来源失效仍只临时回退系统原图。应用图标页顶部调整为“图标样式 + 桌面图标大小”，列表 UI 不变。2026-07-23 已在 OPPO PDCM00 成功 `adb install -r` 覆盖安装并启动 Launcher，无 `AndroidRuntime`/`VerifyError`；弹窗临时预览、滚动保持和桌面一致性仍待可见 UI 矩阵验证。
+
+- 应用图标页补充了 `IconPreviewRepository`：以 Application Context 持有、按 Bitmap allocation 大小计量的 6–16 MiB LruCache，双线程优先队列、同 `IconRenderKey` 请求合并和内存压力回收；Repository 不保存 Activity、View 或 Adapter。页面后台生成应用/版本/单应用模式/variants 候选快照，列表左侧官方图标与右侧当前来源候选均由绑定 key 局部回填，避免 `getView()` 同步 `loadIcon()` 或重复读取 RedirectIconDB。全局 DEFAULT + MODE_AUTO/ORIGINAL 时右侧候选框改为隐藏，避免复制左侧默认图标。2026-07-23 已构建、签名并在 OPPO PDCM00 覆盖安装/启动；改进版、图标包和弹窗预览的完整可见滚动/切换矩阵仍待人工界面验收。
+
+- 2026-07-23 OPPO PDCM00 真机确认应用图标页原先因 `View.setTag(int, Object)` 传入系统 `android.R.id.*` 崩溃的问题已消失：改为 Adapter 内 `IconRowHolder` 保存 `boundOfficialKey`、`boundEffectiveKey` 与 `bindGeneration`，异步回调仅在键与 generation 同时匹配时局部更新。连续进入/返回 10 次、顶部到底部往返滚动 5 次均未见 Launcher 的 `IllegalArgumentException`、`View.setTag`、`VerifyError` 或 `AndroidRuntime` 崩溃。全局样式弹窗和单应用候选页均改走同一 Repository；最终覆盖安装日志保存为 `build/app_icon_final_log.txt`。
+
+- Android 8+ `REQUEST_PIN_SHORTCUT` 兼容链已完成本地构建级修复：确认原版 `DatabaseUpdater.Action.maa` 是静态字段，实际枚举为 `EVENT_INSTALL_OR_UPDATE_SHORTCUT`，不再错误地把 `maa` 当枚举名。桥接层在原版转换后恢复 `ShortcutInfo.getUserHandle().getIdentifier()` 到 `ItemInfo.userId`，并将原版 `QuickLaunchItem` 去重查询收紧为 `intent + user`；分身与主用户的相同 `packageName + shortcutId` 因而不会共用记录。快捷方式图标依次尝试原图、`LauncherApps`、原版默认、来源应用，并强制经过原版 `e.s.a(context, bitmap, packageName, userId)` 合成；合成失败不写入裸图标。确认页的二进制 Manifest 现强制使用原版框架 `Theme.Translucent.NoTitleBar`，不再继承原 `PinShortcutActivity` 的 no-display 窗口属性。构建、签名和最终二进制 Manifest 已验证。vivo X21A 已识别主用户与 `999` 分身用户且微信已安装，但新 APK 覆盖安装仍返回 `Failure [-200]`，尚未完成确认页、主微信/分身微信、支付宝及重启/删除矩阵真机验收，不能标记为完成。
+
+- PIN 快捷方式删除与图标合成的本轮修复已完成构建级验证：系统卸载快速路径现在先按 `ItemInfo.itemType` 分流，`QuickLaunchItem(1)` 继续使用原版 `EVENT_UNINSTALL_SHORTCUT`，不会调用 `UninstallCompat` 卸载来源应用；删除后从启动 Intent 读取 `packageName + shortcutId + userSerial`，按真实 profile 解除该 pinned ID。微信和支付宝的 Android PIN 输入图标被视为已带来源装饰，只做透明边缘归一化而跳过第二次 `e.s.a()` 合成；其他快捷方式保持原版合成器和 `final_icon=true`。构建、签名通过；同一 vivo 覆盖安装仍为 `Failure [-200]`，删除/重启/主分身与单框视觉尚未真机验收。
 
 - 桌面设置“桌面设置”齿轮按钮高清物理纹理合成修复已完成：`Ec.wz()` 使用 `LayoutProperty.setting_button` 逻辑画布大小和 `NormalIconRasterSpec` 的 `rasterScale` 物理缩放比例合成 high-res 纹理。按下状态下支持 60 度齿轮旋转和内阴影，且在合成异常或未就绪时能够安全回退到原版低分辨率流程。2026-07-21 已在 12 宫格、20 宫格和主题切换等场景下通过打包、签名和 aapt 校验，真机回归及截图验证待进行。
 
@@ -60,7 +74,55 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-07-24
+
+#### 下滑系统面板与上滑搜索状态残留修复（构建完成，已增加低频日志）
+
+- **根因**：用户在桌面下滑打开通知栏/控制中心时，`FlingUpGesture.b(MotionEvent)` 在向下滑动阶段将静态标志 `sk` 设为 `true`。当系统面板在 `ACTION_MOVE` 阶段取得焦点后，Launcher 收不到后续 `ACTION_UP`/`ACTION_CANCEL`，跳过了 `FlingUpGesture.c()` 中的 `ew()` 清理，导致 `sk=true` 遗留至下一次手势；下一次上滑时 `!sk = false` 拦截了上滑搜索，直到该次上滑结束才由 `ew()` 清除状态，造成“必须第二次上滑才能打开搜索”的现象。
+- **修复**：
+  1. 在 `launcher/smali/com/smartisanos/launcher/a/a/a.smali` 中增加 `resetAfterSystemPanelGestureMoveConsumed()` 和 `resetAfterSystemPanelGesture()`，仅调用内部私有 `ew()`，不增加重复状态字段。
+  2. 在 `launcher/smali/com/smartisanos/smengine/v.1.smali` 的 `ACTION_MOVE` 系统面板已消费分支（`isSystemPanelGestureConsumed() == true` 且 `onOriginalTargetCancelled()` 执行后）立即调用 `resetAfterSystemPanelGestureMoveConsumed()`。
+  3. 保留 `ACTION_UP`/`ACTION_CANCEL` 消费分支中的 `resetAfterSystemPanelGesture()` 作为兜底。
+  4. 在 `MaintainedLauncherSettingsHost.java` 中增加低频日志 `logFlingUpReset`，输出 `FLING_UP_STATE_RESET reason=SYSTEM_PANEL_MOVE_CONSUMED/SYSTEM_PANEL_UP_CANCEL beforeRk=... beforeSk=... beforeTk=... afterRk=false afterSk=false afterTk=false`。
+- **验证**：执行 `build.bat` 构建成功，签名及二进制 Manifest 检查通过。
+
+#### 自定义上传图标保存目录与列表刷新修复（构建完成）
+
+- **根因**：
+  1. 路径不一致：`saveCustomIcon()` 将相册裁切图片保存至 `getFilesDir()/custom_icons/`，而 `RedirectIconDB.readCustomBytes()` 从 `getFilesDir()/redirect_icons/` 读取，导致数据源永远返回 `null`。
+  2. 列表视图未刷新：`AppIconAdapter.getView()` 与 `rebuildRows()` 直接使用 initial load 时创建的 `RedirectIconInfo` 对象，`info.drawableName` 留在 `"auto"`，未能读取数据库中已更新的 `MODE_CUSTOM` 状态与位图。
+  3. 缓存空值：`iconDrawableForChoice` 在 `TYPE_CUSTOM` 缺失 `iconData` 时返回了 `plusIcon(resources)`，导致 `IconPreviewRepository` 线程池将其作为合法位图写入 LRU 缓存，阻碍了新图片的渲染。
+- **修复**：
+  1. `saveCustomIcon()` 写入目录统一为 `redirect_icons/`，并在 `RedirectIconDB.customFile()` 中增加遗留 `custom_icons/` 自动迁移。
+  2. `AppIconAdapter.getView()` 与 `rebuildRows()` 在绑定和分组时实时调用 `RedirectIconDB.getRedirectIconInfo(...)` 获取最新记录。
+  3. `iconDrawableForChoice` 缺失 `iconData` 时返回 `null`，避免将 `+` 号位图写入 `IconPreviewRepository`；`iconSourceId` 针对 `MODE_CUSTOM` 增加数据长度后缀 `custom_<length>` 驱动缓存 Key 更新。
+- **验证**：`build.bat` 打包与签名成功，`aapt2` 校验通过。
+
 ### 2026-07-23
+
+#### 应用图标全局来源统一与真实预览（构建完成，真机未完成）
+
+- **问题**：旧实现的 `launcher_improved_icon_enabled` 与 `prefs_key_selected_icon_pack` 相互独立，改进版和图标包可同时开启；桌面、列表右侧候选图标与设置选择不能保证使用同一来源，全局切换还会遍历并重写部分 `RedirectIconDB` 记录，存在覆盖单应用设置的风险。
+- **修改**：新增 `IconSourceManager` 管理互斥 `default`、`improved`、`pack:<package>` 状态，并在首次读取迁移旧配置；保存新状态时同步旧字段，保证原版 Smali/旧 Java 兼容。应用图标页顶部由三行改为“图标样式 + 桌面图标大小”，保留原有两行背景和箭头，不修改既有“已重绘/未重绘”列表、行布局或单应用候选页。
+- **解析与预览**：桌面 `iconOverrideDrawable`、列表右侧图标和全局选择弹窗共用“手动 MODE_CUSTOM / MODE_RESOURCE / MODE_PACK / MODE_ORIGINAL 优先；MODE_AUTO/无记录跟随全局；任何来源缺图回退 PackageManager 原图”的解析。弹窗只维护临时选择，取消不写偏好；图标包扫描及 appfilter 预载在后台执行，预览优先跳过已有手动覆盖的普通应用。应用时不修改 `RedirectIconDB`，只清理/预载图标包缓存、刷新现有适配器并走已有逐包 `update_icon` 链。
+- **弹窗视觉收口**：来源列表不使用任何 Android/Material 单选控件；每项为 54dp 锤子式整行，右侧仅复用 `preview_picture_selected` 小对号。首/中/末行分别复用 maintained 圆角背景；分割线改为每行内部的底部细线并左右缩进 24dp，避免穿出右侧圆角。列表独立限高 280dp，标题、预览和底部按钮固定；对号使用 22dp `CENTER_INSIDE`、右侧 24dp 间距且行容器不裁剪子视图。
+- **验证**：基线和修改后均执行 `build.bat`；最终 launcher、maintained 设置资源、Java helper/classes2.dex、二进制 Manifest 注入、zipalign 与 v1/v2/v3 签名均成功。真机覆盖安装仍需先解决设备返回的 `Failure [-200]`，因此未把临时预览一致性、列表滚动位置、单应用覆盖和重启矩阵标记为已验收。
+
+#### Android 8+ PIN 快捷方式的分身用户、原版数据库动作与图标框修复（构建完成，真机未完成）
+
+- **删除分流与去重图标修复（2026-07-23）**：`na.run()` 的普通 Android `UninstallCompat.requestUninstall(packageName)` 快速路径此前只判断单项删除和包名，错误拦截了 `itemType=1` 的 `QuickLaunchItem`，所以拖入微信/支付宝小程序会打开来源应用卸载器。现先检查 `itemType`：只有普通应用（`0`）仍走系统卸载；快捷方式回到原版确认与 `ia -> DatabaseUpdater.Action.naa -> F.b()` 链。快捷方式确认文案改为“删除快捷方式 / 是否删除“名称”？ / 删除”，普通应用既有文案和系统卸载入口未改。
+- **原版删除与 unpin**：`ia` 原有 `naa`（`EVENT_UNINSTALL_SHORTCUT`）分发完成后才调用桥接日志/unpin helper；helper 从当前项目 Intent 读取 package、shortcut ID、user serial，以 `UserManager.getUserForSerialNumber()` 恢复真实 profile（仅 item userId 与进程主用户相同才允许主用户 fallback），读取 pinned 列表、仅移除当前 ID，再写回剩余 IDs。unpin 失败只记录 `SHORTCUT_UNPIN_FAILED`，不回滚已完成的本地删除，也不会触发来源应用卸载。
+- **图标**：微信、支付宝 PIN 输入图标已携带来源框/角标，桥接层记录 `SHORTCUT_ICON_FINAL_MODE mode=source_already_decorated` 后直接保存归一化位图，避免第二次 `e.s.a()`；普通快捷方式仍走原版 `e.s.a()`。`smartisan.shortcut.final_icon=true` 继续写入，因此恢复链不应再次套框。
+- **验证**：`build.bat` 成功完成 Smali、Java compatibility host、二进制 Manifest 注入、zipalign 和签名；`apksigner verify --verbose` 确认 v1/v2/v3。vivo X21A 在线，但安全的 `adb install -r build\\launcher-signed.apk` 仍返回 `Failure [-200]`；未卸载、未清数据，故未获得删除、unpin、主/分身隔离、普通应用卸载回归及微信/支付宝单框的真机证据。
+
+- **确认页生命周期崩溃修复（2026-07-23）**：真机日志已确认崩溃发生在 `PIN_SHORTCUT_DIALOG_SHOWN` 之后、任何 `accept()`、用户解析、图标合成和数据库调用之前：`PinShortcutConfirmActivity did not call finish() prior to onResume() completing`。根因是 `tools/patch_pin_shortcut_manifest.py` 只把原版 no-display `PinShortcutActivity` 改名，却保留其不可显示窗口属性；新的确认页需要承载 `AlertDialog`。补丁脚本现在读取/覆盖已有 `android:theme`，或在缺失时追加 typed reference `0x01/0x01030010`（`@android:style/Theme.Translucent.NoTitleBar`）。未修改 `ShortcutCompatBridge`、`DatabaseUpdater`、`QuickLaunchItem`、分身身份/图标框或 `ShortcutLaunchActivity`。
+- **验证**：重新执行 `build.bat` 成功；`aapt2 dump xmltree --file AndroidManifest.xml build\\launcher-signed.apk` 的确认页记录为 `theme=@0x01030010`、`exported=true`、`excludeFromRecents=true`、`launchMode=1 (singleTop)`，并包含 `CONFIRM_PIN_SHORTCUT` 与 `DEFAULT`。完整 dump 存放于 `build\\final_manifest_dump.txt`。真机覆盖安装仍受 `Failure [-200]` 阻塞，尚不能验证是否继续输出 `SHORTCUT_ACTION_RESOLVED`，更不能据此宣称快捷方式写入成功。
+
+- **根因**：兼容桥接层此前将原版 `DatabaseUpdater.Action.maa` 当作枚举名传给 `Enum.valueOf()`；而 `maa` 实际为静态字段，指向 `EVENT_INSTALL_OR_UPDATE_SHORTCUT`，因此确认页 `accept()` 即使成功，桌面数据库派发仍会失败。原版 `d.j.c()` 转换快捷方式时还会把 `ItemInfo.userId` 重置为 `-1`，会破坏分身身份；原图为空时也没有完整复用原版快捷方式图标框路径。
+- **修复**：`ShortcutCompatBridge` 反射读取 `maa` 字段并校验其枚举名/ordinal 后，继续调用原版 `F.b(action, null, items)`，不重建 Model、PageView 或数据库写入。转换完成后从 `ShortcutInfo.getUserHandle()` 读取 identifier，写回 `ItemInfo.userId`，并记录 `SHORTCUT_USER_RESOLVED`。原版 `QuickLaunchItem` 插入前去重原本只按 Intent，因此仅在该快捷方式入口将查询收紧为 `intent + user`，并保持普通应用的通用去重不变；数据库保存链同时持久化 `user` 与 `shortcutId`。`ShortcutLaunchActivity` 保持以 `UserManager.getUserForSerialNumber(userSerial)` 恢复句柄，分身记录不允许退回 `Process.myUserHandle()`。
+- **图标**：依次使用快捷方式原图、`LauncherApps.getShortcutIconDrawable()`、原版 `contact_shortcut`、来源应用图标；得到位图后必须经原版 `e.s.a(context, normalizedBitmap, packageName, userId)` 合成。包名分别记录 `wechat_shortcut`、`alipay_shortcut` 或 `contact_shortcut`，合成返回空时拒绝创建，避免分身微信写入裸图标或主微信应用图标。
+- **验证**：`build.bat` 已通过 apktool、Java 宿主编译、二进制 Manifest 注入及 v1/v2/v3 签名；`aapt2 dump badging` 确认产物为 `com.smartisanos.launcher`、versionCode `29`、versionName `v1.5.4`，最终 Manifest 含导出的 `PinShortcutConfirmActivity`、`CONFIRM_PIN_SHORTCUT` 过滤器和非导出的 `ShortcutLaunchActivity`。`git diff --check` 通过。
+- **真机状态与风险**：ADB 可见 vivo X21A、主用户 `0` 和分身用户 `999`，且已安装 `com.tencent.mm`；对新 `build\\launcher-signed.apk` 执行覆盖安装被系统拒绝，返回 `Failure [-200]`。因此未在新代码上验证主/分身同一小程序可同时存在、各自启动、重启保留、独立删除/更新，也未验证支付宝图标框。不得把本项宣布为真机完成。
 
 #### 设置页系统返回统一为左上角返回（构建完成，真机待验收）
 

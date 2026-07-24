@@ -462,13 +462,52 @@
 
     .line 26
     :cond_0
-    iget-object v2, p0, Lcom/smartisanos/launcher/data/ItemInfo;->title:Ljava/lang/String;
-
     iget-object v3, p0, Lcom/smartisanos/launcher/data/QuickLaunchItem;->intent:Landroid/content/Intent;
 
-    invoke-static {v2, v3}, Lcom/smartisanos/launcher/data/a/l;->a(Ljava/lang/String;Landroid/content/Intent;)Z
+    const/4 v2, 0x0
 
-    move-result v2
+    invoke-virtual {v3, v2}, Landroid/content/Intent;->toUri(I)Ljava/lang/String;
+
+    move-result-object v3
+
+    new-instance v0, Ljava/util/HashMap;
+
+    invoke-direct {v0}, Ljava/util/HashMap;-><init>()V
+
+    const-string v1, "intent"
+
+    invoke-interface {v0, v1, v3}, Ljava/util/Map;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    const-string v1, "user"
+
+    iget v2, p0, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I
+
+    invoke-static {v2}, Ljava/lang/Integer;->toString(I)Ljava/lang/String;
+
+    move-result-object v2
+
+    invoke-interface {v0, v1, v2}, Ljava/util/Map;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/data/a/l;->c(Ljava/util/Map;)Ljava/util/List;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_2
+
+    invoke-interface {v0}, Ljava/util/List;->size()I
+
+    move-result v0
+
+    if-lez v0, :cond_2
+
+    const/4 v2, 0x1
+
+    goto :goto_0
+
+    :cond_2
+    const/4 v2, 0x0
+
+    :goto_0
 
     if-eqz v2, :cond_1
 
@@ -478,6 +517,8 @@
     const-string v2, "insertShortcut failed, exist"
 
     invoke-virtual {p0, v2}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
+
+    const-wide/16 v0, -0x1
 
     return-wide v0
 

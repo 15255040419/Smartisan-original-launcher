@@ -308,7 +308,7 @@ public final class RedirectIconDB {
     private static byte[] readCustomBytes(Context context, String key) {
         try {
             File file = customFile(context, key);
-            if (!file.exists()) {
+            if (file == null || !file.exists()) {
                 return null;
             }
             Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
@@ -325,10 +325,12 @@ public final class RedirectIconDB {
     }
 
     private static void writeCustomBytes(Context context, String key, byte[] data) {
+        if (data == null) return;
         try {
             File file = customFile(context, key);
+            if (file == null) return;
             File dir = file.getParentFile();
-            if (!dir.exists()) {
+            if (dir != null && !dir.exists()) {
                 dir.mkdirs();
             }
             FileOutputStream out = new FileOutputStream(file);
@@ -342,7 +344,20 @@ public final class RedirectIconDB {
     }
 
     private static File customFile(Context context, String key) {
-        return new File(new File(context.getFilesDir(), "redirect_icons"), Integer.toHexString(key.hashCode()) + ".png");
+        if (context == null || key == null) {
+            return null;
+        }
+        File persistent = new File(new File(context.getFilesDir(), "redirect_icons"),
+                Integer.toHexString(key.hashCode()) + ".png");
+        if (!persistent.exists()) {
+            File legacy = new File(new File(context.getFilesDir(), "custom_icons"), persistent.getName());
+            if (legacy.exists()) {
+                File parent = persistent.getParentFile();
+                if (parent != null) parent.mkdirs();
+                legacy.renameTo(persistent);
+            }
+        }
+        return persistent;
     }
 
     private static String key(String pkg, String cmp) {

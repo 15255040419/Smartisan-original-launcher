@@ -551,6 +551,42 @@
     return-void
 .end method
 
+.method public static resetAfterSystemPanelGestureMoveConsumed()V
+    .locals 4
+
+    const-string v0, "SYSTEM_PANEL_MOVE_CONSUMED"
+
+    sget-boolean v1, Lcom/smartisanos/launcher/a/a/a;->rk:Z
+
+    sget-boolean v2, Lcom/smartisanos/launcher/a/a/a;->sk:Z
+
+    sget-boolean v3, Lcom/smartisanos/launcher/a/a/a;->tk:Z
+
+    invoke-static {v0, v1, v2, v3}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->logFlingUpReset(Ljava/lang/String;ZZZ)V
+
+    invoke-static {}, Lcom/smartisanos/launcher/a/a/a;->ew()V
+
+    return-void
+.end method
+
+.method public static resetAfterSystemPanelGesture()V
+    .locals 4
+
+    const-string v0, "SYSTEM_PANEL_UP_CANCEL"
+
+    sget-boolean v1, Lcom/smartisanos/launcher/a/a/a;->rk:Z
+
+    sget-boolean v2, Lcom/smartisanos/launcher/a/a/a;->sk:Z
+
+    sget-boolean v3, Lcom/smartisanos/launcher/a/a/a;->tk:Z
+
+    invoke-static {v0, v1, v2, v3}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->logFlingUpReset(Ljava/lang/String;ZZZ)V
+
+    invoke-static {}, Lcom/smartisanos/launcher/a/a/a;->ew()V
+
+    return-void
+.end method
+
 .method private static ew()V
     .locals 1
 

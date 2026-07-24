@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "updated": "2026-07-13",
+  "updated": "2026-07-24",
   "path": "icons/drawable/{packageName}.png",
-  "count": 5379,
+  "count": 5315,
   "note": "Multiple artwork files for the same application are declared in icons/variants.json.",
   "mirrors": [
     "https://gitee.com/RANH-F/Smartisan-original-launcher-download/raw/master/icons/drawable/",
@@ -914,12 +914,6 @@
       "file": "cn.dict.android.pro.png",
       "bytes": 15698,
       "sha256": "ca2ed6ca8684ea2aac01ec9632d89891d2cf119f10b408721833573426fe3132"
-    },
-    {
-      "package": "cn.dict.android.pro_2",
-      "file": "cn.dict.android.pro_2.png",
-      "bytes": 18911,
-      "sha256": "5422ed95eba2fc05c14b27554c8eb46e3616048a87a72fcccb8a4bd7b6bdeb0d"
     },
     {
       "package": "cn.dictcn.android.digitize.oxford_necdict_17001",
@@ -2264,12 +2258,6 @@
       "file": "com.alibaba.wireless.png",
       "bytes": 26146,
       "sha256": "e03aa90f72b02ab499c321901ba89eda4e9ca12ef52c8b2673bb945d21d7da6c"
-    },
-    {
-      "package": "com.alibaba.wireless_2",
-      "file": "com.alibaba.wireless_2.png",
-      "bytes": 24356,
-      "sha256": "0db5b31e2b8618202c1ea2854c47c65458c477d01f4325a496e9e4836d996514"
     },
     {
       "package": "com.alibaba.wireless_3",
@@ -4780,12 +4768,6 @@
       "sha256": "1ffbb416da7edc43faf289f22f3459101d38ebd9db856d0509ddc2d03bcdcf73"
     },
     {
-      "package": "com.byfen.market_2",
-      "file": "com.byfen.market_2.png",
-      "bytes": 31648,
-      "sha256": "999e3b4338ddc990036ad391c8418c43c2ddde76d80173806144dcc0de27f48a"
-    },
-    {
       "package": "com.bym.fontcon",
       "file": "com.bym.fontcon.png",
       "bytes": 14426,
@@ -5140,12 +5122,6 @@
       "sha256": "84cc205fb7b6a093f99886b60cb823254fb805f583b559dfeae34b34923187f1"
     },
     {
-      "package": "com.chaozh.reader",
-      "file": "com.chaozh.reader.png",
-      "bytes": 28631,
-      "sha256": "d8d91a2f66db08512a95032cfbeaa30a5966df8098f0161ef3d38f3703c454f4"
-    },
-    {
       "package": "com.chaozhuo.browser_phone",
       "file": "com.chaozhuo.browser_phone.png",
       "bytes": 25713,
@@ -5288,12 +5264,6 @@
       "file": "com.chinamobile.mcloud.png",
       "bytes": 24335,
       "sha256": "f391cd5f7c6a0e767d28ec7e5112f0248cd1435da6b9b4fdb9997468213f87b1"
-    },
-    {
-      "package": "com.chinamworld.bocapad",
-      "file": "com.chinamworld.bocapad.png",
-      "bytes": 22533,
-      "sha256": "31ee7ecb61a775c270127cdd9cad827c11c92052d1ced60917562ead8b2525e4"
     },
     {
       "package": "com.chinamworld.bocmbci",
@@ -5650,12 +5620,6 @@
       "sha256": "7cb8f03cbc62bf32d4ea6f47de5130646f80ad79bf84be363a9877087bfd64a1"
     },
     {
-      "package": "com.cmge.xianjian.mi",
-      "file": "com.cmge.xianjian.mi.png",
-      "bytes": 54250,
-      "sha256": "bdbad3df4da58ef0d55192a42a9d6134ba4c2d4fea171981abbb180cb8aeafca"
-    },
-    {
       "package": "com.cmge.xianjian.UC",
       "file": "com.cmge.xianjian.UC.png",
       "bytes": 78999,
@@ -5994,12 +5958,6 @@
     {
       "package": "com.cootek.smartinputv5_2",
       "file": "com.cootek.smartinputv5_2.png",
-      "bytes": 15061,
-      "sha256": "4ddc9cdbcf53babec15fc143dcd03046f2b3606de0e688f55e66552ce40eb4c0"
-    },
-    {
-      "package": "com.cootek.smartinputv5_3",
-      "file": "com.cootek.smartinputv5_3.png",
       "bytes": 28939,
       "sha256": "991644ff13df9e0dec8cfc2348fab9fead2e2539cfeb0f9228bf71866372a086"
     },
@@ -6242,12 +6200,6 @@
       "file": "com.cyjh.gundam.png",
       "bytes": 15080,
       "sha256": "94f9c67d6ad93c0ff1f0ec66a7704afa96a1209a39ddac794012f6541bd34a33"
-    },
-    {
-      "package": "com.cyou.cx.mtlbb.mi",
-      "file": "com.cyou.cx.mtlbb.mi.png",
-      "bytes": 54489,
-      "sha256": "f31c94d7d28e9d26ea67e713345bb422749ac0c1f5bdb09e29660b4774591f5d"
     },
     {
       "package": "com.cyou.cx.mtlbb.uc",
@@ -6508,12 +6460,6 @@
       "sha256": "65763fcf60a81f5040b4ddabc992879c72ef80f81978ea9640ee0ca697cda2f8"
     },
     {
-      "package": "com.DefiantDev.SkiSafari_2",
-      "file": "com.DefiantDev.SkiSafari_2.png",
-      "bytes": 28914,
-      "sha256": "e38541f61184d9b5ab60238736c8836295e6d50b24d7437685d99ea402a0cabe"
-    },
-    {
       "package": "com.demacia.duoku",
       "file": "com.demacia.duoku.png",
       "bytes": 24985,
@@ -6572,12 +6518,6 @@
       "file": "com.dfpzmasters.wdj.png",
       "bytes": 63101,
       "sha256": "93832cb2f1f5c9547cc83d0fcd5e941d9b3d0de92f3142f0dca96d1fa9dd9625"
-    },
-    {
-      "package": "com.dfpzmasters.wdj_6",
-      "file": "com.dfpzmasters.wdj_6.png",
-      "bytes": 35215,
-      "sha256": "b8ebddbe135bb3fd3899a149b9cbd919bfd755e5fbf4decbf909794e0a7d1665"
     },
     {
       "package": "com.DFQS",
@@ -6906,12 +6846,6 @@
     {
       "package": "com.dolphin.browser",
       "file": "com.dolphin.browser.png",
-      "bytes": 26465,
-      "sha256": "3949cca453e59ef9da17c49b2475ad7abd9eb2747e525b7de4f9f7ab07024b2f"
-    },
-    {
-      "package": "com.dolphin.browser_2",
-      "file": "com.dolphin.browser_2.png",
       "bytes": 65708,
       "sha256": "60f99b5fbc12816baffdcafa83592e8fc140e992e0f25eca72ceed0467a659ac"
     },
@@ -6962,12 +6896,6 @@
       "file": "com.dotgears.flappybird.png",
       "bytes": 6046,
       "sha256": "598b2db1f51c87ef43ed33b72882e1f2e60b9cb172ef18c62f7826c53a886966"
-    },
-    {
-      "package": "com.dotgears.flappybird_2",
-      "file": "com.dotgears.flappybird_2.png",
-      "bytes": 1857,
-      "sha256": "4ffee48b6548c0a192d76b01082eb093eb073fa378953bb5f61b9c96093f7c95"
     },
     {
       "package": "com.dotgears.swing",
@@ -7028,12 +6956,6 @@
       "file": "com.douban.frodo.png",
       "bytes": 11063,
       "sha256": "cbe150d9041d2bf2c2b5e55de161ad79b0e2fbf2d4c71d58c9993b584c48bd11"
-    },
-    {
-      "package": "com.douban.frodo_2",
-      "file": "com.douban.frodo_2.png",
-      "bytes": 8533,
-      "sha256": "6f7303cb795e9d91e5463781c072dcbe03376398f679aa1954e885a085514475"
     },
     {
       "package": "com.douban.frodo_3",
@@ -7118,12 +7040,6 @@
       "file": "com.drakeet.purewriter.png",
       "bytes": 12755,
       "sha256": "84f0a3cbe86f37be6ac6ca89966db95439472c2f42d97bcbd1c85bef5d6b217d"
-    },
-    {
-      "package": "com.drakeet.purewriter_2",
-      "file": "com.drakeet.purewriter_2.png",
-      "bytes": 15676,
-      "sha256": "5a1a4fe501aa743e6b5376fbfa76cdbcf7fd91be0bb95477cf7c361e8c6ab588"
     },
     {
       "package": "com.draw.huapipi",
@@ -7388,12 +7304,6 @@
       "file": "com.ea.games.r3_na.png",
       "bytes": 53505,
       "sha256": "55cec18a7c9f83aef790d918e984f55e5ec2900f057827daa511761c52c9f7c8"
-    },
-    {
-      "package": "com.ea.games.r3_row.adp",
-      "file": "com.ea.games.r3_row.adp.png",
-      "bytes": 44571,
-      "sha256": "96fb174372096f0656d43766a0870142eef9d7f63cdeaa393a76c180da3d0d1a"
     },
     {
       "package": "com.ea.games.simsfreeplay_na",
@@ -7828,12 +7738,6 @@
       "sha256": "1312e04cfcd0b189ee3d9b7a19c643bf7281954ce1b3d9c3a85c56d5475933ab"
     },
     {
-      "package": "com.evernote.past",
-      "file": "com.evernote.past.png",
-      "bytes": 24110,
-      "sha256": "58d4f603b7dced8c003e33d8f0599a1b22bac3c6139dfa95aa1ca5b1f47c2ef8"
-    },
-    {
       "package": "com.evernote",
       "file": "com.evernote.png",
       "bytes": 39227,
@@ -7844,12 +7748,6 @@
       "file": "com.evernote.skitch.png",
       "bytes": 30926,
       "sha256": "3c8f347a83f9bdc6e7e135824b70fbc3bf76bef5fa28e13f824bf5d27ffb0a0f"
-    },
-    {
-      "package": "com.evernote.ui",
-      "file": "com.evernote.ui.png",
-      "bytes": 29060,
-      "sha256": "cf25f2a577f7ab2423a96fdec5c3b74a98c49405ab14a2b938fae4c31c0abc1d"
     },
     {
       "package": "com.evernote.world",
@@ -8074,12 +7972,6 @@
       "sha256": "4f1a2250ddc5f4b3627aebca32fd5f3835d45fd3d7f03ad871b12343b07b5ead"
     },
     {
-      "package": "com.fanfou",
-      "file": "com.fanfou.png",
-      "bytes": 13592,
-      "sha256": "2f15ca2db30bebb66aedf3b99514d83adf5e7a08738560f5d2471e43362657ce"
-    },
-    {
       "package": "com.fanli.android.apps",
       "file": "com.fanli.android.apps.png",
       "bytes": 27888,
@@ -8096,12 +7988,6 @@
       "file": "com.fantasmosoft.free.memory.recover.png",
       "bytes": 39420,
       "sha256": "b745dfa30f32cc1f8ef2869b1117d8b1fb1cff9a9559a90ce4bb29e88be02fd9"
-    },
-    {
-      "package": "com.fantasmosoft.free_memory_recover",
-      "file": "com.fantasmosoft.free_memory_recover.png",
-      "bytes": 29440,
-      "sha256": "3563af195b1602ede6cb840e15a263afea89eb307c68e19bdd824ee100c1a6ad"
     },
     {
       "package": "com.farplace.qingzhuo",
@@ -8302,12 +8188,6 @@
       "sha256": "c4a3a2985faa93d61e454188b7383458dbc333078e0d56df7944afcb3078404c"
     },
     {
-      "package": "com.fenqile.fenqile_2",
-      "file": "com.fenqile.fenqile_2.png",
-      "bytes": 20329,
-      "sha256": "9af1ef50b2bdc979874ae941c4bc80fea736b773d4be4bfe3bda44753c2d8a38"
-    },
-    {
       "package": "com.fetalheart",
       "file": "com.fetalheart.png",
       "bytes": 26271,
@@ -8378,12 +8258,6 @@
       "file": "com.finshell.finance.png",
       "bytes": 32588,
       "sha256": "2553fcd8283c26ca362980b74c714ae21aa795b7d677f53346183af53d80aa70"
-    },
-    {
-      "package": "com.finshell.wallet",
-      "file": "com.finshell.wallet.png",
-      "bytes": 42248,
-      "sha256": "f9161ab04c32a05b943222fbad0fe458d26f4c7ae518a734f294eeb7c9ee9f55"
     },
     {
       "package": "com.firebear.androil",
@@ -8864,12 +8738,6 @@
       "file": "com.gameloft.android.ANMP.GloftA8CN.png",
       "bytes": 65400,
       "sha256": "dbcfcf415a677ee52cc2bc70cabe8949bd6cfdbcb303c3021306263bc305bacd"
-    },
-    {
-      "package": "com.gameloft.android.ANMP.GloftA8HM",
-      "file": "com.gameloft.android.ANMP.GloftA8HM.png",
-      "bytes": 48598,
-      "sha256": "54a875d70dbaf6a1232757a4efee578413a1e8733ca8cf29cd080277314a58be"
     },
     {
       "package": "com.gameloft.android.ANMP.GloftAMHM",
@@ -10150,12 +10018,6 @@
       "sha256": "b3db8810e1462407614f56821fdf92edc395135c3a769f327112f57a68b01c74"
     },
     {
-      "package": "com.happyelements.happyfishandroidmi",
-      "file": "com.happyelements.happyfishandroidmi.png",
-      "bytes": 34623,
-      "sha256": "42dee34ebcdf42969005d06da2b6e6e48f2f4dc83699f6513f3fe99af2025286"
-    },
-    {
       "package": "com.happyelements.hellolua",
       "file": "com.happyelements.hellolua.png",
       "bytes": 30434,
@@ -10416,6 +10278,12 @@
     {
       "package": "com.heytap.yoli",
       "file": "com.heytap.yoli.png",
+      "bytes": 27699,
+      "sha256": "84184e86434112fca4f3e8629903f90e48d65e68ae58ce3174d4da9053830796"
+    },
+    {
+      "package": "com.heytap.yoli_2",
+      "file": "com.heytap.yoli_2.png",
       "bytes": 24831,
       "sha256": "b11e1ea22bfa7d43f46b65fb4dd8bf9148b7e8da1807e687518bbb0d62f6effc"
     },
@@ -11866,12 +11734,6 @@
       "sha256": "a97dd286280a0c3cd190d2851ec233b7ee0491fd3c6048cc98fd1c928d9ff514"
     },
     {
-      "package": "com.ilongyuan.deemo.mi",
-      "file": "com.ilongyuan.deemo.mi.png",
-      "bytes": 43694,
-      "sha256": "95d487af23688edd303f6e0c62b37d5fd15faf2211078a56175e35ad81ee8fe3"
-    },
-    {
       "package": "com.ilongyuan.deemo.uc",
       "file": "com.ilongyuan.deemo.uc.png",
       "bytes": 77026,
@@ -11882,12 +11744,6 @@
       "file": "com.ilongyuan.implosion.ic_launcher.png",
       "bytes": 62442,
       "sha256": "8349109b1239deb3fa60ee59b705a113e8c3e20a4dffbbec2bedd7f49cd6e429"
-    },
-    {
-      "package": "com.ilongyuan.implosion.mi",
-      "file": "com.ilongyuan.implosion.mi.png",
-      "bytes": 49066,
-      "sha256": "1eb59a1503ecd662a50e16e3c1d53efb1776692ccb6ac1f3f01b5f9e79e2385e"
     },
     {
       "package": "com.imagemetrics.lorealparisandroid",
@@ -12028,12 +11884,6 @@
       "sha256": "dc62dd1375f769c300d04e582617d429377ba2d8286a3d585d241991e0068c09"
     },
     {
-      "package": "com.instagram.android_3",
-      "file": "com.instagram.android_3.png",
-      "bytes": 56088,
-      "sha256": "0653d659915bf2f36ffcad96986c02dc5ba08f8bd2a7f944ae6573830d5431ce"
-    },
-    {
       "package": "com.instagram.android_4",
       "file": "com.instagram.android_4.png",
       "bytes": 40304,
@@ -12110,12 +11960,6 @@
       "file": "com.intsig.camscanner_2.png",
       "bytes": 31160,
       "sha256": "57beb0b7364433278dc57609df8ce7d2adaa27d1151364aac5f969c5cce5c1aa"
-    },
-    {
-      "package": "com.intsig.CamScannerLite",
-      "file": "com.intsig.CamScannerLite.png",
-      "bytes": 12859,
-      "sha256": "aae4822adcedf4438da8555f6b028683ff3cf1de89176a1e625d76507668da1c"
     },
     {
       "package": "com.intsig.lic.camscanner",
@@ -13084,12 +12928,6 @@
       "sha256": "ef59e5d118760b7783ce5dbf158b729010065e68b051d7f7e4320e1649e156a0"
     },
     {
-      "package": "com.kaixin00.activity",
-      "file": "com.kaixin00.activity.png",
-      "bytes": 29242,
-      "sha256": "1c364e4e81bd8be9414f14ff46ed35ddf646afb0851bf8395e1ed55eabf8a0a8"
-    },
-    {
       "package": "com.kaixin001.activity",
       "file": "com.kaixin001.activity.png",
       "bytes": 36648,
@@ -13356,12 +13194,6 @@
     {
       "package": "com.kingnez.umasou",
       "file": "com.kingnez.umasou.png",
-      "bytes": 38795,
-      "sha256": "2b05d764f407037856f70ab7c7536c941e84fc1f99eff809e94c3d96640f046e"
-    },
-    {
-      "package": "com.kingnez.umasou_2",
-      "file": "com.kingnez.umasou_2.png",
       "bytes": 83931,
       "sha256": "f86d989a753f7ec62d6567f205a65dfe283b1a391795debdfbef492066fd293e"
     },
@@ -14044,12 +13876,6 @@
       "sha256": "874afbd10cba99acc08f8a4ef52ea0a4ec05613275a129c6d571db7021f3f308"
     },
     {
-      "package": "com.lenovo.anyshare_3",
-      "file": "com.lenovo.anyshare_3.png",
-      "bytes": 28197,
-      "sha256": "464ae08291c5c75bea6ff744387a55f6b7be8a805b9b9fa32d7c297cf6a7ae79"
-    },
-    {
       "package": "com.lenovo.club.app",
       "file": "com.lenovo.club.app.png",
       "bytes": 20139,
@@ -14230,12 +14056,6 @@
       "sha256": "2e27bd6b886209146a65a0867e334204cbcc8e69226b440521ddde564017206d"
     },
     {
-      "package": "com.lilithgames.afk.mi",
-      "file": "com.lilithgames.afk.mi.png",
-      "bytes": 31964,
-      "sha256": "ebec1894109041c68928f85964e47d29a59f48c595d150d5bf916b93f1a8de04"
-    },
-    {
       "package": "com.lilithgames.hgame.cn",
       "file": "com.lilithgames.hgame.cn.png",
       "bytes": 49026,
@@ -14270,12 +14090,6 @@
       "file": "com.linecorp.toss.png",
       "bytes": 35339,
       "sha256": "487d20bb2e402df2cb3d607766853b4a33069bc8a426197111d3f3a55e0f389f"
-    },
-    {
-      "package": "com.linekong.t3.mi",
-      "file": "com.linekong.t3.mi.png",
-      "bytes": 48168,
-      "sha256": "18f893f037f30ce109f138a841ab8ae20332cd0334dce46de2b0373b0da4a1ee"
     },
     {
       "package": "com.linekong.t3.wdj",
@@ -17068,12 +16882,6 @@
       "sha256": "ae2c098a56bf37a2f9155d82c4d9cde48c3412bc3c23bd8a0bc42088d73b5d85"
     },
     {
-      "package": "com.netease.ldxy.mi",
-      "file": "com.netease.ldxy.mi.png",
-      "bytes": 51642,
-      "sha256": "71d3b25b695b0316c27225406d459e6ba7508fada550a8a469645f444a75ec9b"
-    },
-    {
       "package": "com.netease.ldxy.uc",
       "file": "com.netease.ldxy.uc.png",
       "bytes": 79220,
@@ -17178,12 +16986,6 @@
     {
       "package": "com.netease.my_2",
       "file": "com.netease.my_2.png",
-      "bytes": 28385,
-      "sha256": "fa25dc71a7ae70bd3f32196346cd4b49363fa2d6495916d9f95c95ac89c477d3"
-    },
-    {
-      "package": "com.netease.my_3",
-      "file": "com.netease.my_3.png",
       "bytes": 37733,
       "sha256": "21ef4f39a3473f57af634d8aaecc3733346e923566c86742d577a6b093c11251"
     },
@@ -17590,12 +17392,6 @@
       "sha256": "f9da371ae2477953532d6a6f6065327cb9af6a2987248d63d9aa52a2e50b59dd"
     },
     {
-      "package": "com.niting",
-      "file": "com.niting.png",
-      "bytes": 17045,
-      "sha256": "8d0f3ea8cb3ce2201100de389bda0fa0800b462497a7958ee6718f53417bd626"
-    },
-    {
       "package": "com.niu.cloud",
       "file": "com.niu.cloud.png",
       "bytes": 27659,
@@ -17606,12 +17402,6 @@
       "file": "com.niu.cloud_2.png",
       "bytes": 39102,
       "sha256": "7d455076e2972e5afdfe08403279eb44543098a4bca968c35f9b2c62ca229ddf"
-    },
-    {
-      "package": "com.niu.cloud_3",
-      "file": "com.niu.cloud_3.png",
-      "bytes": 21514,
-      "sha256": "e613fde2e16c8800784f7a31f47c09f07a430714a172f489b5561d53f3e18821"
     },
     {
       "package": "com.niuguwang.stock",
@@ -17648,12 +17438,6 @@
       "file": "com.noodlecake.anothercasesolved.png",
       "bytes": 61039,
       "sha256": "739b0a3e37d9aed6232a5be66151d62545470ae2fc675c029f8d50d0fbc437f1"
-    },
-    {
-      "package": "com.noodlecake.anothercasesolved_2",
-      "file": "com.noodlecake.anothercasesolved_2.png",
-      "bytes": 41364,
-      "sha256": "232d0fb5df515588056c41a4104da465c033efd94ad9c812f9f911d0e225f366"
     },
     {
       "package": "com.noodlecake.rsb",
@@ -18118,12 +17902,6 @@
       "sha256": "a48a761733c8e4820967af7d8f592254beae32f84f83bc9827c150c4ce7ef610"
     },
     {
-      "package": "com.ourlinc_2",
-      "file": "com.ourlinc_2.png",
-      "bytes": 16933,
-      "sha256": "49974873c77708c28a3766e5e28fe90ef75f2b551656a80c548bc554ef36a8ba"
-    },
-    {
       "package": "com.outfit7.jigtyfree",
       "file": "com.outfit7.jigtyfree.png",
       "bytes": 17419,
@@ -18208,12 +17986,6 @@
       "sha256": "6e2a8b3e74a41baf220679623a0f8a5969536969fa2eacf649740978b30bcd79"
     },
     {
-      "package": "com.p1.mobile",
-      "file": "com.p1.mobile.png",
-      "bytes": 21756,
-      "sha256": "293c24a4877e8e5c437b17ceff6e696cd99cfa282db4ecb7438c153602d9cabf"
-    },
-    {
       "package": "com.p1.mobile_2",
       "file": "com.p1.mobile_2.png",
       "bytes": 53402,
@@ -18254,12 +18026,6 @@
       "file": "com.paladin.GunStrike.png",
       "bytes": 54770,
       "sha256": "24f347260fda4f65cce03233a82945decb9b90b4f16e1281532dc8388d67bde7"
-    },
-    {
-      "package": "com.paladin.GunStrike2",
-      "file": "com.paladin.GunStrike2.png",
-      "bytes": 37758,
-      "sha256": "d2c3765f2347bb96850d2ea84e12d570b6b387c89f740258c234803b56f05843"
     },
     {
       "package": "com.palmpi.hcollege.feiyu",
@@ -18656,12 +18422,6 @@
       "file": "com.plateno.botaoota.png",
       "bytes": 25466,
       "sha256": "8c71142589d913bb13c3231a0ad53d9fed95cff9c14363679990780c35f6b10e"
-    },
-    {
-      "package": "com.playcrab.hebe.androiduc",
-      "file": "com.playcrab.hebe.androiduc.png",
-      "bytes": 34374,
-      "sha256": "b5ffc911d9821152476838b0c7702c4238806cb07b8e93b2db9ab3beaaa413cb"
     },
     {
       "package": "com.playcrab.hebe.androidwdj",
@@ -19822,12 +19582,6 @@
       "sha256": "c70cea83ffc2134222baddf1d55abfe7f8c9386824081d90119647cac58e7287"
     },
     {
-      "package": "com.rhinocerosstory_2",
-      "file": "com.rhinocerosstory_2.png",
-      "bytes": 9513,
-      "sha256": "2ed6c2ba70c921ac425b012b1ef834854f5c1f79c361530461bd40c1a983ace4"
-    },
-    {
       "package": "com.ricebook.activity",
       "file": "com.ricebook.activity.png",
       "bytes": 34750,
@@ -19952,12 +19706,6 @@
       "file": "com.rovio.angrybirdsstarwarsii.ads.png",
       "bytes": 57307,
       "sha256": "61fab3b945c975428f6393860442b1b721b53920344fe7919045cc2a8f1e3d7f"
-    },
-    {
-      "package": "com.rovio.BadPiggies.mi",
-      "file": "com.rovio.BadPiggies.mi.png",
-      "bytes": 34171,
-      "sha256": "5324450187c039c3818c06ecb23588325aff78ca82cf38f9b3dcf59852002f62"
     },
     {
       "package": "com.rovio.BadPiggies.tw",
@@ -20584,12 +20332,6 @@
       "sha256": "ab205cb20193c88b433456d37ba9ea7998194f3ae8bcbe8200517d4e0560927f"
     },
     {
-      "package": "com.sec.android.app",
-      "file": "com.sec.android.app.png",
-      "bytes": 19387,
-      "sha256": "acafd5ef2a2d56981a6a3ab27e7501d2b0aead9d19db8d31d27495b3a617c823"
-    },
-    {
       "package": "com.sec.android.app.popupcalculator",
       "file": "com.sec.android.app.popupcalculator.png",
       "bytes": 8441,
@@ -20894,12 +20636,6 @@
       "file": "com.shazam.android_3.png",
       "bytes": 49263,
       "sha256": "ee4478cd0fee96a886b0901ff91f98b60b611c15813e3f7d0a91ed2226bc3ec4"
-    },
-    {
-      "package": "com.shazam.encore.android",
-      "file": "com.shazam.encore.android.png",
-      "bytes": 30854,
-      "sha256": "14d5e732f76e009a78ce8bb05205d077324bef2a2e93f87bbacaa1da5d0c6de7"
     },
     {
       "package": "com.shenma.passenger",
@@ -21874,12 +21610,6 @@
       "sha256": "19a531eb4900c06fdebbfe3920d1bc6c3532a0f63723602a87bce74ec1db1254"
     },
     {
-      "package": "com.sony.tvsideview_phone",
-      "file": "com.sony.tvsideview_phone.png",
-      "bytes": 26488,
-      "sha256": "ecdfc05462bc5a81782c3fffdbacd27fa1bdaef15782f69a2b1a3eaba04938a6"
-    },
-    {
       "package": "com.sonyericsson.album",
       "file": "com.sonyericsson.album.png",
       "bytes": 51903,
@@ -21970,12 +21700,6 @@
       "sha256": "1f0ff8b0af5f801a47491eea1282ace3687624efc094f209703f6db84fab1e2f"
     },
     {
-      "package": "com.sonymobile.cta_2",
-      "file": "com.sonymobile.cta_2.png",
-      "bytes": 30321,
-      "sha256": "c5a5428d150f96713b29158285367e038ce20acd645f65e0171ac4178494d4a1"
-    },
-    {
       "package": "com.sonymobile.entrance",
       "file": "com.sonymobile.entrance.png",
       "bytes": 15526,
@@ -22054,12 +21778,6 @@
       "sha256": "0a4b9090274283762977d7f29dc774b5dbcd2224ef4df215b46fe0c3ef7f9357"
     },
     {
-      "package": "com.soundcloud.android_3",
-      "file": "com.soundcloud.android_3.png",
-      "bytes": 11121,
-      "sha256": "de272cb7440356ab46a920b8d9d5bc0f00363385c0e369e19b1b66817f035453"
-    },
-    {
       "package": "com.spdbccc.app",
       "file": "com.spdbccc.app.png",
       "bytes": 36345,
@@ -22124,12 +21842,6 @@
       "file": "com.spotify.music_2.png",
       "bytes": 33618,
       "sha256": "aa5a77e130dade4833d432b83a573d3b3bff61dcb79916d242d2f6ec791e2592"
-    },
-    {
-      "package": "com.spotify.music_3",
-      "file": "com.spotify.music_3.png",
-      "bytes": 17007,
-      "sha256": "c88cee6d485d4507babe68c892b78f6e81546af88c1b3b7552240104882215c4"
     },
     {
       "package": "com.spryfox.tripletown",
@@ -22478,12 +22190,6 @@
       "file": "com.supercell.clashofclans.png",
       "bytes": 61284,
       "sha256": "01fbae6f6385f83a0e5447f15f8dd8f2609fed11818e1c87e5ab9a764dbee960"
-    },
-    {
-      "package": "com.supercell.clashofclans_2",
-      "file": "com.supercell.clashofclans_2.png",
-      "bytes": 43163,
-      "sha256": "d0459ce8f5167dbab1f82c5d37eec31c67acca217a0be7554478175e72237c03"
     },
     {
       "package": "com.supercell.clashroyale.mi",
@@ -22936,12 +22642,6 @@
       "sha256": "d3525d4a38b5e7b5e1ba2865ccc59ecead09f4d1db38d3e9f54fb83591e24cfb"
     },
     {
-      "package": "com.teambition.teambition_2",
-      "file": "com.teambition.teambition_2.png",
-      "bytes": 11214,
-      "sha256": "f2681c98da6125b4b4d5929d6ccd05eedc0d1a55dc983d5a2edc37ec1ebc3b42"
-    },
-    {
       "package": "com.teamviewer.teamviewer.market.mobile",
       "file": "com.teamviewer.teamviewer.market.mobile.png",
       "bytes": 20431,
@@ -23072,12 +22772,6 @@
       "file": "com.tencent.djcity.png",
       "bytes": 29914,
       "sha256": "e90aa1e3dcc791c6a687af5832ef3d268259e8dd7395eda4a8533733b9953f69"
-    },
-    {
-      "package": "com.tencent.djcity_2",
-      "file": "com.tencent.djcity_2.png",
-      "bytes": 24994,
-      "sha256": "a9d4e93c0636131840dbe7d1ea32be394cdfaa38686c9e7abacf68a786d88617"
     },
     {
       "package": "com.tencent.docs",
@@ -23666,12 +23360,6 @@
       "file": "com.tencent.qqpimsecure_3.png",
       "bytes": 43253,
       "sha256": "5f344992b7999b33bf23c862e3cc499436f0fa03c0ab5115ed2cbe01f9f4749c"
-    },
-    {
-      "package": "com.tencent.qqpimsecureicon",
-      "file": "com.tencent.qqpimsecureicon.png",
-      "bytes": 29625,
-      "sha256": "74f55030347a8eafd8a3234444541d465ad139cc6a366ccc8b476bbe41cbe3ca"
     },
     {
       "package": "com.tencent.qqpinyin",
@@ -24424,12 +24112,6 @@
       "sha256": "e627bfd233b4fdbd0ee9a50f8377eaf68a089480544040c6a9a03b9bb7fd5d5d"
     },
     {
-      "package": "com.tianyancha.skyeye_4",
-      "file": "com.tianyancha.skyeye_4.png",
-      "bytes": 9766,
-      "sha256": "cea13a45bab3b25f3ea7f9b7688b29fcce311985f7d5668a293fba6a41e4fc98"
-    },
-    {
       "package": "com.ticktick.task",
       "file": "com.ticktick.task.png",
       "bytes": 35141,
@@ -24532,12 +24214,6 @@
       "sha256": "08fa957fe0fdc2de93233a37e68eb60e60833b4992d99192e73da788d2173bbf"
     },
     {
-      "package": "com.tmall.wireless_2",
-      "file": "com.tmall.wireless_2.png",
-      "bytes": 11029,
-      "sha256": "50606fde522e92864180d3974ac311c4a18aa4b8a9966c5e2f72b3770799356d"
-    },
-    {
       "package": "com.tmri.app.main",
       "file": "com.tmri.app.main.png",
       "bytes": 66748,
@@ -24626,12 +24302,6 @@
       "file": "com.tongcheng.android_2.png",
       "bytes": 45153,
       "sha256": "a0e10b0692f7cdbb0ec0317e6e1a65ebea9cc5de36c99c4632757f583646071c"
-    },
-    {
-      "package": "com.tongcheng.android_3",
-      "file": "com.tongcheng.android_3.png",
-      "bytes": 27729,
-      "sha256": "8aa647985241447e6179bc48ef7bd3114388d3088253a29f1ffea1c59ace0186"
     },
     {
       "package": "com.tonglu.app",
@@ -25994,12 +25664,6 @@
       "file": "com.when.coco.png",
       "bytes": 7616,
       "sha256": "a9ff171b6ff077fad7ff762e0cff95a2cc4fefdd243f02c05400b38337458e10"
-    },
-    {
-      "package": "com.when.coco_2",
-      "file": "com.when.coco_2.png",
-      "bytes": 7517,
-      "sha256": "62628edb356c59015d63c288c631704052ca1e7986bf1478701c469aa54b87ab"
     },
     {
       "package": "com.when.wannianli",
@@ -27502,12 +27166,6 @@
       "sha256": "eb78cd4356e6415544dd6ce386bc01a756f2c0c6bd6f6fe32d12b3e1d8737ebd"
     },
     {
-      "package": "com.yek.android.kfc.activitys_3",
-      "file": "com.yek.android.kfc.activitys_3.png",
-      "bytes": 42187,
-      "sha256": "cdbf964454cad63ab302a72a0e94d47351b5a1352f8ce49ea22b3efd83598170"
-    },
-    {
       "package": "com.yek.android.uniqlo",
       "file": "com.yek.android.uniqlo.png",
       "bytes": 24455,
@@ -27572,12 +27230,6 @@
       "file": "com.ygkj.chelaile.standard_2.png",
       "bytes": 28820,
       "sha256": "7d2c18a43a6cd0710e7a202fd3293588b3f92dafa3093fe1a1a621a626369ba0"
-    },
-    {
-      "package": "com.ygkj.chelaile.standard_3",
-      "file": "com.ygkj.chelaile.standard_3.png",
-      "bytes": 14687,
-      "sha256": "62ef9a666a36825cc37a468c4e0c42a4f1a8d858e164c724579b3340a6165ef3"
     },
     {
       "package": "com.yiban.app",
@@ -27674,12 +27326,6 @@
       "file": "com.yingzt.invest.png",
       "bytes": 17880,
       "sha256": "63b6137b9362f5a9b504a1272d6cee287f31e49868a2adf79dc1233352344e1f"
-    },
-    {
-      "package": "com.yinhan.hunter.mi",
-      "file": "com.yinhan.hunter.mi.png",
-      "bytes": 50827,
-      "sha256": "b737b089669543d54375d0d9cc906b77fe8e0f5feebde5d79b6d03b98b5399f1"
     },
     {
       "package": "com.yinhan.hunter.uc",
@@ -28184,12 +27830,6 @@
       "file": "com.youxiang.soyoungapp.png",
       "bytes": 19958,
       "sha256": "bac4f74c2fe197023324c93076532586be10ba1996af02f67fad9d3c3a8b8c9f"
-    },
-    {
-      "package": "com.youxiang.soyoungapp_2",
-      "file": "com.youxiang.soyoungapp_2.png",
-      "bytes": 19099,
-      "sha256": "9b8c88a6347685985a2ebbde444cdd45e7ddf57a2aab4c08521ddf4b3e7a2f61"
     },
     {
       "package": "com.youyuan.yhb",
@@ -30490,12 +30130,6 @@
       "sha256": "d7b10b8991cb820f145c6a62153c17c8f810d04027a48879b82e35b9426aceef"
     },
     {
-      "package": "me.weishu.exp_2",
-      "file": "me.weishu.exp_2.png",
-      "bytes": 23616,
-      "sha256": "cc2c18e8fbf4d648b68bb295a39a399aa842af93c261b494b1b16e066067c090"
-    },
-    {
       "package": "me.www.mepai",
       "file": "me.www.mepai.png",
       "bytes": 19449,
@@ -31468,18 +31102,6 @@
       "sha256": "df4b4588d35a6550c6738a496e2c51907517b1e9429306ead054f806bad0a823"
     },
     {
-      "package": "pl.idreams.pottery_2",
-      "file": "pl.idreams.pottery_2.png",
-      "bytes": 42192,
-      "sha256": "5cfe85e5b64c8cbe77c73dda3af80c6b8adab0bfb6e1099d7aa1c4cb1b27d9f0"
-    },
-    {
-      "package": "pl.idreams.pottery_3",
-      "file": "pl.idreams.pottery_3.png",
-      "bytes": 42192,
-      "sha256": "39b174cef6152e1b9882e0e8fd1591f670846a46d2630971f170619b6e442b35"
-    },
-    {
       "package": "pl.idreams.potterylite.fhp",
       "file": "pl.idreams.potterylite.fhp.png",
       "bytes": 42192,
@@ -31502,12 +31124,6 @@
       "file": "pl.idreams.skyforce.wdj.png",
       "bytes": 15315,
       "sha256": "382afcc7ea2c56c5c0eb48a3858c57687035b32a02366eaf9c65a526f22e9977"
-    },
-    {
-      "package": "pl.idreams.SkyForceReloaded2016.mt",
-      "file": "pl.idreams.SkyForceReloaded2016.mt.png",
-      "bytes": 17362,
-      "sha256": "c3d1a52404c8b1324c3dd8476bff2045cd556c13a457b33d60359c29371796ba"
     },
     {
       "package": "pl.solidexplorer2",
