@@ -76,6 +76,23 @@
 
 ### 2026-07-24
 
+#### 图标性能优化阶段 8.2 同进程最终长稳复测与数据修正（真机验证）
+
+- **测试环境**：OPPO PDCM00 (Android 12, API 31, 序号 `PZXO8PHMONGYVSOZ`)
+- **同进程 30 分钟桌面静置与交互复测 (PID=11704 保持 100% 一致)**：
+  - 00min: PID 11704 | PSS 149.6 MB | Native 42.4 MB | Graphics 59.7 MB | Act 1 | Views 6 (冷启动稳定后)
+  - 10min: PID 11704 | PSS 199.5 MB | Native 79.0 MB | Graphics 67.2 MB | Act 2 | Views 195 (交互后)
+  - 20min: PID 11704 | PSS 202.7 MB | Native 81.5 MB | Graphics 68.0 MB | Act 2 | Views 195 (+3.2 MB)
+  - 30min: PID **11704** | PSS **203.2 MB** | Native **81.9 MB** | Graphics **68.0 MB** | Act **2** | Views **195** (+0.5 MB)
+  - **同进程判定**：从 00min 至 30min 采样 PID 100% 保持为 `11704`，未发生进程死亡或重启 (`am_proc_died=0`, `lmkd=0`)；内存完全进入 **~203 MB 稳定平台**，无单向递增泄露。
+- **同进程 10 轮图标页高压进出与快速滑动测试 (PID=11704)**：
+  - 第 1 轮: PSS 250.5 MB | Native 83.3 MB | Graphics 111.9 MB
+  - 第 5 轮: PSS 283.0 MB | Native 109.1 MB | Graphics 116.9 MB
+  - 第 10 轮: PSS 276.1 MB | Native 100.2 MB | Graphics 119.9 MB
+  - 10 轮退出 60s 后: PSS 回落至 **223.1 MB** (Native Heap 回落至 **61.7 MB**)
+  - **结论**：高压进出后动态 Session 取消与位图 GC 正常生效，`knownKeys` ($\le 512$) 与 `PackMap` ($\le 2$) 强约束生效，退出 60 秒后 Native Heap 显著回落。
+- **进程死亡与异常日志审计**：`am_proc_died` `0` / `lmkd` `0` / FATAL EXCEPTION `0` / ANR `0` / OOM `0`。
+
 #### 图标性能优化与初始化分阶段收敛（阶段 0 至 8 完成，已通过真机 3 轮验证）
 
 - **背景与目标**：原版本中进入“应用图标”设置页时，主线程同步构建大列表、扫描安装包、解析 `appfilter.xml` 并同步加载全部位图，引发明显主线程阻塞；同时无界的 Key Map、PackMap 和无 Session 状态导致退出页面后任务继续运行且内存高企。
