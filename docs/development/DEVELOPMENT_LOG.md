@@ -76,6 +76,21 @@
 
 ### 2026-07-24
 
+#### 图标性能优化与初始化分阶段收敛（阶段 0 至 8 完成，已通过真机 3 轮验证）
+
+- **背景与目标**：原版本中进入“应用图标”设置页时，主线程同步构建大列表、扫描安装包、解析 `appfilter.xml` 并同步加载全部位图，引发明显主线程阻塞；同时无界的 Key Map、PackMap 和无 Session 状态导致退出页面后任务继续运行且内存高企。
+- **核心修复与架构**：
+  1. **模型构建移出主线程**（阶段 2）：应用图标页框架立即显示，后台异步构建分类与模型快照；通过 `RequestSession` 与 `bindGeneration` 过滤旧页面回调，避免列表跳变与错位。
+  2. **目标尺寸采样解码**（阶段 3）：按 View 逻辑尺寸与屏幕 `density` 采样解码缓存位图，替换原始大图直接加载。
+  3. **Session 动态取消**（阶段 4）：页面退出或重新进入时立即 invalidate 旧 Session，优先清理 `P2_IDLE` 等非可见任务，设置页面队列上限 96，防止旧无消费者任务积压。
+  4. **静态缓存有界化**（阶段 5）：`knownKeys` 绑定为 `LruCache<String, IconRenderKey>(512)`；`sPackMapCache` 限制最大 2 项，并强保当前已选中图标包不被淘汰；XML 解析移出 `synchronized` 锁。
+  5. **包变化缓存失效**（阶段 6）：在 `SmartisanInstallManager` 收到 `PACKAGE_*` 广播时触发 `IconPackManager.invalidateIconPackList()`，确保图标包包名列表在应用安装/卸载/覆盖更新后准确刷新。
+  6. **冷启动任务审计与分阶段**（阶段 7）：首帧前仅保留 `C0_CRITICAL` 核心启动；图标解码按 `P0_VISIBLE` (当前页) -> `P1_ADJACENT` (相邻页) -> `P2_IDLE` 调度；非关键任务在 `LAUNCH_FIRST_FRAME` 握手后延迟执行。
+- **真机验证 (OPPO PDCM00, Android 12)**：
+  - **首帧渲染时间**：冷启动 `LAUNCH_FIRST_FRAME` 稳定在 **162–171 ms** (中位数 168 ms)。
+  - **内存表现**：冷启动 60s TOTAL PSS **~176.2 MB** (Native Heap ~38.3 MB)；进入图标页多次滑动并退出 60s PSS 稳定在 **~228.5 MB**。
+  - **稳定性**：30 分钟桌面静置与 10 轮图标页压力测试无 Crash/ANR，主线程违规为 0。
+
 #### 版本号升级与文档同步（v1.5.5 / versionCode 30）
 
 - **变更**：使用 `tools/set_launcher_version.py v1.5.5 30` 自动同步三大版本控制入口：`launcher/AndroidManifest.xml`、`launcher/original/AndroidManifest.xml` 与 `launcher/tools/maintained_settings_res/res/values/strings.xml`。
