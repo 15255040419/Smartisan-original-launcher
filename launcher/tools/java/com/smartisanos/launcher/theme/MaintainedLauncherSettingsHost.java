@@ -3743,24 +3743,32 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    private static boolean isActivityInvalid(Activity activity) {
+        return activity == null || activity.isFinishing()
+                || (Build.VERSION.SDK_INT >= 17 && activity.isDestroyed());
+    }
+
     private static void loadIconPageDataAsync(final int generation, final Activity activity,
                                               final SettingsResourceContext context,
                                               final Resources resources, final ListView list,
                                               final LinearLayout footer, final boolean forceRefresh,
                                               final int restorePosition) {
-        if (generation != sIconPageLoadGeneration || list.getWindowToken() == null) {
+        if (generation != sIconPageLoadGeneration || isActivityInvalid(activity)) {
             return;
         }
+        final Context appContext = activity.getApplicationContext();
         new Thread(new Runnable() {
             public void run() {
                 long started = android.os.SystemClock.elapsedRealtime();
-                logOperation(activity, "ICON_LIST", forceRefresh ? "refresh_start" : "load_start");
-                final IconPageData data = loadIconPageData(activity, forceRefresh);
-                logOperation(activity, "ICON_LIST", "load_complete count=" + data.entries.size()
+                logOperation(appContext, "ICON_LIST", forceRefresh ? "refresh_start" : "load_start");
+                final IconPageData data = loadIconPageData(appContext, forceRefresh);
+                logOperation(appContext, "ICON_LIST", "load_complete count=" + (data == null || data.entries == null ? 0 : data.entries.size())
                         + ", elapsed_ms=" + (android.os.SystemClock.elapsedRealtime() - started));
                 new Handler(Looper.getMainLooper()).post(new Runnable() {
                     public void run() {
-                        if (generation != sIconPageLoadGeneration || list.getWindowToken() == null) {
+                        if (generation != sIconPageLoadGeneration
+                                || isActivityInvalid(activity)
+                                || list.getWindowToken() == null) {
                             return;
                         }
                         renderIconPageList(activity, context, resources, list, footer, data,
@@ -3823,7 +3831,7 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static IconPageData loadIconPageData(Activity activity, boolean forceRefresh) {
+    private static IconPageData loadIconPageData(Context context, boolean forceRefresh) {
         long now = android.os.SystemClock.uptimeMillis();
         synchronized (MaintainedLauncherSettingsHost.class) {
             if (!forceRefresh && sIconPageDataCache != null
@@ -3831,11 +3839,13 @@ public final class MaintainedLauncherSettingsHost {
                 return sIconPageDataCache;
             }
         }
-        IconManager manager = new IconManager(activity);
-        List<RedirectIconInfo> entries = AppIconAdapter.loadEntries(activity, manager);
+        Context appContext = context == null ? null : context.getApplicationContext();
+        if (appContext == null) appContext = context;
+        IconManager manager = new IconManager(appContext);
+        List<RedirectIconInfo> entries = AppIconAdapter.loadEntries(appContext, manager);
         ArrayList<IconPreviewRepository.AppIconRowModel> snapshotRows =
                 new ArrayList<IconPreviewRepository.AppIconRowModel>();
-        Map<String, List<String>> variants = loadIconVariantMap(activity);
+        Map<String, List<String>> variants = loadIconVariantMap(appContext);
         for (RedirectIconInfo entry : entries) {
             ResolveInfo resolved = manager.getResolveInfo(entry.packageName, entry.componentName);
             ActivityInfo ai = resolved == null ? null : resolved.activityInfo;
@@ -3846,7 +3856,7 @@ public final class MaintainedLauncherSettingsHost {
                     entry.componentName, entry.ownerId,
                     manager.getLableForPackage(entry.packageName, entry.componentName), mode,
                     RedirectIconDB.resourceNameOf(entry), !TextUtils.isEmpty(candidate), candidate,
-                    false, "", "", packageVersionStamp(activity, entry.packageName)));
+                    false, "", "", packageVersionStamp(appContext, entry.packageName)));
         }
         IconPageData data = new IconPageData(manager, entries,
                 new IconPreviewRepository.AppIconSnapshot(snapshotRows));
@@ -14633,11 +14643,11 @@ public final class MaintainedLauncherSettingsHost {
             rebuildRows();
         }
 
-        static List<RedirectIconInfo> loadEntries(Activity activity) {
-            return loadEntries(activity, new IconManager(activity));
+        static List<RedirectIconInfo> loadEntries(Context context) {
+            return loadEntries(context, new IconManager(context));
         }
 
-        static List<RedirectIconInfo> loadEntries(Activity activity, final IconManager iconManager) {
+        static List<RedirectIconInfo> loadEntries(Context context, final IconManager iconManager) {
             final ArrayList<RedirectIconInfo> result = new ArrayList<RedirectIconInfo>();
             long started = android.os.SystemClock.elapsedRealtime();
             try {
@@ -14650,11 +14660,11 @@ public final class MaintainedLauncherSettingsHost {
                         result.add(info);
                     } else {
                         filtered++;
-                        logOperation(activity, "ICON_FILTER", "package=" + info.packageName
+                        logOperation(context, "ICON_FILTER", "package=" + info.packageName
                                 + ", component=" + info.componentName + ", resolve=" + (resolveInfo != null));
                     }
                 }
-                logOperation(activity, "ICON_LIST", "redirected_count=" + resolved.size()
+                logOperation(context, "ICON_LIST", "redirected_count=" + resolved.size()
                         + ", visible_count=" + result.size() + ", filtered_count=" + filtered);
                 final HashMap<String, String> labels = new HashMap<String, String>();
                 Collections.sort(result, new Comparator<RedirectIconInfo>() {
@@ -14665,9 +14675,9 @@ public final class MaintainedLauncherSettingsHost {
                     }
                 });
             } catch (Throwable ignored) {
-                logOperation(activity, "ICON_LIST", "resolve_failed " + shortError(ignored));
+                logOperation(context, "ICON_LIST", "resolve_failed " + shortError(ignored));
             }
-            logOperation(activity, "ICON_LIST", "resolve_elapsed_ms="
+            logOperation(context, "ICON_LIST", "resolve_elapsed_ms="
                     + (android.os.SystemClock.elapsedRealtime() - started));
             return result;
         }
