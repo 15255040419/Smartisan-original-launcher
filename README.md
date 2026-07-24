@@ -17,8 +17,8 @@
 
 <p align="center">
   <img alt="Android" src="https://img.shields.io/badge/Android-6.0%2B-brightgreen?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.5.4-blue?style=flat-square">
-  <img alt="Build" src="https://img.shields.io/badge/build-29-orange?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.5.5-blue?style=flat-square">
+  <img alt="Build" src="https://img.shields.io/badge/build-30-orange?style=flat-square">
   <img alt="Status" src="https://img.shields.io/badge/status-active-success?style=flat-square">
 </p>
 
@@ -49,11 +49,21 @@
 
 ## 当前状态
 
-当前版本：**v1.5.4 / versionCode 29**
+当前版本：**v1.5.5 / versionCode 30**
 支持系统：**Android 6.0 及以上**
 测试环境：已在 **Android 12 / Android 15 / Android 16** 环境开展兼容测试。
 
 不同厂商 ROM 在应用分身、后台限制、主题行为、解锁广播和系统入口暴露方式上仍可能存在差异，本项目会持续针对真实设备反馈进行适配。
+
+### v1.5.5 更新摘要
+
+#### 新增功能
+* **全局图标来源收敛与重构**：优化图标切换逻辑，默认/改进版/图标包合并为图标样式。
+* **小程序/PIN 快捷方式兼容恢复**：新增允许创建快捷方式添加到桌面（需要设置桌面为默认桌面，桌面允许通知权限）。
+* **桌面手势优化**：新增桌面左侧下滑打开通知栏，右侧下滑打开控制中心，上滑打开搜索页面。
+* **图标视觉细节提升**：修复桌面桌面图标、设置齿轮按钮物理纹理清晰度。
+* **设置页返回逻辑优化**：统一设置页系统返回逻辑，屏幕手势返回、虚拟键返回、左上角返回按钮逻辑统一。桌面HOME按钮返回主页
+* **桌面HOME按钮逻辑优化**：桌面状态按home按钮或底部上滑返回首页。
 
 ### v1.5.4 更新摘要
 

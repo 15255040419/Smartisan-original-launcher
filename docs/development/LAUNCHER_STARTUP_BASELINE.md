@@ -51,7 +51,7 @@
 测试环境：
 
 - 设备：Android Emulator `emulator-5554`
-- APK：`com.smartisanos.launcher v1.5.4 (29)`
+- APK：`com.smartisanos.launcher v1.5.5 (30)`
 - 状态：12 宫格、普通黑色主题、透明模式关闭、动态天气/日历关闭、图标包关闭、角标隐藏
 - 数据：覆盖安装，不清除 Launcher 数据
 

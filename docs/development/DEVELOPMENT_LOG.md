@@ -76,6 +76,12 @@
 
 ### 2026-07-24
 
+#### 版本号升级与文档同步（v1.5.5 / versionCode 30）
+
+- **变更**：使用 `tools/set_launcher_version.py v1.5.5 30` 自动同步三大版本控制入口：`launcher/AndroidManifest.xml`、`launcher/original/AndroidManifest.xml` 与 `launcher/tools/maintained_settings_res/res/values/strings.xml`。
+- **文档同步**：同步更新 `README.md`（含 v1.5.5 更新摘要）、`docs/architecture/APK_STRUCTURE.md` 及 `docs/development/LAUNCHER_STARTUP_BASELINE.md` 中的版本号。
+- **验证**：运行 `python tools/set_launcher_version.py v1.5.5 30` 执行通过，二进制 Manifest 校验成功。
+
 #### 下滑系统面板与上滑搜索状态残留修复（构建完成，已增加低频日志）
 
 - **根因**：用户在桌面下滑打开通知栏/控制中心时，`FlingUpGesture.b(MotionEvent)` 在向下滑动阶段将静态标志 `sk` 设为 `true`。当系统面板在 `ACTION_MOVE` 阶段取得焦点后，Launcher 收不到后续 `ACTION_UP`/`ACTION_CANCEL`，跳过了 `FlingUpGesture.c()` 中的 `ew()` 清理，导致 `sk=true` 遗留至下一次手势；下一次上滑时 `!sk = false` 拦截了上滑搜索，直到该次上滑结束才由 `ew()` 清除状态，造成“必须第二次上滑才能打开搜索”的现象。

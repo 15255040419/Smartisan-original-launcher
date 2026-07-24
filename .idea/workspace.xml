@@ -5,11 +5,25 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="295b82c4-8572-45f1-add8-3c13ec0468e1" name="更改" comment="">
+      <change afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconPreviewRepository.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconSourceManager.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/MEMORY.md" beforeDir="false" afterPath="$PROJECT_DIR$/MEMORY.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-aligned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-aligned.apk" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-signed.apk.idsig" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/build/launcher-unsigned.apk" beforeDir="false" afterPath="$PROJECT_DIR$/build/launcher-unsigned.apk" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/development/DEVELOPMENT_LOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/development/DEVELOPMENT_LOG.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/original/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/original/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/ia.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/ia.smali" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/na.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/a/na.smali" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/a/l.smali" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/smali/com/smartisanos/launcher/data/a/l.smali" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconPackManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/home/settings/icons/IconPackManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/PinShortcutConfirmActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/PinShortcutConfirmActivity.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/ShortcutCompatBridge.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/ShortcutCompatBridge.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" beforeDir="false" afterPath="$PROJECT_DIR$/launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tools/patch_pin_shortcut_manifest.py" beforeDir="false" afterPath="$PROJECT_DIR$/tools/patch_pin_shortcut_manifest.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,7 +65,7 @@
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "fix/pin-shortcut",
+    "git-widget-placeholder": "0e60b246",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "E:/FANG/smartisan/smartisan-launcher-original-port",
     "settings.editor.selected.configurable": "AndroidSdkUpdater"
