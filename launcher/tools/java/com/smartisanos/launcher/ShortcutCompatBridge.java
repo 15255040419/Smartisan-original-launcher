@@ -137,7 +137,7 @@ public final class ShortcutCompatBridge {
     }
 
     /** Uses the original DatabaseUpdater.Action.maa entry without duplicating its model/PageView work. */
-    public static boolean dispatchInstall(Object item) {
+    public static boolean dispatchInstall(Object item, Context sourceContext) {
         if (item == null) {
             Log.e(TAG, "SHORTCUT_DATABASE_DISPATCH_FAILED reason=item_null");
             return false;
@@ -147,8 +147,11 @@ public final class ShortcutCompatBridge {
             Object action = resolveInstallAction(actionClass);
             Method dispatch = Class.forName("com.smartisanos.launcher.data.F").getMethod(
                     "b", actionClass, java.util.List.class, ArrayList.class);
-            ArrayList<Object> items = new ArrayList<>(1);
+            ArrayList<Object> items = new ArrayList<>(2);
             items.add(item);
+            // The original shortcut entry supplies the Activity as the second argument.
+            // Keep that convention even though the current action reads the item asynchronously.
+            if (sourceContext != null) items.add(sourceContext);
             dispatch.invoke(null, action, null, items);
             Log.i(TAG, "SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName="
                     + ((Enum<?>) action).name() + " itemCount=1 package=" + getField(item, "packageName")
@@ -161,6 +164,40 @@ public final class ShortcutCompatBridge {
             Log.e(TAG, "SHORTCUT_DATABASE_DISPATCH_FAILED type=" + cause.getClass().getSimpleName()
                     + " message=" + String.valueOf(cause.getMessage()), cause);
             return false;
+        }
+    }
+
+    public static boolean isStored(Context context, ShortcutInfo shortcut, long userSerial) {
+        if (context == null || shortcut == null) return false;
+        try {
+            boolean primary = shortcut.getUserHandle() != null
+                    && Process.myUserHandle().equals(shortcut.getUserHandle());
+            Intent intent = createLaunchIntent(context, shortcut.getPackage(), shortcut.getId(), userSerial,
+                    primary && userSerial >= 0L);
+            java.util.Map<String, String> where = new java.util.HashMap<>();
+            where.put("intent", intent.toUri(0));
+            List<?> rows = (List<?>) Class.forName("com.smartisanos.launcher.data.a.l")
+                    .getMethod("c", java.util.Map.class).invoke(null, where);
+            return rows != null && !rows.isEmpty();
+        } catch (Throwable error) {
+            Log.e(TAG, "PIN_DATABASE_ROW_QUERY_FAILED package=" + shortcut.getPackage()
+                    + " shortcutId=" + shortcut.getId() + " userSerial=" + userSerial, error);
+            return false;
+        }
+    }
+
+    public static void reconcilePinned(Context context, List<ShortcutInfo> shortcuts, UserHandle user) {
+        if (context == null || shortcuts == null) return;
+        long serial = userSerial(context, user);
+        for (ShortcutInfo shortcut : shortcuts) {
+            if (shortcut == null || !shortcut.isPinned()) continue;
+            if (isStored(context, shortcut, serial)) continue;
+            Object item = createItem(context, shortcut, serial);
+            if (item == null) continue;
+            Log.i(TAG, "PIN_RECONCILE_DATABASE_MISSING packageName=" + shortcut.getPackage()
+                    + " shortcutId=" + shortcut.getId() + " userId=" + userIdentifier(user)
+                    + " userSerial=" + serial);
+            dispatchInstall(item, context);
         }
     }
 
@@ -193,7 +230,9 @@ public final class ShortcutCompatBridge {
             Log.i(TAG, "SHORTCUT_DELETE_ACTION_RESOLVED field=naa enumName=EVENT_UNINSTALL_SHORTCUT");
             Log.i(TAG, "SHORTCUT_DELETE_DATABASE_DISPATCHED itemId=" + getField(item, "id") + " package=" + packageName
                     + " shortcutId=" + shortcutId + " userId=" + userId + " userSerial=" + userSerial);
-            unpinShortcut(context, packageName, shortcutId, userId, userSerial);
+            UserManager users = (UserManager) context.getSystemService(Context.USER_SERVICE);
+            unpinShortcut(context, packageName, shortcutId,
+                    users == null ? null : users.getUserForSerialNumber(userSerial), userSerial);
         } catch (Throwable error) {
             Log.e(TAG, "SHORTCUT_UNPIN_FAILED reason=identity type=" + error.getClass().getSimpleName(), error);
         }
@@ -208,13 +247,14 @@ public final class ShortcutCompatBridge {
                 + " userSerial=" + intent.getLongExtra(EXTRA_USER_SERIAL, -1L);
     }
 
-    private static void unpinShortcut(Context context, String packageName, String shortcutId, int userId, long userSerial) {
+    public static void unpinShortcut(Context context, String packageName, String shortcutId, UserHandle user, long userSerial) {
+        int userId = userIdentifier(user);
         Log.i(TAG, "SHORTCUT_UNPIN_BEGIN package=" + packageName + " shortcutId=" + shortcutId
                 + " userId=" + userId + " userSerial=" + userSerial);
         try {
             if (packageName == null || shortcutId == null) throw new IllegalArgumentException("missing shortcut identity");
             UserManager users = (UserManager) context.getSystemService(Context.USER_SERVICE);
-            UserHandle user = userSerial >= 0 && users != null ? users.getUserForSerialNumber(userSerial) : null;
+            user = userSerial >= 0 && users != null ? users.getUserForSerialNumber(userSerial) : user;
             if (user == null && userId == userIdentifier(Process.myUserHandle())) user = Process.myUserHandle();
             if (user == null) throw new IllegalStateException("unresolved user");
             LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
@@ -331,7 +371,7 @@ public final class ShortcutCompatBridge {
         }
     }
 
-    private static int userIdentifier(UserHandle user) {
+    public static int userIdentifier(UserHandle user) {
         try {
             return (Integer) UserHandle.class.getMethod("getIdentifier").invoke(user);
         } catch (ReflectiveOperationException ignored) {

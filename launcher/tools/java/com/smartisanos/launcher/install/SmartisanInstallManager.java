@@ -10,6 +10,7 @@ import android.content.pm.LauncherApps;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ShortcutInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
@@ -27,6 +28,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.smartisanos.launcher.diagnostics.StartupCompatibilityLogger;
+import com.smartisanos.launcher.ShortcutCompatBridge;
 import com.smartisanos.launcher.theme.MaintainedLauncherSettingsHost;
 
 import java.io.File;
@@ -173,6 +175,7 @@ public final class SmartisanInstallManager {
         }
         Log.i(TAG, "INSTALL_MODEL_READY pending=" + pendingEventCount());
         processPendingEvents(context, "model_ready_reconcile");
+        reconcilePinnedShortcuts(context);
     }
 
     /**
@@ -386,6 +389,18 @@ public final class SmartisanInstallManager {
                 }
                 @Override public void onPackagesUnavailable(String[] packages, UserHandle user,
                                                             boolean replacing) { }
+                @Override public void onShortcutsChanged(final String packageName,
+                                                         final List<ShortcutInfo> shortcuts,
+                                                         final UserHandle user) {
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1 || !sModelReady) return;
+                    Handler worker = sWorkerHandler;
+                    if (worker == null) return;
+                    worker.post(new Runnable() {
+                        @Override public void run() {
+                            ShortcutCompatBridge.reconcilePinned(context, shortcuts, user);
+                        }
+                    });
+                }
             });
             synchronized (LOCK) {
                 sLauncherAppsRegistered = true;
@@ -393,6 +408,28 @@ public final class SmartisanInstallManager {
         } catch (Throwable t) {
             StartupCompatibilityLogger.optionalModuleDisabled("launcher_apps_callback", t);
         }
+    }
+
+    private static void reconcilePinnedShortcuts(final Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1 || context == null || sWorkerHandler == null) return;
+        sWorkerHandler.post(new Runnable() {
+            @Override public void run() {
+                try {
+                    LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+                    if (apps == null) return;
+                    List<UserHandle> profiles = apps.getProfiles();
+                    if (profiles == null) return;
+                    for (UserHandle user : profiles) {
+                        List<ShortcutInfo> shortcuts = apps.getShortcuts(
+                                new LauncherApps.ShortcutQuery().setQueryFlags(
+                                        LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED), user);
+                        ShortcutCompatBridge.reconcilePinned(context, shortcuts, user);
+                    }
+                } catch (Throwable error) {
+                    Log.w(TAG, "PIN_RECONCILE_FAILED type=" + error.getClass().getSimpleName(), error);
+                }
+            }
+        });
     }
 
     private static void scheduleSessionScan(long delayMs) {

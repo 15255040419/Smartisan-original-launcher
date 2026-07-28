@@ -12,43 +12,27 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.ContextThemeWrapper;
 
-import java.util.ArrayDeque;
-
-/** Activity-token based confirmation for Android O+ pinned shortcuts. */
+/** One Android O+ PinItemRequest is handled by one short-lived activity. */
 public final class PinShortcutConfirmActivity extends Activity {
     private static final String TAG = "ShortcutCompat";
     private static final String ACTION_CONFIRM_PIN_SHORTCUT = "android.content.pm.action.CONFIRM_PIN_SHORTCUT";
-    private final ArrayDeque<Intent> queuedIntents = new ArrayDeque<>();
+    private static final long[] VERIFY_DELAYS_MS = {0L, 100L, 250L, 500L, 1000L, 2000L};
     private LauncherApps.PinItemRequest request;
     private ShortcutInfo shortcut;
     private AlertDialog dialog;
     private boolean requestHandled;
-    private boolean databaseDispatched;
+    private int verifyAttempt;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        Log.i(TAG, "PIN_SHORTCUT_ACTIVITY_CREATED");
-        queuedIntents.add(new Intent(getIntent()));
-        processNext();
+        Log.i(TAG, identity("PIN_ACTIVITY_CREATED requestValid=unknown"));
+        extractRequest(getIntent());
     }
 
-    @Override protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        queuedIntents.add(new Intent(intent));
-        if (request == null && dialog == null) processNext();
-    }
-
-    private void processNext() {
-        if (request != null || dialog != null) return;
-        Intent intent = queuedIntents.poll();
-        if (intent == null) {
-            finishWithLog();
-            return;
-        }
+    private void extractRequest(Intent intent) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !ACTION_CONFIRM_PIN_SHORTCUT.equals(intent.getAction())) {
-            Log.w(TAG, "PIN_ITEM_REQUEST_INVALID reason=unsupported_or_wrong_action");
-            processNext();
+            Log.w(TAG, identity("PIN_REQUEST_INVALID reason=unsupported_or_wrong_action requestValid=false"));
+            finishWithLog();
             return;
         }
         LauncherApps apps = (LauncherApps) getSystemService(Context.LAUNCHER_APPS_SERVICE);
@@ -56,20 +40,17 @@ public final class PinShortcutConfirmActivity extends Activity {
         if (request == null || !request.isValid()
                 || request.getRequestType() != LauncherApps.PinItemRequest.REQUEST_TYPE_SHORTCUT
                 || request.getShortcutInfo() == null) {
-            Log.w(TAG, "PIN_ITEM_REQUEST_INVALID requestFound=" + (request != null));
-            request = null;
-            processNext();
+            Log.w(TAG, identity("PIN_REQUEST_INVALID requestFound=" + (request != null) + " requestValid=false"));
+            finishWithLog();
             return;
         }
         shortcut = request.getShortcutInfo();
         if (isEmpty(shortcut.getPackage()) || isEmpty(shortcut.getId())) {
-            Log.w(TAG, "PIN_ITEM_REQUEST_INVALID reason=missing_identity");
-            request = null;
-            processNext();
+            Log.w(TAG, identity("PIN_REQUEST_INVALID reason=missing_identity requestValid=false"));
+            finishWithLog();
             return;
         }
-        Log.i(TAG, "PIN_ITEM_REQUEST_FOUND package=" + shortcut.getPackage() + " shortcutId=" + shortcut.getId()
-                + " requestValid=true");
+        Log.i(TAG, identity("PIN_REQUEST_EXTRACTED requestValid=true"));
         showConfirmation();
     }
 
@@ -93,60 +74,81 @@ public final class PinShortcutConfirmActivity extends Activity {
             dialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
                 @Override public void onCancel(DialogInterface value) { cancelCurrent(); }
             });
-            Log.i(TAG, "PIN_SHORTCUT_DIALOG_SHOW_REQUESTED package=" + shortcut.getPackage()
-                    + " shortcutId=" + shortcut.getId() + " windowType=activity");
             dialog.show();
-            Log.i(TAG, "PIN_SHORTCUT_DIALOG_SHOWN package=" + shortcut.getPackage() + " shortcutId=" + shortcut.getId());
+            Log.i(TAG, identity("PIN_DIALOG_SHOWN requestValid=true"));
         } catch (RuntimeException e) {
-            Log.e(TAG, "PIN_SHORTCUT_DIALOG_SHOW_FAILED type=" + e.getClass().getSimpleName(), e);
-            clearCurrent();
-            processNext();
+            Log.e(TAG, identity("PIN_COMMIT_FAILED stage=dialog type=" + e.getClass().getSimpleName()), e);
+            finishWithLog();
         }
     }
 
     private synchronized void confirmCurrent() {
         if (requestHandled || request == null || shortcut == null) {
-            Log.w(TAG, "PIN_SHORTCUT_DUPLICATE_BLOCKED");
+            Log.w(TAG, identity("PIN_COMMIT_FAILED stage=duplicate requestValid=false"));
             return;
         }
         requestHandled = true;
         long serial = ShortcutCompatBridge.userSerial(this, shortcut.getUserHandle());
-        Log.i(TAG, "PIN_SHORTCUT_CONFIRMED package=" + shortcut.getPackage() + " shortcutId=" + shortcut.getId()
-                + " userSerial=" + serial);
+        Log.i(TAG, identity("PIN_USER_CONFIRMED userSerial=" + serial + " requestValid=true"));
         Object item = ShortcutCompatBridge.createItem(this, shortcut, serial);
         if (item == null) {
-            Log.e(TAG, "PIN_SHORTCUT_ACCEPT_FAILED reason=item_create_failed");
-            clearCurrent();
-            processNext();
+            Log.e(TAG, identity("PIN_COMMIT_FAILED stage=item_create requestValid=true"));
+            finishWithLog();
             return;
         }
+        Log.i(TAG, identity("PIN_ITEM_CREATED userSerial=" + serial + " requestValid=true"));
         try {
-            Log.i(TAG, "PIN_SHORTCUT_ACCEPT_BEGIN package=" + shortcut.getPackage() + " shortcutId=" + shortcut.getId());
+            Log.i(TAG, identity("PIN_ACCEPT_BEGIN userSerial=" + serial + " requestValid=true"));
             if (!request.isValid() || !request.accept()) {
-                Log.w(TAG, "PIN_SHORTCUT_ACCEPT_FAILED result=false");
-                clearCurrent();
-                processNext();
+                Log.w(TAG, identity("PIN_COMMIT_FAILED stage=accept requestValid=false"));
+                finishWithLog();
                 return;
             }
-            Log.i(TAG, "PIN_SHORTCUT_ACCEPT_SUCCESS package=" + shortcut.getPackage() + " shortcutId=" + shortcut.getId());
-            boolean dispatched = ShortcutCompatBridge.dispatchInstall(item);
-            databaseDispatched = dispatched;
+            Log.i(TAG, identity("PIN_ACCEPT_SUCCESS userSerial=" + serial + " requestValid=true"));
+            Log.i(TAG, identity("PIN_DATABASE_DISPATCH_BEGIN userSerial=" + serial + " requestValid=true"));
+            boolean dispatched = ShortcutCompatBridge.dispatchInstall(item, this);
             if (!dispatched) {
-                Log.e(TAG, "PIN_SHORTCUT_DATABASE_FAILED package=" + shortcut.getPackage()
-                        + " shortcutId=" + shortcut.getId());
+                rollbackAndFinish(serial, "dispatch");
+                return;
             }
+            Log.i(TAG, identity("PIN_DATABASE_DISPATCH_RETURNED userSerial=" + serial + " requestValid=true"));
+            verifyCommit(serial);
         } catch (RuntimeException e) {
-            Log.e(TAG, "PIN_SHORTCUT_ACCEPT_FAILED type=" + e.getClass().getSimpleName(), e);
+            Log.e(TAG, identity("PIN_COMMIT_FAILED stage=accept_or_dispatch type=" + e.getClass().getSimpleName()), e);
+            rollbackAndFinish(serial, "exception");
         }
-        clearCurrent();
-        processNext();
+    }
+
+    private void verifyCommit(final long serial) {
+        if (shortcut == null) return;
+        if (ShortcutCompatBridge.isStored(this, shortcut, serial)) {
+            Log.i(TAG, identity("PIN_DATABASE_ROW_FOUND userSerial=" + serial + " requestValid=true"));
+            Log.i(TAG, identity("PIN_COMMIT_SUCCESS userSerial=" + serial + " requestValid=true"));
+            finishWithLog();
+            return;
+        }
+        if (++verifyAttempt >= VERIFY_DELAYS_MS.length) {
+            rollbackAndFinish(serial, "database_row_missing");
+            return;
+        }
+        getWindow().getDecorView().postDelayed(new Runnable() {
+            @Override public void run() { verifyCommit(serial); }
+        }, VERIFY_DELAYS_MS[verifyAttempt]);
+    }
+
+    private void rollbackAndFinish(long serial, String stage) {
+        Log.e(TAG, identity("PIN_COMMIT_FAILED stage=" + stage + " userSerial=" + serial + " requestValid=true"));
+        if (shortcut != null) {
+            ShortcutCompatBridge.unpinShortcut(this, shortcut.getPackage(), shortcut.getId(), shortcut.getUserHandle(), serial);
+            Log.i(TAG, identity("PIN_ROLLBACK_UNPIN_SUCCESS userSerial=" + serial + " requestValid=true"));
+        }
+        finishWithLog();
     }
 
     private void cancelCurrent() {
         if (request == null || requestHandled) return;
-        Log.i(TAG, "PIN_SHORTCUT_CANCELLED package=" + shortcut.getPackage() + " shortcutId=" + shortcut.getId());
-        clearCurrent();
-        processNext();
+        Log.i(TAG, identity("PIN_COMMIT_FAILED stage=cancel requestValid=true"));
+        finishWithLog();
     }
 
     @Override public void onBackPressed() { cancelCurrent(); }
@@ -157,18 +159,18 @@ public final class PinShortcutConfirmActivity extends Activity {
         super.onDestroy();
     }
 
-    private void clearCurrent() {
-        if (dialog != null) dialog.dismiss();
-        dialog = null;
-        request = null;
-        shortcut = null;
-        requestHandled = false;
-        databaseDispatched = false;
+    private void finishWithLog() {
+        Log.i(TAG, identity("PIN_ACTIVITY_FINISHED activityFinishing=true"));
+        finish();
     }
 
-    private void finishWithLog() {
-        Log.i(TAG, "SHORTCUT_ACTIVITY_FINISHED activityFinishing=true");
-        finish();
+    private String identity(String event) {
+        String packageName = shortcut == null ? "unknown" : shortcut.getPackage();
+        String shortcutId = shortcut == null ? "unknown" : shortcut.getId();
+        long serial = shortcut == null ? -1L : ShortcutCompatBridge.userSerial(this, shortcut.getUserHandle());
+        return event + " packageName=" + packageName + " shortcutId=" + shortcutId
+                + " userId=" + (shortcut == null ? -1 : ShortcutCompatBridge.userIdentifier(shortcut.getUserHandle()))
+                + " userSerial=" + serial;
     }
 
     private int resourceId(String name) { return getResources().getIdentifier(name, "string", getPackageName()); }

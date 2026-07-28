@@ -17,7 +17,7 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-07-24）
+## 当前状态总览（2026-07-28）
 
 - 桌面下滑打开系统面板与上滑搜索之间的手势状态冲突已定位并修复：`FlingUpGesture.b()` 在向下 MOVE 过程会将静态标志 `sk` 设为 `true`；由于系统面板在 `ACTION_MOVE` 阶段取得焦点后 Launcher 不会收到后续 `ACTION_UP`/`ACTION_CANCEL`，导致 `sk=true` 残留至下一次手势并拦截第一次上滑搜索。现已在 `v.1.smali` 的 `ACTION_MOVE` 已确认消费分支及 `ACTION_UP`/`ACTION_CANCEL` 兜底分支中调用 `FlingUpGesture.resetAfterSystemPanelGestureMoveConsumed()` / `resetAfterSystemPanelGesture()`，立即重置 `rk`/`sk`/`tk` 并记录 `FLING_UP_STATE_RESET` 日志。
 
@@ -30,6 +30,8 @@
 - 2026-07-23 OPPO PDCM00 真机确认应用图标页原先因 `View.setTag(int, Object)` 传入系统 `android.R.id.*` 崩溃的问题已消失：改为 Adapter 内 `IconRowHolder` 保存 `boundOfficialKey`、`boundEffectiveKey` 与 `bindGeneration`，异步回调仅在键与 generation 同时匹配时局部更新。连续进入/返回 10 次、顶部到底部往返滚动 5 次均未见 Launcher 的 `IllegalArgumentException`、`View.setTag`、`VerifyError` 或 `AndroidRuntime` 崩溃。全局样式弹窗和单应用候选页均改走同一 Repository；最终覆盖安装日志保存为 `build/app_icon_final_log.txt`。
 
 - Android 8+ `REQUEST_PIN_SHORTCUT` 兼容链已完成本地构建级修复：确认原版 `DatabaseUpdater.Action.maa` 是静态字段，实际枚举为 `EVENT_INSTALL_OR_UPDATE_SHORTCUT`，不再错误地把 `maa` 当枚举名。桥接层在原版转换后恢复 `ShortcutInfo.getUserHandle().getIdentifier()` 到 `ItemInfo.userId`，并将原版 `QuickLaunchItem` 去重查询收紧为 `intent + user`；分身与主用户的相同 `packageName + shortcutId` 因而不会共用记录。快捷方式图标依次尝试原图、`LauncherApps`、原版默认、来源应用，并强制经过原版 `e.s.a(context, bitmap, packageName, userId)` 合成；合成失败不写入裸图标。确认页的二进制 Manifest 现强制使用原版框架 `Theme.Translucent.NoTitleBar`，不再继承原 `PinShortcutActivity` 的 no-display 窗口属性。构建、签名和最终二进制 Manifest 已验证。vivo X21A 已识别主用户与 `999` 分身用户且微信已安装，但新 APK 覆盖安装仍返回 `Failure [-200]`，尚未完成确认页、主微信/分身微信、支付宝及重启/删除矩阵真机验收，不能标记为完成。
+
+- 2026-07-28 已进一步收敛 Android O+ PIN 快捷方式的“系统已 pinned、桌面无 Cell”不一致：OPPO PDCM00 日志确认微信分身 `u999` 的请求可被系统置为 pinned，但该 profile 无法解析 Launcher 的 `CONFIRM_PIN_SHORTCUT` Activity，故不会进入确认/落库；主用户请求则可进入 Activity。确认 Activity 已恢复“一请求一 Activity”模型（移除 `singleTop`、意图队列和 `onNewIntent` 复用，增加 `stateNotNeeded=true`），并恢复原版 DatabaseUpdater 参数约定的 `[QuickLaunchItem, Activity/Context]`。`EVENT_INSTALL_OR_UPDATE_SHORTCUT` 仍负责原版 Intent 维度 upsert；`request.accept()` 或反射返回不再视为提交成功，必须在有限轮次内查到原版快捷方式数据库行，否则仅解除本次 `packageName + shortcutId + user` 的 pin。Launcher 初始模型就绪后会在后台对已 pinned 快捷方式按 profile 对账，补建“pinned 存在、数据库缺失”的条目，不阻塞首帧。`PIN_*` 日志已分离 Activity、request、accept、入库派发、数据库确认、失败和回滚阶段。2026-07-28 已完成构建、签名、ADB 覆盖安装和 Launcher 重启；主/分身微信、支付宝、取消、删除后重加、杀进程/重启等真机矩阵尚未完成，不能标记为完全修复。
 
 - PIN 快捷方式删除与图标合成的本轮修复已完成构建级验证：系统卸载快速路径现在先按 `ItemInfo.itemType` 分流，`QuickLaunchItem(1)` 继续使用原版 `EVENT_UNINSTALL_SHORTCUT`，不会调用 `UninstallCompat` 卸载来源应用；删除后从启动 Intent 读取 `packageName + shortcutId + userSerial`，按真实 profile 解除该 pinned ID。微信和支付宝的 Android PIN 输入图标被视为已带来源装饰，只做透明边缘归一化而跳过第二次 `e.s.a()` 合成；其他快捷方式保持原版合成器和 `final_icon=true`。构建、签名通过；同一 vivo 覆盖安装仍为 `Failure [-200]`，删除/重启/主分身与单框视觉尚未真机验收。
 
@@ -77,6 +79,14 @@
 ## 每日修复记录（倒序）
 
 ### 2026-07-28
+
+#### Android O+ PIN 快捷方式请求与桌面数据一致性（构建、安装完成；真机矩阵待验证）
+
+- **真机根因**：OPPO PDCM00 (`Android 12`，`PZXO8PHMONGYVSOZ`) 的实时 `logcat` 与 `dumpsys shortcut` 显示，微信分身运行在 `u999`；新添加的小程序已处于该用户的 pinned 集合，但 `cmd package resolve-activity --user 999` 无法解析 `com.smartisanos.launcher/.PinShortcutConfirmActivity`。因此没有确认弹窗时，系统会保留 pinned 状态而 Launcher 不会收到可落库的 `PinItemRequest`，表现为“有时没有弹窗，添加后桌面没有图标”。这与主用户可解析确认 Activity 的成功路径不同，并非随机。
+- **对照与修复**：对比 maintained `6798dd765e478026c5207c3ed1b5b9a357405cba` 后，当前确认页取消 `singleTop`、`queuedIntents`、`onNewIntent()` 和多请求循环；Manifest 保留 `exported=true`、`Theme.Translucent.NoTitleBar`，新增 `stateNotNeeded=true`。每个 Activity 只读取自己的 `getIntent()`、展示一次确认并在取消/关闭后结束。调用当前原版 `F.b()` 时恢复第二项 Activity/Context 参数，仍使用当前 `EVENT_INSTALL_OR_UPDATE_SHORTCUT`，不覆盖 `F.smali`。
+- **提交语义**：`ShortcutCompatBridge.dispatchInstall()` 的反射不再被当作落库成功。确认后记录 `PIN_ACCEPT_*` 与 `PIN_DATABASE_DISPATCH_*`，再以最终 `ShortcutLaunchActivity` Intent 查询原版快捷方式表；只有找到行才记录 `PIN_DATABASE_ROW_FOUND`、`PIN_COMMIT_SUCCESS`。失败会只移除本次 shortcut ID 的 pin，记录 `PIN_COMMIT_FAILED` 与 `PIN_ROLLBACK_UNPIN_SUCCESS`，不会清空同包其他小程序。原版当前 Action 已按完整 Intent 做 upsert，Intent 包含 `shortcutId + userSerial`，所以同一小程序重复请求更新、不同微信小程序及主/分身独立存在。
+- **一致性修复**：在 `SmartisanInstallManager.onLauncherModelReady()` 后的后台线程查询 `FLAG_MATCH_PINNED`；`LauncherApps.Callback.onShortcutsChanged()` 也在模型就绪后补查。系统 pinned 存在而 Launcher 数据库缺失时复用同一原版转换/入库路径补建；不在首帧、每帧或 PIN 请求队列中执行该扫描。
+- **验证状态**：`build.bat` 成功完成 maintained 资源、Smali、Java compatibility host、二进制 Manifest 注入、zipalign 和签名；`adb install -r -d build\\launcher-signed.apk` 已成功安装至 OPPO PDCM00，并强制重启 Launcher。完整 PIN 真机矩阵尚未完成：同一/不同小程序重复、取消后重试、确认后切桌面/杀 Launcher/重启、删除后重加、主微信/分身微信及支付宝均待以 `PIN_*` 日志和桌面 Cell/启动结果验收。本条不得解读为功能已完全验证。
 
 #### 应用图标有效来源与分组口径收敛（构建完成，真机待验收）
 

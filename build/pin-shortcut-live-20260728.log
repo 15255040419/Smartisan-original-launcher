@@ -1,0 +1,831 @@
+--------- beginning of system
+07-28 19:59:02.802  1837  4840 I ActivityManager: Killing 29072:com.tencent.mm:xweb_sandboxed_process_0:com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0/u999a253i138 (adj 0): isolated not needed
+07-28 19:59:03.066  1837  2918 I ActivityManager: Process com.tencent.mm:appbrand1 (pid 26805) has died: prev SVC 
+07-28 19:59:03.067  1837  2918 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.ipcinvoker.wx_extension.service.Appbrand1IPCService in 1000ms for connection
+07-28 19:59:03.067  1837  2918 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.appbrand.loading.AppBrandProcessTriggerService1 in 11000ms for connection
+07-28 19:59:03.068  1837  2918 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.magicbrush.core.MagicBrushServiceContextBase in 21000ms for connection
+07-28 19:59:03.669  1837  2918 I ActivityTaskManager: START u999 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.tencent.mm/.ui.LauncherUI mCallingUid=10520} from uid 10520
+07-28 19:59:03.940  1837  1872 I ActivityManager: Start proc 31411:com.tencent.mm:appbrand1/u999a253 for service {com.tencent.mm/com.tencent.mm.ipcinvoker.wx_extension.service.Appbrand1IPCService}
+07-28 19:59:03.984  1837  1851 W ActivityManager: Slow operation: 65ms so far, now at startProcess: done updating battery stats
+07-28 19:59:03.985  1837  1851 W ActivityManager: Slow operation: 65ms so far, now at startProcess: building log message
+07-28 19:59:03.985  1837  1851 I ActivityManager: Start proc 31434:com.tencent.mm:xweb_sandboxed_process_0:com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0/u999i139 for service {com.tencent.mm/com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0}
+07-28 19:59:03.985  1837  1851 W ActivityManager: Slow operation: 65ms so far, now at startProcess: starting to update pids map
+07-28 19:59:03.985  1837  1851 W ActivityManager: Slow operation: 65ms so far, now at startProcess: done updating pids map
+07-28 19:59:05.005  1837  1851 W ActivityManager: setGlThreads detect 6832 31583
+07-28 19:59:05.665  1837  2160 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI03 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 19:59:09.094  1837  2160 W ActivityManager: Receiver with filter android.content.IntentFilter@65edf70 already registered for pid 9421, callerPackage is com.tencent.mm
+07-28 19:59:09.487  1837  2160 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUIMoveTaskToBackStubUI0 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 19:59:09.594  1837  2160 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1203083524)
+--------- beginning of main
+07-28 19:59:09.722  1837  1855 I ActivityTaskManager: Displayed com.tencent.mm/.plugin.appbrand.ui.AppBrandUIMoveTaskToBackStubUI0: +225ms
+07-28 19:59:09.745  1837  3896 I ActivityTaskManager: moveTaskToBack: Task{3bdb651 #4649 type=standard A=99910253:.AppBrandUI03 U=999 visible=false mode=fullscreen translucent=true sz=1}
+07-28 19:59:10.499  1837  2160 W ActivityManager: setGlThreads detect 6832 31726
+07-28 19:59:11.374  1837  4850 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI00 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 19:59:14.094  1837  3896 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 19:59:23.863  1837  4862 I ActivityTaskManager: START u999 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.tencent.mm/.ui.LauncherUI mCallingUid=10520} from uid 10520
+07-28 19:59:26.411  1837  2778 W ActivityManager: setGlThreads detect 6832 31801
+07-28 19:59:27.130  1837  1851 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI00 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 19:59:30.200  1837  4850 W ActivityManager: Receiver with filter android.content.IntentFilter@9161c6e already registered for pid 9421, callerPackage is com.tencent.mm
+07-28 19:59:34.030  1837  2778 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUIMoveTaskToBackStubUI0 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 19:59:34.109  1837  2160 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1203114873)
+07-28 19:59:34.229  1837  1855 I ActivityTaskManager: Displayed com.tencent.mm/.plugin.appbrand.ui.AppBrandUIMoveTaskToBackStubUI0: +192ms
+07-28 19:59:34.232  1837  4854 I ActivityTaskManager: moveTaskToBack: Task{a705c1d #4641 type=standard A=99910253:.AppBrandUI00 U=999 visible=false mode=fullscreen translucent=true sz=1}
+07-28 19:59:34.998  1837  3896 W ActivityManager: setGlThreads detect 6832 31822
+07-28 19:59:36.067  1837  2778 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI03 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 19:59:38.835  1837  3896 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 19:59:55.441  1837  2723 I ActivityManager: Killing 31434:com.tencent.mm:xweb_sandboxed_process_0:com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0/u999a253i139 (adj 0): isolated not needed
+07-28 19:59:55.671  1837  4848 I ActivityManager: Process com.tencent.mm:appbrand1 (pid 31411) has died: cch SVC 
+07-28 19:59:55.673  1837  4848 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.magicbrush.core.MagicBrushServiceContextBase in 1000ms for connection
+07-28 19:59:55.673  1837  4848 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.appbrand.loading.AppBrandProcessTriggerService1 in 44000ms for connection
+07-28 19:59:55.673  1837  4848 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.ipcinvoker.wx_extension.service.Appbrand1IPCService in 11000ms for connection
+07-28 20:00:05.666  1837  4840 I ActivityManager: Process com.tencent.mm:xweb_privileged_process_0 (pid 29092) has died: fg  SVC 
+07-28 20:00:11.681  1837  4840 I ActivityTaskManager: START u999 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.tencent.mm/.ui.LauncherUI mCallingUid=10520} from uid 10520
+07-28 20:00:11.835  1837  1872 I ActivityManager: Start proc 31906:com.tencent.mm:appbrand1/u999a253 for service {com.tencent.mm/com.tencent.mm.plugin.magicbrush.core.MagicBrushServiceContextBase}
+07-28 20:00:11.976  1837  1872 I ActivityManager: Start proc 31927:com.tencent.mm:xweb_sandboxed_process_0:com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0/u999i140 for service {com.tencent.mm/com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0}
+07-28 20:00:11.997  1837  1872 I ActivityManager: Start proc 31947:com.tencent.mm:xweb_privileged_process_0/u999a253 for service {com.tencent.mm/com.tencent.xweb.pinus.sdk.process.PrivilegedProcessService0}
+07-28 20:00:13.109  1837  4840 W ActivityManager: setGlThreads detect 6832 32154
+07-28 20:00:15.363  1837  4850 I ActivityManager: Process com.oplus.lfeh (pid 30840) has died: vis IMPF
+07-28 20:00:15.364  1837  4850 W ActivityManager: Scheduling restart of crashed service com.oplus.lfeh/.service.LogFileEncrypterService in 1000ms for connection
+07-28 20:00:16.762  1837  4840 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI03 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:00:23.190  1837  4850 I ActivityTaskManager: START u0 {act=android.content.pm.action.CONFIRM_PIN_SHORTCUT flg=0x10008000 cmp=com.smartisanos.launcher/.PinShortcutConfirmActivity (has extras) mCallingUid=1000} from uid 1000
+07-28 20:00:23.198  1837  4850 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4672 attached=false
+07-28 20:00:23.308  1837  4850 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1202758496)
+07-28 20:00:23.350 23321 23321 I ShortcutCompat: PIN_SHORTCUT_ACTIVITY_CREATED
+07-28 20:00:23.352 23321 23321 I ShortcutCompat: PIN_ITEM_REQUEST_FOUND package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b requestValid=true
+07-28 20:00:23.364 23321 23321 I ShortcutCompat: PIN_SHORTCUT_DIALOG_SHOW_REQUESTED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b windowType=activity
+07-28 20:00:23.400 23321 23321 I ShortcutCompat: PIN_SHORTCUT_DIALOG_SHOWN package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b
+07-28 20:00:23.477  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.PinShortcutConfirmActivity: +276ms
+07-28 20:00:24.587 23321 23321 I ShortcutCompat: PIN_SHORTCUT_CONFIRMED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userSerial=10
+07-28 20:00:24.712 23321 23321 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:00:24.718 23321 23321 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999
+07-28 20:00:24.718 23321 23321 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b width=230 height=230
+07-28 20:00:24.718 23321 23321 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b mode=source_already_decorated
+07-28 20:00:24.718 23321 23321 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:00:24.718 23321 23321 I ShortcutCompat: PIN_SHORTCUT_ACCEPT_BEGIN package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b
+07-28 20:00:24.745 23321 23321 I ShortcutCompat: PIN_SHORTCUT_ACCEPT_SUCCESS package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b
+07-28 20:00:24.745 23321 23321 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:00:24.745 23321 23321 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b
+07-28 20:00:24.767 23321 23321 I ShortcutCompat: SHORTCUT_ACTIVITY_FINISHED activityFinishing=true
+07-28 20:00:25.131  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4672 attached=false
+07-28 20:00:25.131  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4672 attached=false
+07-28 20:00:26.227  1837  4854 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:00:27.451  1837  4850 I ActivityTaskManager: START u999 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.tencent.mm/.ui.LauncherUI mCallingUid=10520} from uid 10520
+07-28 20:00:28.979  1837  4850 W ActivityManager: setGlThreads detect 6832 32321
+07-28 20:00:30.375  1837  4848 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI02 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:00:30.912  1837  1872 I ActivityManager: Start proc 32329:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:00:30.953  1837  1872 I ActivityManager: Start proc 32351:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:00:33.568  1837  1851 W ActivityManager: Receiver with filter android.content.IntentFilter@65e9057 already registered for pid 9421, callerPackage is com.tencent.mm
+07-28 20:00:34.490  1837  4850 I ActivityManager: Process com.redteamobile.roaming (pid 32351) has died: fg  RCVR
+07-28 20:00:37.338  1837  4848 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 32329) has died: cch+5 CEM 
+07-28 20:01:26.394  1837  3891 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUIMoveTaskToBackStubUI0 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:01:26.489  1837  4850 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1203139389)
+07-28 20:01:26.599  1837  1855 I ActivityTaskManager: Displayed com.tencent.mm/.plugin.appbrand.ui.AppBrandUIMoveTaskToBackStubUI0: +198ms
+07-28 20:01:26.602  1837  1852 I ActivityTaskManager: moveTaskToBack: Task{615faf3 #4671 type=standard A=99910253:.AppBrandUI02 U=999 visible=false mode=fullscreen translucent=true sz=1}
+07-28 20:01:27.639  1837  3857 W ActivityManager: setGlThreads detect 6832 32444
+07-28 20:01:29.179  1837  4855 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI03 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:01:32.740  1837  4855 W ActivityManager: Receiver with filter android.content.IntentFilter@111ae9f already registered for pid 9421, callerPackage is com.tencent.mm
+07-28 20:01:35.312  1837  4855 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUIMoveTaskToBackStubUI0 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:01:35.408  1837  2160 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1203251769)
+07-28 20:01:35.538  1837  1855 I ActivityTaskManager: Displayed com.tencent.mm/.plugin.appbrand.ui.AppBrandUIMoveTaskToBackStubUI0: +216ms
+07-28 20:01:35.541  1837  3857 I ActivityTaskManager: moveTaskToBack: Task{3bdb651 #4649 type=standard A=99910253:.AppBrandUI03 U=999 visible=false mode=fullscreen translucent=true sz=1}
+07-28 20:01:36.323  1837  2918 W ActivityManager: setGlThreads detect 6832 32511
+07-28 20:01:44.535  1837  3857 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI03 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:01:51.915  1837  1872 I ActivityManager: Start proc 32575:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:01:52.020  1837  1872 I ActivityManager: Start proc 32615:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:01:52.326  1837  1872 I ActivityManager: Start proc 32652:com.mediatek.gnssdebugreport/u0a183 for service {com.mediatek.gnssdebugreport/com.mediatek.gnssdebugreport.GnssDebugReportService}
+07-28 20:01:53.213  1837  4854 I ActivityTaskManager: START u0 {act=android.content.pm.action.CONFIRM_PIN_SHORTCUT flg=0x10008000 cmp=com.smartisanos.launcher/.PinShortcutConfirmActivity (has extras) mCallingUid=1000} from uid 1000
+07-28 20:01:53.215  1837  4854 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4673 attached=false
+07-28 20:01:53.355  1837  4852 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1203188587)
+07-28 20:01:53.391 23321 23321 I ShortcutCompat: PIN_SHORTCUT_ACTIVITY_CREATED
+07-28 20:01:53.394 23321 23321 I ShortcutCompat: PIN_ITEM_REQUEST_FOUND package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b requestValid=true
+07-28 20:01:53.395 23321 23321 I ShortcutCompat: PIN_SHORTCUT_DIALOG_SHOW_REQUESTED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b windowType=activity
+07-28 20:01:53.432 23321 23321 I ShortcutCompat: PIN_SHORTCUT_DIALOG_SHOWN package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b
+07-28 20:01:53.541  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.PinShortcutConfirmActivity: +319ms
+07-28 20:01:54.214 23321 23321 I ShortcutCompat: PIN_SHORTCUT_CONFIRMED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userSerial=10
+07-28 20:01:54.299 23321 23321 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:01:54.301 23321 23321 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999
+07-28 20:01:54.301 23321 23321 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b width=230 height=230
+07-28 20:01:54.302 23321 23321 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b mode=source_already_decorated
+07-28 20:01:54.302 23321 23321 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:01:54.302 23321 23321 I ShortcutCompat: PIN_SHORTCUT_ACCEPT_BEGIN package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b
+07-28 20:01:54.306 23321 23321 I ShortcutCompat: PIN_SHORTCUT_ACCEPT_SUCCESS package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b
+07-28 20:01:54.306 23321 23321 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:01:54.306 23321 23321 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b
+07-28 20:01:54.318 23321 23321 I ShortcutCompat: SHORTCUT_ACTIVITY_FINISHED activityFinishing=true
+07-28 20:01:54.679  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4673 attached=false
+07-28 20:01:54.679  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4673 attached=false
+07-28 20:01:54.997  1837  4850 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:01:55.588  1837  1931 I ActivityManager: Process com.redteamobile.roaming (pid 32615) has died: cch+5 CEM 
+07-28 20:01:58.212  1837  4855 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 32575) has died: cch+15 CEM 
+07-28 20:02:11.677  1837  4854 I ActivityManager: Killing 31927:com.tencent.mm:xweb_sandboxed_process_0:com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0/u999a253i140 (adj 0): isolated not needed
+07-28 20:02:11.917  1837  3891 I ActivityManager: Process com.tencent.mm:appbrand1 (pid 31906) has died: prev SVC 
+07-28 20:02:11.918  1837  3891 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.appbrand.loading.AppBrandProcessTriggerService1 in 1000ms for connection
+07-28 20:02:11.919  1837  3891 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.magicbrush.core.MagicBrushServiceContextBase in 11000ms for connection
+07-28 20:02:11.919  1837  3891 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.ipcinvoker.wx_extension.service.Appbrand1IPCService in 21000ms for connection
+07-28 20:02:12.951  1837  1872 I ActivityManager: Start proc 32756:com.tencent.mm:appbrand1/u999a253 for service {com.tencent.mm/com.tencent.mm.plugin.appbrand.loading.AppBrandProcessTriggerService1}
+07-28 20:02:21.901  1837  3891 I ActivityManager: Process com.tencent.mm:xweb_privileged_process_0 (pid 31947) has died: fg  SVC 
+07-28 20:06:10.139  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4650 attached=false
+07-28 20:06:10.139  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4650 attached=false
+07-28 20:06:52.754  1837  1872 I ActivityManager: Start proc 898:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:06:52.849  1837  1872 I ActivityManager: Start proc 925:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:06:56.156  1837  4848 I ActivityManager: Process com.redteamobile.roaming (pid 925) has died: fg  RCVR
+07-28 20:06:59.030  1837  4851 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 898) has died: cch+35 CEM 
+07-28 20:08:00.145  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4642 attached=false
+07-28 20:08:00.145  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4642 attached=false
+07-28 20:10:08.037  1837  4841 I ActivityManager: Process com.oplus.romupdate (pid 30600) has died: fg  SVC 
+07-28 20:11:29.534  1837  1871 I ActivityManager: Force stopping com.smartisanos.launcher appid=10520 user=-1: installPackageLI
+07-28 20:11:29.848  1837  1871 I ActivityManager: Killing 23321:com.smartisanos.launcher/u0a520 (adj 0): stop com.smartisanos.launcher due to installPackageLI
+07-28 20:11:29.851  1837  1871 W ActivityTaskManager: Force removing ActivityRecord{84e8103 u0 com.smartisanos.launcher/.Launcher t4639 f}}: app died, no saved state
+07-28 20:11:29.909  1837  1837 W ActivityManager: Unbind failed: could not find connection for android.app.LoadedApk$ServiceDispatcher$InnerConnection@3ba597a
+07-28 20:11:29.947  1837  1858 W ActivityManager: setHasOverlayUi called on unknown pid: 23321
+07-28 20:11:31.502  1837  1872 I ActivityManager: Start proc 1511:com.coloros.weather.service/u0a149 for service {com.coloros.weather.service/com.oplus.weather.external.WeatherCommonService}
+07-28 20:11:32.147  1837  1906 I ActivityManager: Force stopping com.smartisanos.launcher appid=10520 user=0: pkg removed
+07-28 20:11:32.355  1837  1872 W ActivityManager: Slow operation: 122ms so far, now at startProcess: done updating battery stats
+07-28 20:11:32.355  1837  1872 W ActivityManager: Slow operation: 122ms so far, now at startProcess: building log message
+07-28 20:11:32.355  1837  1872 I ActivityManager: Start proc 1771:com.android.keychain/1000 for service {com.android.keychain/com.android.keychain.KeyChainService}
+07-28 20:11:32.355  1837  1872 W ActivityManager: Slow operation: 122ms so far, now at startProcess: starting to update pids map
+07-28 20:11:32.355  1837  1872 W ActivityManager: Slow operation: 123ms so far, now at startProcess: done updating pids map
+07-28 20:11:32.364  1837  3891 I ActivityManager: Force stopping com.smartisanos.launcher appid=10520 user=0: from pid 1769
+07-28 20:11:32.372  1837  3891 I ActivityManager: Force stopping com.smartisanos.launcher appid=10520 user=999: from pid 1769
+07-28 20:11:32.546  1837  1991 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.smartisanos.launcher/.Launcher (has extras)} from uid 0
+07-28 20:11:32.642  1837  1872 W ActivityManager: Slow operation: 211ms so far, now at startProcess: done updating battery stats
+07-28 20:11:32.643  1837  1872 W ActivityManager: Slow operation: 211ms so far, now at startProcess: building log message
+07-28 20:11:32.643  1837  1872 I ActivityManager: Start proc 1827:com.smartisanos.launcher/u0a520 for service {com.smartisanos.launcher/com.smartisanos.launcher.badge.SmartisanBadgeListenerService}
+07-28 20:11:32.643  1837  1872 W ActivityManager: Slow operation: 211ms so far, now at startProcess: starting to update pids map
+07-28 20:11:32.650  1837  1872 W ActivityManager: Slow operation: 218ms so far, now at startProcess: done updating pids map
+07-28 20:11:32.683  1837  1872 W ActivityManager: Slow operation: 82ms so far, now at startProcess: returned from zygote!
+07-28 20:11:32.696  1837  1872 W ActivityManager: Slow operation: 95ms so far, now at startProcess: done updating battery stats
+07-28 20:11:32.696  1837  1872 W ActivityManager: Slow operation: 96ms so far, now at startProcess: building log message
+07-28 20:11:32.696  1837  1872 I ActivityManager: Start proc 1964:com.oplus.dmp/u0a104 for broadcast {com.oplus.dmp/com.oplus.oss.daemon.DaemonReceiver}
+07-28 20:11:32.696  1837  1872 W ActivityManager: Slow operation: 96ms so far, now at startProcess: starting to update pids map
+07-28 20:11:32.696  1837  1872 W ActivityManager: Slow operation: 96ms so far, now at startProcess: done updating pids map
+07-28 20:11:32.804  1837  1872 W ActivityManager: Slow operation: 106ms so far, now at startProcess: returned from zygote!
+07-28 20:11:32.805  1837  1872 W ActivityManager: Slow operation: 106ms so far, now at startProcess: done updating battery stats
+07-28 20:11:32.805  1837  1872 W ActivityManager: Slow operation: 106ms so far, now at startProcess: building log message
+07-28 20:11:32.805  1837  1872 I ActivityManager: Start proc 2195:com.oplus.deepthinker:worker/u0a169 for service {com.oplus.deepthinker/com.oplus.deepthinker.internal.inner.proton.schedule.TrainJobService}
+07-28 20:11:32.805  1837  1872 W ActivityManager: Slow operation: 107ms so far, now at startProcess: starting to update pids map
+07-28 20:11:32.806  1837  1872 W ActivityManager: Slow operation: 107ms so far, now at startProcess: done updating pids map
+07-28 20:11:32.834  1837  1872 W ActivityManager: Slow operation: 60ms so far, now at startProcess: returned from zygote!
+07-28 20:11:32.834  1837  1872 W ActivityManager: Slow operation: 60ms so far, now at startProcess: done updating battery stats
+07-28 20:11:32.835  1837  1872 W ActivityManager: Slow operation: 61ms so far, now at startProcess: building log message
+07-28 20:11:32.835  1837  1872 I ActivityManager: Start proc 2212:com.oplus.safecenter/1000 for broadcast {com.oplus.safecenter/com.oplus.safecenter.privacy.control.DeepProtectReceiver}
+07-28 20:11:32.835  1837  1872 W ActivityManager: Slow operation: 61ms so far, now at startProcess: starting to update pids map
+07-28 20:11:32.835  1837  1872 W ActivityManager: Slow operation: 61ms so far, now at startProcess: done updating pids map
+07-28 20:11:33.008  1837  2160 W ActivityManager: setGlThreads detect 1827 2276
+07-28 20:11:33.280  1837  4862 W ActivityManager: setGlThreads detect 1827 2360
+07-28 20:11:33.346  1837  1872 I ActivityManager: Start proc 2388:com.oplus.dmp:index/u0a104 for content provider {com.oplus.dmp/com.oplus.oss.provider.IndexProvider}
+07-28 20:11:33.413  1837  3857 W ActivityManager: setGlThreads detect 1827 2348
+07-28 20:11:33.427  1837  3857 W ActivityTaskManager: Request to remove task ignored for non-existent task 4673
+07-28 20:11:33.451  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.Launcher: +906ms
+07-28 20:11:33.656  1837  1872 I ActivityManager: Start proc 2427:com.oplus.romupdate/u0a155 for content provider {com.oplus.romupdate/com.oplusos.romupdate.provider.RomUpdateProvider}
+07-28 20:11:33.920  1837  3857 I ActivityManager: Killing 29974:com.coloros.assistantscreen/u0a214 (adj 955): empty #17
+07-28 20:11:33.921  1837  3857 I ActivityManager: Killing 29749:android.process.media/u0a49 (adj 999): empty #18
+07-28 20:11:34.041  1837  3857 W ActivityManager: Scheduling restart of crashed service com.coloros.assistantscreen/com.oplus.assistantscreen.window.AssistantWindowService in 1000ms for connection
+07-28 20:11:34.080  1837  1872 I ActivityManager: Start proc 2486:com.coloros.assistantscreen/u0a214 for content provider {com.coloros.assistantscreen/com.oplus.assistantscreen.window.watch.WatchWindowProvider}
+07-28 20:11:34.600  1827  2171 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:11:34.602  1827  2171 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999
+07-28 20:11:34.602  1827  2171 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b width=230 height=230
+07-28 20:11:34.602  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b mode=source_already_decorated
+07-28 20:11:34.602  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:11:34.602  1827  2171 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:11:34.602  1827  2171 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:11:34.602  1827  2171 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b
+07-28 20:11:34.655  1827  2171 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:11:34.657  1827  2171 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999
+07-28 20:11:34.657  1827  2171 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b width=230 height=230
+07-28 20:11:34.657  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b mode=source_already_decorated
+07-28 20:11:34.657  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:11:34.657  1827  2171 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 userSerial=10
+07-28 20:11:34.657  1827  2171 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:11:34.657  1827  2171 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b
+07-28 20:11:34.715  1827  2171 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:11:34.717  1827  2171 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999
+07-28 20:11:34.717  1827  2171 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b width=230 height=230
+07-28 20:11:34.717  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b mode=source_already_decorated
+07-28 20:11:34.717  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:11:34.717  1827  2171 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 userSerial=10
+07-28 20:11:34.717  1827  2171 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:11:34.717  1827  2171 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b
+07-28 20:11:34.802  1827  2171 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:11:34.804  1827  2171 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999
+07-28 20:11:34.804  1827  2171 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b width=230 height=230
+07-28 20:11:34.804  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b mode=source_already_decorated
+07-28 20:11:34.804  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:11:34.804  1827  2171 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:11:34.804  1827  2171 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:11:34.804  1827  2171 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b
+07-28 20:11:34.862  1827  2171 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:11:34.863  1827  2171 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999
+07-28 20:11:34.864  1827  2171 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b width=230 height=230
+07-28 20:11:34.864  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b mode=source_already_decorated
+07-28 20:11:34.864  1827  2171 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:11:34.864  1827  2171 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 userSerial=10
+07-28 20:11:34.864  1827  2171 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:11:34.864  1827  2171 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b
+07-28 20:11:35.236  1837  2160 W ActivityManager: Receiver with filter android.content.IntentFilter@599b11d already registered for pid 2486, callerPackage is com.coloros.assistantscreen
+07-28 20:11:53.090  1837  1872 I ActivityManager: Start proc 2669:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:11:53.160  1837  1872 I ActivityManager: Start proc 2803:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:11:56.473  1837  3830 I ActivityManager: Process com.redteamobile.roaming (pid 2803) has died: cch+5 CEM 
+07-28 20:11:58.722  1837  1872 I ActivityManager: Start proc 2975:com.eg.android.AlipayGphone:tools/u0a335 for service {com.eg.android.AlipayGphone/com.alipay.mobile.common.logging.process.LogServiceInToolsProcess}
+07-28 20:11:59.330  1837  3830 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 2669) has died: cch+35 CEM 
+07-28 20:12:02.198  1837  1946 I ActivityManager: Killing 30215:com.oplus.olc/1000 (adj 999): empty #17
+07-28 20:12:02.199  1837  1946 I ActivityManager: Killing 30117:com.coloros.ocs.opencapabilityservice/u0a145 (adj 999): empty #18
+07-28 20:12:02.201  1837  1946 I ActivityManager: Killing 30097:com.coloros.sceneservice/u0a206 (adj 999): empty #19
+07-28 20:12:02.238  1837  2160 W ActivityManager: Scheduling restart of crashed service com.oplus.olc/.service.OplusAppServicesManagerClient in 1000ms for connection
+07-28 20:12:02.773  1837  1872 I ActivityManager: Start proc 3561:com.oplus.olc/1000 for service {com.oplus.olc/com.oplus.olc.service.OplusAppServicesManagerClient}
+07-28 20:12:04.700  1837  1931 I ActivityManager: Killing 24043:com.nearme.instant.platform:provider/u0a116 (adj 999): empty #17
+07-28 20:12:04.701  1837  1931 I ActivityManager: Killing 26197:com.google.android.cellbroadcastreceiver/u0a229 (adj 999): empty #18
+07-28 20:12:04.701  1837  1931 I ActivityManager: Killing 30700:com.google.process.gservices/u999a196 (adj 999): empty #19
+07-28 20:12:15.948  1837  3857 I ActivityManager: Process com.tencent.mm:appbrand1 (pid 32756) has died: fg  SVC 
+07-28 20:12:15.949  1837  3857 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.appbrand.loading.AppBrandProcessTriggerService1 in 1000ms for connection
+07-28 20:12:15.949  1837  3857 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.ipcinvoker.wx_extension.service.Appbrand1IPCService in 11000ms for connection
+07-28 20:12:17.007  1837  1872 W ActivityManager: Slow operation: 55ms so far, now at startProcess: returned from zygote!
+07-28 20:12:17.007  1837  1872 W ActivityManager: Slow operation: 55ms so far, now at startProcess: done updating battery stats
+07-28 20:12:17.008  1837  1872 W ActivityManager: Slow operation: 55ms so far, now at startProcess: building log message
+07-28 20:12:17.008  1837  1872 I ActivityManager: Start proc 3643:com.tencent.mm:appbrand1/u999a253 for service {com.tencent.mm/com.tencent.mm.plugin.appbrand.loading.AppBrandProcessTriggerService1}
+07-28 20:12:17.008  1837  1872 W ActivityManager: Slow operation: 55ms so far, now at startProcess: starting to update pids map
+07-28 20:12:17.008  1837  1872 W ActivityManager: Slow operation: 55ms so far, now at startProcess: done updating pids map
+07-28 20:12:47.624  1837  1991 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.smartisanos.launcher/.Launcher (has extras)} from uid 0
+07-28 20:13:18.690  1837  1871 I ActivityManager: Force stopping com.smartisanos.launcher appid=10520 user=-1: installPackageLI
+07-28 20:13:18.979  1837  1871 I ActivityManager: Killing 1827:com.smartisanos.launcher/u0a520 (adj 0): stop com.smartisanos.launcher due to installPackageLI
+07-28 20:13:18.982  1837  1871 W ActivityTaskManager: Force removing ActivityRecord{d641bc2 u0 com.smartisanos.launcher/.Launcher t4674 f}}: app died, no saved state
+07-28 20:13:19.079  1837  1837 W ActivityManager: Unbind failed: could not find connection for android.app.LoadedApk$ServiceDispatcher$InnerConnection@6f61e67
+07-28 20:13:19.091  1837  1858 W ActivityManager: setHasOverlayUi called on unknown pid: 1827
+07-28 20:13:20.139  1837  1906 I ActivityManager: Force stopping com.smartisanos.launcher appid=10520 user=0: pkg removed
+07-28 20:13:20.329  1837  1872 W ActivityManager: Slow operation: 77ms so far, now at startProcess: done updating battery stats
+07-28 20:13:20.329  1837  1872 W ActivityManager: Slow operation: 78ms so far, now at startProcess: building log message
+07-28 20:13:20.329  1837  1872 I ActivityManager: Start proc 4258:com.smartisanos.launcher/u0a520 for service {com.smartisanos.launcher/com.smartisanos.launcher.badge.SmartisanBadgeListenerService}
+07-28 20:13:20.329  1837  1872 W ActivityManager: Slow operation: 78ms so far, now at startProcess: starting to update pids map
+07-28 20:13:20.330  1837  1872 W ActivityManager: Slow operation: 78ms so far, now at startProcess: done updating pids map
+07-28 20:13:21.513  1837  4839 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.smartisanos.launcher/.LauncherAlias bnds=[290,760][542,1061] mCallingUid=10172} from uid 10172
+07-28 20:13:21.515  1837  4839 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4675 attached=false
+07-28 20:13:21.534  1837  3874 W ActivityManager: setGlThreads detect 4258 4403
+07-28 20:13:21.860  1837  3830 W ActivityManager: setGlThreads detect 4258 4431
+07-28 20:13:21.968  1837  3830 W ActivityManager: setGlThreads detect 4258 4413
+07-28 20:13:22.126  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.LauncherAlias: +575ms
+07-28 20:13:23.858  4258  4337 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:23.864  4258  4337 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999
+07-28 20:13:23.864  4258  4337 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b width=230 height=230
+07-28 20:13:23.865  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b mode=source_already_decorated
+07-28 20:13:23.865  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:23.865  4258  4337 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:23.865  4258  4337 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:23.865  4258  4337 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b
+07-28 20:13:23.923  4258  4337 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:23.925  4258  4337 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999
+07-28 20:13:23.925  4258  4337 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b width=230 height=230
+07-28 20:13:23.925  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b mode=source_already_decorated
+07-28 20:13:23.925  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:23.925  4258  4337 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 userSerial=10
+07-28 20:13:23.925  4258  4337 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:23.925  4258  4337 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b
+07-28 20:13:23.992  4258  4337 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:23.993  4258  4337 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999
+07-28 20:13:23.993  4258  4337 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b width=230 height=230
+07-28 20:13:23.993  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b mode=source_already_decorated
+07-28 20:13:23.993  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:23.993  4258  4337 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 userSerial=10
+07-28 20:13:23.993  4258  4337 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:23.994  4258  4337 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b
+07-28 20:13:24.056  4258  4337 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:24.058  4258  4337 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999
+07-28 20:13:24.058  4258  4337 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b width=230 height=230
+07-28 20:13:24.058  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b mode=source_already_decorated
+07-28 20:13:24.058  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:24.058  4258  4337 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:13:24.058  4258  4337 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:24.058  4258  4337 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b
+07-28 20:13:24.115  4258  4337 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:24.116  4258  4337 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999
+07-28 20:13:24.116  4258  4337 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b width=230 height=230
+07-28 20:13:24.116  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b mode=source_already_decorated
+07-28 20:13:24.116  4258  4337 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:24.116  4258  4337 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 userSerial=10
+07-28 20:13:24.116  4258  4337 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:24.117  4258  4337 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b
+07-28 20:13:29.763  1837  4839 I ActivityTaskManager: START u999 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.tencent.mm/.ui.LauncherUI mCallingUid=10520} from uid 10520
+07-28 20:13:30.476  1837  1872 I ActivityManager: Start proc 4548:com.tencent.mm:xweb_sandboxed_process_0:com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0/u999i141 for service {com.tencent.mm/com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0}
+07-28 20:13:30.528  1837  1872 W ActivityManager: Slow operation: 70ms so far, now at startProcess: returned from zygote!
+07-28 20:13:30.528  1837  1872 W ActivityManager: Slow operation: 71ms so far, now at startProcess: done updating battery stats
+07-28 20:13:30.528  1837  1872 W ActivityManager: Slow operation: 71ms so far, now at startProcess: building log message
+07-28 20:13:30.528  1837  1872 I ActivityManager: Start proc 4575:com.tencent.mm:xweb_privileged_process_0/u999a253 for service {com.tencent.mm/com.tencent.xweb.pinus.sdk.process.PrivilegedProcessService0}
+07-28 20:13:30.528  1837  1872 W ActivityManager: Slow operation: 71ms so far, now at startProcess: starting to update pids map
+07-28 20:13:30.529  1837  1872 W ActivityManager: Slow operation: 71ms so far, now at startProcess: done updating pids map
+07-28 20:13:32.320  1837  4839 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:13:32.332  1837  4839 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1203966805)
+07-28 20:13:32.548  1837  4850 I ActivityManager: Process com.smartisanos.launcher (pid 4258) has died: fg  TOP 
+07-28 20:13:32.551  1837  4850 W ActivityManager: Scheduling restart of crashed service com.smartisanos.launcher/.badge.SmartisanBadgeListenerService in 1000ms for connection
+07-28 20:13:32.568  1837  1858 W ActivityManager: setHasOverlayUi called on unknown pid: 4258
+07-28 20:13:32.669  1837  1872 I ActivityManager: Start proc 26497:com.smartisanos.launcher/u0a520 for top-activity {com.smartisanos.launcher/com.smartisanos.launcher.Launcher}
+07-28 20:13:32.960  1837  3828 W ActivityManager: setGlThreads detect 26497 4710
+07-28 20:13:33.189  1837  2778 W ActivityManager: setGlThreads detect 26497 4743
+07-28 20:13:33.236  1837  4853 I ActivityManager: Process com.oplus.deepthinker:worker (pid 2195) has died: cch+5 CEM 
+07-28 20:13:33.248  1837  4855 W ActivityManager: setGlThreads detect 26497 4726
+07-28 20:13:33.308  1837  4853 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4675 attached=false
+07-28 20:13:33.308  1837  4853 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4675 attached=false
+07-28 20:13:34.809 26497  4692 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:34.813 26497  4692 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999
+07-28 20:13:34.813 26497  4692 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b width=230 height=230
+07-28 20:13:34.813 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b mode=source_already_decorated
+07-28 20:13:34.814 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:34.814 26497  4692 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:34.814 26497  4692 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:34.814 26497  4692 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b
+07-28 20:13:34.874 26497  4692 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:34.879 26497  4692 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999
+07-28 20:13:34.879 26497  4692 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b width=230 height=230
+07-28 20:13:34.879 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b mode=source_already_decorated
+07-28 20:13:34.879 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:34.879 26497  4692 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 userSerial=10
+07-28 20:13:34.879 26497  4692 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:34.880 26497  4692 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b
+07-28 20:13:34.935 26497  4692 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:34.937 26497  4692 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999
+07-28 20:13:34.937 26497  4692 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b width=230 height=230
+07-28 20:13:34.937 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b mode=source_already_decorated
+07-28 20:13:34.937 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:34.937 26497  4692 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 userSerial=10
+07-28 20:13:34.937 26497  4692 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:34.937 26497  4692 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b
+07-28 20:13:34.989 26497  4692 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:34.991 26497  4692 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999
+07-28 20:13:34.991 26497  4692 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b width=230 height=230
+07-28 20:13:34.991 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b mode=source_already_decorated
+07-28 20:13:34.991 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:34.991 26497  4692 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:13:34.991 26497  4692 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:34.991 26497  4692 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b
+07-28 20:13:35.109 26497  4692 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:35.112 26497  4692 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999
+07-28 20:13:35.112 26497  4692 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b width=230 height=230
+07-28 20:13:35.112 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b mode=source_already_decorated
+07-28 20:13:35.112 26497  4692 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:35.112 26497  4692 I ShortcutCompat: PIN_RECONCILE_DATABASE_MISSING packageName=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 userSerial=10
+07-28 20:13:35.112 26497  4692 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:35.112 26497  4692 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b
+07-28 20:13:35.440  1837  1991 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.smartisanos.launcher/.Launcher (has extras)} from uid 0
+07-28 20:13:38.102  1837  1991 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.smartisanos.launcher/.Launcher (has extras)} from uid 0
+07-28 20:13:41.710  1837  1872 I ActivityManager: Start proc 4818:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:13:41.760  1837  1872 I ActivityManager: Start proc 4849:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:13:41.799  1837  1872 I ActivityManager: Start proc 4888:com.google.android.cellbroadcastreceiver/u0a229 for broadcast {com.google.android.cellbroadcastreceiver/com.android.cellbroadcastreceiver.CellBroadcastReceiver}
+07-28 20:13:43.350 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_REQUESTED itemId=92 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:43.375 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DIALOG_SHOWN itemId=92 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:44.171 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_CONFIRMED itemId=92 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:44.171 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_ACTION_RESOLVED field=naa enumName=EVENT_UNINSTALL_SHORTCUT
+07-28 20:13:44.171 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DATABASE_DISPATCHED itemId=92 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:44.172 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_BEGIN package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:44.175 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_SUCCESS package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10 remaining=4
+07-28 20:13:44.920  1837  2613 I ActivityTaskManager: START u999 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.tencent.mm/.ui.LauncherUI mCallingUid=10520} from uid 10520
+07-28 20:13:45.063  1837  4853 I ActivityManager: Process com.redteamobile.roaming (pid 4849) has died: cch+5 CEM 
+07-28 20:13:45.930  1837  2613 W ActivityManager: setGlThreads detect 6832 4988
+07-28 20:13:46.812  1837  2918 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI02 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:13:47.926  1837  4850 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 4818) has died: cch+5 CEM 
+07-28 20:13:49.448  1837  4850 I ActivityTaskManager: START u0 {act=android.content.pm.action.CONFIRM_PIN_SHORTCUT flg=0x10008000 cmp=com.smartisanos.launcher/.PinShortcutConfirmActivity (has extras) mCallingUid=1000} from uid 1000
+07-28 20:13:49.452  1837  4850 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4677 attached=false
+07-28 20:13:49.593  1837  4850 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1203977975)
+07-28 20:13:49.615 26497 26497 I ShortcutCompat: PIN_ACTIVITY_CREATED requestValid=unknown packageName=unknown shortcutId=unknown userId=-1 userSerial=-1
+07-28 20:13:49.617 26497 26497 I ShortcutCompat: PIN_REQUEST_EXTRACTED requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:49.642 26497 26497 I ShortcutCompat: PIN_DIALOG_SHOWN requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:49.759  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.PinShortcutConfirmActivity: +272ms
+07-28 20:13:50.533 26497 26497 I ShortcutCompat: PIN_USER_CONFIRMED userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:50.661 26497 26497 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:13:50.665 26497 26497 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999
+07-28 20:13:50.665 26497 26497 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b width=230 height=230
+07-28 20:13:50.665 26497 26497 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b mode=source_already_decorated
+07-28 20:13:50.665 26497 26497 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:13:50.666 26497 26497 I ShortcutCompat: PIN_ITEM_CREATED userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:50.668 26497 26497 I ShortcutCompat: PIN_ACCEPT_BEGIN userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:50.710 26497 26497 I ShortcutCompat: PIN_ACCEPT_SUCCESS userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:50.710 26497 26497 I ShortcutCompat: PIN_DATABASE_DISPATCH_BEGIN userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:50.710 26497 26497 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:13:50.710 26497 26497 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b
+07-28 20:13:50.711 26497 26497 I ShortcutCompat: PIN_DATABASE_DISPATCH_RETURNED userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:50.813 26497 26497 I ShortcutCompat: PIN_DATABASE_ROW_FOUND userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:50.813 26497 26497 I ShortcutCompat: PIN_COMMIT_SUCCESS userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:50.813 26497 26497 I ShortcutCompat: PIN_ACTIVITY_FINISHED activityFinishing=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:51.170  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4677 attached=false
+07-28 20:13:51.170  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4677 attached=false
+07-28 20:13:52.267  1837  2915 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:13:54.821 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_REQUESTED itemId=97 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:54.839 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DIALOG_SHOWN itemId=97 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:55.492 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_CONFIRMED itemId=97 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:55.492 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_ACTION_RESOLVED field=naa enumName=EVENT_UNINSTALL_SHORTCUT
+07-28 20:13:55.492 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DATABASE_DISPATCHED itemId=97 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:55.493 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_BEGIN package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:13:55.495 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_SUCCESS package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10 remaining=4
+07-28 20:13:56.655  1837  3828 I ActivityTaskManager: START u999 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.tencent.mm/.ui.LauncherUI mCallingUid=10520} from uid 10520
+07-28 20:13:57.929  1837  4838 W ActivityManager: setGlThreads detect 6832 5162
+07-28 20:13:58.721  1837  2918 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI02 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:14:01.269  1837  4850 I ActivityTaskManager: START u0 {act=android.content.pm.action.CONFIRM_PIN_SHORTCUT flg=0x10008000 cmp=com.smartisanos.launcher/.PinShortcutConfirmActivity (has extras) mCallingUid=1000} from uid 1000
+07-28 20:14:01.272  1837  4850 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4678 attached=false
+07-28 20:14:01.405  1837  4850 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1203994872)
+07-28 20:14:01.421 26497 26497 I ShortcutCompat: PIN_ACTIVITY_CREATED requestValid=unknown packageName=unknown shortcutId=unknown userId=-1 userSerial=-1
+07-28 20:14:01.423 26497 26497 I ShortcutCompat: PIN_REQUEST_EXTRACTED requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:01.442 26497 26497 I ShortcutCompat: PIN_DIALOG_SHOWN requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:01.521  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.PinShortcutConfirmActivity: +223ms
+07-28 20:14:02.369 26497 26497 I ShortcutCompat: PIN_USER_CONFIRMED userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:02.469 26497 26497 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:14:02.473 26497 26497 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999
+07-28 20:14:02.473 26497 26497 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b width=230 height=230
+07-28 20:14:02.474 26497 26497 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b mode=source_already_decorated
+07-28 20:14:02.474 26497 26497 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:14:02.474 26497 26497 I ShortcutCompat: PIN_ITEM_CREATED userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:02.474 26497 26497 I ShortcutCompat: PIN_ACCEPT_BEGIN userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:02.510 26497 26497 I ShortcutCompat: PIN_ACCEPT_SUCCESS userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:02.510 26497 26497 I ShortcutCompat: PIN_DATABASE_DISPATCH_BEGIN userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:02.510 26497 26497 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:14:02.511 26497 26497 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b
+07-28 20:14:02.511 26497 26497 I ShortcutCompat: PIN_DATABASE_DISPATCH_RETURNED userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:02.613 26497 26497 I ShortcutCompat: PIN_DATABASE_ROW_FOUND userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:02.613 26497 26497 I ShortcutCompat: PIN_COMMIT_SUCCESS userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:02.614 26497 26497 I ShortcutCompat: PIN_ACTIVITY_FINISHED activityFinishing=true packageName=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:02.968  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4678 attached=false
+07-28 20:14:02.968  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4678 attached=false
+07-28 20:14:03.298  1837  4855 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:14:04.196  1837  1872 I ActivityManager: Start proc 5235:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:14:04.239  1837  1872 I ActivityManager: Start proc 5260:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:14:05.051  1837  4848 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smartisanos.launcher/.ShortcutLaunchActivity (has extras) mCallingUid=10520} from uid 10520
+07-28 20:14:05.053  1837  4848 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4679 attached=false
+07-28 20:14:05.072  1837  2915 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204006684)
+07-28 20:14:05.084 26497 26497 I ShortcutCompat: SHORTCUT_LAUNCH_BEGIN package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userSerial=10
+07-28 20:14:05.088  1837  2915 I ActivityTaskManager: START u999 {act=com.tencent.mm.action.WX_SHORTCUT flg=0x14000000 pkg=com.tencent.mm cmp=com.tencent.mm/.plugin.base.stub.WXShortcutEntryActivity (has extras) mCallingUid=1000} from uid 99910253
+07-28 20:14:05.089  1837  2915 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4680 attached=false
+07-28 20:14:05.099 26497 26497 I ShortcutCompat: SHORTCUT_LAUNCH_SUCCESS package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b
+07-28 20:14:05.106  1837  2915 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1202545934)
+07-28 20:14:05.200  1837  4855 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI02 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:14:05.341  1837  1855 I ActivityTaskManager: Displayed com.tencent.mm/.plugin.appbrand.ui.AppBrandUI02: +290ms
+07-28 20:14:06.102  1837  4855 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:14:07.149  1837  2915 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.smartisanos.launcher/.ShortcutLaunchActivity (has extras) mCallingUid=10520} from uid 10520
+07-28 20:14:07.151  1837  2915 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4681 attached=false
+07-28 20:14:07.163  1837  4848 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204010352)
+07-28 20:14:07.173 26497 26497 I ShortcutCompat: SHORTCUT_LAUNCH_BEGIN package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userSerial=10
+07-28 20:14:07.175  1837  2915 I ActivityTaskManager: START u999 {act=com.tencent.mm.action.WX_SHORTCUT flg=0x14000000 pkg=com.tencent.mm cmp=com.tencent.mm/.plugin.base.stub.WXShortcutEntryActivity (has extras) mCallingUid=1000} from uid 99910253
+07-28 20:14:07.176  1837  2915 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4682 attached=false
+07-28 20:14:07.185 26497 26497 I ShortcutCompat: SHORTCUT_LAUNCH_SUCCESS package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b
+07-28 20:14:07.193  1837  2915 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204010386)
+07-28 20:14:07.290  1837  4848 I ActivityTaskManager: START u999 {cmp=com.tencent.mm/.plugin.appbrand.launching.AppBrandLaunchProxyUI (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:14:07.320  1837  2778 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204012473)
+07-28 20:14:07.421  1837  1855 I ActivityTaskManager: Displayed com.tencent.mm/.plugin.appbrand.launching.AppBrandLaunchProxyUI: +271ms
+07-28 20:14:07.435  1837  4848 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI01 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:14:07.437  1837  4848 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4683 attached=false
+07-28 20:14:07.501  1837  4850 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1203260687)
+07-28 20:14:07.591  1837  4848 I ActivityManager: Process com.redteamobile.roaming (pid 5260) has died: cch+5 CEM 
+07-28 20:14:07.806  1837  1855 I ActivityTaskManager: Displayed com.tencent.mm/.plugin.appbrand.ui.AppBrandUI01: +278ms
+07-28 20:14:08.043  1837  2778 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:14:08.046  1837  2778 W ActivityTaskManager: App already has a visible window, why would you want a starting window?
+07-28 20:14:08.546  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4682 attached=false
+07-28 20:14:08.546  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4682 attached=false
+07-28 20:14:10.543  1837  4850 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 5235) has died: cch+45 CEM 
+07-28 20:14:11.083 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_REQUESTED itemId=95 package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:11.101 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DIALOG_SHOWN itemId=95 package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:11.707 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_CONFIRMED itemId=95 package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:11.707 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_ACTION_RESOLVED field=naa enumName=EVENT_UNINSTALL_SHORTCUT
+07-28 20:14:11.707 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DATABASE_DISPATCHED itemId=95 package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:11.707 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_BEGIN package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:11.708 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_SUCCESS package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10 remaining=4
+07-28 20:14:12.916  1837  4850 I ActivityTaskManager: START u999 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.tencent.mm/.ui.LauncherUI mCallingUid=10520} from uid 10520
+07-28 20:14:14.212  1837  2779 W ActivityManager: setGlThreads detect 6832 5412
+07-28 20:14:15.186  1837  2779 I ActivityTaskManager: START u999 {flg=0x10000000 cmp=com.tencent.mm/.plugin.appbrand.ui.AppBrandUI01 (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:14:18.655  1837  4850 I ActivityTaskManager: START u0 {act=android.content.pm.action.CONFIRM_PIN_SHORTCUT flg=0x10008000 cmp=com.smartisanos.launcher/.PinShortcutConfirmActivity (has extras) mCallingUid=1000} from uid 1000
+07-28 20:14:18.656  1837  4850 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4684 attached=false
+07-28 20:14:18.825  1837  3828 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204012443)
+07-28 20:14:18.845 26497 26497 I ShortcutCompat: PIN_ACTIVITY_CREATED requestValid=unknown packageName=unknown shortcutId=unknown userId=-1 userSerial=-1
+07-28 20:14:18.848 26497 26497 I ShortcutCompat: PIN_REQUEST_EXTRACTED requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:18.868 26497 26497 I ShortcutCompat: PIN_DIALOG_SHOWN requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:18.935  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.PinShortcutConfirmActivity: +271ms
+07-28 20:14:19.541 26497 26497 I ShortcutCompat: PIN_USER_CONFIRMED userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:19.589 26497 26497 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userIdentifier=999 userSerial=10 isPrimaryUser=false
+07-28 20:14:19.591 26497 26497 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999
+07-28 20:14:19.591 26497 26497 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b width=230 height=230
+07-28 20:14:19.591 26497 26497 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b mode=source_already_decorated
+07-28 20:14:19.591 26497 26497 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 frameType=source_already_decorated iconSource=shortcut
+07-28 20:14:19.592 26497 26497 I ShortcutCompat: PIN_ITEM_CREATED userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:19.592 26497 26497 I ShortcutCompat: PIN_ACCEPT_BEGIN userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:19.598 26497 26497 I ShortcutCompat: PIN_ACCEPT_SUCCESS userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:19.598 26497 26497 I ShortcutCompat: PIN_DATABASE_DISPATCH_BEGIN userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:19.598 26497 26497 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:14:19.598 26497 26497 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b
+07-28 20:14:19.598 26497 26497 I ShortcutCompat: PIN_DATABASE_DISPATCH_RETURNED userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:19.700 26497 26497 I ShortcutCompat: PIN_DATABASE_ROW_FOUND userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:19.700 26497 26497 I ShortcutCompat: PIN_COMMIT_SUCCESS userSerial=10 requestValid=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:19.700 26497 26497 I ShortcutCompat: PIN_ACTIVITY_FINISHED activityFinishing=true packageName=com.tencent.mm shortcutId=c39e423cc39f53c280c2996758c39557c2a9c38e5ec288c3bc65144b userId=999 userSerial=10
+07-28 20:14:20.044  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4684 attached=false
+07-28 20:14:20.044  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4684 attached=false
+07-28 20:14:20.177  1837  3828 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:14:22.099  1837  1991 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.smartisanos.launcher/.Launcher (has extras)} from uid 0
+07-28 20:14:23.606  1837  1872 I ActivityManager: Start proc 5491:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:14:23.667  1837  1872 I ActivityManager: Start proc 5522:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:14:26.993  1837  4850 I ActivityManager: Process com.redteamobile.roaming (pid 5522) has died: fg  RCVR
+07-28 20:14:28.566 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_REQUESTED itemId=96 package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 userSerial=10
+07-28 20:14:28.585 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DIALOG_SHOWN itemId=96 package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 userSerial=10
+07-28 20:14:29.394 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_CONFIRMED itemId=96 package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 userSerial=10
+07-28 20:14:29.394 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_ACTION_RESOLVED field=naa enumName=EVENT_UNINSTALL_SHORTCUT
+07-28 20:14:29.394 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DATABASE_DISPATCHED itemId=96 package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 userSerial=10
+07-28 20:14:29.395 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_BEGIN package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 userSerial=10
+07-28 20:14:29.397 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_SUCCESS package=com.tencent.mm shortcutId=c39e423cc39e52c39ac29f630ec39450c2acc29b55c395c3b161144b userId=999 userSerial=10 remaining=4
+07-28 20:14:29.628  1837  2778 I ActivityManager: Process com.eg.android.AlipayGphone:tools (pid 2975) has died: cch+25 CEM 
+07-28 20:14:31.358  1837  4848 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 5491) has died: cch+5 CEM 
+07-28 20:14:33.320 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_REQUESTED itemId=93 package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 userSerial=10
+07-28 20:14:33.337 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DIALOG_SHOWN itemId=93 package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 userSerial=10
+07-28 20:14:33.939 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_CONFIRMED itemId=93 package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 userSerial=10
+07-28 20:14:33.939 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_ACTION_RESOLVED field=naa enumName=EVENT_UNINSTALL_SHORTCUT
+07-28 20:14:33.939 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DATABASE_DISPATCHED itemId=93 package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 userSerial=10
+07-28 20:14:33.939 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_BEGIN package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 userSerial=10
+07-28 20:14:33.941 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_SUCCESS package=com.tencent.mm shortcutId=c39e426bc28a5ac395c3883109c28809c2a6c38b57c289c3b4374e4b userId=999 userSerial=10 remaining=3
+07-28 20:14:36.612  1837  4850 I ActivityManager: Killing 4548:com.tencent.mm:xweb_sandboxed_process_0:com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0/u999a253i141 (adj 0): isolated not needed
+07-28 20:14:37.072 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_REQUESTED itemId=94 package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 userSerial=10
+07-28 20:14:37.087 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DIALOG_SHOWN itemId=94 package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 userSerial=10
+07-28 20:14:37.131  1837  4851 I ActivityManager: Process com.tencent.mm:appbrand1 (pid 3643) has died: prev SVC 
+07-28 20:14:37.131  1837  4851 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.magicbrush.core.MagicBrushServiceContextBase in 1000ms for connection
+07-28 20:14:37.132  1837  4851 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.appbrand.loading.AppBrandProcessTriggerService1 in 11000ms for connection
+07-28 20:14:37.132  1837  4851 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.ipcinvoker.wx_extension.service.Appbrand1IPCService in 21000ms for connection
+07-28 20:14:37.774 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_CONFIRMED itemId=94 package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 userSerial=10
+07-28 20:14:37.774 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_ACTION_RESOLVED field=naa enumName=EVENT_UNINSTALL_SHORTCUT
+07-28 20:14:37.774 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DATABASE_DISPATCHED itemId=94 package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 userSerial=10
+07-28 20:14:37.775 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_BEGIN package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 userSerial=10
+07-28 20:14:37.777 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_SUCCESS package=com.tencent.mm shortcutId=c39e423ec39b53c284c29c675bc39c04c2a9c29f05c392c2a637404b userId=999 userSerial=10 remaining=2
+07-28 20:14:39.981  1837  1872 I ActivityManager: Start proc 5599:com.xingin.xhs:simplePush/u0a235 for service {com.xingin.xhs/com.xingin.strategy.service.StrategyMediaService}
+07-28 20:14:41.038  1837  4838 W ActivityManager: Receiver with filter android.content.IntentFilter@978fd97 already registered for pid 2268, callerPackage is com.android.systemui
+07-28 20:14:41.135  1837  1872 I ActivityManager: Start proc 5686:com.oplus.eyeprotect/u0a186 for service {com.oplus.eyeprotect/com.oplus.eyeprotect.services.EyeProtectTileService}
+07-28 20:14:41.177  1837  1872 W ActivityManager: Slow operation: 53ms so far, now at startProcess: returned from zygote!
+07-28 20:14:41.177  1837  1872 W ActivityManager: Slow operation: 53ms so far, now at startProcess: done updating battery stats
+07-28 20:14:41.177  1837  1872 W ActivityManager: Slow operation: 54ms so far, now at startProcess: building log message
+07-28 20:14:41.177  1837  1872 I ActivityManager: Start proc 5694:com.oplus.screenrecorder/u0a97 for service {com.oplus.screenrecorder/com.oplus.screenrecorder.floatwindow.services.QuickPanelService}
+07-28 20:14:41.177  1837  1872 W ActivityManager: Slow operation: 54ms so far, now at startProcess: starting to update pids map
+07-28 20:14:41.178  1837  1872 W ActivityManager: Slow operation: 54ms so far, now at startProcess: done updating pids map
+07-28 20:14:41.228  1837  1872 W ActivityManager: Slow operation: 57ms so far, now at startProcess: returned from zygote!
+07-28 20:14:41.243  1837  1872 W ActivityManager: Slow operation: 72ms so far, now at startProcess: done updating battery stats
+07-28 20:14:41.243  1837  1872 W ActivityManager: Slow operation: 72ms so far, now at startProcess: building log message
+07-28 20:14:41.243  1837  1872 I ActivityManager: Start proc 5729:com.oplus.linker:app/u0a95 for service {com.oplus.linker/com.oplus.linker.synergy.service.TVTileService}
+07-28 20:14:41.243  1837  1872 W ActivityManager: Slow operation: 72ms so far, now at startProcess: starting to update pids map
+07-28 20:14:41.244  1837  1872 W ActivityManager: Slow operation: 72ms so far, now at startProcess: done updating pids map
+07-28 20:14:41.275  1837  1872 I ActivityManager: Start proc 5753:com.coloros.sharescreen/u0a158 for service {com.coloros.sharescreen/com.coloros.sharescreen.service.ShareScreenTileService}
+07-28 20:14:41.519  1837  4840 I ActivityManager: Killing 29676:com.oplus.games/u0a239 (adj 965): empty #17
+07-28 20:14:41.627  1837  3891 I ActivityManager: Killing 30315:com.heytap.pictorial/u0a154 (adj 965): empty #17
+07-28 20:14:41.673  1837  3891 I ActivityManager: Killing 2486:com.coloros.assistantscreen/u0a214 (adj 955): empty #17
+07-28 20:14:41.730  1837  3874 W ActivityManager: Scheduling restart of crashed service com.coloros.assistantscreen/com.oplus.assistantscreen.window.AssistantWindowService in 16401ms for connection
+07-28 20:14:41.794  1837  1872 I ActivityManager: Start proc 5796:com.coloros.assistantscreen/u0a214 for content provider {com.coloros.assistantscreen/com.oplus.assistantscreen.window.watch.WatchWindowProvider}
+07-28 20:14:42.099  1837  3874 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.oplus.screenrecorder/.MainActivity (has extras) mCallingUid=10097} from uid 10097
+07-28 20:14:42.099  1837  3874 W ActivityTaskManager: Background activity start for com.oplus.screenrecorder allowed because SYSTEM_ALERT_WINDOW permission is granted.
+07-28 20:14:42.104  1837  3874 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4685 attached=false
+07-28 20:14:42.167  1837  2778 W ActivityManager: setGlThreads detect 5694 5847
+07-28 20:14:42.441  1837  1855 I ActivityTaskManager: Displayed com.oplus.screenrecorder/.MainActivity: +334ms
+07-28 20:14:42.486  1837  1852 W ActivityTaskManager: Request to remove task ignored for non-existent task 4684
+07-28 20:14:42.799  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4685 attached=false
+07-28 20:14:42.799  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4685 attached=false
+07-28 20:14:42.809  1837  1930 W ActivityManager: Receiver with filter android.content.IntentFilter@9f5022 already registered for pid 5796, callerPackage is com.coloros.assistantscreen
+07-28 20:14:42.858  1837  1872 I ActivityManager: Start proc 5936:com.coloros.sceneservice/u0a206 for content provider {com.coloros.sceneservice/com.coloros.sceneservice.provider.LightProvider}
+07-28 20:14:42.865  1837  2613 I ActivityManager: Killing 25926:com.google.process.gservices/u0a196 (adj 999): empty #17
+07-28 20:14:42.877  1837  2613 I ActivityManager: Killing 30153:com.eg.android.AlipayGphone:gpu_process/u0a335 (adj 955): empty #17
+07-28 20:14:42.927  1837  2613 W ActivityManager: Scheduling restart of crashed service com.eg.android.AlipayGphone/com.alipay.mywebview.sdk_shell.service.export.MYWebViewGpuProcessService0 in 15205ms for connection
+07-28 20:14:43.080  1837  2613 W ActivityManager: Unable to start service Intent { cmp=com.coloros.sceneservice/.appmanager.AppManagerClientService } U=0: not found
+07-28 20:14:43.789  1837  1872 I ActivityManager: Start proc 5981:com.oplus.games/u0a239 for content provider {com.oplus.games/com.coloros.gamespaceui.provider.InterfaceProvider}
+07-28 20:14:44.315  1837  4862 W ActivityManager: Receiver with filter android.content.IntentFilter@902d124 already registered for pid 5981, callerPackage is com.oplus.games
+07-28 20:14:44.492  1837  2160 W ActivityManager: Receiver with filter android.content.IntentFilter@566954c already registered for pid 5981, callerPackage is com.oplus.games
+07-28 20:14:47.023  1837  4854 I ActivityManager: Process com.tencent.mm:xweb_privileged_process_0 (pid 4575) has died: fg  SVC 
+07-28 20:14:47.344 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_REQUESTED itemId=98 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:47.360 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DIALOG_SHOWN itemId=98 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:48.072 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_CONFIRMED itemId=98 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:48.072 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_ACTION_RESOLVED field=naa enumName=EVENT_UNINSTALL_SHORTCUT
+07-28 20:14:48.072 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DATABASE_DISPATCHED itemId=98 package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:48.072 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_BEGIN package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10
+07-28 20:14:48.074 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_SUCCESS package=com.tencent.mm shortcutId=c39e4238c28559c395c29c605fc39b08c2aac29c5ec395c2a761434b userId=999 userSerial=10 remaining=1
+07-28 20:14:48.159  1837  1872 I ActivityManager: Start proc 6174:com.tencent.mm:appbrand1/u999a253 for service {com.tencent.mm/com.tencent.mm.plugin.appbrand.loading.AppBrandProcessTriggerService1}
+07-28 20:14:50.704  1837  3828 W ActivityManager: Receiver with filter android.content.IntentFilter@e2a39e already registered for pid 2268, callerPackage is com.android.systemui
+07-28 20:14:51.377  1837  2059 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN flg=0x24000000 cmp=com.smartisanos.launcher/.theme.ThemeChooserActivity (has extras) mCallingUid=10520} from uid 10520
+07-28 20:14:51.390  1837  2059 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204024105)
+07-28 20:14:51.490  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.theme.ThemeChooserActivity: +113ms
+07-28 20:15:10.674  1837  4854 I ActivityManager: Killing 30182:com.eg.android.AlipayGphone:sandboxed_privilege_process0/u0a335 (adj 955): empty #17
+07-28 20:15:10.766  1837  4854 W ActivityManager: Scheduling restart of crashed service com.eg.android.AlipayGphone/com.alipay.mywebview.sdk_shell.service.export.MYWebViewPrivilegedService$Main_0 in 1000ms for connection
+07-28 20:15:10.987  1837  1872 I ActivityManager: Start proc 6486:com.eg.android.AlipayGphone:gpu_process/u0a335 for service {com.eg.android.AlipayGphone/com.alipay.mywebview.sdk_shell.service.export.MYWebViewGpuProcessService0}
+07-28 20:15:11.061  1837  1872 I ActivityManager: Start proc 6512:com.eg.android.AlipayGphone:sandboxed_privilege_process0/u0a335 for service {com.eg.android.AlipayGphone/com.alipay.mywebview.sdk_shell.service.export.MYWebViewPrivilegedService$Main_0}
+07-28 20:15:11.777  1837  4854 W ActivityManager: setGlThreads detect 6486 6599
+07-28 20:15:12.441  1837  3828 I ActivityManager: Killing 1511:com.coloros.weather.service/u0a149 (adj 955): empty #17
+07-28 20:15:12.442  1837  3828 I ActivityManager: Killing 3561:com.oplus.olc/1000 (adj 999): empty #18
+07-28 20:15:12.472  1837  4841 W ActivityManager: Scheduling restart of crashed service com.oplus.olc/.service.OplusAppServicesManagerClient in 1000ms for connection
+07-28 20:15:13.033  1837  1872 I ActivityManager: Start proc 6624:com.oplus.olc/1000 for service {com.oplus.olc/com.oplus.olc.service.OplusAppServicesManagerClient}
+07-28 20:15:16.690  1837  1867 I ActivityManager: Killing 1771:com.android.keychain/1000 (adj 999): empty #17
+07-28 20:15:51.129  1837  1871 W ActivityManager: Stopping service due to app idle: u0a235 -1m0s629ms com.xingin.xhs/.push.simple.component.service.SimplePushService
+07-28 20:16:00.447  1837  1877 I ActivityManager: Killing 2212:com.oplus.safecenter/1000 (adj 955): empty #17
+07-28 20:16:22.660  1837  4839 I ActivityTaskManager: START u999 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.tencent.mm/.ui.LauncherUI mCallingUid=10520} from uid 10520
+07-28 20:16:23.255  1837  1872 W ActivityManager: Slow operation: 53ms so far, now at startProcess: returned from zygote!
+07-28 20:16:23.255  1837  1872 W ActivityManager: Slow operation: 53ms so far, now at startProcess: done updating battery stats
+07-28 20:16:23.256  1837  1872 W ActivityManager: Slow operation: 53ms so far, now at startProcess: building log message
+07-28 20:16:23.256  1837  1872 I ActivityManager: Start proc 6718:com.tencent.mm:xweb_sandboxed_process_0:com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0/u999i142 for service {com.tencent.mm/com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0}
+07-28 20:16:23.256  1837  1872 W ActivityManager: Slow operation: 53ms so far, now at startProcess: starting to update pids map
+07-28 20:16:23.257  1837  1872 W ActivityManager: Slow operation: 54ms so far, now at startProcess: done updating pids map
+07-28 20:16:23.296  1837  1872 W ActivityManager: Slow operation: 73ms so far, now at startProcess: returned from zygote!
+07-28 20:16:23.296  1837  1872 W ActivityManager: Slow operation: 73ms so far, now at startProcess: done updating battery stats
+07-28 20:16:23.297  1837  1872 W ActivityManager: Slow operation: 73ms so far, now at startProcess: building log message
+07-28 20:16:23.297  1837  1872 I ActivityManager: Start proc 6739:com.tencent.mm:xweb_privileged_process_0/u999a253 for service {com.tencent.mm/com.tencent.xweb.pinus.sdk.process.PrivilegedProcessService0}
+07-28 20:16:23.297  1837  1872 W ActivityManager: Slow operation: 73ms so far, now at startProcess: starting to update pids map
+07-28 20:16:23.297  1837  1872 W ActivityManager: Slow operation: 73ms so far, now at startProcess: done updating pids map
+07-28 20:16:26.267  1837  4839 I ActivityTaskManager: START u999 {flg=0x4000000 cmp=com.tencent.mm/.plugin.gallery.ui.AlbumPreviewUI (has extras) mCallingUid=99910253} from uid 99910253
+07-28 20:16:26.313  1837  4839 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204012600)
+07-28 20:16:26.604  1837  1855 I ActivityTaskManager: Displayed com.tencent.mm/.plugin.gallery.ui.AlbumPreviewUI: +336ms
+07-28 20:16:30.942  1837  4839 W ActivityManager: setGlThreads detect 6832 7002
+07-28 20:16:30.969  1837  4839 W ActivityManager: setGlThreads detect 6832 7009
+07-28 20:16:38.706  1837  1980 W ActivityManager: Unable to start service Intent { act=com.quark.browser.intent.action.COCKROACH flg=0x4 (has extras) } U=0: not found
+07-28 20:16:38.936  1837  3874 E ActivityManager: Failure starting process com.android.providers.downloads
+07-28 20:16:38.936  1837  3874 E ActivityManager: java.lang.SecurityException: Package com.android.providers.downloads was not found!
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at com.android.server.pm.PackageManagerService.checkPackageStartable(PackageManagerService.java:9063)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at com.android.server.am.ProcessList.startProcessLocked(ProcessList.java:1935)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at com.android.server.am.ProcessList.startProcessLocked(ProcessList.java:2583)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at com.android.server.am.ProcessList.startProcessLocked(ProcessList.java:2742)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at com.android.server.am.ActivityManagerService.startProcessLocked(ActivityManagerService.java:2911)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at com.android.server.am.ContentProviderHelper.getContentProviderImpl(ContentProviderHelper.java:572)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at com.android.server.am.ContentProviderHelper.getContentProvider(ContentProviderHelper.java:139)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at com.android.server.am.ActivityManagerService.getContentProvider(ActivityManagerService.java:6553)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at android.app.IActivityManager$Stub.onTransact(IActivityManager.java:2501)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at com.android.server.am.ActivityManagerService.onTransact(ActivityManagerService.java:2700)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at android.os.Binder.execTransactInternal(Binder.java:1221)
+07-28 20:16:38.936  1837  3874 E ActivityManager: 	at android.os.Binder.execTransact(Binder.java:1163)
+07-28 20:16:38.936  1837  3874 I ActivityManager: Force stopping com.android.providers.downloads appid=10049 user=999: start failure
+07-28 20:16:38.967  1837  1858 I ActivityManager: Exiting empty application process 0:com.android.providers.downloads/u999a49 (null)
+07-28 20:16:38.984  1837  3874 E ActivityManager: Failure starting process com.android.providers.downloads
+07-28 20:16:38.984  1837  3874 E ActivityManager: java.lang.SecurityException: Package com.android.providers.downloads was not found!
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at com.android.server.pm.PackageManagerService.checkPackageStartable(PackageManagerService.java:9063)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at com.android.server.am.ProcessList.startProcessLocked(ProcessList.java:1935)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at com.android.server.am.ProcessList.startProcessLocked(ProcessList.java:2583)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at com.android.server.am.ProcessList.startProcessLocked(ProcessList.java:2742)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at com.android.server.am.ActivityManagerService.startProcessLocked(ActivityManagerService.java:2911)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at com.android.server.am.ContentProviderHelper.getContentProviderImpl(ContentProviderHelper.java:572)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at com.android.server.am.ContentProviderHelper.getContentProvider(ContentProviderHelper.java:139)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at com.android.server.am.ActivityManagerService.getContentProvider(ActivityManagerService.java:6553)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at android.app.IActivityManager$Stub.onTransact(IActivityManager.java:2501)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at com.android.server.am.ActivityManagerService.onTransact(ActivityManagerService.java:2700)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at android.os.Binder.execTransactInternal(Binder.java:1221)
+07-28 20:16:38.984  1837  3874 E ActivityManager: 	at android.os.Binder.execTransact(Binder.java:1163)
+07-28 20:16:38.984  1837  3874 I ActivityManager: Force stopping com.android.providers.downloads appid=10049 user=999: start failure
+07-28 20:16:38.988  1837  3874 E ActivityManager: Failure starting process com.android.providers.downloads
+07-28 20:16:38.988  1837  3874 E ActivityManager: java.lang.SecurityException: Package com.android.providers.downloads was not found!
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at com.android.server.pm.PackageManagerService.checkPackageStartable(PackageManagerService.java:9063)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at com.android.server.am.ProcessList.startProcessLocked(ProcessList.java:1935)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at com.android.server.am.ProcessList.startProcessLocked(ProcessList.java:2583)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at com.android.server.am.ProcessList.startProcessLocked(ProcessList.java:2742)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at com.android.server.am.ActivityManagerService.startProcessLocked(ActivityManagerService.java:2911)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at com.android.server.am.ContentProviderHelper.getContentProviderImpl(ContentProviderHelper.java:572)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at com.android.server.am.ContentProviderHelper.getContentProvider(ContentProviderHelper.java:139)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at com.android.server.am.ActivityManagerService.getContentProvider(ActivityManagerService.java:6553)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at android.app.IActivityManager$Stub.onTransact(IActivityManager.java:2501)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at com.android.server.am.ActivityManagerService.onTransact(ActivityManagerService.java:2700)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at android.os.Binder.execTransactInternal(Binder.java:1221)
+07-28 20:16:38.988  1837  3874 E ActivityManager: 	at android.os.Binder.execTransact(Binder.java:1163)
+07-28 20:16:38.988  1837  3874 I ActivityManager: Force stopping com.android.providers.downloads appid=10049 user=999: start failure
+07-28 20:16:38.990  1837  1858 I ActivityManager: Exiting empty application process 0:com.android.providers.downloads/u999a49 (null)
+07-28 20:16:38.991  1837  1858 I ActivityManager: Exiting empty application process 0:com.android.providers.downloads/u999a49 (null)
+07-28 20:16:55.004  1837  1872 I ActivityManager: Start proc 7409:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:16:55.060  1837  1872 I ActivityManager: Start proc 7456:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:16:58.393  1837  1851 I ActivityManager: Process com.redteamobile.roaming (pid 7456) has died: fg  RCVR
+07-28 20:17:01.268  1837  4839 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 7409) has died: cch+5 CEM 
+07-28 20:19:22.232  1837  4839 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:19:25.723  1837  4839 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.eg.android.AlipayGphone/.AlipayLogin (has extras) mCallingUid=10520} from uid 10520
+07-28 20:19:25.731  1837  4839 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4686 attached=false
+07-28 20:19:25.781  1837  4839 W ActivityManager: setGlThreads detect 5255 7716
+07-28 20:19:25.799  1837  1872 I ActivityManager: Start proc 7722:com.coloros.securepay/u0a153 for service {com.coloros.securepay/com.coloros.securepay.SecurityScanService}
+07-28 20:19:25.984  1837  4862 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:19:26.143  1837  4862 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:19:26.633  1837  1872 I ActivityManager: Start proc 7918:com.eg.android.AlipayGphone:widgetProvider/u0a335 for broadcast {com.eg.android.AlipayGphone/com.alipay.mobile.security.widget.provider.AlipayMainWidgetProvider}
+07-28 20:19:27.240  1837  4862 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:19:27.256  1837  1872 I ActivityManager: Start proc 8162:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:19:27.348  1837  1872 I ActivityManager: Start proc 8186:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:19:27.589  1837  1855 I ActivityTaskManager: Displayed com.eg.android.AlipayGphone/.AlipayLogin: +1s840ms
+07-28 20:19:27.712  1837  3830 W ActivityManager: setGlThreads detect 7722 8278
+07-28 20:19:28.116  1837  1872 W ActivityManager: Slow operation: 104ms so far, now at startProcess: returned from zygote!
+07-28 20:19:28.116  1837  1872 W ActivityManager: Slow operation: 104ms so far, now at startProcess: done updating battery stats
+07-28 20:19:28.117  1837  1872 W ActivityManager: Slow operation: 104ms so far, now at startProcess: building log message
+07-28 20:19:28.117  1837  1872 I ActivityManager: Start proc 8359:com.eg.android.AlipayGphone:tools/u0a335 for service {com.eg.android.AlipayGphone/com.alipay.mobile.common.logging.process.LogServiceInToolsProcess}
+07-28 20:19:28.117  1837  1872 W ActivityManager: Slow operation: 104ms so far, now at startProcess: starting to update pids map
+07-28 20:19:28.117  1837  1872 W ActivityManager: Slow operation: 105ms so far, now at startProcess: done updating pids map
+07-28 20:19:28.194  1837  2778 W ActivityManager: Slow operation: 51ms so far, now at attachApplicationLocked: after mServices.attachApplicationLocked
+07-28 20:19:29.321  1837  1872 I ActivityManager: Start proc 8577:com.google.process.gservices/u0a196 for content provider {com.google.android.gsf/com.google.android.gsf.gservices.GservicesProvider}
+07-28 20:19:29.586  1837  4848 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:19:29.636  1837  1872 I ActivityManager: Start proc 8632:com.coloros.securityguard/u0a156 for content provider {com.coloros.securityguard/com.coloros.securityguard.data.SecurityEventProvider}
+07-28 20:19:30.731  1837  4839 I ActivityManager: Killing 2388:com.oplus.dmp:index/u0a104 (adj 999): empty #17
+07-28 20:19:30.803  1837  1872 I ActivityManager: Start proc 8806:com.finshell.wallet/u0a113 for service {com.finshell.wallet/com.nearme.pay.service.vendorservice.VendorService}
+07-28 20:19:31.435  1837  4841 I ActivityManager: Process com.redteamobile.roaming (pid 8186) has died: cch+55 CEM 
+07-28 20:19:32.403  1837  2779 W ActivityManager: Receiver with filter android.content.IntentFilter@850abf9 already registered for pid 8806, callerPackage is com.finshell.wallet
+07-28 20:19:33.662  1837  2779 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 8162) has died: cch+45 CEM 
+07-28 20:19:33.743  1837  1872 I ActivityManager: Start proc 9120:com.finshell.wallet:icon/u0a113 for service {com.finshell.wallet/com.finshell.icon.LaunchIconService}
+07-28 20:19:33.943  1837  3895 W ActivityManager: Receiver with filter android.content.IntentFilter@ebb75e already registered for pid 9120, callerPackage is com.finshell.wallet
+07-28 20:19:34.191  1837  4841 I ActivityManager: Process com.finshell.wallet:icon (pid 9120) has died: fg  SVC 
+07-28 20:19:35.028  1837  4839 W ActivityTaskManager: Request to remove task ignored for non-existent task 4685
+07-28 20:19:38.559  1837  4839 I ActivityManager: Killing 6718:com.tencent.mm:xweb_sandboxed_process_0:com.tencent.xweb.pinus.sdk.process.SandboxedProcessService0/u999a253i142 (adj 0): isolated not needed
+07-28 20:19:38.761  1837  1872 I ActivityManager: Start proc 9650:com.finshell.wallet:plugin/u0a113 for service {com.finshell.wallet/com.finshell.shadow.host.framework.remote.ShadowPluginService}
+07-28 20:19:38.828  1837  4853 I ActivityManager: Process com.tencent.mm:xweb_privileged_process_0 (pid 6739) has died: fg  SVC 
+07-28 20:19:38.934  1837  4839 I ActivityTaskManager: START u0 {flg=0x18000000 cmp=com.eg.android.AlipayGphone/com.alipay.mobile.nebulax.xriver.activity.XRiverActivity$App01 (has extras) mCallingUid=10335} from uid 10335
+07-28 20:19:38.941  1837  4839 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4687 attached=false
+07-28 20:19:39.060  1837  4853 W ActivityManager: Receiver with filter android.content.IntentFilter@37fa712 already registered for pid 9650, callerPackage is com.finshell.wallet
+07-28 20:19:39.196  1837  2778 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204331022)
+07-28 20:19:39.611  1837  1855 I ActivityTaskManager: Displayed com.eg.android.AlipayGphone/com.alipay.mobile.nebulax.xriver.activity.XRiverActivity$App01: +665ms
+07-28 20:19:39.638  1837  4839 I ActivityManager: Process com.tencent.mm:appbrand1 (pid 6174) has died: cch SVC 
+07-28 20:19:39.641  1837  4839 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.magicbrush.core.MagicBrushServiceContextBase in 1000ms for connection
+07-28 20:19:39.641  1837  4839 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.ipcinvoker.wx_extension.service.Appbrand1IPCService in 11000ms for connection
+07-28 20:19:39.641  1837  4839 W ActivityManager: Scheduling restart of crashed service com.tencent.mm/.plugin.appbrand.loading.AppBrandProcessTriggerService1 in 21000ms for connection
+07-28 20:19:40.147  1837  2778 W ActivityManager: setGlThreads detect 6486 6566
+07-28 20:19:51.075  1837  4850 I ActivityTaskManager: START u0 {flg=0x40000 cmp=com.eg.android.AlipayGphone/com.alipay.mobile.share.ui.activity.ShareVerticalDialogActivityV3 (has extras) mCallingUid=10335} from uid 10335
+07-28 20:19:51.100  1837  4850 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204344476)
+07-28 20:19:51.327  1837  1855 I ActivityTaskManager: Displayed com.eg.android.AlipayGphone/com.alipay.mobile.share.ui.activity.ShareVerticalDialogActivityV3: +236ms
+07-28 20:19:55.348  1837  2778 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:19:56.010  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4687 attached=false
+07-28 20:19:56.010  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4687 attached=false
+07-28 20:19:56.021  1837  1858 I ActivityManager: Killing 1964:com.oplus.dmp/u0a104 (adj 999): empty #17
+07-28 20:19:57.656  1837  4853 I ActivityTaskManager: START u0 {flg=0x40000 cmp=com.eg.android.AlipayGphone/com.alipay.android.phone.homemarket.marketnew.AppManageActivityV3 (has extras) mCallingUid=10335} from uid 10335
+07-28 20:19:57.718  1837  4854 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204356380)
+07-28 20:19:57.931  1837  1855 I ActivityTaskManager: Displayed com.eg.android.AlipayGphone/com.alipay.android.phone.homemarket.marketnew.AppManageActivityV3: +273ms
+07-28 20:20:00.659  1837  1872 I ActivityManager: Start proc 10692:com.tencent.mm:appbrand1/u999a253 for service {com.tencent.mm/com.tencent.mm.plugin.appbrand.loading.AppBrandProcessTriggerService1}
+07-28 20:20:02.425  1837  4850 I ActivityTaskManager: START u0 {flg=0x18000000 cmp=com.eg.android.AlipayGphone/com.alipay.mobile.nebulax.xriver.activity.XRiverActivity$App01 (has extras) mCallingUid=10335} from uid 10335
+07-28 20:20:02.426  1837  4850 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4688 attached=false
+07-28 20:20:02.524  1837  4850 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204362998)
+07-28 20:20:02.782  1837  1855 I ActivityTaskManager: Displayed com.eg.android.AlipayGphone/com.alipay.mobile.nebulax.xriver.activity.XRiverActivity$App01: +297ms
+07-28 20:20:03.310  1837  1872 W ActivityManager: Slow operation: 221ms so far, now at startProcess: returned from zygote!
+07-28 20:20:03.310  1837  1872 W ActivityManager: Slow operation: 222ms so far, now at startProcess: done updating battery stats
+07-28 20:20:03.311  1837  1872 W ActivityManager: Slow operation: 222ms so far, now at startProcess: building log message
+07-28 20:20:03.311  1837  1872 I ActivityManager: Start proc 10950:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:20:03.311  1837  1872 W ActivityManager: Slow operation: 223ms so far, now at startProcess: starting to update pids map
+07-28 20:20:03.315  1837  1872 W ActivityManager: Slow operation: 226ms so far, now at startProcess: done updating pids map
+07-28 20:20:03.433  1837  4854 W ActivityManager: Slow operation: 67ms so far, now at attachApplicationLocked: after sendPendingBroadcastsLocked
+07-28 20:20:03.587  1837  4848 W ActivityManager: setGlThreads detect 5255 10993
+07-28 20:20:03.635  1837  1872 W ActivityManager: Slow operation: 161ms so far, now at startProcess: returned from zygote!
+07-28 20:20:03.636  1837  1872 W ActivityManager: Slow operation: 162ms so far, now at startProcess: done updating battery stats
+07-28 20:20:03.636  1837  1872 W ActivityManager: Slow operation: 163ms so far, now at startProcess: building log message
+07-28 20:20:03.636  1837  1872 I ActivityManager: Start proc 10997:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:20:03.636  1837  1872 W ActivityManager: Slow operation: 163ms so far, now at startProcess: starting to update pids map
+07-28 20:20:03.650  1837  1872 W ActivityManager: Slow operation: 177ms so far, now at startProcess: done updating pids map
+07-28 20:20:04.525  1837  2779 W ActivityManager: Receiver with filter android.content.IntentFilter@8367bda already registered for pid 5255, callerPackage is com.eg.android.AlipayGphone
+07-28 20:20:04.873  1837  4854 W ActivityManager: setGlThreads detect 5255 10843
+07-28 20:20:06.367  1837  4853 I ActivityTaskManager: START u0 {act=android.content.pm.action.CONFIRM_PIN_SHORTCUT flg=0x10008000 cmp=com.smartisanos.launcher/.PinShortcutConfirmActivity (has extras) mCallingUid=1000} from uid 1000
+07-28 20:20:06.376  1837  4853 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4689 attached=false
+07-28 20:20:06.461  1837  4853 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204056670)
+07-28 20:20:06.505 26497 26497 I ShortcutCompat: PIN_ACTIVITY_CREATED requestValid=unknown packageName=unknown shortcutId=unknown userId=-1 userSerial=-1
+07-28 20:20:06.507 26497 26497 I ShortcutCompat: PIN_REQUEST_EXTRACTED requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:06.564 26497 26497 I ShortcutCompat: PIN_DIALOG_SHOWN requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:06.669  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.PinShortcutConfirmActivity: +271ms
+07-28 20:20:07.333  1837  4839 I ActivityManager: Killing 4888:com.google.android.cellbroadcastreceiver/u0a229 (adj 999): empty #17
+07-28 20:20:07.659 26497 26497 I ShortcutCompat: PIN_USER_CONFIRMED userSerial=0 requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:07.719 26497 26497 I ShortcutCompat: SHORTCUT_USER_RESOLVED package=com.eg.android.AlipayGphone shortcutId=2017050407110255 userIdentifier=0 userSerial=0 isPrimaryUser=true
+07-28 20:20:07.721 26497 26497 I ShortcutCompat: SHORTCUT_ICON_INPUT iconSource=shortcut package=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0
+07-28 20:20:07.721 26497 26497 I ShortcutCompat: SHORTCUT_ICON_NORMALIZED package=com.eg.android.AlipayGphone shortcutId=2017050407110255 width=230 height=230
+07-28 20:20:07.721 26497 26497 I ShortcutCompat: SHORTCUT_ICON_FINAL_MODE package=com.eg.android.AlipayGphone shortcutId=2017050407110255 mode=source_already_decorated
+07-28 20:20:07.721 26497 26497 I ShortcutCompat: SHORTCUT_ICON_FINAL_READY package=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 frameType=source_already_decorated iconSource=shortcut
+07-28 20:20:07.722 26497 26497 I ShortcutCompat: PIN_ITEM_CREATED userSerial=0 requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:07.722 26497 26497 I ShortcutCompat: PIN_ACCEPT_BEGIN userSerial=0 requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:07.741 26497 26497 I ShortcutCompat: PIN_ACCEPT_SUCCESS userSerial=0 requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:07.742 26497 26497 I ShortcutCompat: PIN_DATABASE_DISPATCH_BEGIN userSerial=0 requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:07.742 26497 26497 I ShortcutCompat: SHORTCUT_ACTION_RESOLVED field=maa enumName=EVENT_INSTALL_OR_UPDATE_SHORTCUT ordinal=19
+07-28 20:20:07.742 26497 26497 I ShortcutCompat: SHORTCUT_DATABASE_DISPATCHED actionField=maa actionName=EVENT_INSTALL_OR_UPDATE_SHORTCUT itemCount=1 package=com.eg.android.AlipayGphone shortcutId=2017050407110255
+07-28 20:20:07.742 26497 26497 I ShortcutCompat: PIN_DATABASE_DISPATCH_RETURNED userSerial=0 requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:07.844 26497 26497 I ShortcutCompat: PIN_DATABASE_ROW_FOUND userSerial=0 requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:07.845 26497 26497 I ShortcutCompat: PIN_COMMIT_SUCCESS userSerial=0 requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:07.845 26497 26497 I ShortcutCompat: PIN_ACTIVITY_FINISHED activityFinishing=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:08.097  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4689 attached=false
+07-28 20:20:08.097  1837  1859 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4689 attached=false
+07-28 20:20:08.856  1837  3857 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:20:09.077  1837  4850 I ActivityTaskManager: START u0 {flg=0x40000 cmp=com.eg.android.AlipayGphone/com.alipay.mobile.nebulax.xriver.activity.XRiverActivity (has extras) mCallingUid=10335} from uid 10335
+07-28 20:20:09.107  1837  3857 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204367805)
+07-28 20:20:09.344  1837  4853 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:20:09.353  1837  3857 I ActivityManager: Process com.redteamobile.roaming (pid 10997) has died: cch+5 CEM 
+07-28 20:20:09.782  1837  4850 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000000 cmp=com.smartisanos.launcher/.Launcher (has extras) mCallingUid=10172} from uid 10172
+07-28 20:20:10.287  1837  1858 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{b80314f u0 com.eg.android.AlipayGphone/com.alipay.mobile.nebulax.xriver.activity.XRiverActivity t4688}
+07-28 20:20:11.160  1837  1930 I ActivityManager: Killing 5796:com.coloros.assistantscreen/u0a214 (adj 955): empty #17
+07-28 20:20:11.329  1837  4850 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 10950) has died: cch+35 CEM 
+07-28 20:20:11.433  1837  1930 W ActivityManager: Scheduling restart of crashed service com.coloros.assistantscreen/com.oplus.assistantscreen.window.AssistantWindowService in 1000ms for connection
+07-28 20:20:11.463  1837  1872 I ActivityManager: Start proc 11531:com.coloros.assistantscreen/u0a214 for content provider {com.coloros.assistantscreen/com.oplus.assistantscreen.window.watch.WatchWindowProvider}
+07-28 20:20:14.005  1837  3830 W ActivityManager: Receiver with filter android.content.IntentFilter@4ccbb38 already registered for pid 11531, callerPackage is com.coloros.assistantscreen
+07-28 20:20:15.245 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_REQUESTED itemId=100 package=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:15.270 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DIALOG_SHOWN itemId=100 package=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:16.055 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_CONFIRMED itemId=100 package=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:16.055 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_ACTION_RESOLVED field=naa enumName=EVENT_UNINSTALL_SHORTCUT
+07-28 20:20:16.055 26497 26497 I ShortcutCompat: SHORTCUT_DELETE_DATABASE_DISPATCHED itemId=100 package=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:16.056 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_BEGIN package=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:16.060 26497 26497 I ShortcutCompat: SHORTCUT_UNPIN_SUCCESS package=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0 remaining=0
+07-28 20:20:18.157  1837  4852 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.eg.android.AlipayGphone/.AlipayLogin (has extras) mCallingUid=10520} from uid 10520
+07-28 20:20:18.376  1837  1930 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:20:18.528  1837  4851 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:20:19.543  1837  1930 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:20:21.010  1837  3830 W ActivityManager: Unable to start service Intent { cmp=com.nearme.statistics.rom/.service.ReceiverService (has extras) } U=0: not found
+07-28 20:20:21.593  1837  3830 I ActivityTaskManager: START u0 {flg=0x34000000 cmp=com.eg.android.AlipayGphone/com.alipay.mobile.nebulax.xriver.activity.XRiverActivity$App01 (has extras) mCallingUid=10335} from uid 10335
+07-28 20:20:23.182  1837  4840 W ActivityManager: Receiver with filter android.content.IntentFilter@9d1e4e4 already registered for pid 5255, callerPackage is com.eg.android.AlipayGphone
+07-28 20:20:23.426  1837  1872 W ActivityManager: Slow operation: 53ms so far, now at startProcess: returned from zygote!
+07-28 20:20:23.426  1837  1872 W ActivityManager: Slow operation: 53ms so far, now at startProcess: done updating battery stats
+07-28 20:20:23.426  1837  1872 W ActivityManager: Slow operation: 54ms so far, now at startProcess: building log message
+07-28 20:20:23.426  1837  1872 I ActivityManager: Start proc 12164:com.oplus.wirelesssettings:tzupdate/1000 for broadcast {com.oplus.wirelesssettings/com.oplus.tzupdate.timezone.MccChangeReceiver}
+07-28 20:20:23.426  1837  1872 W ActivityManager: Slow operation: 54ms so far, now at startProcess: starting to update pids map
+07-28 20:20:23.427  1837  1872 W ActivityManager: Slow operation: 54ms so far, now at startProcess: done updating pids map
+07-28 20:20:23.643  1837  1872 W ActivityManager: Slow operation: 155ms so far, now at startProcess: returned from zygote!
+07-28 20:20:23.644  1837  1872 W ActivityManager: Slow operation: 155ms so far, now at startProcess: done updating battery stats
+07-28 20:20:23.644  1837  1872 W ActivityManager: Slow operation: 155ms so far, now at startProcess: building log message
+07-28 20:20:23.644  1837  1872 I ActivityManager: Start proc 12194:com.redteamobile.roaming/u0a245 for broadcast {com.redteamobile.roaming/com.redteamobile.roaming.receiver.MccChangeReceiver}
+07-28 20:20:23.644  1837  1872 W ActivityManager: Slow operation: 155ms so far, now at startProcess: starting to update pids map
+07-28 20:20:23.648  1837  1872 W ActivityManager: Slow operation: 159ms so far, now at startProcess: done updating pids map
+07-28 20:20:24.238  1837  4851 I ActivityTaskManager: START u0 {act=android.content.pm.action.CONFIRM_PIN_SHORTCUT flg=0x10008000 cmp=com.smartisanos.launcher/.PinShortcutConfirmActivity (has extras) mCallingUid=1000} from uid 1000
+07-28 20:20:24.249  1837  4851 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=4690 attached=false
+07-28 20:20:24.322  1837  4851 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (1204371741)
+07-28 20:20:24.381 26497 26497 I ShortcutCompat: PIN_ACTIVITY_CREATED requestValid=unknown packageName=unknown shortcutId=unknown userId=-1 userSerial=-1
+07-28 20:20:24.383 26497 26497 I ShortcutCompat: PIN_REQUEST_EXTRACTED requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:24.408 26497 26497 I ShortcutCompat: PIN_DIALOG_SHOWN requestValid=true packageName=com.eg.android.AlipayGphone shortcutId=2017050407110255 userId=0 userSerial=0
+07-28 20:20:24.497  1837  1855 I ActivityTaskManager: Displayed com.smartisanos.launcher/.PinShortcutConfirmActivity: +217ms
+07-28 20:20:27.094  1837  1872 I ActivityManager: Start proc 12305:com.google.android.cellbroadcastreceiver/u0a229 for broadcast {com.google.android.cellbroadcastreceiver/com.android.cellbroadcastreceiver.CellBroadcastReceiver}
+07-28 20:20:27.513  1837  4851 I ActivityManager: Process com.redteamobile.roaming (pid 12194) has died: cch+15 CEM 
+07-28 20:20:29.994  1837  3896 I ActivityManager: Process com.oplus.wirelesssettings:tzupdate (pid 12164) has died: cch+15 CEM 
+07-28 20:20:38.963  1837  3874 I ActivityManager: Killing 5981:com.oplus.games/u0a239 (adj 945): empty #17
