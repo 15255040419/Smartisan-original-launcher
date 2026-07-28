@@ -37,7 +37,9 @@
 
 - 启动兼容性审计已完成首轮可执行收敛：`LauncherApplication -> ja -> Launcher -> J` 启动主链不再直接校验 `IActivityObserver`、`ActivityManagerNative`、`IWindowManager` 或 `SmtPCUtils` 的隐藏类型；锤子专属 Activity 观察、外接屏、全局动画缩放与锁屏位置查询均降级为不影响桌面启动的默认行为。`SmartisanInstallManager` 初始化或 `LauncherApps` 服务不可用时只禁用安装/下载协作功能并输出完整诊断，不中断 Application。2026-07-18 已在 Android 12 Google 模拟器完成覆盖安装、冷启动与首帧日志检查；小米、OPPO、vivo、三星、摩托罗拉、华为、一加及 Android 6/8/11/13/15/16 真机回归待验证。
 - SMEngine 动画时间推进已从每个渲染帧固定 `20.0f` 改为真实 `uptimeMillis` 帧间隔，并按原帧基准折算为 `realDelta * 20 / 16.6667`、单帧上限 100ms；因此不依赖设备报告的刷新率，90/120Hz 会自然缩短单帧逻辑推进以保持总时长。`Ra.T(float)` 的唯一明确粒子入口也已由固定 `0.02f` 改为本帧引擎 delta / 1000。高刷新率修复本身未改动 unlock XML、冷重载或原版解锁视觉资源；60/90/120Hz 真机回归待验证。
-- 解锁动画去重已统一为按真实 `SCREEN_OFF` 创建的 `unlockGeneration`：原始广播与生命周期兜底竞争同一个原子播放权，生命周期只补一次已授权的原版 `USER_PRESENT`，不再使用 1.2s / 1.5s 时间窗、120ms 延迟重放或“领取后再派发两套广播”。`onStart()` 对无播放权或重复 generation 返回拒绝，作为第二层保护。`build.bat` 与 v1/v2/v3 签名已通过；锁屏、解锁、快速锁屏解锁、主题切换、文件夹展开与多 ROM 真机回归待验证。
+- 解锁触发链已恢复到 `V1.5.3` 标签对应的 `25d20c4c`：移除了 `UnlockAnimationCoordinator` 的 generation、提前 claim 与动画回调拦截。`ia` 重新按原始广播顺序处理，生命周期兜底恢复为 v1.5.3 的“真实熄屏确认 + 原始广播时间戳去重 + 原版 `action_keyguard_on`/`USER_PRESENT` 事件”。`Eb.update()` 继续使用真实时间差推进，首帧不推进且单帧上限 100ms。2026-07-27 已完成构建和 v1/v2/v3 签名；OPPO PDCM00 当前未连接，锁屏/快速锁屏/60-144Hz/多 ROM 真机矩阵待验证。
+
+- 2026-07-28 已将上滑搜索的数据源扩展到当前 Launcher 已固定的 PIN 小程序快捷方式；快捷方式使用 `packageName + shortcutId + user` 独立记录、匹配和启动，不与普通 Activity 搜索条目混用。构建通过但尚无设备完成“添加到桌面 → 搜索 → 启动”的真机闭环。应用图标的桌面、列表右侧预览和单应用顶部预览已继续收敛到同一有效来源解析；动态天气/日历的尺寸与阴影视觉仍待用户真机验收，未标记为已修复。
 - 构建产物为 `build\launcher-signed.apk`；构建、zipalign、v1/v2/v3 签名和 ADB 覆盖安装均已验证。
 - 桌面手势保留两个独立设置：`swipe_up_search_enabled`（默认开）控制上滑搜索页；`swipe_down_system_panels_enabled`（默认开）控制下拉系统面板。下滑系统面板允许从空白区域、应用图标和关闭状态文件夹图标开始，Dock 仍禁止下滑；横向/向上轻微抖动不会直接拒绝。状态机、反射失败不吞事件、真实拖动成功入口和成功后的持续消费已实现：`b.1.smali::j()` 不再过早占有，`Ha.c/d()` 只在原版拖动已建立后标记；CANCEL 只由 `smengine/v.1` 的原版 `rh()` 发送一次，并在原始 `UP/CANCEL` 投递前消费。2026-07-18 已完成构建和 v1/v2/v3 签名验证；轻微反向抖动、慢速下拉与长按/拖动竞速、反射全部失败、CANCEL 清理和 Dock 真机回归待验证。
 - 普通 Android Home 兼容已接入原版 `J.a(Intent)`：保留锤子 `android.intent.extra.FROM_HOME_KEY`，并识别 `ACTION_MAIN + CATEGORY_HOME`。仅在 Launcher 已 resumed、持有窗口焦点且未 finish 的第二次 Home 中转交原版关闭临时状态与 `createScrollToLeftEvent`；从其他应用返回时只恢复原页面，不回首页。首页继续由原版 PageView/负一屏模型计算，未写死索引 0，返回键保持空实现。构建和 v1/v2/v3 签名已通过；各 ROM Home 交付时序、文件夹/编辑/负一屏和快速重复 Home 真机回归待验证。
@@ -73,6 +75,32 @@
 4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
 
 ## 每日修复记录（倒序）
+
+### 2026-07-28
+
+#### 应用图标有效来源与分组口径收敛（构建完成，真机待验收）
+
+- **问题**：桌面、应用图标列表右侧预览、单应用页顶部预览和“已重绘/未重绘”分组此前各自使用候选缓存、系统原图或数据库状态，导致同一应用在三个位置显示不一致；同包多 Activity 的拨号/联系人还可能因标签或包名兜底而串图。
+- **收敛**：保留全局 `DEFAULT` / `IMPROVED` / `PACK:<package>` 单选和单应用手动覆盖优先级，统一由当前有效来源解析桌面、列表与单应用顶部预览；分组改按实际可解析的当前图标判断。系统图标映射改为组件优先，并只对系统应用应用标签别名，避免第三方同名应用或同包双 Activity 被错误套图。普通静态图标不再通过 `alphaVisibleBounds` 再次推导几何，最终尺寸仍由原版静态图标管线负责。
+- **动态状态**：天气、日历、时钟在动态开关开启时由原版 ActiveIcon 链显示，分组不再把它们误判为缺少静态候选。此前针对 ActiveIcon 的比例、alpha 阈值、阴影参数和 PNG 尺寸试验均已撤回；当前没有把动态天气/日历视觉一致性标记为完成。
+- **验证与风险**：`build.bat`、Java 宿主编译、Smali 回编译、签名和 `git diff --check` 通过。OPPO PDCM00 未连接，仍需在默认/改进版/图标包切换、拨号/联系人、12/20 宫格与三个主题下，由用户核对桌面、列表及单应用页的实际一致性。
+
+#### 上滑搜索纳入已固定的小程序快捷方式（构建完成，真机待验证）
+
+- **根因**：搜索页只查询 `ACTION_MAIN + CATEGORY_LAUNCHER` 的 Activity；固定小程序快捷方式的身份是 `packageName + shortcutId + user`，既不会出现在该查询中，也不能由普通 `startMainActivity()` 正确启动。
+- **修复**：仅通过 `LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED` 读取当前 Launcher 已固定的快捷方式，不混入未固定的动态/推荐快捷方式。`SearchEntry` 为快捷方式保留独立 `shortcutId` 和用户身份，搜索历史不再与来源应用 Activity 冲突；点击结果使用 `LauncherApps.startShortcut()`。若快捷方式位于已锁页面，仍先经过现有密码确认，再交给已有 `ShortcutLaunchActivity` 处理。
+- **验证与风险**：`build.bat` 成功，最终 APK 仍为 `com.smartisanos.launcher v1.5.5 / 30`；当前无 ADB 设备，未完成“应用请求固定 → 桌面出现 → 上滑搜索名称 → 点击启动”的主用户、分身用户及删除后消失验证。
+
+### 2026-07-27
+
+#### 解锁触发链恢复至 v1.5.3，保留高刷新率真实时间推进（构建完成，真机待验证）
+
+- **基线**：Git 标签 `V1.5.3` 指向 `25d20c4c`（`release v1.5.3`，Manifest 为 `v1.5.3 / 28`），不是按日期推断。
+- **根因**：后续 `UnlockAnimationCoordinator` 在广播入口提前过滤/认领事件，并以独立 generation、播放权和动画回调决定是否允许播放；该状态与后续 Activity、页面或场景检查不同步时会留下已认领但未播放的周期，破坏 v1.5.3 已验证的原始触发顺序。
+- **恢复**：`ia.1.smali` 删除 Coordinator 广播前置过滤并恢复 v1.5.3 的 `noteOriginalUnlockBroadcast()`；`animations/c/b.smali` 删除 generation 获取和 `onAnimationStarted/onAnimationFinished` 拦截，保留原版场景 cleanup 及低频 timing diagnostics；`ja.1.smali` 删除进程启动 reset；`MaintainedLauncherSettingsHost` 恢复 v1.5.3 的熄屏确认、1200/1500ms 时间戳去重与原始双事件 fallback；删除 `UnlockAnimationCoordinator.java`。
+- **保留**：`Eb.smali` 没有回退固定每帧 20 的原版行为，仍以 `uptimeMillis` 帧间隔折算统一 SMEngine delta；`mStartTime==0` 时只建立时间基准，恢复后不会把长暂停直接推进到 Timeline。
+- **验证**：`build.bat` 成功，maintained 设置资源、Smali、classes2.dex、二进制 Manifest 注入、zipalign 均完成；`apksigner` v1/v2/v3 均验证通过。`PZXO8PHMONGYVSOZ` 未出现在 ADB 列表，未安装、未产生锁屏日志或截图，未将任何锁屏次数、动画时长、刷新率兼容性或 ROM 兼容性标为已验证。
+- **风险**：待在 OPPO PDCM00 Android 12/ColorOS 上完成正常及快速锁屏解锁；60/90/120/144Hz、主题/文件夹、进程回收和其他 ROM 均待真机验证。
 
 ### 2026-07-24
 
@@ -186,12 +214,7 @@
 
 ### 2026-07-19
 
-#### 桌面设置、动态天气和日历接入普通图标 RasterSpec（真机冷启动验证完成）
-
-- **根因**：这三个入口绕过了普通静态图标的 `IconRasterDiagnostics.composeStaticIconTexture()` 规格：桌面设置与 ActiveIcon 各层直接由 `SceneNode.setImageName()` 加载主题目录的原始小纹理；动态根节点还叠加了 `0.7332 × 0.94` 的历史专用缩小系数。因此即使普通图标已使用物理 Artwork/Texture 规格，特殊图标仍会显得小且细节不足。此前按场景节点推导出的 181px 路径已确认不是普通图标最终纹理标准，已废弃且未保留。
-- **修复**：在已有 `IconRasterDiagnostics` 中抽出只读 `NormalIconRasterSpec`，它与普通静态链使用同一 `icon_size_origin`、`icon_size_with_shadow`、Surface 映射和 page mode。`SceneNode.setImageName()` 只在原版 `setting_button/`、`weather/`、`calendar/` 三类主题资源上委托该规格生成 v2 最终缓存；其他 SMEngine 资源与普通图标链不变。每个 ActiveIcon 图层保留原节点坐标、UV、层级和动画，仅以同一个 `normal:...:normal-spec-v2` 共享规格生成清晰纹理；没有再建立 181px 或独立 Raster 类。动态根节点及缓存帧删除专用光学校正，恢复普通图标大小偏好的原始比例。
-- **缓存与验证**：特殊缓存目录升级为 `normal_icon_raster_v2`，仅失效桌面设置/天气/日历旧结果。1080×2304、当前 page mode=1 的冷启动日志中普通规格为 Artwork `230`、Texture `295`；桌面设置四层均生成 `230×230`，天气背景/封面为原始 `256×256`、天气图形 `230×230`、温度 `119×230`，日历背景/夹子/翻页为 `256×256`、日期 `230×176`，全部使用同一 `normal:230x295:1080x2304:1:normal-spec-v2`。ADB 覆盖安装后以显式 `monkey -p com.smartisanos.launcher` 冷启动，当前焦点为 `com.smartisanos.launcher/.LauncherAlias`；截图 `build/smartisan_special_icons_cold.png` 来自 Smartisan Launcher，不是系统默认桌面。`build.bat`、APK v1/v2/v3 签名、`aapt2 dump badging` 均通过。
-- **回归注意**：当前普通图标逻辑、ActiveIcon 数据刷新、日期跨日、SceneNode 逻辑坐标、UV、z-order 和 engine delta 未改。需后续在 12/20 宫格、50/150% 图标大小、2K Surface、主题切换与天气刷新时继续确认图层缓存键刷新；首个特殊纹理仍在节点首次装载时生成，尚未迁移到单独后台预热任务。
+#### 【已废弃】桌面设置、动态天气和日历接入普通图标 RasterSpec（尺寸与阴影视觉方案错误）
 
 ### 2026-07-18
 
@@ -639,12 +662,7 @@
 - 修复：合成缓存图时仅使用静态图标确定输出画布尺寸，不再把完整静态图标绘入画布，最终只显示一份动态天气或日历本体。
 - 回归：不得再次在 ActiveIcon 合成结果下方绘制完整应用图标，也不能恢复已废弃的人工 `_shadow` 资源方案。
 
-#### 恢复 v1.5.3 已验证的动态天气和日历尺寸链
-
-- 回归根因：处理双层图标时，不仅移除了错误的完整静态底板，还误删了 `v1.5.3` 已真机确认的动态几何链。实时 `WeatherView` / `CalendarView` 不再乘 `94%` 外层修正，动画结束后的缓存帧也绕过了 `composeActiveIconToBaseBounds()` 的 `73.32%` 画布比例与原版纵向校正，导致天气和日历同时缩小、结束帧和实时帧职责再次混乱。
-- 修复：精确恢复 `release v1.5.3` 的几何实现：实时节点继续保留原版 `useSmallActiveIcon(mode)` 与 `nc(vm)` 分支，并乘 `0.94`；缓存帧继续按普通图标画布的 `0.7332` 比例和 `0.05487805` 纵向校正合成，最终位置仍由原版 `sq()` 负责。合成时只画动态前景，不画传入的完整静态应用图标，因此不会重新出现双层。
-- 阴影结论：普通静态图标的安全软件阴影在图标数据库 Bitmap 生成阶段完成，实时 ActiveIcon 是独立 SceneNode，不能直接共享完整静态图标 Bitmap。原版 `sc[27] + MutiTexMaterial` 是另一条私有 GL 阴影链，已在 Android 16 真机验证会崩溃；当前继续使用原版 ActiveIcon 底图保留的低 alpha 柔和投影，不恢复私有 GL 阴影或人工 `_shadow` 资源。
-- 验证：已完成 `build.bat` 全量重打包、Java 兼容宿主编译、dex 合并、zipalign 与签名。当前 ADB 设备列表为空，尺寸和阴影视觉仍需设备重新连接后做真机对比；回归基准为 `v1.5.3` 的尺寸正常状态，而不是后续缩小或双层状态。
+#### 【已废弃】恢复 v1.5.3 动态天气和日历尺寸链（比例与阴影结论已被后续真机截图推翻）
 
 #### 应用改名弹窗接入统一锤子风格容器
 

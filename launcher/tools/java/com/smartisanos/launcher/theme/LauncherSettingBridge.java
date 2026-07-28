@@ -18,11 +18,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 
 public final class LauncherSettingBridge {
     // Keep cached and live active-icon frames on the footprint verified in v1.5.3.
     private static final float ACTIVE_ICON_OPTICAL_SCALE = 0.7332f;
-    private static final float ACTIVE_ICON_LIVE_SCALE = 0.94f;
     // Original active-icon anchor: (icon_size_with_shadow - icon_size_origin) / 4.
     private static final float ACTIVE_ICON_UP_OFFSET = 0.05487805f;
     private static final String PREFS = "com.smartisanos.launcher_prefs";
@@ -204,11 +204,6 @@ public final class LauncherSettingBridge {
         } catch (Throwable ignored) {
         }
         return 1.20f * ACTIVE_ICON_OPTICAL_SCALE;
-    }
-
-    /** Outer correction shared by live WeatherView and CalendarView roots. */
-    public static float activeIconLiveScale() {
-        return ACTIVE_ICON_LIVE_SCALE;
     }
 
     /** Static-frame optical correction; the live node keeps the original nc(vm) anchor. */
@@ -521,6 +516,243 @@ public final class LauncherSettingBridge {
         } catch (Throwable error) {
             Log.w(TAG, "ACTIVE_ICON_LIVE_SHADOW_NODE_STATE_FAILED type=" + type
                     + " class=" + error.getClass().getSimpleName());
+        }
+    }
+
+    // Disabled by default.  It can be enabled for a controlled device capture through
+    // Settings.System launcher_active_icon_geometry_debug=1.
+    private static final String KEY_ACTIVE_ICON_GEOMETRY_DEBUG =
+            "launcher_active_icon_geometry_debug";
+    private static long sActiveIconGeometryGeneration;
+    private static final Map<Object, ActiveIconRootBase> ACTIVE_ICON_ROOT_BASES =
+            new WeakHashMap<>();
+
+    /**
+     * Bridges the live ActiveIcon root to the already-created static Cell F slot.
+     * The weather/calendar child coordinates and shadow nodes are deliberately untouched.
+     */
+    public static void applyActiveIconRootGeometry(Object cell, Object staticIconNode) {
+        try {
+            Object values = readPrivateField(cell, "sc");
+            if (!(values instanceof Object[]) || staticIconNode == null) return;
+            Object[] nodes = (Object[]) values;
+            if (nodes.length <= 7 || nodes[7] == null) return;
+            Object activeRoot = nodes[7];
+            String type = activeRoot.getClass().getName().endsWith(".H") ? "weather" : "calendar";
+            Object activeBase = findActiveIconBase(activeRoot, type);
+            if (activeBase == null) return;
+
+            ActiveIconRootBase rootBase = activeIconRootBase(activeRoot);
+            restoreActiveIconRootBase(activeRoot, rootBase);
+            invoke(activeRoot, "updateGeometricState");
+
+            Object staticScale = invoke(staticIconNode, "getScale");
+            Object baseScale = invoke(activeBase, "getScale");
+            Rect staticRect = worldRect(staticIconNode);
+            Rect activeBaseRect = worldRect(activeBase);
+            if (staticRect == null || activeBaseRect == null || staticRect.width <= 0.0f
+                    || staticRect.height <= 0.0f || activeBaseRect.width <= 0.0f
+                    || activeBaseRect.height <= 0.0f) return;
+
+            // Both sizes are measured after their parent transforms.  The uniform ratio
+            // therefore bridges the actual static F slot instead of a grid-specific constant.
+            float calculatedScale = staticRect.width / activeBaseRect.width;
+            float finalScale = rootBase.scaleX * calculatedScale;
+            Object parent = invoke(activeRoot, "getParent");
+            if (parent == null) return;
+            Object parentTransform = invoke(parent, "getWorldTransform");
+            Object targetWorldCenter = newVector(staticRect.centerX, staticRect.centerY, 0.0f);
+            Object targetLocalCenter = invoke(parentTransform, "e", targetWorldCenter, null);
+            invoke(activeRoot, "setScale", finalScale, finalScale, rootBase.scaleZ);
+            invoke(activeRoot, "setTranslate", floatField(targetLocalCenter, "x"),
+                    floatField(targetLocalCenter, "y"), floatField(targetLocalCenter, "z"));
+            invoke(activeRoot, "setScaleRotatePivot", rootBase.pivotX, rootBase.pivotY,
+                    rootBase.pivotZ);
+            invoke(activeRoot, "updateGeometricState");
+
+            long generation = ++sActiveIconGeometryGeneration;
+            if (activeIconGeometryDebugEnabled()) {
+                Object shadow = findLiveShadow(activeRoot);
+                Rect activeFinalRect = worldRect(activeBase);
+                Rect shadowFinalRect = shadow == null ? null : worldRect(shadow);
+                Log.d(TAG, "ACTIVE_ICON_GEOMETRY_APPLY type=" + type
+                        + " mode=" + activeIconMode(cell)
+                        + " staticWidth=" + staticRect.width
+                        + " staticHeight=" + staticRect.height
+                        + " staticScaleX=" + floatField(staticScale, "x")
+                        + " staticScaleY=" + floatField(staticScale, "y")
+                        + " staticCenterX=" + staticRect.centerX
+                        + " staticCenterY=" + staticRect.centerY
+                        + " activeBaseWidth=" + activeBaseRect.width
+                        + " activeBaseHeight=" + activeBaseRect.height
+                        + " activeBaseScale=" + vector2(baseScale)
+                        + " calculatedScale=" + calculatedScale
+                        + " activeFinalWidth=" + (activeFinalRect == null ? -1.0f : activeFinalRect.width)
+                        + " activeFinalHeight=" + (activeFinalRect == null ? -1.0f : activeFinalRect.height)
+                        + " activeCenterX=" + (activeFinalRect == null ? -1.0f : activeFinalRect.centerX)
+                        + " activeCenterY=" + (activeFinalRect == null ? -1.0f : activeFinalRect.centerY)
+                        + " shadowFinalWidth=" + (shadowFinalRect == null ? -1.0f : shadowFinalRect.width)
+                        + " shadowFinalHeight=" + (shadowFinalRect == null ? -1.0f : shadowFinalRect.height)
+                        + " generation=" + generation);
+            }
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_GEOMETRY_APPLY_FAILED class="
+                    + error.getClass().getSimpleName());
+        }
+    }
+
+    private static boolean activeIconGeometryDebugEnabled() {
+        Context context = applicationContext();
+        return context != null && readBool(context, KEY_ACTIVE_ICON_GEOMETRY_DEBUG, false);
+    }
+
+    private static String activeIconMode(Object cell) {
+        try {
+            Object value = invoke(cell, "getSinglePageMode");
+            return Integer.valueOf(0).equals(value) ? "12" : "20";
+        } catch (Throwable ignored) {
+            return "unknown";
+        }
+    }
+
+    private static Object findActiveIconBase(Object activeRoot, String type) throws Exception {
+        int count = ((Integer) invoke(activeRoot, "getChildCount")).intValue();
+        String expected = "weather".equals(type) ? "weatherView_back" : "calenderBg";
+        for (int i = 0; i < count; i++) {
+            Object child = invoke(activeRoot, "getChildAt", Integer.valueOf(i));
+            Object name = invoke(child, "getName");
+            if (expected.equals(name)) return child;
+        }
+        return null;
+    }
+
+    private static Object findLiveShadow(Object activeRoot) throws Exception {
+        int count = ((Integer) invoke(activeRoot, "getChildCount")).intValue();
+        for (int i = 0; i < count; i++) {
+            Object child = invoke(activeRoot, "getChildAt", Integer.valueOf(i));
+            Object name = invoke(child, "getName");
+            if (name instanceof String && ((String) name).endsWith("LiveShadow")) return child;
+        }
+        return null;
+    }
+
+    private static synchronized ActiveIconRootBase activeIconRootBase(Object activeRoot) throws Exception {
+        ActiveIconRootBase base = ACTIVE_ICON_ROOT_BASES.get(activeRoot);
+        if (base == null) {
+            Object scale = invoke(activeRoot, "getScale");
+            Object translate = readPrivateField(activeRoot, "mLocalTranslate");
+            Object pivot = invoke(activeRoot, "getScaleRotatePivot");
+            base = new ActiveIconRootBase(floatField(scale, "x"), floatField(scale, "y"),
+                    floatField(scale, "z"), floatField(translate, "x"),
+                    floatField(translate, "y"), floatField(translate, "z"),
+                    floatField(pivot, "x"), floatField(pivot, "y"), floatField(pivot, "z"));
+            ACTIVE_ICON_ROOT_BASES.put(activeRoot, base);
+        }
+        return base;
+    }
+
+    private static void restoreActiveIconRootBase(Object root, ActiveIconRootBase base) throws Exception {
+        invoke(root, "setScale", base.scaleX, base.scaleY, base.scaleZ);
+        invoke(root, "setTranslate", base.translateX, base.translateY, base.translateZ);
+        invoke(root, "setScaleRotatePivot", base.pivotX, base.pivotY, base.pivotZ);
+    }
+
+    private static Object newVector(float x, float y, float z) throws Exception {
+        Class<?> vector = Class.forName("com.smartisanos.smengine.a.j");
+        return vector.getConstructor(float.class, float.class, float.class).newInstance(x, y, z);
+    }
+
+    private static Rect worldRect(Object node) throws Exception {
+        Object volume = invoke(node, "getWorldBoundingVolume");
+        if (volume == null) return null;
+        Object first = invoke(volume, "Qj");
+        Object second = invoke(volume, "Pj");
+        float firstX = floatField(first, "x");
+        float firstY = floatField(first, "y");
+        float secondX = floatField(second, "x");
+        float secondY = floatField(second, "y");
+        return new Rect(Math.min(firstX, secondX), Math.min(firstY, secondY),
+                Math.max(firstX, secondX), Math.max(firstY, secondY));
+    }
+
+    private static Object invoke(Object target, String name, Object... arguments) throws Exception {
+        for (Method method : target.getClass().getMethods()) {
+            if (name.equals(method.getName()) && method.getParameterTypes().length == arguments.length) {
+                return method.invoke(target, arguments);
+            }
+        }
+        throw new NoSuchMethodException(name);
+    }
+
+    private static Object readPrivateField(Object target, String name) throws Exception {
+        for (Class<?> type = target == null ? null : target.getClass(); type != null; type = type.getSuperclass()) {
+            try {
+                Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                return field.get(target);
+            } catch (NoSuchFieldException ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static float floatField(Object target, String name) throws Exception {
+        if (target == null) return 0.0f;
+        return target.getClass().getField(name).getFloat(target);
+    }
+
+    private static String vector2(Object vector) {
+        try {
+            return "(" + floatField(vector, "x") + "," + floatField(vector, "y") + ")";
+        } catch (Throwable ignored) {
+            return "null";
+        }
+    }
+
+    private static final class ActiveIconRootBase {
+        final float scaleX;
+        final float scaleY;
+        final float scaleZ;
+        final float translateX;
+        final float translateY;
+        final float translateZ;
+        final float pivotX;
+        final float pivotY;
+        final float pivotZ;
+
+        ActiveIconRootBase(float scaleX, float scaleY, float scaleZ, float translateX,
+                float translateY, float translateZ, float pivotX, float pivotY, float pivotZ) {
+            this.scaleX = scaleX;
+            this.scaleY = scaleY;
+            this.scaleZ = scaleZ;
+            this.translateX = translateX;
+            this.translateY = translateY;
+            this.translateZ = translateZ;
+            this.pivotX = pivotX;
+            this.pivotY = pivotY;
+            this.pivotZ = pivotZ;
+        }
+    }
+
+    private static final class Rect {
+        final float left;
+        final float top;
+        final float right;
+        final float bottom;
+        final float width;
+        final float height;
+        final float centerX;
+        final float centerY;
+
+        Rect(float left, float top, float right, float bottom) {
+            this.left = left;
+            this.top = top;
+            this.right = right;
+            this.bottom = bottom;
+            width = right - left;
+            height = bottom - top;
+            centerX = (left + right) * 0.5f;
+            centerY = (top + bottom) * 0.5f;
         }
     }
 

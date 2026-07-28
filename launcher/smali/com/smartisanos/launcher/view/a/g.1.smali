@@ -8711,6 +8711,8 @@
 
     invoke-virtual {v1, p1}, Lcom/smartisanos/smengine/SceneNode;->setLayer(I)V
 
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconRootGeometry(Ljava/lang/Object;Ljava/lang/Object;)V
+
     .line 15
     :cond_2
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->rl()V

@@ -1973,10 +1973,6 @@
     move v3, v4
 
     :goto_1
-    if-nez p2, :cond_6
-
-    if-nez v1, :cond_6
-
     if-eqz p3, :cond_6
 
     .line 101

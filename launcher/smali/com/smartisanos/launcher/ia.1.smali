@@ -24,16 +24,6 @@
 .method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
     .locals 6
 
-    # Verify and filter broadcast via UnlockAnimationCoordinator
-    invoke-static {p1, p2}, Lcom/smartisanos/launcher/gesture/UnlockAnimationCoordinator;->onBroadcastReceived(Landroid/content/Context;Landroid/content/Intent;)Z
-
-    move-result v0
-
-    if-nez v0, :cond_continue
-
-    return-void
-
-    :cond_continue
     .line 1
     invoke-virtual {p2}, Landroid/content/Intent;->getAction()Ljava/lang/String;
 
@@ -345,6 +335,8 @@
     return-void
 
     :cond_codex_unlock_state_ready
+    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->noteOriginalUnlockBroadcast()V
+
     sget-boolean p1, Lcom/smartisanos/launcher/va;->DBG:Z
 
     if-eqz p1, :cond_e

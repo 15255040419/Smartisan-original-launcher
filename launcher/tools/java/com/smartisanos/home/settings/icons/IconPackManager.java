@@ -76,7 +76,7 @@ public final class IconPackManager {
         }
         // A package-level contacts mapping must not replace its separate
         // DialtactsActivity. Only an explicit component mapping may do that.
-        if (TextUtils.isEmpty(drawable) && isDialerComponent(className)) {
+        if (TextUtils.isEmpty(drawable) && isDialerComponent(packageName, className)) {
             return null;
         }
         if (TextUtils.isEmpty(drawable)) {
@@ -111,7 +111,7 @@ public final class IconPackManager {
             loadedPackage = sLoadedPackage;
             drawable = !TextUtils.isEmpty(className)
                     ? sComponentToDrawable.get(flatten(packageName, className)) : null;
-            if (TextUtils.isEmpty(drawable) && isDialerComponent(className)) return null;
+            if (TextUtils.isEmpty(drawable) && isDialerComponent(packageName, className)) return null;
             if (TextUtils.isEmpty(drawable)) drawable = sPackageToDrawable.get(packageName);
         }
         return TextUtils.isEmpty(drawable) ? null
@@ -141,6 +141,9 @@ public final class IconPackManager {
         }
         String drawable = !TextUtils.isEmpty(className)
                 ? map.componentToDrawable.get(flatten(packageName, className)) : null;
+        if (TextUtils.isEmpty(drawable) && isDialerComponent(packageName, className)) {
+            return null;
+        }
         if (TextUtils.isEmpty(drawable)) drawable = map.packageToDrawable.get(packageName);
         return drawable == null ? null : drawableFor(context, iconPackPackage, drawable);
     }
@@ -164,18 +167,17 @@ public final class IconPackManager {
         logPackPerf("ICON_PACK_CACHE_HIT", iconPackPackage, sPackMapCache.size(), "nonblocking_fetch");
         String drawable = !TextUtils.isEmpty(className)
                 ? map.componentToDrawable.get(flatten(packageName, className)) : null;
-        if (TextUtils.isEmpty(drawable) && isDialerComponent(className)) return null;
+        if (TextUtils.isEmpty(drawable) && isDialerComponent(packageName, className)) return null;
         if (TextUtils.isEmpty(drawable)) drawable = map.packageToDrawable.get(packageName);
         return TextUtils.isEmpty(drawable) ? null : drawableFor(context, iconPackPackage, drawable);
     }
 
-    private static boolean isDialerComponent(String className) {
-        if (TextUtils.isEmpty(className)) {
+    private static boolean isDialerComponent(String packageName, String className) {
+        if (!"com.android.contacts".equals(packageName) || TextUtils.isEmpty(className)) {
             return false;
         }
-        String value = className.toLowerCase();
-        return value.contains("dialtacts") || value.contains("dialer")
-                || value.contains("dialpad") || value.contains("phoneactivity");
+        String normalized = className.startsWith(".") ? packageName + className : className;
+        return "com.android.contacts.DialtactsActivityAlias".equals(normalized);
     }
 
     public static ArrayList<String> getIconPackPackages(Context context) {

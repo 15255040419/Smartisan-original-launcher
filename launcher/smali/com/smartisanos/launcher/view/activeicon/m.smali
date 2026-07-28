@@ -3056,7 +3056,7 @@
 
     move-result v0
 
-    if-eqz v0, :cond_active_normal
+    if-eqz v0, :cond_0
 
     .line 13
     sget v0, Lcom/smartisanos/launcher/data/Constants;->icon_scale:F
@@ -3074,22 +3074,6 @@
     mul-float/2addr v0, v1
 
     div-float/2addr v0, v3
-
-    goto :cond_active_apply
-
-    :cond_active_normal
-    const/high16 v0, 0x3f800000    # 1.0f
-
-    move v2, v0
-
-    :cond_active_apply
-    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->activeIconLiveScale()F
-
-    move-result v3
-
-    mul-float/2addr v2, v3
-
-    mul-float/2addr v0, v3
 
     const/high16 v1, 0x3f800000    # 1.0f
 
