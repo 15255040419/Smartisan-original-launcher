@@ -26,3 +26,8 @@ manifest_decode_keep/
 manifest_decode_test/
 recovered_diff.txt
 recovered_log.json
+.idea/caches/
+.idea/workspace.xml
+build/*.apk
+build/*.idsig
+

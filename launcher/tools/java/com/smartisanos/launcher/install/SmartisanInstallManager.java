@@ -654,6 +654,9 @@ public final class SmartisanInstallManager {
             return;
         }
         ensure(context);
+        try {
+            com.smartisanos.home.settings.icons.IconPackManager.invalidateIconPackList();
+        } catch (Throwable ignored) {}
         if (Intent.ACTION_PACKAGE_REMOVED.equals(action) && !replacing) {
             onPackageRemoved(context, packageName, source);
             return;

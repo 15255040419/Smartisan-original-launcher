@@ -2426,9 +2426,6 @@
 
     invoke-static {v0}, Lcom/smartisanos/launcher/diagnostics/StartupCompatibilityLogger;->mark(Ljava/lang/String;)V
 
-    # Reset UnlockAnimationCoordinator state
-    invoke-static {}, Lcom/smartisanos/launcher/gesture/UnlockAnimationCoordinator;->resetForProcessStart()V
-
     .line 1
     invoke-static {}, Landroid/os/Process;->myTid()I
 

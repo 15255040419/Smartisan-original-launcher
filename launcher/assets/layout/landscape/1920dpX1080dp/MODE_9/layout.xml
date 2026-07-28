@@ -96,7 +96,7 @@
     <integer name="icon_offset_y">8</integer>
     <integer name="icon_offset_y_without_app_name">0</integer>
     <dp name="icon_size_origin">64dp</dp>
-    <dp name="icon_size_origin_resize">56dp</dp>
+    <dp name="icon_size_origin_resize">64dp</dp>
     <dp name="shortcut_mask_radius">61dp</dp>
     <dp name="icon_size_with_shadow">82dp</dp>
     <integer name="lock_icon_height">102</integer>

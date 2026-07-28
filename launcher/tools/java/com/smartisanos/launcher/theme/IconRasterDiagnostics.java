@@ -235,8 +235,8 @@ public final class IconRasterDiagnostics {
         int pageMode = currentPageMode();
         String themeMode = String.valueOf(currentConstant("isTransparentTheme", 0));
         int iconPercent = Math.round(logicalArtwork * 100f / Math.max(1, baseIconSize(pageMode)));
-        String pipeline = isOriginalActiveIcon(itemInfo) ? "ORIGINAL_ACTIVE_ICON" : "STATIC_V3";
-        String key = baseKey + "#raster:v3:" + packageName + ':' + componentName + ':' + userId + ':'
+        String pipeline = isOriginalActiveIcon(itemInfo) ? "ORIGINAL_ACTIVE_ICON" : "STATIC_V4_COMPONENT_SOURCE";
+        String key = baseKey + "#raster:v4:" + packageName + ':' + componentName + ':' + userId + ':'
                 + sourceHash + ':' + artwork + 'x' + artwork + ':' + texture + 'x' + texture
                 + ':' + metrics.widthPixels + 'x' + metrics.heightPixels + ':' + metrics.densityDpi
                 + ':' + iconPercent + ':' + pageMode + ':' + themeMode + ':' + pipeline;

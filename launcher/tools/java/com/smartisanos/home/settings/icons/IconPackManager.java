@@ -31,9 +31,34 @@ public final class IconPackManager {
     private static final HashMap<String, String> sPackageToDrawable = new HashMap<String, String>();
     private static final HashMap<String, String> sComponentToDrawable = new HashMap<String, String>();
     private static final HashMap<String, PackMap> sPackMapCache = new HashMap<String, PackMap>();
+    private static final HashSet<String> sLoadingPacks = new HashSet<String>();
     private static boolean sSelectedPackPreloadPending;
 
     private IconPackManager() {
+    }
+
+    public static void logPackPerf(String tag, String packageName, int cacheSize, String extra) {
+        android.util.Log.d("SmartisanPerf", tag + " | pkg=" + (packageName == null ? "" : packageName)
+                + " | cacheSize=" + cacheSize + " | extra=" + (extra == null ? "" : extra)
+                + " | thread=" + Thread.currentThread().getName());
+    }
+
+    private static void putPackMapLocked(Context context, String packageName, PackMap packMap) {
+        sPackMapCache.put(packageName, packMap);
+        if (sPackMapCache.size() > 2) {
+            String selected = getSelectedIconPackPackage(context);
+            String candidateToEvict = null;
+            for (String pkg : sPackMapCache.keySet()) {
+                if (!pkg.equals(selected)) {
+                    candidateToEvict = pkg;
+                    break;
+                }
+            }
+            if (candidateToEvict != null) {
+                sPackMapCache.remove(candidateToEvict);
+                logPackPerf("ICON_PACK_CACHE_EVICT", candidateToEvict, sPackMapCache.size(), "capacity_exceeded");
+            }
+        }
     }
 
     public static Drawable getPackedIcon(Context context, String packageName) {
@@ -51,7 +76,7 @@ public final class IconPackManager {
         }
         // A package-level contacts mapping must not replace its separate
         // DialtactsActivity. Only an explicit component mapping may do that.
-        if (TextUtils.isEmpty(drawable) && isDialerComponent(className)) {
+        if (TextUtils.isEmpty(drawable) && isDialerComponent(packageName, className)) {
             return null;
         }
         if (TextUtils.isEmpty(drawable)) {
@@ -86,7 +111,7 @@ public final class IconPackManager {
             loadedPackage = sLoadedPackage;
             drawable = !TextUtils.isEmpty(className)
                     ? sComponentToDrawable.get(flatten(packageName, className)) : null;
-            if (TextUtils.isEmpty(drawable) && isDialerComponent(className)) return null;
+            if (TextUtils.isEmpty(drawable) && isDialerComponent(packageName, className)) return null;
             if (TextUtils.isEmpty(drawable)) drawable = sPackageToDrawable.get(packageName);
         }
         return TextUtils.isEmpty(drawable) ? null
@@ -102,14 +127,23 @@ public final class IconPackManager {
         PackMap map;
         synchronized (sPackMapCache) {
             map = sPackMapCache.get(iconPackPackage);
-            if (map == null) {
-                map = new PackMap();
-                loadPackMap(context, iconPackPackage, map.packageToDrawable, map.componentToDrawable);
-                sPackMapCache.put(iconPackPackage, map);
+        }
+        if (map == null) {
+            logPackPerf("ICON_PACK_CACHE_MISS", iconPackPackage, sPackMapCache.size(), "sync_fetch");
+            PackMap loaded = new PackMap();
+            loadPackMap(context, iconPackPackage, loaded.packageToDrawable, loaded.componentToDrawable);
+            synchronized (sPackMapCache) {
+                putPackMapLocked(context, iconPackPackage, loaded);
+                map = loaded;
             }
+        } else {
+            logPackPerf("ICON_PACK_CACHE_HIT", iconPackPackage, sPackMapCache.size(), "sync_fetch");
         }
         String drawable = !TextUtils.isEmpty(className)
                 ? map.componentToDrawable.get(flatten(packageName, className)) : null;
+        if (TextUtils.isEmpty(drawable) && isDialerComponent(packageName, className)) {
+            return null;
+        }
         if (TextUtils.isEmpty(drawable)) drawable = map.packageToDrawable.get(packageName);
         return drawable == null ? null : drawableFor(context, iconPackPackage, drawable);
     }
@@ -126,23 +160,24 @@ public final class IconPackManager {
             map = sPackMapCache.get(iconPackPackage);
         }
         if (map == null) {
+            logPackPerf("ICON_PACK_CACHE_MISS", iconPackPackage, sPackMapCache.size(), "nonblocking_fetch");
             preloadIconPackAsync(context, iconPackPackage);
             return null;
         }
+        logPackPerf("ICON_PACK_CACHE_HIT", iconPackPackage, sPackMapCache.size(), "nonblocking_fetch");
         String drawable = !TextUtils.isEmpty(className)
                 ? map.componentToDrawable.get(flatten(packageName, className)) : null;
-        if (TextUtils.isEmpty(drawable) && isDialerComponent(className)) return null;
+        if (TextUtils.isEmpty(drawable) && isDialerComponent(packageName, className)) return null;
         if (TextUtils.isEmpty(drawable)) drawable = map.packageToDrawable.get(packageName);
         return TextUtils.isEmpty(drawable) ? null : drawableFor(context, iconPackPackage, drawable);
     }
 
-    private static boolean isDialerComponent(String className) {
-        if (TextUtils.isEmpty(className)) {
+    private static boolean isDialerComponent(String packageName, String className) {
+        if (!"com.android.contacts".equals(packageName) || TextUtils.isEmpty(className)) {
             return false;
         }
-        String value = className.toLowerCase();
-        return value.contains("dialtacts") || value.contains("dialer")
-                || value.contains("dialpad") || value.contains("phoneactivity");
+        String normalized = className.startsWith(".") ? packageName + className : className;
+        return "com.android.contacts.DialtactsActivityAlias".equals(normalized);
     }
 
     public static ArrayList<String> getIconPackPackages(Context context) {
@@ -257,18 +292,53 @@ public final class IconPackManager {
         if (context == null || TextUtils.isEmpty(iconPackPackage)) return;
         final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
         synchronized (sPackMapCache) {
-            if (sPackMapCache.containsKey(iconPackPackage)) return;
-            sPackMapCache.put(iconPackPackage, new PackMap());
+            if (sPackMapCache.containsKey(iconPackPackage)) {
+                logPackPerf("ICON_PACK_CACHE_HIT", iconPackPackage, sPackMapCache.size(), "preload_hit");
+                return;
+            }
+            if (sLoadingPacks.contains(iconPackPackage)) {
+                logPackPerf("ICON_PACK_LOAD_DEDUP", iconPackPackage, sPackMapCache.size(), "already_loading");
+                return;
+            }
+            sLoadingPacks.add(iconPackPackage);
         }
+        logPackPerf("ICON_PACK_LOAD_BEGIN", iconPackPackage, sPackMapCache.size(), "async_start");
         new Thread(new Runnable() {
             public void run() {
+                long start = android.os.SystemClock.elapsedRealtime();
                 PackMap loaded = new PackMap();
                 loadPackMap(app, iconPackPackage, loaded.packageToDrawable, loaded.componentToDrawable);
+                long duration = android.os.SystemClock.elapsedRealtime() - start;
                 synchronized (sPackMapCache) {
-                    sPackMapCache.put(iconPackPackage, loaded);
+                    sLoadingPacks.remove(iconPackPackage);
+                    putPackMapLocked(app, iconPackPackage, loaded);
                 }
+                logPackPerf("ICON_PACK_LOAD_END", iconPackPackage, sPackMapCache.size(), "durationMs=" + duration);
             }
         }, "icon-pack-preload").start();
+    }
+
+    public static void invalidateIconPackList() {
+        synchronized (IconPackManager.class) {
+            sIconPackList = null;
+        }
+    }
+
+    public static void trimMemory(Context context, int level) {
+        String selected = getSelectedIconPackPackage(context);
+        synchronized (sPackMapCache) {
+            java.util.Iterator<String> it = sPackMapCache.keySet().iterator();
+            while (it.hasNext()) {
+                String pkg = it.next();
+                if (!pkg.equals(selected)) {
+                    it.remove();
+                    logPackPerf("ICON_PACK_CACHE_TRIM", pkg, sPackMapCache.size(), "level=" + level);
+                }
+            }
+        }
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            invalidateIconPackList();
+        }
     }
 
     /** Returns only appfilter targets already parsed for the selected pack. */
