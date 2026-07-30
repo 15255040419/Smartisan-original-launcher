@@ -42,6 +42,8 @@
 
 .field private mTextView:Lcom/smartisanos/launcher/view/Mc;
 
+.field private sceneMetrics:Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;
+
 .field private vC:Lcom/smartisanos/smengine/g;
 
 
@@ -1352,6 +1354,12 @@
     iget-object v1, p0, Lcom/smartisanos/launcher/view/b/t;->TQ:Lcom/smartisanos/launcher/data/LayoutProperty;
 
     iget v1, v1, Lcom/smartisanos/launcher/data/LayoutProperty;->folder_title_location_y:F
+
+    iget-object v4, p0, Lcom/smartisanos/launcher/view/b/t;->TQ:Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    invoke-static {v4, v1}, Lcom/smartisanos/launcher/data/FolderVisualGeometry;->resolveTitleScreenY(Ljava/lang/Object;F)F
+
+    move-result v1
 
     sget v4, Lcom/smartisanos/launcher/data/Constants;->window_width:I
 
@@ -5479,6 +5487,101 @@
     :cond_4
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/b/t;->create()V
 
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/b/fa;->getSinglePageMode()I
+
+    move-result v0
+
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/b/t;->TQ:Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    invoke-static {p0, v0, v1}, Lcom/smartisanos/launcher/data/FolderSceneMetrics;->resolve(Ljava/lang/Object;ILjava/lang/Object;)Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;
+
+    move-result-object v7
+
+    iput-object v7, p0, Lcom/smartisanos/launcher/view/b/t;->sceneMetrics:Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;
+
+    invoke-virtual {v7}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;->getUniformScale()F
+
+    move-result v1
+
+    const/high16 v2, 0x3f800000    # 1.0f
+
+    invoke-virtual {p0, v1, v1, v2}, Lcom/smartisanos/smengine/SceneNode;->setScale(FFF)V
+
+    invoke-virtual {v7}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;->getTranslateX()F
+
+    move-result v1
+
+    invoke-virtual {v7}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;->getTranslateY()F
+
+    move-result v2
+
+    const/4 v3, 0x0
+
+    invoke-virtual {p0, v1, v2, v3}, Lcom/smartisanos/smengine/SceneNode;->setTranslate(FFF)V
+
+    invoke-virtual {v7}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;->isIdentity()Z
+
+    move-result v0
+
+    if-nez v0, :folder_scene_metrics_applied
+
+    move-object v0, p0
+
+    const/4 v1, 0x1
+
+    invoke-virtual {v7}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;->getSafeClipRect()Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;
+
+    move-result-object v2
+
+    invoke-virtual {v2}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;->getLeft()I
+
+    move-result v2
+
+    sget v3, Lcom/smartisanos/launcher/data/Constants;->window_height:I
+
+    invoke-virtual {v7}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;->getSafeClipRect()Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;
+
+    move-result-object v4
+
+    invoke-virtual {v4}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;->getBottom()I
+
+    move-result v4
+
+    sub-int/2addr v3, v4
+
+    invoke-virtual {v7}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;->getSafeClipRect()Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;
+
+    move-result-object v4
+
+    invoke-virtual {v4}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;->getRight()I
+
+    move-result v4
+
+    sub-int/2addr v4, v2
+
+    invoke-virtual {v7}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;->getSafeClipRect()Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;
+
+    move-result-object v5
+
+    invoke-virtual {v5}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;->getBottom()I
+
+    move-result v5
+
+    invoke-virtual {v7}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$Result;->getSafeClipRect()Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;
+
+    move-result-object v6
+
+    invoke-virtual {v6}, Lcom/smartisanos/launcher/data/FolderSceneMetrics$SafeClipRect;->getTop()I
+
+    move-result v6
+
+    sub-int/2addr v5, v6
+
+    const/4 v6, 0x1
+
+    invoke-virtual/range {v0 .. v6}, Lcom/smartisanos/smengine/SceneNode;->setScissor(ZIIIIZ)V
+
+    :folder_scene_metrics_applied
     .line 37
     invoke-virtual {p0}, Lcom/smartisanos/smengine/SceneNode;->updateGeometricState()V
 

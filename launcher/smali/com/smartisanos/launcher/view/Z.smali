@@ -217,9 +217,15 @@
 
     move-result-object p3
 
-    iget p3, p3, Lcom/smartisanos/launcher/data/LayoutProperty;->folder_dot_view_location_y:I
+    move-object p4, p3
+
+    iget p3, p4, Lcom/smartisanos/launcher/data/LayoutProperty;->folder_dot_view_location_y:I
 
     int-to-float p3, p3
+
+    invoke-static {p4, p3}, Lcom/smartisanos/launcher/data/FolderVisualGeometry;->resolveIndicatorScreenY(Ljava/lang/Object;F)F
+
+    move-result p3
 
     sget p4, Lcom/smartisanos/launcher/data/Constants;->window_width:I
 
@@ -257,9 +263,15 @@
 
     move-result-object p3
 
-    iget p3, p3, Lcom/smartisanos/launcher/data/LayoutProperty;->folder_dot_view_location_y:I
+    move-object p4, p3
+
+    iget p3, p4, Lcom/smartisanos/launcher/data/LayoutProperty;->folder_dot_view_location_y:I
 
     int-to-float p3, p3
+
+    invoke-static {p4, p3}, Lcom/smartisanos/launcher/data/FolderVisualGeometry;->resolveIndicatorScreenY(Ljava/lang/Object;F)F
+
+    move-result p3
 
     sget p4, Lcom/smartisanos/launcher/data/Constants;->window_width:I
 

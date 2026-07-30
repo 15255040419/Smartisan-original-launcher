@@ -8,14 +8,6 @@ public final class LayoutPropertyAdapter {
     private static final String TAG = "LayoutPropertyAdapter";
     private static final float BASE_WIDTH = 1080.0f;
     private static final float BASE_HEIGHT = 1920.0f;
-    // The bookcase texture includes transparent side margins. A full-screen-width
-    // node produces the original launcher's roughly 84%-wide visible frame.
-    private static final float FOLDER_WIDTH_RATIO = 1.0f;
-    // The PNG's visible shelf centers are 358 px apart inside a 1356 px node.
-    private static final float FOLDER_VISIBLE_ROW_RATIO = 358.0f / 1356.0f;
-    private static final float FOLDER_ICON_TO_VISIBLE_ROW_RATIO = 0.48f;
-    private static final float FOLDER_TEXT_TO_VISIBLE_ROW_RATIO = 0.092f;
-    private static final float FOLDER_NAME_OFFSET_TO_VISIBLE_ROW_RATIO = 0.29f;
     // Measured from the visible shelf interiors of the 246px (MODE_12) and
     // 178px (MODE_20) closed-folder textures. Both texture sets share these
     // normalized centers, so the same geometry works at every screen scale.
@@ -50,6 +42,22 @@ public final class LayoutPropertyAdapter {
         float scaleX = width / resourceBaseWidth;
         float scaleY = height / resourceBaseHeight;
         float scale = Math.min(1.0f, Math.min(scaleX, scaleY));
+        if ("_folder".equals(suffix)) {
+            // Open-folder geometry is loaded from the original _folder resource
+            // set. Keep that shared LayoutProperty untouched; any future
+            // compatibility transform belongs to the FolderPageView scene.
+            Log.i(TAG, "folder source"
+                    + " bookcase=" + numericField(property, "folder_bookcase_width")
+                    + "x" + numericField(property, "folder_bookcase_height")
+                    + " iconOrigin=" + numericField(property, "icon_size_origin")
+                    + " iconShadow=" + numericField(property, "icon_size_with_shadow")
+                    + " textSize=" + numericField(property, "text_font_size")
+                    + " nameOffsetY=" + numericField(property, "name_off_set_y")
+                    + " titleY=" + numericField(property, "folder_title_location_y")
+                    + " dotY=" + numericField(property, "folder_dot_view_location_y")
+                    + " sceneScaleOwner=FolderSceneMetrics");
+            return;
+        }
         if (Math.abs(scale - 1.0f) < EPSILON
                 && Math.abs(scaleX - 1.0f) < EPSILON
                 && Math.abs(scaleY - 1.0f) < EPSILON) {
@@ -74,7 +82,6 @@ public final class LayoutPropertyAdapter {
                     }
                 }
             }
-            normalizeFolderLayout(property, suffix, width);
             Log.i(TAG, "adapt suffix=" + suffix
                     + ", screen=" + width + "x" + height
                     + ", resourceBase=" + resourceBaseWidth + "x" + resourceBaseHeight
@@ -106,15 +113,6 @@ public final class LayoutPropertyAdapter {
         }
         centerFolderPreview(property, 2, "_2_2");
         centerFolderPreview(property, 3, "_3_3");
-        // Open-folder labels belong to the icon group as well. Keep their font
-        // proportional when the user changes the global launcher icon size.
-        if (numericField(property, "folder_bookcase_height") > 0f
-                && numericField(property, "dock_height") <= EPSILON) {
-            try {
-                scaleNumericField(property, "text_font_size", factor);
-            } catch (Throwable ignored) {
-            }
-        }
     }
 
     private static void centerFolderPreview(Object property, int gridSize, String suffix) {
@@ -156,51 +154,6 @@ public final class LayoutPropertyAdapter {
                     container * (0.5f - visibleCenter));
         } catch (Throwable ignored) {
         }
-    }
-
-    private static void normalizeFolderLayout(Object property, String suffix, int screenWidth)
-            throws ReflectiveOperationException {
-        if (!"_folder".equals(suffix) || screenWidth <= 0) {
-            return;
-        }
-        float bookcaseWidth = numericField(property, "folder_bookcase_width");
-        float bookcaseHeight = numericField(property, "folder_bookcase_height");
-        if (bookcaseWidth <= 0 || bookcaseHeight <= 0) {
-            return;
-        }
-        float targetWidth = screenWidth * FOLDER_WIDTH_RATIO;
-        if (bookcaseWidth > targetWidth + EPSILON) {
-            float frameFactor = targetWidth / bookcaseWidth;
-            float targetHeight = bookcaseHeight * frameFactor;
-            setNumericField(property, "folder_bookcase_width", targetWidth);
-            setNumericField(property, "folder_bookcase_cover_width", targetWidth);
-            setNumericField(property, "folder_bookcase_height", targetHeight);
-            setNumericField(property, "folder_bookcase_cover_height", targetHeight);
-            bookcaseHeight = targetHeight;
-        }
-
-        float iconSize = numericField(property, "icon_size_origin");
-        float visibleRowHeight = bookcaseHeight * FOLDER_VISIBLE_ROW_RATIO;
-        float targetIconSize = visibleRowHeight * FOLDER_ICON_TO_VISIBLE_ROW_RATIO;
-        if (iconSize > 0f && Math.abs(iconSize - targetIconSize) > EPSILON) {
-            float iconFactor = targetIconSize / iconSize;
-            scaleNumericField(property, "icon_size_origin", iconFactor);
-            scaleNumericField(property, "icon_size_with_shadow", iconFactor);
-            scaleNumericField(property, "icon_size_origin_resize", iconFactor);
-        }
-
-        float textSize = numericField(property, "text_font_size");
-        float targetTextSize = visibleRowHeight * FOLDER_TEXT_TO_VISIBLE_ROW_RATIO;
-        if (textSize > 0f && Math.abs(textSize - targetTextSize) > EPSILON) {
-            scaleNumericField(property, "text_font_size", targetTextSize / textSize);
-        }
-
-        float nameOffset = numericField(property, "name_off_set_y");
-        float targetNameOffset = visibleRowHeight * FOLDER_NAME_OFFSET_TO_VISIBLE_ROW_RATIO;
-        setNumericField(property, "name_off_set_y",
-                nameOffset > 0f ? targetNameOffset : -targetNameOffset);
-        Log.i(TAG, "folder content normalized: icon=" + targetIconSize
-                + ", text=" + targetTextSize + ", row=" + visibleRowHeight);
     }
 
     private static float numericField(Object property, String fieldName) {

@@ -1343,9 +1343,15 @@
     .line 15
     iget-object p1, p0, Lcom/smartisanos/launcher/view/a/g;->dH:Lcom/smartisanos/launcher/data/LayoutProperty;
 
-    iget p1, p1, Lcom/smartisanos/launcher/data/LayoutProperty;->name_off_set_y:I
+    move-object v2, p1
+
+    iget p1, v2, Lcom/smartisanos/launcher/data/LayoutProperty;->name_off_set_y:I
 
     int-to-float p1, p1
+
+    invoke-static {v2, p1}, Lcom/smartisanos/launcher/data/FolderVisualGeometry;->resolveLabelCenterY(Ljava/lang/Object;F)F
+
+    move-result p1
 
     const/4 v2, 0x0
 
@@ -3202,11 +3208,15 @@
     if-eqz v2, :cond_0
 
     .line 2
-    iget-object v2, p0, Lcom/smartisanos/launcher/view/a/g;->dH:Lcom/smartisanos/launcher/data/LayoutProperty;
+    iget-object v3, p0, Lcom/smartisanos/launcher/view/a/g;->dH:Lcom/smartisanos/launcher/data/LayoutProperty;
 
-    iget v2, v2, Lcom/smartisanos/launcher/data/LayoutProperty;->name_off_set_y:I
+    iget v2, v3, Lcom/smartisanos/launcher/data/LayoutProperty;->name_off_set_y:I
 
     int-to-float v2, v2
+
+    invoke-static {v3, v2}, Lcom/smartisanos/launcher/data/FolderVisualGeometry;->resolveLabelCenterY(Ljava/lang/Object;F)F
+
+    move-result v2
 
     .line 3
     aget-object v0, v0, v1

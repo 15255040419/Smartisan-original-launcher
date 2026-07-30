@@ -459,6 +459,8 @@
 .method public onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V
     .locals 6
 
+    invoke-static {}, Lcom/smartisanos/launcher/animations/AnimationFrameRateController;->reset()V
+
     .line 1
     sget-boolean p1, Lcom/smartisanos/launcher/va;->DBG:Z
 

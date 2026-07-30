@@ -17,7 +17,9 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-07-28）
+## 当前状态总览（2026-07-29）
+
+- 文件夹综合自适应误入普通桌面的回归已修复：实验性的 `FolderLayoutMetrics` 已移除；`FolderCellPositionAdapter` 只在当前容器精确为 `com.smartisanos.launcher.view.b.t` 且模式精确为 `PAGE_1_3X3_MODE_FOLDER(8)` 时复制坐标数组，普通 Page 原样返回。`LayoutPropertyAdapter` 的 `_folder` 分支只记录原始资源值并直接返回，不修改共享 `LayoutProperty`。打开文件夹的内部静态几何由只读 `FolderVisualGeometry` 计算：原版三列 X、书架、图标尺寸和 XML 基准保持不变，应用文字以图标可见底边为锚点并使用 `appLabelGap=20`，图标与文字作为内容组在每层居中；标题以书架可见顶部为锚点使用 `titleGap=300`；分页节点以书架实心外框下沿为锚点使用 `indicatorGap=44`，不再把长投影当底边。只读 `FolderSceneMetrics` 仅输出整体 `uniformScale/translateX/translateY/safeClipRect`，OPPO PDCM00 1080×2400 输出 `1/0/0`。OPPO 已覆盖安装验证 12 宫格 3×4、20 宫格 4×5及两种模式下的打开文件夹，普通桌面无书架污染且无 `AndroidRuntime`；设备最终恢复为 12 宫格。
 
 - 桌面下滑打开系统面板与上滑搜索之间的手势状态冲突已定位并修复：`FlingUpGesture.b()` 在向下 MOVE 过程会将静态标志 `sk` 设为 `true`；由于系统面板在 `ACTION_MOVE` 阶段取得焦点后 Launcher 不会收到后续 `ACTION_UP`/`ACTION_CANCEL`，导致 `sk=true` 残留至下一次手势并拦截第一次上滑搜索。现已在 `v.1.smali` 的 `ACTION_MOVE` 已确认消费分支及 `ACTION_UP`/`ACTION_CANCEL` 兜底分支中调用 `FlingUpGesture.resetAfterSystemPanelGestureMoveConsumed()` / `resetAfterSystemPanelGesture()`，立即重置 `rk`/`sk`/`tk` 并记录 `FLING_UP_STATE_RESET` 日志。
 
@@ -38,8 +40,8 @@
 - 桌面设置“桌面设置”齿轮按钮高清物理纹理合成修复已完成：`Ec.wz()` 使用 `LayoutProperty.setting_button` 逻辑画布大小和 `NormalIconRasterSpec` 的 `rasterScale` 物理缩放比例合成 high-res 纹理。按下状态下支持 60 度齿轮旋转和内阴影，且在合成异常或未就绪时能够安全回退到原版低分辨率流程。2026-07-21 已在 12 宫格、20 宫格和主题切换等场景下通过打包、签名和 aapt 校验，真机回归及截图验证待进行。
 
 - 启动兼容性审计已完成首轮可执行收敛：`LauncherApplication -> ja -> Launcher -> J` 启动主链不再直接校验 `IActivityObserver`、`ActivityManagerNative`、`IWindowManager` 或 `SmtPCUtils` 的隐藏类型；锤子专属 Activity 观察、外接屏、全局动画缩放与锁屏位置查询均降级为不影响桌面启动的默认行为。`SmartisanInstallManager` 初始化或 `LauncherApps` 服务不可用时只禁用安装/下载协作功能并输出完整诊断，不中断 Application。2026-07-18 已在 Android 12 Google 模拟器完成覆盖安装、冷启动与首帧日志检查；小米、OPPO、vivo、三星、摩托罗拉、华为、一加及 Android 6/8/11/13/15/16 真机回归待验证。
-- SMEngine 动画时间推进已从每个渲染帧固定 `20.0f` 改为真实 `uptimeMillis` 帧间隔，并按原帧基准折算为 `realDelta * 20 / 16.6667`、单帧上限 100ms；因此不依赖设备报告的刷新率，90/120Hz 会自然缩短单帧逻辑推进以保持总时长。`Ra.T(float)` 的唯一明确粒子入口也已由固定 `0.02f` 改为本帧引擎 delta / 1000。高刷新率修复本身未改动 unlock XML、冷重载或原版解锁视觉资源；60/90/120Hz 真机回归待验证。
-- 解锁触发链已恢复到 `V1.5.3` 标签对应的 `25d20c4c`：移除了 `UnlockAnimationCoordinator` 的 generation、提前 claim 与动画回调拦截。`ia` 重新按原始广播顺序处理，生命周期兜底恢复为 v1.5.3 的“真实熄屏确认 + 原始广播时间戳去重 + 原版 `action_keyguard_on`/`USER_PRESENT` 事件”。`Eb.update()` 继续使用真实时间差推进，首帧不推进且单帧上限 100ms。2026-07-27 已完成构建和 v1/v2/v3 签名；OPPO PDCM00 当前未连接，锁屏/快速锁屏/60-144Hz/多 ROM 真机矩阵待验证。
+- SMEngine 动画推进已收敛为 `AnimationFrameRateController` 的稳定固定步长：默认 60fps，使用无分配 EMA 忽略首帧、恢复帧和大于 25ms 的异常长帧，连续 24 个稳定样本后按迟滞切换 60/90/120/144 档；`Eb.update()` 每帧只把 `20×60/effectiveRenderFps` 传给 `Ra.T()`，不追赶长帧。暂停、恢复和 Surface 重建均重置采样。确定性测试得到 60/90/120/144 对应 `20/13.333333/10/8.333333`，偶发 40ms 长帧不会改变 120 档；OPPO 当前仅能实测 60Hz，其他刷新率仍需真机矩阵。
+- 解锁触发链已恢复到 `V1.5.3` 标签对应的 `25d20c4c`：移除了 `UnlockAnimationCoordinator` 的 generation、提前 claim 与动画回调拦截。`ia` 重新按原始广播顺序处理，生命周期兜底恢复为 v1.5.3 的“真实熄屏确认 + 原始广播时间戳去重 + 原版 `action_keyguard_on`/`USER_PRESENT` 事件”。动画推进以同日 `AnimationFrameRateController` 的稳定固定步长结论为准；未恢复旧的真实长帧直接推进。触发链已构建并签名，锁屏/快速锁屏、90/120/144Hz和多ROM矩阵仍待验证。
 
 - 2026-07-28 已将上滑搜索的数据源扩展到当前 Launcher 已固定的 PIN 小程序快捷方式；快捷方式使用 `packageName + shortcutId + user` 独立记录、匹配和启动，不与普通 Activity 搜索条目混用。构建通过但尚无设备完成“添加到桌面 → 搜索 → 启动”的真机闭环。应用图标的桌面、列表右侧预览和单应用顶部预览已继续收敛到同一有效来源解析；动态天气/日历的尺寸与阴影视觉仍待用户真机验收，未标记为已修复。
 - 构建产物为 `build\launcher-signed.apk`；构建、zipalign、v1/v2/v3 签名和 ADB 覆盖安装均已验证。
@@ -77,6 +79,31 @@
 4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
 
 ## 每日修复记录（倒序）
+
+### 2026-07-29
+
+#### SMEngine稳定固定步长与刷新率识别（构建、60Hz OPPO真机验证完成）
+
+- **根因与修复**：真实长帧差值一次性送入 `Ra.T()` 会使文件夹、解锁、翻页、主题和Cell回弹突然追赶；按屏幕宣称刷新率选步长又无法处理120Hz屏幕实际只渲染60fps。新增 `AnimationFrameRateController`：默认60fps，使用无分配EMA，忽略首帧、后台/Surface恢复帧和大于25ms的异常长帧；候选档连续稳定24帧并通过迟滞后才切换60/90/120/144档。`Eb.update()` 每帧只将 `20×60/effectiveRenderFps` 送入原版 `Ra.T()`，不追赶长帧；暂停、恢复和Surface重建时重置采样。
+- **边界**：未修改文件夹Timeline、duration、scale、alpha、interpolator或局部速度倍率。
+- **验证与风险**：确定性测试得到60/90/120/144fps分别为 `20/13.333333/10/8.333333`，偶发40ms长帧不改变120档。`build.bat`、v1/v2/v3签名和OPPO PDCM00覆盖安装成功；当前OPPO只提供60Hz实际渲染，90/120/144Hz墙钟时长仍需对应真机。
+
+#### 打开文件夹内容组、标题和分页节点自适应（12/20宫格OPPO真机验证完成）
+
+- **原版对应关系**：普通12宫格为3×4，图标内容/阴影尺寸为 `160/205`；普通20宫格为4×5，对应 `118/152`。两者打开文件夹后都进入独立模式8和固定3×3布局。本机文件夹值为内容 `192`、阴影 `184`，没有按外部12/20宫格缩放；本轮不缩小文件夹图标。
+- **原版资源恢复**：临时写入 `2242x1080`、`2340x1080` 的 `-82/350/1840` 固定像素方案已撤销；两个 `layout.xml` 均恢复原版 `nameOffset/titleY/dotY=-72/253/1757`。
+- **内容组与行中心**：`FolderCellPositionAdapter` 精确门控真实 `t` 容器与模式8，按 `358×folderBookcaseWidth/1080` 计算行距。`FolderVisualGeometry` 从图标阴影尺寸扣除原版可见底边内缩，再以独立 `appLabelGap=20×scale` 计算文字中心；图标、阴影和文字的完整内容组中心用于修正每层Cell，而不是单独强推 `name_off_set_y`。
+- **标题与分页节点**：标题以书架可见顶部 `y=129/1356` 为锚点，`titleGap=300×scale`。原纹理实心外框最后一行是 `y=1224`，其下为长投影；分页点现以实心外框下沿为锚点并使用 `indicatorGap=44×scale`，OPPO节点中心Y为 `1746+44=1790`。`Z`节点实际位置和 `FolderSceneMetrics` 安全区边界消费同一结果。
+- **隔离**：没有修改共享 `LayoutProperty`、`Constants.mode()` 返回对象、普通桌面资源、关闭预览或动画。`FolderSceneMetrics` 必须同时命中精确 `FolderPageView(t)` 与模式8；OPPO日志为 `scale=1.0 translateX=0.0 translateY=0.0 clip=0,96-1080,2310`。
+- **验证**：纯计算覆盖720×1600、1080×1920、1080×2400、1440×2560、1440×3200。`build.bat`、v1/v2/v3签名和OPPO覆盖安装通过；12/20宫格普通桌面及打开文件夹无 `FATAL EXCEPTION/VerifyError`，设备最终恢复12宫格。
+- **风险**：当前文件夹只有一页，分页节点不会绘制，最终44px间距只完成纹理边界、纯计算和节点接入验证，仍需多页文件夹可见验收。其他尺寸/ROM、隐藏/加密文件夹、其他主题尚无真机矩阵。
+
+#### 普通桌面与文件夹派生布局隔离（构建、OPPO 真机验证完成）
+
+- **根因**：`fa.ir()` 是普通桌面 Page 与打开文件夹容器共用的坐标入口。本轮文件夹综合自适应把原有 `FolderCellPositionAdapter.adaptPositions(owner, points)` 改成无 owner 参数的 `FolderLayoutMetrics.adaptPositions(points)`，导致普通 12/20 宫格也收到固定三列文件夹行坐标；同时 `FolderLayoutMetrics` 通过反射把书架、标题、分页点等派生值写回传入的 `LayoutProperty`。
+- **修复**：`fa.ir()` 恢复 owner 门控，只有类层级确认为 `com.smartisanos.launcher.view.b.t` 的打开文件夹容器才复制并调整坐标；普通 `fa` Page 原样返回 `Constants.pageCellCenterPoints`。共用 `M.smali` 中本轮文件夹坐标调用保持移除。`LayoutPropertyAdapter` 遇到 `_folder` 时提前返回，不再对传入对象做文件夹专用缩放；实验性的 `FolderLayoutMetrics` 随后已完整删除。该阶段未修改 MODE_9/12/20 资源、数据库、Timeline、`Eb.update()`、`Ra.T()`、刷新率检测或动画 duration；后续阶段的变化以同日更靠上的记录为准。
+- **真机验证**：`build.bat` 成功；最终 APK 为 `v1.5.5 / versionCode 30`，v1/v2/v3 签名通过。OPPO PDCM00 (`Android 12`) 使用 `adb install -r` 覆盖安装且不清数据；冷启动 HOME 成功。12 宫格显示 3×4 原布局，20 宫格显示 4×5 原布局，图标/文字随宫格模式恢复各自尺寸，桌面设置入口位于底部，关闭文件夹预览正常，普通 Page 无文件夹书架。打开文件夹时书架只出现在文件夹页；日志无 `AndroidRuntime`/`VerifyError`。验证后已将设备从临时 20 宫格恢复到原 12 宫格。
+- **剩余风险**：本轮仅完成普通桌面恢复和单个打开文件夹的观察性检查；第二桌面页、Dock 的复杂内容、隐藏/加密板块、文件夹多页、不同分辨率/ROM 尚未形成完整真机矩阵。文件夹完整几何与高刷新率动画必须继续作为两个独立任务，不得在本修复中混做。
 
 ### 2026-07-28
 
