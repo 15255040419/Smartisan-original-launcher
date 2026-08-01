@@ -2628,6 +2628,10 @@
 
     move-result v9
 
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->textureCacheKey(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object p1
+
     invoke-static {}, Lcom/smartisanos/smengine/Ra;->getInstance()Lcom/smartisanos/smengine/Ra;
 
     move-result-object v1
@@ -2655,9 +2659,7 @@
     if-nez v0, :cond_a
 
     .line 63
-    iget-wide v2, p0, Lcom/smartisanos/launcher/data/ItemInfo;->id:J
-
-    invoke-static {v2, v3}, Lcom/smartisanos/launcher/Aa;->h(J)Landroid/graphics/Bitmap;
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->iconRawSource(Ljava/lang/Object;)Landroid/graphics/Bitmap;
 
     move-result-object p2
 
@@ -2715,9 +2717,7 @@
     iput-object v3, p0, Lcom/smartisanos/launcher/data/ItemInfo;->iconRawData:[B
 
     .line 66
-    iget-wide v3, p0, Lcom/smartisanos/launcher/data/ItemInfo;->id:J
-
-    invoke-static {v3, v4}, Lcom/smartisanos/launcher/Aa;->g(J)Landroid/graphics/Bitmap;
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->iconRawSource(Ljava/lang/Object;)Landroid/graphics/Bitmap;
 
     move-result-object v3
 
@@ -2776,6 +2776,10 @@
 
     .line 71
     :cond_5
+    invoke-static {p0, v3}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->prepareStaticSource(Ljava/lang/Object;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+
+    move-result-object v3
+
     invoke-static {v3}, Lcom/smartisanos/launcher/actions/sort/color/f;->c(Landroid/graphics/Bitmap;)Lcom/smartisanos/launcher/actions/sort/color/IconColor$ColorInfo;
 
     move-result-object p2
@@ -2998,6 +3002,19 @@
 
     .line 37
     :cond_1
+    invoke-static {p0, p1, p4, p5, p6}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->useDesktopStaticPipeline(Ljava/lang/Object;Ljava/lang/Object;ZII)Z
+
+    move-result v1
+
+    if-eqz v1, :cond_codex_original_pipeline
+
+    invoke-static {p1, p2, p3}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;Z)Lcom/smartisanos/smengine/Da;
+
+    move-result-object v0
+
+    return-object v0
+
+    :cond_codex_original_pipeline
     invoke-static {}, Lcom/smartisanos/smengine/Ra;->getInstance()Lcom/smartisanos/smengine/Ra;
 
     move-result-object v1
@@ -3024,6 +3041,40 @@
     :goto_0
     if-nez v0, :cond_8
 
+    invoke-static {p1}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->useManagedDesktopPipeline(Ljava/lang/Object;)Z
+
+    move-result v2
+
+    if-eqz v2, :cond_codex_original_static_load
+
+    invoke-static {p1}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->iconRawSource(Ljava/lang/Object;)Landroid/graphics/Bitmap;
+
+    move-result-object v3
+
+    invoke-static {p1, v3}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->prepareStaticSource(Ljava/lang/Object;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+
+    move-result-object v3
+
+    if-eqz v3, :cond_codex_original_static_load
+
+    invoke-static {v3, p5}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->composeStaticIconTexture(Landroid/graphics/Bitmap;I)Landroid/graphics/Bitmap;
+
+    move-result-object p0
+
+    if-eqz p4, :cond_codex_managed_ready
+
+    const/16 v2, 0x23
+
+    invoke-static {p0, v2}, Lcom/smartisanos/launcher/e/s;->c(Landroid/graphics/Bitmap;I)Landroid/graphics/Bitmap;
+
+    move-result-object p0
+
+    :cond_codex_managed_ready
+    const/4 v2, 0x1
+
+    goto :goto_codex_primary_texture_ready
+
+    :cond_codex_original_static_load
     .line 40
     iget-wide v2, p1, Lcom/smartisanos/launcher/data/ItemInfo;->id:J
 
@@ -3182,6 +3233,7 @@
 
     move-result-object p0
 
+    :goto_codex_primary_texture_ready
     .line 53
     new-instance v0, Lcom/smartisanos/smengine/Da;
 

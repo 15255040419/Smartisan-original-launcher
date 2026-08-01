@@ -18,6 +18,7 @@ public class SettingItemText extends LinearLayout {
     protected TextView mTitle;
     protected TextView mSummary;
     protected TextView mSubTitle;
+    protected TextView mValue;
     protected FrameLayout framelayout;
     protected LinearLayout mTextContainer;
 
@@ -63,9 +64,16 @@ public class SettingItemText extends LinearLayout {
     }
 
     protected void initRightWidget() {
+        if (mValue != null) {
+            removeView(mValue);
+        }
         if (mArrow != null) {
             removeView(mArrow);
         }
+        mValue = text(getContext(), 14, 0xff878c96, false);
+        mValue.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        mValue.setSingleLine(true);
+        addView(mValue, new LayoutParams(LayoutParams.WRAP_CONTENT, -1));
         mArrow = text(getContext(), 26, 0xffb7b7b7, false);
         mArrow.setText(">");
         mArrow.setGravity(Gravity.CENTER);
@@ -101,6 +109,17 @@ public class SettingItemText extends LinearLayout {
 
     public TextView getSubTitleView() {
         return mSubTitle;
+    }
+
+    public void setValue(CharSequence value) {
+        if (mValue != null) {
+            mValue.setText(value == null ? "" : value);
+            mValue.setVisibility(value == null || value.length() == 0 ? GONE : VISIBLE);
+        }
+    }
+
+    public void setArrowVisible(boolean visible) {
+        if (mArrow != null) mArrow.setVisibility(visible ? VISIBLE : INVISIBLE);
     }
 
     public void setBackgroundStyle(int style) {
@@ -157,7 +176,11 @@ public class SettingItemText extends LinearLayout {
     }
 
     private static CharSequence firstText(Context context, AttributeSet attrs, String name) {
-        CharSequence value = readText(context, attrs, "http://schemas.android.com/apk/res/smartisanos", name);
+        CharSequence value = readText(context, attrs, "http://schemas.android.com/apk/res-auto", name);
+        if (value != null) {
+            return value;
+        }
+        value = readText(context, attrs, "http://schemas.android.com/apk/res/smartisanos", name);
         if (value != null) {
             return value;
         }

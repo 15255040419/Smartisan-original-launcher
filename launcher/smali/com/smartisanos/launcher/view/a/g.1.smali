@@ -744,6 +744,12 @@
 
     .line 28
     :cond_5
+    const/4 v1, 0x0
+
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconRootGeometry(Ljava/lang/Object;Ljava/lang/Object;)V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconShadowOwnership(Ljava/lang/Object;)V
+
     iget-object p0, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
 
     aget-object p0, p0, v5
@@ -3029,11 +3035,11 @@
     if-eqz v0, :cond_0
 
     .line 2
-    iget-object p0, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
 
-    aput-object v0, p0, p1
+    aput-object v0, v1, p1
 
-    return-object v0
+    goto :active_raster_diag
 
     :cond_0
     if-nez p1, :cond_1
@@ -3154,9 +3160,27 @@
     .line 13
     :cond_a
     :goto_0
-    iget-object p0, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/a/g;->sc:[Lcom/smartisanos/smengine/SceneNode;
 
-    aput-object v0, p0, p1
+    aput-object v0, v1, p1
+
+    :active_raster_diag
+    const/4 v1, 0x1
+
+    if-eq p1, v1, :active_raster_diag_run
+
+    const/4 v1, 0x7
+
+    if-ne p1, v1, :active_raster_diag_done
+
+    :active_raster_diag_run
+    const/4 v1, 0x0
+
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconRootGeometry(Ljava/lang/Object;Ljava/lang/Object;)V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconShadowOwnership(Ljava/lang/Object;)V
+
+    :active_raster_diag_done
 
     return-object v0
 .end method
@@ -8588,6 +8612,12 @@
 
     move-result-object v0
 
+    iget-object v2, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    invoke-static {v2, v0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->desktopTextureCacheKey(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v0
+
     iput-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->TH:Ljava/lang/String;
 
     .line 3
@@ -8721,11 +8751,13 @@
 
     invoke-virtual {v1, p1}, Lcom/smartisanos/smengine/SceneNode;->setLayer(I)V
 
-    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconRootGeometry(Ljava/lang/Object;Ljava/lang/Object;)V
-
     .line 15
     :cond_2
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconRootGeometry(Ljava/lang/Object;Ljava/lang/Object;)V
+
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->rl()V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconShadowOwnership(Ljava/lang/Object;)V
 
     return-object v1
 .end method
@@ -9871,6 +9903,12 @@
 
     move-result-object p2
 
+    iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    invoke-static {v0, p2}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->desktopTextureCacheKey(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object p2
+
     iput-object p2, p0, Lcom/smartisanos/launcher/view/a/g;->TH:Ljava/lang/String;
 
     .line 7
@@ -10765,6 +10803,12 @@
 
     move-result-object v0
 
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    invoke-static {v1, v0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->desktopTextureCacheKey(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object v0
+
     iput-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->TH:Ljava/lang/String;
 
     .line 3
@@ -10904,11 +10948,15 @@
     .line 17
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->rl()V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconShadowOwnership(Ljava/lang/Object;)V
+
     goto :goto_1
 
     .line 18
     :cond_2
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->an()V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconShadowOwnership(Ljava/lang/Object;)V
 
     .line 19
     :cond_3
@@ -14385,6 +14433,8 @@
     sget-boolean v1, Lcom/smartisanos/launcher/data/Constants;->SHOW_ICON_SHADOW_LIST:Z
 
     invoke-virtual {p0, v0, v1}, Lcom/smartisanos/launcher/view/a/g;->i(IZ)V
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconShadowOwnership(Ljava/lang/Object;)V
 
     return-void
 .end method

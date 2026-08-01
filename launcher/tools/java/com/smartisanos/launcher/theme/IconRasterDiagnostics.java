@@ -1,10 +1,12 @@
 package com.smartisanos.launcher.theme;
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.util.DisplayMetrics;
 import android.util.Log;
 
@@ -19,16 +21,36 @@ public final class IconRasterDiagnostics {
 
     /** The one physical raster contract used by every launcher icon source. */
     public static final class NormalIconRasterSpec {
+        public final int logicalArtworkWidth;
+        public final int logicalArtworkHeight;
+        public final int logicalTextureWidth;
+        public final int logicalTextureHeight;
+        public final int physicalArtworkWidth;
+        public final int physicalArtworkHeight;
+        public final int physicalTextureWidth;
+        public final int physicalTextureHeight;
         public final int artworkWidth;
         public final int textureWidth;
         public final float artworkInset;
         public final float rasterScale;
         public final String id;
 
-        private NormalIconRasterSpec(int artworkWidth, int textureWidth,
+        private NormalIconRasterSpec(int logicalArtworkWidth, int logicalArtworkHeight,
+                int logicalTextureWidth, int logicalTextureHeight,
+                int physicalArtworkWidth, int physicalArtworkHeight,
+                int physicalTextureWidth, int physicalTextureHeight,
                 float artworkInset, float rasterScale, String id) {
-            this.artworkWidth = artworkWidth;
-            this.textureWidth = textureWidth;
+            this.logicalArtworkWidth = logicalArtworkWidth;
+            this.logicalArtworkHeight = logicalArtworkHeight;
+            this.logicalTextureWidth = logicalTextureWidth;
+            this.logicalTextureHeight = logicalTextureHeight;
+            this.physicalArtworkWidth = physicalArtworkWidth;
+            this.physicalArtworkHeight = physicalArtworkHeight;
+            this.physicalTextureWidth = physicalTextureWidth;
+            this.physicalTextureHeight = physicalTextureHeight;
+            // Compatibility aliases for the already-shipped static raster path.
+            this.artworkWidth = physicalArtworkWidth;
+            this.textureWidth = physicalTextureWidth;
             this.artworkInset = artworkInset;
             this.rasterScale = rasterScale;
             this.id = id;
@@ -99,13 +121,126 @@ public final class IconRasterDiagnostics {
         return source;
     }
 
+    /** Decodes the persisted source bytes without Aa.h()'s layout-size resample. */
+    public static Bitmap iconRawSource(Object itemInfo) {
+        if (itemInfo == null) return null;
+        try {
+            Object value = itemInfo.getClass().getField("iconRawData").get(itemInfo);
+            if (!(value instanceof byte[])) return null;
+            byte[] bytes = (byte[]) value;
+            return bytes.length == 0 ? null
+                    : BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Keeps native managed artwork intact. Default PackageManager artwork is
+     * reloaded only when a previous grid mode left a differently-sized source
+     * bitmap, then rendered directly into the current original artwork canvas.
+     */
+    public static Bitmap prepareStaticSource(Object itemInfo, Bitmap cachedSource) {
+        boolean managed = MaintainedLauncherSettingsHost.hasEffectiveManagedIcon(itemInfo);
+        NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
+        int logicalArtwork = currentLayoutSize("icon_size_origin");
+        int required = managed && spec != null ? spec.artworkWidth : logicalArtwork;
+        if (required <= 0) return cachedSource;
+        if (cachedSource != null && !cachedSource.isRecycled()) {
+            boolean sufficient = managed
+                    ? cachedSource.getWidth() >= required && cachedSource.getHeight() >= required
+                    : cachedSource.getWidth() == required && cachedSource.getHeight() == required;
+            if (sufficient) return cachedSource;
+        }
+
+        Drawable drawable = loadCurrentDesktopDrawable(itemInfo);
+        if (drawable != null) {
+            if (managed) {
+                Bitmap nativeSource = sourceBitmap(drawable);
+                if (nativeSource != null) {
+                    recycleIfOwned(cachedSource, nativeSource);
+                    return nativeSource;
+                }
+            } else {
+                Bitmap exact = Bitmap.createBitmap(required, required, Bitmap.Config.ARGB_8888);
+                Canvas canvas = new Canvas(exact);
+                Rect previous = new Rect(drawable.getBounds());
+                drawable.setBounds(0, 0, required, required);
+                drawable.draw(canvas);
+                drawable.setBounds(previous);
+                recycleIfOwned(cachedSource, exact);
+                Log.i(TAG, "ICON_SOURCE_RELOADED_DIRECT packageName="
+                        + itemField(itemInfo, "packageName")
+                        + " targetArtwork=" + required + " reason=grid_or_raster_changed");
+                return exact;
+            }
+        }
+        return rasterizeStaticIcon(cachedSource, required);
+    }
+
+    /**
+     * Only ordinary desktop static application Cells use the source-to-final
+     * path. Active icons, folders, black/white special rendering and off-size
+     * animation textures retain their original pipeline.
+     */
+    public static boolean useDesktopStaticPipeline(Object activeIcon, Object itemInfo,
+            boolean blackWhite, int width, int height) {
+        if (itemInfo == null || blackWhite || isOriginalActiveIcon(itemInfo)) {
+            return false;
+        }
+        String className = itemInfo.getClass().getName();
+        if (className.endsWith(".FolderInfo")
+                || itemField(itemInfo, "packageName").isEmpty()) {
+            return false;
+        }
+        int mode = currentPageMode();
+        int folderMode = currentFolderMode();
+        int texture = currentLayoutSize("icon_size_with_shadow");
+        return mode != folderMode && texture > 0 && width == texture && height == texture;
+    }
+
+    public static boolean useManagedDesktopPipeline(Object itemInfo) {
+        return itemInfo != null
+                && !itemInfo.getClass().getName().endsWith(".FolderInfo")
+                && !itemField(itemInfo, "packageName").isEmpty()
+                && currentPageMode() != currentFolderMode()
+                && !isOriginalActiveIcon(itemInfo)
+                && MaintainedLauncherSettingsHost.hasEffectiveManagedIcon(itemInfo);
+    }
+
+    private static Drawable loadCurrentDesktopDrawable(Object itemInfo) {
+        try {
+            Class<?> launcher = Class.forName("com.smartisanos.launcher.ja");
+            Object instance = launcher.getMethod("getInstance").invoke(null);
+            Object context = launcher.getMethod("getApplication").invoke(instance);
+            if (!(context instanceof android.content.Context)) return null;
+            return MaintainedLauncherSettingsHost.loadIconForDesktopItem(
+                    (android.content.Context) context,
+                    itemField(itemInfo, "packageName"),
+                    itemField(itemInfo, "componentName"),
+                    itemField(itemInfo, "title"));
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static void recycleIfOwned(Bitmap oldBitmap, Bitmap replacement) {
+        if (oldBitmap != null && oldBitmap != replacement && !oldBitmap.isRecycled()) {
+            oldBitmap.recycle();
+        }
+    }
+
     /**
      * Composes one final texture from source artwork.  The source is never
      * resized to the launcher logical size first; the only resample is directly
      * into the physical-artwork rectangle on the physical shadow texture.
      */
     public static Bitmap composeStaticIconTexture(Bitmap source) {
-        return composeTexture(source, false);
+        return composeTexture(source, false, 0);
+    }
+
+    public static Bitmap composeStaticIconTexture(Bitmap source, int logicalTexturePx) {
+        return composeTexture(source, false, logicalTexturePx);
     }
 
     /**
@@ -114,7 +249,7 @@ public final class IconRasterDiagnostics {
      * icon_size_origin bitmap, so a 2K texture is never enlarged from 160/192.
      */
     public static Bitmap composeNormalizedFallbackTexture(Bitmap source) {
-        return composeTexture(source, true);
+        return composeTexture(source, true, 0);
     }
 
     /**
@@ -133,16 +268,36 @@ public final class IconRasterDiagnostics {
         int logicalHeight = Math.max(1, currentConstant("window_height", metrics.heightPixels));
         float scaleX = metrics.widthPixels / (float) logicalWidth;
         float scaleY = metrics.heightPixels / (float) logicalHeight;
-        float rasterScale = Math.max(scaleX, scaleY);
+        /*
+         * The desktop scene is uniformly fitted into the render surface.  A
+         * taller screen is not a larger icon scale: status/navigation insets
+         * commonly make the physical/logical height ratio differ while the
+         * horizontal grid is already exact.  Using max(scaleX, scaleY) made
+         * icon textures larger than their SceneNodes on tall displays and the
+         * node then clipped the right/bottom artwork.  Conversely, taking the
+         * smaller axis shrinks icons when the app surface excludes system bars.
+         * Launcher grid geometry is width-owned, so its physical raster scale
+         * is the horizontal physical/logical ratio only. LayoutPropertyAdapter
+         * has already handled any short-screen fit in the logical dimensions.
+         */
+        float rasterScale = scaleX;
+        if (!(rasterScale > 0f) || Float.isInfinite(rasterScale)
+                || Float.isNaN(rasterScale)) {
+            rasterScale = 1f;
+        }
         int artwork = (int) Math.ceil(logicalArtwork * rasterScale);
         int texture = (int) Math.ceil(logicalTexture * rasterScale);
-        return new NormalIconRasterSpec(artwork, texture, (texture - artwork) * 0.5f,
-                rasterScale, "normal:" + artwork + 'x' + texture + ':'
+        return new NormalIconRasterSpec(
+                logicalArtwork, logicalArtwork, logicalTexture, logicalTexture,
+                artwork, artwork, texture, texture,
+                (texture - artwork) * 0.5f,
+                rasterScale, "normal:v6:" + artwork + 'x' + texture + ':'
                         + metrics.widthPixels + 'x' + metrics.heightPixels + ':'
                         + currentPageMode());
     }
 
-    private static Bitmap composeTexture(Bitmap source, boolean normalizedFallback) {
+    private static Bitmap composeTexture(Bitmap source, boolean normalizedFallback,
+            int actualLogicalTexture) {
         if (source == null || source.isRecycled()) return source;
         int logicalArtwork = currentLayoutSize("icon_size_origin");
         int logicalTexture = currentLayoutSize("icon_size_with_shadow");
@@ -156,8 +311,11 @@ public final class IconRasterDiagnostics {
         float rasterScale = spec.rasterScale;
         int artwork = spec.artworkWidth;
         int texture = spec.textureWidth;
-        Bitmap result = Bitmap.createBitmap(texture, texture, Bitmap.Config.ARGB_8888);
-        float inset = (texture - artwork) * 0.5f;
+        if (actualLogicalTexture > 0 && logicalTexture > 0) {
+            texture = Math.max(1, (int) Math.ceil(actualLogicalTexture * rasterScale));
+            artwork = Math.max(1, Math.round(texture
+                    * (logicalArtwork / (float) logicalTexture)));
+        }
         float contentInset = 0f;
         if (normalizedFallback) {
             int logicalResizedArtwork = currentLayoutSize("icon_size_origin_resize");
@@ -170,12 +328,29 @@ public final class IconRasterDiagnostics {
                 contentSize / Math.max(1, source.getHeight()));
         float drawWidth = source.getWidth() * sourceScale;
         float drawHeight = source.getHeight() * sourceScale;
-        float drawLeft = inset + contentInset + (contentSize - drawWidth) * 0.5f;
-        float drawTop = inset + contentInset + (contentSize - drawHeight) * 0.5f;
+        float drawLeftInArtwork = contentInset + (contentSize - drawWidth) * 0.5f;
+        float drawTopInArtwork = contentInset + (contentSize - drawHeight) * 0.5f;
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
-        Canvas canvas = new Canvas(result);
-        canvas.drawBitmap(source, new Rect(0, 0, source.getWidth(), source.getHeight()),
-                new RectF(drawLeft, drawTop, drawLeft + drawWidth, drawTop + drawHeight), paint);
+        Bitmap physicalArtwork = Bitmap.createBitmap(
+                artwork, artwork, Bitmap.Config.ARGB_8888);
+        Canvas artworkCanvas = new Canvas(physicalArtwork);
+        artworkCanvas.drawBitmap(source, new Rect(0, 0, source.getWidth(), source.getHeight()),
+                new RectF(drawLeftInArtwork, drawTopInArtwork,
+                        drawLeftInArtwork + drawWidth, drawTopInArtwork + drawHeight), paint);
+        Bitmap result = LauncherSettingBridge.composeStaticIconTextureWithOriginalShadow(
+                physicalArtwork, texture, rasterScale);
+        float artworkLeft = (texture - artwork) * 0.5f;
+        float artworkTop = (texture - artwork) * 0.25f;
+        float drawLeft = artworkLeft + drawLeftInArtwork;
+        float drawTop = artworkTop + drawTopInArtwork;
+        if (result == null) {
+            result = Bitmap.createBitmap(texture, texture, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(result);
+            canvas.drawBitmap(physicalArtwork, artworkLeft, artworkTop, paint);
+            Log.w(TAG, "ICON_STATIC_SHADOW_FALLBACK targetArtwork="
+                    + artwork + " targetTexture=" + texture);
+        }
+        physicalArtwork.recycle();
         Log.i(TAG, "ICON_PIPELINE_SELECTED pipeline="
                 + (normalizedFallback ? "NORMALIZED_HIGH_RES_FALLBACK" : "DIRECT_HIGH_RES_STATIC")
                 + " sourceType=" + (normalizedFallback ? "APK_LEGACY_DRAWABLE" : "RESOURCE_STATIC")
@@ -222,6 +397,7 @@ public final class IconRasterDiagnostics {
 
     /** Keeps the SMEngine in-memory texture cache separate per physical raster. */
     public static String textureCacheKey(Object itemInfo, String baseKey) {
+        if (baseKey == null || baseKey.contains("#raster:v6:")) return baseKey;
         DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
         NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
         if (spec == null) return baseKey;
@@ -235,14 +411,28 @@ public final class IconRasterDiagnostics {
         int pageMode = currentPageMode();
         String themeMode = String.valueOf(currentConstant("isTransparentTheme", 0));
         int iconPercent = Math.round(logicalArtwork * 100f / Math.max(1, baseIconSize(pageMode)));
-        String pipeline = isOriginalActiveIcon(itemInfo) ? "ORIGINAL_ACTIVE_ICON" : "STATIC_V4_COMPONENT_SOURCE";
-        String key = baseKey + "#raster:v4:" + packageName + ':' + componentName + ':' + userId + ':'
+        String pipeline = isOriginalActiveIcon(itemInfo) ? "ORIGINAL_ACTIVE_ICON" : "STATIC_V6_COMPONENT_SOURCE";
+        String key = baseKey + "#raster:v6:" + packageName + ':' + componentName + ':' + userId + ':'
                 + sourceHash + ':' + artwork + 'x' + artwork + ':' + texture + 'x' + texture
                 + ':' + metrics.widthPixels + 'x' + metrics.heightPixels + ':' + metrics.densityDpi
                 + ':' + iconPercent + ':' + pageMode + ':' + themeMode + ':' + pipeline;
         Log.i(TAG, "ICON_CACHE_PIPELINE_KEY packageName=" + packageName
                 + " pipeline=" + pipeline + " finalCacheKey=" + key);
         return key;
+    }
+
+    /** Returns a size-aware key only for ordinary desktop static application Cells. */
+    public static String desktopTextureCacheKey(Object itemInfo, String baseKey) {
+        if (baseKey == null || itemInfo == null
+                || itemInfo.getClass().getName().endsWith(".FolderInfo")
+                || itemField(itemInfo, "packageName").isEmpty()
+                || currentPageMode() == currentFolderMode()) {
+            return baseKey;
+        }
+        if (isOriginalActiveIcon(itemInfo)) {
+            return ActiveIconRasterSpec.frameCacheKey(textureCacheKey(itemInfo, baseKey));
+        }
+        return textureCacheKey(itemInfo, baseKey);
     }
 
     public static void reportTextureCacheLookup(String key, boolean hit) {
@@ -357,6 +547,16 @@ public final class IconRasterDiagnostics {
             return constants.getField(fieldName).getInt(null);
         } catch (Throwable ignored) {
             return fallback;
+        }
+    }
+
+    private static int currentFolderMode() {
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            return ((Integer) constants.getMethod("getPAGE_1_3X3_MODE_FOLDER")
+                    .invoke(null)).intValue();
+        } catch (Throwable ignored) {
+            return Integer.MIN_VALUE;
         }
     }
 

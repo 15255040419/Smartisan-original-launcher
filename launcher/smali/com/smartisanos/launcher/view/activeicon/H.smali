@@ -5944,9 +5944,11 @@
 
     iget v3, v3, Lcom/smartisanos/launcher/data/LayoutProperty;->weather_back_size:F
 
-    float-to-int v5, v3
+    invoke-static {v3}, Lcom/smartisanos/launcher/theme/ActiveIconRasterSpec;->physicalArtworkWidth(F)I
 
-    float-to-int v3, v3
+    move-result v5
+
+    move v3, v5
 
     .line 3
     invoke-virtual {v2}, Landroid/graphics/Bitmap;->getConfig()Landroid/graphics/Bitmap$Config;
@@ -5962,6 +5964,18 @@
     new-instance v5, Landroid/graphics/Canvas;
 
     invoke-direct {v5, v3}, Landroid/graphics/Canvas;-><init>(Landroid/graphics/Bitmap;)V
+
+    iget-object v9, v0, Lcom/smartisanos/launcher/view/activeicon/H;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    iget v9, v9, Lcom/smartisanos/launcher/data/LayoutProperty;->weather_back_size:F
+
+    const-string v10, "weather"
+
+    invoke-static {v10, v9}, Lcom/smartisanos/launcher/theme/ActiveIconRasterSpec;->cachedArtworkScale(Ljava/lang/String;F)F
+
+    move-result v9
+
+    invoke-virtual {v5, v9, v9}, Landroid/graphics/Canvas;->scale(FF)V
 
     .line 6
     new-instance v6, Landroid/graphics/Paint;

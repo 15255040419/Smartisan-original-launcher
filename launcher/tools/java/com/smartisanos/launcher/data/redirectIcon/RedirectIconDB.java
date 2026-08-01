@@ -171,6 +171,11 @@ public final class RedirectIconDB {
         sHasManagedIconOverride = null;
     }
 
+    /** Invalidates only metadata state after an atomic backup restore. */
+    public static void invalidateCaches() {
+        sHasManagedIconOverride = null;
+    }
+
     public static Map<String, RedirectIconInfo> getIconTableData(Context context, boolean loadIcon) {
         HashMap<String, RedirectIconInfo> out = new HashMap<String, RedirectIconInfo>();
         if (context == null) {

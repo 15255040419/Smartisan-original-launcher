@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/follow_title_top"
+        android:layout_marginBottom="@dimen/follow_title_bottom"
+        android:gravity="left|center"
+        android:paddingLeft="@dimen/setting_item_text_left"
+        android:text="@string/usage_tips_title"
+        android:textColor="@color/follow_title_text_color"
+        android:textSize="@dimen/follow_title_text_size" />
+
+    <include layout="@layout/setting_tips_desktop_gestures" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/follow_title_top"
+        android:layout_marginBottom="@dimen/follow_title_bottom"
+        android:gravity="left|center"
+        android:paddingLeft="@dimen/setting_item_text_left"
+        android:text="@string/usage_tips_dynamic_weather_calendar_group"
+        android:textColor="@color/follow_title_text_color"
+        android:textSize="@dimen/follow_title_text_size" />
+
+    <include layout="@layout/setting_tips_dynamic_weather_calendar" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/follow_title_top"
+        android:layout_marginBottom="@dimen/follow_title_bottom"
+        android:gravity="left|center"
+        android:paddingLeft="@dimen/setting_item_text_left"
+        android:text="@string/usage_tips_ocd_group"
+        android:textColor="@color/follow_title_text_color"
+        android:textSize="@dimen/follow_title_text_size" />
+
+    <include layout="@layout/setting_tips_ocd" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/follow_title_top"
+        android:layout_marginBottom="@dimen/follow_title_bottom"
+        android:gravity="left|center"
+        android:paddingLeft="@dimen/setting_item_text_left"
+        android:text="@string/usage_tips_shortcuts_group"
+        android:textColor="@color/follow_title_text_color"
+        android:textSize="@dimen/follow_title_text_size" />
+
+    <include layout="@layout/setting_tips_shortcuts" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/settings_item_bottom_margin" />
+</LinearLayout>

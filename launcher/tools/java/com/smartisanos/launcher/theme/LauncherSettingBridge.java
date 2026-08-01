@@ -3,7 +3,6 @@ package com.smartisanos.launcher.theme;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.provider.Settings;
@@ -18,13 +17,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 
 public final class LauncherSettingBridge {
-    // Keep cached and live active-icon frames on the footprint verified in v1.5.3.
-    private static final float ACTIVE_ICON_OPTICAL_SCALE = 0.7332f;
-    // Original active-icon anchor: (icon_size_with_shadow - icon_size_origin) / 4.
-    private static final float ACTIVE_ICON_UP_OFFSET = 0.05487805f;
     private static final String PREFS = "com.smartisanos.launcher_prefs";
     private static final String SETTINGS_PREFS = "launcher_settings";
     private static final String KEY_ICON_SIZE = "launcher_icon_size";
@@ -32,13 +26,17 @@ public final class LauncherSettingBridge {
     private static final int SHADOW_DARK = 0;
     private static final int SHADOW_LIGHT = 1;
     private static final int SHADOW_TRANSPARENT = 2;
+    private static final int STATIC_ICON_SHADOW_ALPHA_CUTOFF = 128;
     private static volatile String sLastLoggedShadowSpec;
+    private static volatile Method sOriginalStaticShadowMethod;
+    private static volatile boolean sOriginalStaticShadowResolveFailed;
     private static final Object ACTIVE_ICON_SHADOW_LOCK = new Object();
     private static final Map<String, String> ACTIVE_ICON_LIVE_SHADOW_CACHE = new HashMap<>();
     private static final Set<String> LOGGED_CACHED_FRAME_COMPOSITIONS = new HashSet<>();
-    // v1 treated pb.path() values as filesystem paths.  They are normally theme-asset
-    // paths, so keep corrected products isolated from any stale cache entries.
-    private static final String ACTIVE_ICON_SHADOW_CACHE_DIR = "active_icon_shadow_v2";
+    // v1 treated pb.path() values as filesystem paths. They are normally theme-asset
+    // paths. v4 also switches ActiveIcon shadows to the original static shadow
+    // generator, so keep corrected products isolated from stale software-blur entries.
+    private static final String ACTIVE_ICON_SHADOW_CACHE_DIR = "active_icon_shadow_v5";
     public static final String KEY_DYNAMIC_WEATHER_CALENDAR =
             "launcher_dynamic_weather_calendar_enabled";
 
@@ -189,75 +187,82 @@ public final class LauncherSettingBridge {
         return effectiveIconSizePercent(normalizeIconSizePercent(readInt(context, KEY_ICON_SIZE, 100)));
     }
 
-    /** Keeps live weather/calendar roots on the same optical scale as v1.5.3. */
-    public static float readActiveIconScaleFactor() {
-        try {
-            Class<?> proxy = Class.forName("com.smartisanos.launcher.ja");
-            Object instance = proxy.getMethod("getInstance").invoke(null);
-            if (instance != null) {
-                Object application = proxy.getMethod("getApplication").invoke(instance);
-                if (application instanceof Context) {
-                    return readIconSizePercent((Context) application) / 100.0f
-                            * ACTIVE_ICON_OPTICAL_SCALE;
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return 1.20f * ACTIVE_ICON_OPTICAL_SCALE;
-    }
-
-    /** Static-frame optical correction; the live node keeps the original nc(vm) anchor. */
-    public static float activeIconUpOffset(float iconSize) {
-        return Math.max(0.0f, iconSize * ACTIVE_ICON_UP_OFFSET);
-    }
-
     /**
-     * Creates the cached weather/calendar frame.  The passed-in images belong to the
-     * original caller, so this method must never recycle either of them.
+     * Places the original cached ActiveIcon artwork into the same physical
+     * texture contract as an ordinary static icon. SceneNode geometry remains
+     * untouched; the root is used only to locate the matching live shadow
+     * texture so cached and live states share one visual owner.
      */
-    public static Bitmap composeActiveIconToBaseBounds(Bitmap base, Bitmap active) {
-        if (base == null) return active;
+    public static Bitmap composeActiveIconToBaseBounds(
+            Object activeRoot, Bitmap base, Bitmap active) {
         if (active == null) return base;
-        int width = base.getWidth();
-        int height = base.getHeight();
-        float scale = Math.min(width / (float) Math.max(1, active.getWidth()),
-                height / (float) Math.max(1, active.getHeight())) * ACTIVE_ICON_OPTICAL_SCALE;
-        int dstLeft = Math.round((width - active.getWidth() * scale) * 0.5f);
-        int dstTop = Math.round((height - active.getHeight() * scale) * 0.5f
-                - activeIconUpOffset(Math.min(width, height)));
-        int dstRight = dstLeft + Math.round(active.getWidth() * scale);
-        int dstBottom = dstTop + Math.round(active.getHeight() * scale);
-        Bitmap artwork = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas artworkCanvas = new Canvas(artwork);
-        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-        android.graphics.Rect src = new android.graphics.Rect(0, 0, active.getWidth(), active.getHeight());
-        android.graphics.Rect dst = new android.graphics.Rect(dstLeft, dstTop, dstRight, dstBottom);
-        artworkCanvas.drawBitmap(active, src, dst, paint);
-
+        ActiveIconRasterSpec raster = ActiveIconRasterSpec.resolve();
+        if (raster == null || raster.physicalArtworkWidth <= 0
+                || raster.physicalTextureWidth <= 0) {
+            return active;
+        }
+        int width = raster.physicalTextureWidth;
+        int height = raster.physicalTextureHeight;
+        int artworkWidth = raster.physicalArtworkWidth;
+        int artworkHeight = raster.physicalArtworkHeight;
+        int dstLeft = Math.round((width - artworkWidth) * 0.5f);
+        int dstTop = Math.round((height - artworkHeight) * 0.25f);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG
+                | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
         EffectiveIconShadowSpec shadowSpec = effectiveIconShadowSpec();
         boolean logCachedFrame = shouldLogCachedFrame("CACHED_ACTIVE", width, height, shadowSpec);
         if (logCachedFrame) {
             logCachedFrameComposeStarted("CACHED_ACTIVE", width, height, shadowSpec);
         }
-        Bitmap shadowOnly = createShadowOnlyBitmap(artwork, shadowSpec);
         Bitmap result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(result);
-        if (shadowOnly != null) {
-            canvas.drawBitmap(shadowOnly, 0.0f, 0.0f, paint);
+
+        Bitmap sharedShadow = null;
+        try {
+            Object shadowNode = findLiveShadow(activeRoot);
+            if (shadowNode != null) {
+                Object texture = invoke(shadowNode, "getTextureName", Integer.valueOf(0));
+                if (texture instanceof String) {
+                    String path = (String) texture;
+                    sharedShadow = BitmapFactory.decodeFile(path);
+                    if (sharedShadow == null) {
+                        sharedShadow = decodeActiveIconShadowSource(path, "CACHED_ACTIVE");
+                    }
+                }
+            }
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_CACHED_SHARED_SHADOW_LOOKUP_FAILED class="
+                    + error.getClass().getSimpleName());
+        }
+        if (sharedShadow != null && !sharedShadow.isRecycled()) {
+            float artworkCenterX = dstLeft + artworkWidth * 0.5f;
+            float artworkCenterY = dstTop + artworkHeight * 0.5f;
+            float shadowLeft = artworkCenterX - sharedShadow.getWidth() * 0.5f;
+            float shadowTop = artworkCenterY - sharedShadow.getHeight() * 0.5f;
+            canvas.drawBitmap(sharedShadow, shadowLeft, shadowTop, paint);
             if (logCachedFrame) {
                 Log.d(TAG, "ACTIVE_ICON_CACHED_FRAME_SHADOW_CREATED type=CACHED_ACTIVE"
-                        + " width=" + width + " height=" + height
-                        + " shadowWidth=" + shadowOnly.getWidth()
-                        + " shadowHeight=" + shadowOnly.getHeight()
+                        + " owner=DynamicShadowNode"
+                        + " shadowWidth=" + sharedShadow.getWidth()
+                        + " shadowHeight=" + sharedShadow.getHeight()
                         + shadowLogSuffix(shadowSpec));
             }
-            shadowOnly.recycle();
+            sharedShadow.recycle();
         }
-        canvas.drawBitmap(artwork, 0.0f, 0.0f, paint);
-        artwork.recycle();
+
+        canvas.drawBitmap(active,
+                new android.graphics.Rect(0, 0, active.getWidth(), active.getHeight()),
+                new android.graphics.Rect(dstLeft, dstTop,
+                        dstLeft + artworkWidth, dstTop + artworkHeight), paint);
+        if (base != null && base != result && !base.isRecycled()) base.recycle();
+        if (active != result && !active.isRecycled()) active.recycle();
         if (logCachedFrame) {
             Log.d(TAG, "ACTIVE_ICON_CACHED_FRAME_COMPOSE_FINISHED type=CACHED_ACTIVE"
-                    + " width=" + width + " height=" + height + shadowLogSuffix(shadowSpec));
+                    + " width=" + width + " height=" + height
+                    + " artwork=" + artworkWidth + "x" + artworkHeight
+                    + " opticalScale=removed"
+                    + " rasterScale=" + raster.rasterScale
+                    + shadowLogSuffix(shadowSpec));
         }
         return result;
     }
@@ -298,29 +303,172 @@ public final class LauncherSettingBridge {
         return field.get(null);
     }
 
-    /** Shared software renderer for active weather/calendar cached frames. */
-    private static Bitmap createShadowOnlyBitmap(Bitmap silhouette, EffectiveIconShadowSpec spec) {
-        if (silhouette == null || spec == null) {
+    /**
+     * Renders the ActiveIcon shadow with the same original helper and vertical
+     * anchor used by managed static icons. The returned bitmap contains only
+     * the two generated shadow layers; the live background remains a separate
+     * original ActiveIcon SceneNode.
+     */
+    private static Bitmap createActiveIconShadowWithOriginalGenerator(
+            Bitmap silhouette, EffectiveIconShadowSpec spec, float physicalScale,
+            int canvasSize, int artworkPadding) {
+        if (silhouette == null || spec == null || canvasSize <= 0) {
             return null;
         }
+        float safeScale = physicalScale > 0.0f ? physicalScale : 1.0f;
         Bitmap result = Bitmap.createBitmap(
-                silhouette.getWidth(), silhouette.getHeight(), Bitmap.Config.ARGB_8888);
+                canvasSize, canvasSize, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(result);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG
+                | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+        int generated = 0;
         for (int i = 0; i < spec.radii.length && i < spec.colors.length; i++) {
-            int radius = spec.radii[i];
-            if (radius <= 0) {
+            float radius = spec.radii[i] * safeScale;
+            if (radius <= 0.0f) {
                 continue;
             }
-            Paint blurPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-            blurPaint.setMaskFilter(new BlurMaskFilter(radius, BlurMaskFilter.Blur.NORMAL));
-            int[] offset = new int[2];
-            Bitmap alpha = silhouette.extractAlpha(blurPaint, offset);
-            Paint colorPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-            colorPaint.setColor(spec.colors[i]);
-            canvas.drawBitmap(alpha, offset[0], offset[1] + Math.max(1, radius / 4), colorPaint);
-            alpha.recycle();
+            Bitmap shadow = invokeOriginalStaticShadow(
+                    silhouette, radius, spec.colors[i]);
+            if (shadow == null) {
+                continue;
+            }
+            float shadowLeft = (canvasSize - shadow.getWidth()) * 0.5f;
+            float shadowTop = artworkPadding - Math.round(radius)
+                    + Math.round(Math.sqrt(radius));
+            if (spec.mode == SHADOW_TRANSPARENT) {
+                shadowTop += 2.0f * safeScale;
+            }
+            canvas.drawBitmap(shadow, shadowLeft, shadowTop, paint);
+            shadow.recycle();
+            generated++;
         }
+        if (generated == 0) {
+            result.recycle();
+            return null;
+        }
+        Log.i(TAG, "ACTIVE_ICON_ORIGINAL_SHADOW_COMPOSED mode=" + spec.mode
+                + " generatedLayers=" + generated
+                + " artwork=" + silhouette.getWidth() + 'x' + silhouette.getHeight()
+                + " texture=" + canvasSize + 'x' + canvasSize
+                + " physicalScale=" + safeScale
+                + " artworkPadding=" + artworkPadding);
         return result;
+    }
+
+    /**
+     * Composes a managed static icon with the same shadow generator and vertical
+     * anchor used by the original Cell pipeline. The artwork is already at its
+     * final physical size, so this stage never enlarges a logical-size bitmap.
+     */
+    public static Bitmap composeStaticIconTextureWithOriginalShadow(
+            Bitmap artwork, int textureSize, float physicalScale) {
+        if (artwork == null || artwork.isRecycled() || textureSize <= 0) {
+            return null;
+        }
+        EffectiveIconShadowSpec spec = effectiveIconShadowSpec();
+        Bitmap result = Bitmap.createBitmap(
+                textureSize, textureSize, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG
+                | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+        float artworkLeft = (textureSize - artwork.getWidth()) * 0.5f;
+        float artworkTop = (textureSize - artwork.getHeight()) * 0.25f;
+        float safeScale = physicalScale > 0.0f ? physicalScale : 1.0f;
+        Bitmap silhouette = createStaticShadowSilhouette(artwork);
+        int generated = 0;
+        if (spec != null && silhouette != null) {
+            for (int i = 0; i < spec.radii.length && i < spec.colors.length; i++) {
+                float radius = spec.radii[i] * safeScale;
+                if (radius <= 0.0f) {
+                    continue;
+                }
+                Bitmap shadow = invokeOriginalStaticShadow(
+                        silhouette, radius, spec.colors[i]);
+                if (shadow == null) {
+                    continue;
+                }
+                float shadowLeft = (textureSize - shadow.getWidth()) * 0.5f;
+                float shadowTop = artworkTop + Math.round(Math.sqrt(radius));
+                if (spec.mode == SHADOW_TRANSPARENT) {
+                    shadowTop += 2.0f * safeScale;
+                }
+                canvas.drawBitmap(shadow, shadowLeft, shadowTop, paint);
+                shadow.recycle();
+                generated++;
+            }
+        }
+        if (silhouette != null && silhouette != artwork && !silhouette.isRecycled()) {
+            silhouette.recycle();
+        }
+        canvas.drawBitmap(artwork, artworkLeft, artworkTop, paint);
+        Log.i(TAG, "STATIC_ICON_ORIGINAL_SHADOW_COMPOSED mode="
+                + (spec == null ? -1 : spec.mode)
+                + " generatedLayers=" + generated
+                + " artwork=" + artwork.getWidth() + 'x' + artwork.getHeight()
+                + " texture=" + textureSize + 'x' + textureSize
+                + " physicalScale=" + safeScale
+                + " artworkTop=" + artworkTop);
+        return result;
+    }
+
+    /**
+     * Removes only low-alpha exterior pixels from the shadow mask. The visible
+     * artwork remains untouched, while a legacy baked PNG shadow does not
+     * become a second launcher-generated shadow.
+     */
+    private static Bitmap createStaticShadowSilhouette(Bitmap artwork) {
+        try {
+            int width = artwork.getWidth();
+            int height = artwork.getHeight();
+            int[] pixels = new int[width * height];
+            artwork.getPixels(pixels, 0, width, 0, 0, width, height);
+            for (int i = 0; i < pixels.length; i++) {
+                if ((pixels[i] >>> 24) < STATIC_ICON_SHADOW_ALPHA_CUTOFF) {
+                    pixels[i] = 0;
+                }
+            }
+            Bitmap silhouette = Bitmap.createBitmap(
+                    width, height, Bitmap.Config.ARGB_8888);
+            silhouette.setPixels(pixels, 0, width, 0, 0, width, height);
+            return silhouette;
+        } catch (Throwable error) {
+            Log.w(TAG, "STATIC_ICON_SHADOW_MASK_FAILED class="
+                    + error.getClass().getSimpleName());
+            return artwork;
+        }
+    }
+
+    private static Bitmap invokeOriginalStaticShadow(
+            Bitmap silhouette, float radius, int color) {
+        try {
+            Method method = sOriginalStaticShadowMethod;
+            if (method == null && !sOriginalStaticShadowResolveFailed) {
+                synchronized (LauncherSettingBridge.class) {
+                    method = sOriginalStaticShadowMethod;
+                    if (method == null && !sOriginalStaticShadowResolveFailed) {
+                        Class<?> helper = Class.forName(
+                                "com.smartisanos.launcher.data.L");
+                        method = helper.getDeclaredMethod("a",
+                                Bitmap.class, Canvas.class,
+                                Float.TYPE, Integer.TYPE);
+                        method.setAccessible(true);
+                        sOriginalStaticShadowMethod = method;
+                    }
+                }
+            }
+            if (method == null) {
+                return null;
+            }
+            Object value = method.invoke(
+                    null, silhouette, new Canvas(), radius, color);
+            return value instanceof Bitmap ? (Bitmap) value : null;
+        } catch (Throwable error) {
+            sOriginalStaticShadowResolveFailed = true;
+            Log.w(TAG, "STATIC_ICON_ORIGINAL_SHADOW_FAILED class="
+                    + error.getClass().getSimpleName()
+                    + " message=" + error.getMessage());
+            return null;
+        }
     }
 
     private static void logEffectiveIconShadowSpec(EffectiveIconShadowSpec spec) {
@@ -362,13 +510,17 @@ public final class LauncherSettingBridge {
                     + shadowLogSuffix(spec));
             return null;
         }
-        int baseSize = Math.max(1, Math.round(backgroundSize));
-        int padding = shadowPadding(spec);
+        float physicalScale =
+                ActiveIconRasterSpec.physicalScaleForActiveBackground(backgroundSize);
+        int baseSize = Math.max(1, Math.round(backgroundSize * physicalScale));
+        int padding = Math.max(1, Math.round(shadowPadding(spec) * physicalScale));
         int canvasSize = baseSize + padding * 2;
-        String key = type + ':' + sourcePath + ':' + baseSize + ':' + canvasSize + ':'
+        String key = ActiveIconRasterSpec.cacheKey(type, sourcePath,
+                Math.round(backgroundSize),
+                Math.round(activeIconLiveShadowNodeSize(backgroundSize)),
+                baseSize, canvasSize) + ':'
                 + spec.mode + ':' + Arrays.toString(spec.radii) + ':' + Arrays.toString(spec.colors)
-                + ':' + readIconSizePercent(context) + ':' + Math.round(context.getResources()
-                        .getDisplayMetrics().density * 100.0f);
+                + ':' + readIconSizePercent(context);
         synchronized (ACTIVE_ICON_SHADOW_LOCK) {
             String cached = ACTIVE_ICON_LIVE_SHADOW_CACHE.get(key);
             if (cached != null && new File(cached).isFile()) {
@@ -384,7 +536,8 @@ public final class LauncherSettingBridge {
                         + " source=" + sourcePath);
                 return null;
             }
-            Bitmap silhouette = Bitmap.createBitmap(canvasSize, canvasSize, Bitmap.Config.ARGB_8888);
+            Bitmap silhouette = Bitmap.createBitmap(
+                    baseSize, baseSize, Bitmap.Config.ARGB_8888);
             Canvas silhouetteCanvas = new Canvas(silhouette);
             Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
             float scale = Math.min(baseSize / (float) source.getWidth(),
@@ -392,12 +545,17 @@ public final class LauncherSettingBridge {
             float drawWidth = source.getWidth() * scale;
             float drawHeight = source.getHeight() * scale;
             silhouetteCanvas.drawBitmap(source, null,
-                    new android.graphics.RectF(padding + (baseSize - drawWidth) * 0.5f,
-                            padding + (baseSize - drawHeight) * 0.5f,
-                            padding + (baseSize + drawWidth) * 0.5f,
-                            padding + (baseSize + drawHeight) * 0.5f), paint);
+                    new android.graphics.RectF((baseSize - drawWidth) * 0.5f,
+                            (baseSize - drawHeight) * 0.5f,
+                            (baseSize + drawWidth) * 0.5f,
+                            (baseSize + drawHeight) * 0.5f), paint);
             source.recycle();
-            Bitmap shadow = createShadowOnlyBitmap(silhouette, spec);
+            Bitmap shadowSilhouette = createStaticShadowSilhouette(silhouette);
+            Bitmap shadow = createActiveIconShadowWithOriginalGenerator(
+                    shadowSilhouette, spec, physicalScale, canvasSize, padding);
+            if (shadowSilhouette != silhouette && !shadowSilhouette.isRecycled()) {
+                shadowSilhouette.recycle();
+            }
             silhouette.recycle();
             if (shadow == null) {
                 return null;
@@ -430,10 +588,12 @@ public final class LauncherSettingBridge {
             ACTIVE_ICON_LIVE_SHADOW_CACHE.put(key, path);
             Log.d(TAG, "ACTIVE_ICON_LIVE_SHADOW_BITMAP_CREATED type=" + type
                     + " width=" + canvasSize + " height=" + canvasSize
+                    + " physicalScale=" + physicalScale
                     + " outputBytes=" + output.length() + shadowLogSuffix(spec));
             Log.d(TAG, "ACTIVE_ICON_LIVE_BACKGROUND_TEXTURE_CREATED type=" + type
                     + " width=" + baseSize + " height=" + baseSize
                     + " shadowWidth=" + canvasSize + " shadowHeight=" + canvasSize
+                    + " logicalBackground=" + backgroundSize
                     + shadowLogSuffix(spec));
             return path;
         }
@@ -484,6 +644,8 @@ public final class LauncherSettingBridge {
         } catch (Throwable error) {
             Log.w(TAG, "ACTIVE_ICON_SHADOW_SOURCE_COPY_FAILED type=" + type
                     + " class=" + error.getClass().getSimpleName());
+        } finally {
+            if (!original.isRecycled()) original.recycle();
         }
         return null;
     }
@@ -519,32 +681,24 @@ public final class LauncherSettingBridge {
         }
     }
 
-    // Disabled by default.  It can be enabled for a controlled device capture through
-    // Settings.System launcher_active_icon_geometry_debug=1.
-    private static final String KEY_ACTIVE_ICON_GEOMETRY_DEBUG =
-            "launcher_active_icon_geometry_debug";
     private static long sActiveIconGeometryGeneration;
-    private static final Map<Object, ActiveIconRootBase> ACTIVE_ICON_ROOT_BASES =
-            new WeakHashMap<>();
-
     /**
-     * Bridges the live ActiveIcon root to the already-created static Cell F slot.
-     * The weather/calendar child coordinates and shadow nodes are deliberately untouched.
+     * Read-only verification at the static Cell/ActiveIcon boundary. The
+     * V1.5.3 root scale, pivot, translation and internal coordinates remain
+     * authoritative; normal operation never applies an after-the-fact scale.
      */
     public static void applyActiveIconRootGeometry(Object cell, Object staticIconNode) {
         try {
             Object values = readPrivateField(cell, "sc");
-            if (!(values instanceof Object[]) || staticIconNode == null) return;
+            if (!(values instanceof Object[])) return;
             Object[] nodes = (Object[]) values;
+            if (staticIconNode == null && nodes.length > 1) staticIconNode = nodes[1];
+            if (staticIconNode == null) return;
             if (nodes.length <= 7 || nodes[7] == null) return;
             Object activeRoot = nodes[7];
             String type = activeRoot.getClass().getName().endsWith(".H") ? "weather" : "calendar";
             Object activeBase = findActiveIconBase(activeRoot, type);
             if (activeBase == null) return;
-
-            ActiveIconRootBase rootBase = activeIconRootBase(activeRoot);
-            restoreActiveIconRootBase(activeRoot, rootBase);
-            invoke(activeRoot, "updateGeometricState");
 
             Object staticScale = invoke(staticIconNode, "getScale");
             Object baseScale = invoke(activeBase, "getScale");
@@ -554,56 +708,101 @@ public final class LauncherSettingBridge {
                     || staticRect.height <= 0.0f || activeBaseRect.width <= 0.0f
                     || activeBaseRect.height <= 0.0f) return;
 
-            // Both sizes are measured after their parent transforms.  The uniform ratio
-            // therefore bridges the actual static F slot instead of a grid-specific constant.
-            float calculatedScale = staticRect.width / activeBaseRect.width;
-            float finalScale = rootBase.scaleX * calculatedScale;
-            Object parent = invoke(activeRoot, "getParent");
-            if (parent == null) return;
-            Object parentTransform = invoke(parent, "getWorldTransform");
-            Object targetWorldCenter = newVector(staticRect.centerX, staticRect.centerY, 0.0f);
-            Object targetLocalCenter = invoke(parentTransform, "e", targetWorldCenter, null);
-            invoke(activeRoot, "setScale", finalScale, finalScale, rootBase.scaleZ);
-            invoke(activeRoot, "setTranslate", floatField(targetLocalCenter, "x"),
-                    floatField(targetLocalCenter, "y"), floatField(targetLocalCenter, "z"));
-            invoke(activeRoot, "setScaleRotatePivot", rootBase.pivotX, rootBase.pivotY,
-                    rootBase.pivotZ);
-            invoke(activeRoot, "updateGeometricState");
-
+            ActiveIconRasterSpec raster = ActiveIconRasterSpec.resolve();
+            float logicalArtwork = raster == null ? activeBaseRect.width
+                    : raster.logicalArtworkWidth;
+            float logicalTexture = raster == null ? staticRect.width
+                    : Math.max(1.0f, raster.physicalTextureWidth / raster.rasterScale);
+            float staticArtworkWidth = staticRect.width
+                    * logicalArtwork / Math.max(1.0f, logicalTexture);
+            float staticArtworkHeight = staticRect.height
+                    * logicalArtwork / Math.max(1.0f, logicalTexture);
+            float widthRatio = activeBaseRect.width / Math.max(1.0f, staticArtworkWidth);
+            float heightRatio = activeBaseRect.height / Math.max(1.0f, staticArtworkHeight);
+            float centerDeltaX = activeBaseRect.centerX - staticRect.centerX;
+            float centerDeltaY = activeBaseRect.centerY - staticRect.centerY;
             long generation = ++sActiveIconGeometryGeneration;
-            if (activeIconGeometryDebugEnabled()) {
-                Object shadow = findLiveShadow(activeRoot);
-                Rect activeFinalRect = worldRect(activeBase);
-                Rect shadowFinalRect = shadow == null ? null : worldRect(shadow);
-                Log.d(TAG, "ACTIVE_ICON_GEOMETRY_APPLY type=" + type
-                        + " mode=" + activeIconMode(cell)
-                        + " staticWidth=" + staticRect.width
-                        + " staticHeight=" + staticRect.height
-                        + " staticScaleX=" + floatField(staticScale, "x")
-                        + " staticScaleY=" + floatField(staticScale, "y")
-                        + " staticCenterX=" + staticRect.centerX
-                        + " staticCenterY=" + staticRect.centerY
-                        + " activeBaseWidth=" + activeBaseRect.width
-                        + " activeBaseHeight=" + activeBaseRect.height
-                        + " activeBaseScale=" + vector2(baseScale)
-                        + " calculatedScale=" + calculatedScale
-                        + " activeFinalWidth=" + (activeFinalRect == null ? -1.0f : activeFinalRect.width)
-                        + " activeFinalHeight=" + (activeFinalRect == null ? -1.0f : activeFinalRect.height)
-                        + " activeCenterX=" + (activeFinalRect == null ? -1.0f : activeFinalRect.centerX)
-                        + " activeCenterY=" + (activeFinalRect == null ? -1.0f : activeFinalRect.centerY)
-                        + " shadowFinalWidth=" + (shadowFinalRect == null ? -1.0f : shadowFinalRect.width)
-                        + " shadowFinalHeight=" + (shadowFinalRect == null ? -1.0f : shadowFinalRect.height)
-                        + " generation=" + generation);
-            }
+            Object shadow = findLiveShadow(activeRoot);
+            Rect shadowFinalRect = shadow == null ? null : worldRect(shadow);
+            Log.i(TAG, "ACTIVE_ICON_GEOMETRY_VERIFY type=" + type
+                    + " mode=" + activeIconMode(cell)
+                    + " staticTextureWorldRect=" + staticRect
+                    + " staticArtworkLogicalRect="
+                    + staticArtworkWidth + "x" + staticArtworkHeight
+                    + " activeBackgroundLogicalRect="
+                    + activeBaseRect.width + "x" + activeBaseRect.height
+                    + " activeToStaticWidthRatio=" + widthRatio
+                    + " activeToStaticHeightRatio=" + heightRatio
+                    + " centerDeltaX=" + centerDeltaX
+                    + " centerDeltaY=" + centerDeltaY
+                    + " staticVisible=" + invoke(staticIconNode, "isVisible")
+                    + " activeRootVisible=" + invoke(activeRoot, "isVisible")
+                    + " activeBackgroundVisible=" + invoke(activeBase, "isVisible")
+                    + " staticScale=" + vector2(staticScale)
+                    + " activeBaseScale=" + vector2(baseScale)
+                    + " shadowWorldRect=" + shadowFinalRect
+                    + " rootScaleApplied=false"
+                    + " generation=" + generation);
+            logActiveIconNodeTree(type, activeRoot, activeBase, shadow);
         } catch (Throwable error) {
-            Log.w(TAG, "ACTIVE_ICON_GEOMETRY_APPLY_FAILED class="
+            Log.w(TAG, "ACTIVE_ICON_GEOMETRY_VERIFY_FAILED class="
                     + error.getClass().getSimpleName());
         }
     }
 
-    private static boolean activeIconGeometryDebugEnabled() {
-        Context context = applicationContext();
-        return context != null && readBool(context, KEY_ACTIVE_ICON_GEOMETRY_DEBUG, false);
+    /**
+     * Dynamic weather/calendar owns its shadow while its original ActiveIcon
+     * root exists. Ordinary Cells and disabled dynamic icons retain sc[27].
+     */
+    public static void applyActiveIconShadowOwnership(Object cell) {
+        try {
+            Object values = readPrivateField(cell, "sc");
+            if (!(values instanceof Object[])) return;
+            Object[] nodes = (Object[]) values;
+            Object activeRoot = nodes.length > 7 ? nodes[7] : null;
+            Object cellShadow = nodes.length > 27 ? nodes[27] : null;
+            if (cellShadow == null) return;
+            Object dynamicShadow = activeRoot == null ? null : findLiveShadow(activeRoot);
+            boolean dynamicOwnsShadow = dynamicShadow != null;
+            invoke(cellShadow, "setVisibility", Boolean.valueOf(!dynamicOwnsShadow));
+            Log.i(TAG, "ACTIVE_ICON_SHADOW_OWNERSHIP owner="
+                    + (dynamicOwnsShadow ? "DynamicShadowNode" : "OrdinaryCellShadow")
+                    + " ordinaryCellShadowVisible=" + (!dynamicOwnsShadow)
+                    + " liveShadowVisible=" + dynamicOwnsShadow);
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_SHADOW_OWNERSHIP_FAILED class="
+                    + error.getClass().getSimpleName());
+        }
+    }
+
+    private static void logActiveIconNodeTree(
+            String type, Object root, Object base, Object shadow) {
+        try {
+            int childCount = ((Integer) invoke(root, "getChildCount")).intValue();
+            StringBuilder tree = new StringBuilder(256);
+            tree.append("ACTIVE_ICON_NODE_TREE type=").append(type)
+                    .append(" root=").append(invoke(root, "getName"))
+                    .append(" rootScale=").append(vector2(invoke(root, "getScale")))
+                    .append(" childCount=").append(childCount);
+            for (int i = 0; i < childCount; i++) {
+                Object child = invoke(root, "getChildAt", Integer.valueOf(i));
+                tree.append(" | ").append(invoke(child, "getName"))
+                        .append("{class=").append(child.getClass().getSimpleName())
+                        .append(",visible=").append(invoke(child, "isVisible"))
+                        .append(",layer=").append(invoke(child, "getLayer"))
+                        .append(",queue=").append(invoke(child, "getRenderQueue"))
+                        .append(",scale=").append(vector2(invoke(child, "getScale")))
+                        .append(",texture=").append(invoke(child, "getTextureName",
+                                Integer.valueOf(0)))
+                        .append('}');
+            }
+            tree.append(" baseIsChild=").append(base != null)
+                    .append(" shadowIsChild=").append(shadow != null);
+            Log.i(TAG, tree.toString());
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_NODE_TREE_FAILED type=" + type
+                    + " class=" + error.getClass().getSimpleName());
+        }
     }
 
     private static String activeIconMode(Object cell) {
@@ -634,32 +833,6 @@ public final class LauncherSettingBridge {
             if (name instanceof String && ((String) name).endsWith("LiveShadow")) return child;
         }
         return null;
-    }
-
-    private static synchronized ActiveIconRootBase activeIconRootBase(Object activeRoot) throws Exception {
-        ActiveIconRootBase base = ACTIVE_ICON_ROOT_BASES.get(activeRoot);
-        if (base == null) {
-            Object scale = invoke(activeRoot, "getScale");
-            Object translate = readPrivateField(activeRoot, "mLocalTranslate");
-            Object pivot = invoke(activeRoot, "getScaleRotatePivot");
-            base = new ActiveIconRootBase(floatField(scale, "x"), floatField(scale, "y"),
-                    floatField(scale, "z"), floatField(translate, "x"),
-                    floatField(translate, "y"), floatField(translate, "z"),
-                    floatField(pivot, "x"), floatField(pivot, "y"), floatField(pivot, "z"));
-            ACTIVE_ICON_ROOT_BASES.put(activeRoot, base);
-        }
-        return base;
-    }
-
-    private static void restoreActiveIconRootBase(Object root, ActiveIconRootBase base) throws Exception {
-        invoke(root, "setScale", base.scaleX, base.scaleY, base.scaleZ);
-        invoke(root, "setTranslate", base.translateX, base.translateY, base.translateZ);
-        invoke(root, "setScaleRotatePivot", base.pivotX, base.pivotY, base.pivotZ);
-    }
-
-    private static Object newVector(float x, float y, float z) throws Exception {
-        Class<?> vector = Class.forName("com.smartisanos.smengine.a.j");
-        return vector.getConstructor(float.class, float.class, float.class).newInstance(x, y, z);
     }
 
     private static Rect worldRect(Object node) throws Exception {
@@ -706,31 +879,6 @@ public final class LauncherSettingBridge {
             return "(" + floatField(vector, "x") + "," + floatField(vector, "y") + ")";
         } catch (Throwable ignored) {
             return "null";
-        }
-    }
-
-    private static final class ActiveIconRootBase {
-        final float scaleX;
-        final float scaleY;
-        final float scaleZ;
-        final float translateX;
-        final float translateY;
-        final float translateZ;
-        final float pivotX;
-        final float pivotY;
-        final float pivotZ;
-
-        ActiveIconRootBase(float scaleX, float scaleY, float scaleZ, float translateX,
-                float translateY, float translateZ, float pivotX, float pivotY, float pivotZ) {
-            this.scaleX = scaleX;
-            this.scaleY = scaleY;
-            this.scaleZ = scaleZ;
-            this.translateX = translateX;
-            this.translateY = translateY;
-            this.translateZ = translateZ;
-            this.pivotX = pivotX;
-            this.pivotY = pivotY;
-            this.pivotZ = pivotZ;
         }
     }
 
@@ -817,8 +965,8 @@ public final class LauncherSettingBridge {
     public static boolean isDynamicIconPackage(String packageName) {
         if (packageName == null) return false;
         return WeatherBridge.isWeatherPackage(packageName, null, null)
-                || "com.android.calendar".equals(packageName)
-                || "com.smartisanos.calendar".equals(packageName)
+                || com.smartisanos.launcher.compat.CalendarAppDetector
+                        .isCalendarPackage(applicationContext(), packageName)
                 || "com.smartisanos.clock".equals(packageName);
     }
 

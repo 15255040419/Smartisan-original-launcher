@@ -1801,6 +1801,10 @@
 .method public setImageName(Ljava/lang/String;)V
     .locals 1
 
+    invoke-static {p0, p1}, Lcom/smartisanos/launcher/theme/ActiveIconRasterSpec;->textureForNode(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/String;
+
+    move-result-object p1
+
     .line 1
     invoke-super {p0, p1}, Lcom/smartisanos/smengine/SceneNode;->setImageName(Ljava/lang/String;)V
 

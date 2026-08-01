@@ -2518,6 +2518,10 @@
     .line 17
     iget-object v0, p0, Lcom/smartisanos/launcher/ja;->Jg:Landroid/app/Application;
 
+    invoke-static {v0}, Lcom/smartisanos/launcher/backup/RestoreRecoveryGuard;->beforeLauncherDatabaseInit(Landroid/content/Context;)V
+
+    iget-object v0, p0, Lcom/smartisanos/launcher/ja;->Jg:Landroid/app/Application;
+
     invoke-static {v0}, Lcom/smartisanos/launcher/data/C;->init(Landroid/content/Context;)V
 
     .line 18

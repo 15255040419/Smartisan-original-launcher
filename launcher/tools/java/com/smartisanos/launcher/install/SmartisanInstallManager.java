@@ -794,6 +794,10 @@ public final class SmartisanInstallManager {
         Handler main = sHandler == null ? new Handler(Looper.getMainLooper()) : sHandler;
         main.post(new Runnable() {
             @Override public void run() {
+                if (Intent.ACTION_PACKAGE_ADDED.equals(event.action) && !event.replacing) {
+                    com.smartisanos.launcher.backup.PendingItemRestoreHandler
+                            .onPackageAdded(context, event.packageName);
+                }
                 notifyOriginalPackageAdded(context, event.packageName);
                 deletePendingIcon(context, event.packageName);
             }

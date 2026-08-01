@@ -132,7 +132,7 @@
 .method public a(Landroid/graphics/Bitmap;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
     .locals 10
 
-    invoke-static {p1, p2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->composeActiveIconToBaseBounds(Landroid/graphics/Bitmap;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+    invoke-static {p0, p1, p2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->composeActiveIconToBaseBounds(Ljava/lang/Object;Landroid/graphics/Bitmap;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
 
     move-result-object p0
 

@@ -17,7 +17,17 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-07-29）
+## 当前状态总览（2026-08-01）
+
+- 桌面备份与恢复已完成可用性修复：入口位于“设置默认桌面”下、“关于我们”上，管理页和恢复预览页复用现有锤子设置行、`setting_next` 箭头、Title 和统一弹窗/进度框。原版数据库的 `table_pageinfos.pageIndex` 允许负值、预分配空页和重复值，不能作为唯一键；现按 `_id` 校验，并以实际根级图标页计算预览页数，恢复时避免新页 `_id` 冲突。`table_pageinfos.pageTitle`（桌面编辑模式页面分组标题）和 `table_iteminfos.title`（含文件夹标题）同样随布局快照读写。vivo X21A Android 9 截图已确认真实备份、恢复和撤销入口可用；`emulator-5554` Android 17 已完成构建/覆盖安装。Android 12 及其他 ROM 仍需在本修复包上复测，当前不能宣称所有设备均已真机验收。
+- “关于”页已移除仅供该页使用的操作日志录制、扫描、预览、合并与分享链，也不再创建 `operation_logs`；公共 `android.util.Log` 和其他诊断链保持不变。原位置改为静态“使用小技巧”，按桌面手势、动态天气和日历、强迫症选项、小程序和快捷方式四组呈现，复用 `setting_follow_view.xml` 的标题/边距/颜色与 `setting_item_up`、`more_item_middle`、`setting_item_down` 背景。中英文资源均已补齐；Android 17 1440×3120 模拟器确认 About 可进入、四组可滚动到底、最后一组未被导航栏遮挡且没有操作日志条目。Android 8/12/14/16 仍待真实设备矩阵，不能据此宣称全部已验收。
+- vivo X21A Android 9 首次安装后或从其他界面返回 Launcher 偶发只显示系统壁纸的问题已定位并修复：原版 `LauncherActivityTheme -> @style/Animation` 在二进制 `resources.arsc` 中仍引用 Smartisan framework 私有动画 `0x010a0177/0x010a0178`，vivo Android 9 的 WindowManager 加载不存在的资源时会在窗口布局阶段反复抛 `Resources$NotFoundException`，但 Launcher 进程、Activity 和 Surface 仍存活，因此表现为空白而不是应用崩溃。当前资源表仅将对应的9个 task/wallpaper过渡项改为 `@null`，不修改 Launcher 内部动画。最终 APK 已确认不再包含两个私有资源 ID；vivo 覆盖安装后完成5次强停冷启动、8次设置页返回和一次 ART verify，桌面均可见且日志无 `FATAL EXCEPTION`、`NullPointerException`、`VerifyError`、资源缺失或 WindowManager 布局异常。最终 APK 的101个 framework资源引用及Manifest的41个framework引用与该 Android 9 framework逐项比对均无缺失；SDK30/34/36资源表比对也无缺失。Android 6/8及其他厂商真机仍属于未覆盖矩阵，不能据此宣称所有ROM零风险。
+- Shizuku 更换默认桌面功能已完全移除：vivo Android 9 已确认 `cmd package set-home-activity` 即使即时返回成功，按 Home 后仍会被系统 `HOMERECOVERY` 恢复为厂商桌面，不能作为可靠跨 ROM 能力交付。设置页“设置默认桌面”恢复为原有 Android 10+ Role / 系统默认应用设置链；APK 不再包含 Shizuku Provider、权限、元数据、UserService、离线依赖或二进制 Manifest 修补器。
+- 动态天气/日历的兼容阴影已从独立 `BlurMaskFilter` 收敛到普通 managed 静态图标已经验证的原版 `data/L.a(Bitmap, Canvas, radius, color)` 生成器：继续读取同一组 dark/light/transparent 半径与颜色，每层物理半径随 `ActiveIconRasterSpec` 缩放，实时节点与缓存帧共用同一 `DynamicShadowNode` 阴影纹理；动态开启时仅隐藏该 Cell 的普通阴影，关闭后恢复。输入轮廓与静态链相同，只在阴影蒙版中清除 alpha 小于128的旧外部投影，不裁剪动态底板。旧软件模糊缓存已通过 `active_icon_shadow_v5` 隔离。OPPO PDCM00 已确认 v4 原版生成器两层阴影比旧软件模糊更接近普通图标，v5 完整轮廓链已构建成功；随后 OPPO ADB 断开，v5 最终真机截图仍待复验。不得以经验 Alpha 倍率继续加深，也不得恢复现代 Android 上会导致 GLThread 崩溃的原版私有 `sc[27] + MutiTexMaterial` 链。
+- maintained 设置页的英文本地化已补齐截图范围：强迫症角标与通知使用权弹窗、主题名称、图标样式/图标大小及其弹窗、已重绘分组、应用分身空态、隐私密码设置/输入页、宫格名称与切换确认、检查更新结果均从设置资源读取，不再由 Java 直接写死中文。主题显示名以稳定 theme id 映射对应 string，仅改变 UI 文案，不改变主题包名、主题 id 或提交链；图标页行类型判断也已从中文标题比较改为稳定类型值。中文资源保持原文，默认资源提供英文。`1440×3120 / en-US` 模拟器已覆盖安装并可见确认 `12-Cell Grid / 20-Cell Grid`、`Badge Reminders`、通知授权弹窗、应用分身空态、隐私密码输入页、Icon Settings 主列表、图标样式弹窗和图标大小弹窗均为英文；未见 Launcher `FATAL EXCEPTION` / `VerifyError`。主题页与检查更新各异常分支未完成逐项可见触发。
+
+- 普通桌面高分辨率图标基线已恢复：1080 坐标系继续保持用户已确认正常的 12 宫格 `160/205`、20 宫格 `118/152`；仅 1440 坐标系 `values-sw411dp` 恢复 `clean_launcher_raw` 原版 12 宫格 `192/246`、20 宫格 `138/178`，应用名称偏移分别恢复为 `-131/-100`，桌面设置按钮恢复为 `134`。`LayoutPropertyAdapter` 继续以资源 `dock_width=1440` 为基准只向下适配中间分辨率，不移除最大 `1.0` 的安全上限。默认 APK 图标由原版 Drawable 转换链按最终 `icon_size_origin` 直接栅格化；改进版、图标包、在线及自定义源继续由 `IconRasterDiagnostics` 从源图一次采样到最终物理纹理，桌面设置按钮使用相同物理倍率。没有新增“先缩小再放大”的节点倍率；1080 资源、打开文件夹、关闭预览内部比例、Cell 坐标、文字字号及动画均未修改。1440×3120 模拟器已完成覆盖安装和当前20宫格可见验证，12宫格及其他高分辨率真机仍待验收。
+- 普通桌面静态纹理跨分辨率链已进一步收敛：物理倍率只取 `SurfaceWidth / Constants.window_width`，不再让全面屏系统栏造成的高度差误放大或误缩小图标；SMEngine 缓存键加入组件、用户、源图哈希、宫格模式、最终尺寸、分辨率、density 和图标比例。managed 静态源在普通桌面主 Cell 入口按该 Cell 的真实目标边长直接从原图合成，随后在同一最终物理尺寸上复用原版 `HolographicOutlineHelper` 与当前 dark/light/transparent 阴影参数，不再依赖各源 PNG 是否自带烘焙阴影；低 alpha 外部像素只从阴影蒙版剔除，不裁剪图标本体。动态图标、打开文件夹、关闭文件夹预览和特殊黑白链保持原版分流。1440×3120/560dpi 与 1080×2400/480dpi 模拟验证中，目标内容/纹理分别为 `230/295` 与 `192/246`，视觉 dp 基本一致，截图中的竖线碎片消失；OPPO PDCM00 浅色主题真机确认每个受管静态图标生成两层原版阴影。192px 以下旧素材仍受原图分辨率上限约束并明确记录 `ICON_LOW_RES_SOURCE_LIMITED`。
 
 - 文件夹综合自适应误入普通桌面的回归已修复：实验性的 `FolderLayoutMetrics` 已移除；`FolderCellPositionAdapter` 只在当前容器精确为 `com.smartisanos.launcher.view.b.t` 且模式精确为 `PAGE_1_3X3_MODE_FOLDER(8)` 时复制坐标数组，普通 Page 原样返回。`LayoutPropertyAdapter` 的 `_folder` 分支只记录原始资源值并直接返回，不修改共享 `LayoutProperty`。打开文件夹的内部静态几何由只读 `FolderVisualGeometry` 计算：原版三列 X、书架、图标尺寸和 XML 基准保持不变，应用文字以图标可见底边为锚点并使用 `appLabelGap=20`，图标与文字作为内容组在每层居中；标题以书架可见顶部为锚点使用 `titleGap=300`；分页节点以书架实心外框下沿为锚点使用 `indicatorGap=44`，不再把长投影当底边。只读 `FolderSceneMetrics` 仅输出整体 `uniformScale/translateX/translateY/safeClipRect`，OPPO PDCM00 1080×2400 输出 `1/0/0`。OPPO 已覆盖安装验证 12 宫格 3×4、20 宫格 4×5及两种模式下的打开文件夹，普通桌面无书架污染且无 `AndroidRuntime`；设备最终恢复为 12 宫格。
 
@@ -79,6 +89,82 @@
 4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
 
 ## 每日修复记录（倒序）
+
+### 2026-08-01
+
+#### 关于页：移除操作日志并新增使用小技巧
+
+- **根因与范围**：操作日志是 About 页面独占的临时诊断功能，包含持久化状态、`operation_logs` 私有目录、logcat 子线程、文件扫描、预览、合并和发送；它既不属于普通崩溃诊断，也不为其他设置功能服务。
+- **修复**：删除 About 宿主对该区域的绑定，以及这条专用录制/扫描/分享链和相关状态字段。保留现有 `android.util.Log`、崩溃诊断、更新安装和其他设置逻辑。About 仍使用原有 `ScrollView`，在“关注我们”之后加入静态 `setting_tips_view`：四个分组均复用 `setting_follow_view.xml` 的分组标题、颜色、边距及三段圆角列表 drawable；每项采用主标题和可换行副说明，不增加按钮、弹窗、线程或跳转。
+- **本地化与验证**：27 个 `usage_tips_*` 键成对写入默认英文与 `values-zh-rCN`。`build.bat` 完整通过，最终 APK 为 `v1.5.5/30` 且 v1/v2/v3 签名验证通过；Android 17 `1440×3120` 模拟器覆盖安装后，About 可打开、返回，英文四组全部可见并可滚动至最后一项，底部保留导航栏安全空间，UIAutomator 未见操作日志文本。Android 8/12/14/16、小屏/异形屏的真实设备矩阵尚未连接，不能声称已完成全机型真机验收。
+
+#### 桌面备份与恢复：原版页表兼容、页面统一与真实备份修复
+
+- **根因**：首版把 `table_pageinfos.pageIndex` 错当成唯一且非负的业务主键。原版页表实际可含负值的特殊页、预分配空页及重复页索引，导致 Android 9/12 的现有布局在导出校验阶段报 `Invalid pageIndex` 或 `Duplicate page index`，备份无法创建。
+- **修复**：页表改为以原版 SQLite 主键 `_id` 做唯一性校验，保留原始 `pageIndex/status/containment`；恢复校验同样只验证 `_id`，新增保留应用时按实际已使用的根级页追加，并为真正新增页分配新的 `_id`。布局快照继续按原版列白名单读写 `table_pageinfos.pageTitle` 和 `table_iteminfos.title`，所以页面分组标题、文件夹标题、文件夹内容及位置会一起轮转。预览的“桌面板块数量”改为实际含根级内容的页面数，不再显示页表预分配容量。
+- **界面**：首页入口移到“设置默认桌面”下、“关于我们”上；管理页去除手工 `>`，统一使用 `setting_next`，标题和右侧值采用一级设置的字号/颜色，右侧值与箭头留出固定但紧凑的间距，标题会自动让位。已选择的 SAF 目录显示其 document-id 路径（如 `/Download/LauncherBackup`），而不是泛化的“已选择目录”；这不是假定存在可访问的真实文件系统路径。恢复预览页同步使用相同的行高、字重、颜色和卡片宽度。说明明确列出会备份的页面/文件夹/位置/设置/主题/名称/图标，以及不会备份的壁纸、应用数据、账户、权限、默认桌面、密码、天气缓存和定位信息。
+- **进度与恢复**：备份、校验和恢复均继续复用 `SmartisanProgressDialog` 显示阶段状态；恢复确认后仍走既有 `:reload` 冷重载，桌面首帧后再结束过渡，备份本身不重载桌面。
+- **验证边界**：用户提供的 vivo X21A Android 9 截图已显示 2026-08-01 的成功备份、恢复预览和可撤销状态；本地 `build.bat` 和 Android 17 模拟器覆盖安装通过。Android 12 及 Android 8/10/11/13–16 的真实 SAF Provider、恢复、撤销、杀进程恢复仍需逐机复测，不能用单机成功代替全机型承诺。
+
+#### 移除 Shizuku 默认桌面通道
+
+- **原因**：vivo X21A Android 9 实测 `cmd package set-home-activity` 可短暂返回成功，但用户按 Home 后系统会触发 `vivo.action.HOMERECOVERY` 并恢复 `com.bbk.launcher2`；该通道不能保证默认桌面真实持久生效。
+- **处理**：移除设置页 Shizuku 选择/弹窗/文案、桥接和 UserService、离线 Shizuku JAR、文本与二进制 Manifest 的 Provider/权限/元数据以及构建期 AXML 修补器。原“设置默认桌面”入口恢复为只走既有 Android Role / 系统默认应用设置。
+- **验证**：`build.bat` 重新构建成功；最终 APK 的 AXML 未发现 `ShizukuProvider`、`API_V23` 或 `V3_SUPPORT`，APK ZIP 与源码运行链均未发现 Shizuku/Rikka 类。
+
+### 2026-07-31
+
+#### 【已废弃】桌面备份与恢复（早期实现与构建级验证）
+
+#### 【已废弃】Shizuku 可选默认桌面授权通道
+
+#### Android 9窗口动画私有framework资源导致壁纸空白（修复、vivo真机验证完成）
+
+- **现象与根因**：vivo X21A Android 9 安装后首次打开或从其他界面返回锤子桌面时，偶发只剩系统壁纸；退出再进入后恢复。ADB确认 Launcher进程、前台Activity和`smt_launcher` Surface均存在，没有Launcher侧`FATAL EXCEPTION`。实际异常来自系统WindowManager在`AppTransition.loadAnimation()`阶段反复抛出`Resources$NotFoundException: Resource ID #0x10a0177`。最终APK及原版APK的`LauncherActivityTheme -> @style/Animation`均保留了Smartisan framework私有的`0x010a0177/0x010a0178`，而该vivo framework的动画资源只到`0x010a00bd`，窗口布局因此可能在过渡期间中断。
+- **修复**：仅把`style/Animation`中9个仍指向私有资源的task open/close、wallpaper open和wallpaper intra open/close值改为`@null`，与该样式其余空过渡项保持一致。新增`tools/patch_launcher_window_animation_resources.py`，按属性ID、旧资源ID和唯一出现次数校验后二进制修补`launcher/resources.arsc`；意外资源表会直接失败，不会宽泛替换。未修改Launcher内部翻页、文件夹、主题、解锁、Cell回弹、Timeline、duration或Surface生命周期。
+- **最终包检查**：`build.bat`成功；`aapt2 dump resources`确认`style/Animation`的25项全部为`@null`，最终APK中`0x010a0177/0x010a0178`命中数为0；badging为`v1.5.5/30`，v1/v2/v3签名验证通过。最终APK的101个framework资源引用与vivo Android 9、SDK30、SDK34、SDK36资源表比对均无缺失；Manifest的41个framework引用在vivo Android 9上也无缺失；Smali/Java未发现硬编码`0x01xxxxxx` framework资源ID。
+- **真机验证**：vivo安装器覆盖安装且保留数据后，执行5次`force-stop -> LauncherAlias`冷启动，全部`Status: ok`且前台为`smt_launcher`；执行8次`系统设置 -> Back`返回，全部回到同一Launcher窗口。`cmd package compile -m verify -f`成功，最终截图确认12宫格实际可见。完整测试日志未出现`FATAL EXCEPTION`、`AndroidRuntime`、`NullPointerException`、`VerifyError`、`Resources$NotFoundException`、`NoSuchMethodError`、`ClassNotFoundException`、`UnsatisfiedLinkError`、native fatal或Launcher ANR。
+- **风险边界**：本次已清除当前APK中同类“引用不存在的Android framework资源”问题，但静态审计不能证明所有厂商ROM和所有业务入口都不会崩溃。Android 6/8、三星/小米/华为/一加等真实设备未在本轮连接验证；动态天气、主题切换、宫格重载和低内存进程恢复仍按各专项矩阵验收，不能用本次启动通过替代。
+
+#### 动态天气/日历阴影复用静态原版生成器（v4 OPPO可见验证；v5构建完成待设备复验）
+
+- **根因**：动态图标兼容阴影与普通 managed 静态图标虽然读取相同的 `ICON_SHADOW_RADIUS(_TRANSPARENT)` 和 `ICON_SHADOW_COLOR[mode]`，但前者仍使用独立 `extractAlpha + BlurMaskFilter`，后者已经复用原版 `data/L.a()` / `HolographicOutlineHelper`。OPPO 浅色主题日志确认两者都是半径 `[9,3]`、颜色 `[0x12000000,0x12000000]`；差异来自生成器和轮廓预处理，不是动态节点少一层。
+- **原版边界**：Smartisan 原机的静态 Bitmap 阴影与动态 `sc[27] + MutiTexMaterial` GL 阴影并非同一调用链，只共享主题视觉目标。私有动态 GL 链依赖现代 Android 已移除的模糊接口和旧 Shader，已有 GLThread 崩溃证据，不能恢复。本轮继续保留 V1.5.3 ActiveIcon SceneNode、天气/日期刷新、广播、Timeline 和内部逻辑坐标，只以已验证的原版静态软件生成器作为安全兼容替代。
+- **修复**：动态底板先按 `ActiveIconRasterSpec` 直接栅格到最终物理 artwork；阴影蒙版与静态链一样清除 alpha 小于128的旧外部投影，再分别调用 `L.a()` 生成两层阴影并按相同纵向锚点合成到唯一 `DynamicShadowNode` 纹理。缓存目录升级为 `active_icon_shadow_v5`，缓存帧继续复用该阴影，不新增 Alpha 倍率、第三层阴影或 SceneNode 放大。
+- **验证**：`git diff --check` 与两次 `build.bat` 均通过。OPPO PDCM00 上 v4 日志确认日历和天气均为 `ACTIVE_ICON_ORIGINAL_SHADOW_COMPOSED generatedLayers=2`，物理 artwork/纹理为 `230×230/276×276`，日期31和天气内容正常，用户截图确认比旧软件模糊方案有所改善；未见 `FATAL EXCEPTION` 或 `VerifyError`。补齐静态同款 alpha 蒙版后的 v5 已构建、签名，但安装验证时 OPPO 从 ADB 断开，当前仅剩不允许覆盖安装的 vivo X21A，故不能把 v5 可见效果标记为真机完成。
+- **风险**：普通图标 PNG 内部可能自带高 alpha 材质阴影，动态图标只有 Launcher 生成的外投影，不能保证与每一张不同素材的内部明暗完全相同。后续只复验 v5 的 OPPO 浅色主题、暗色/透明主题和12/20宫格；如果生成外投影已一致，不再通过动态图标专用经验倍率追逐个别烘焙素材。
+
+### 2026-07-30
+
+#### 受管静态图标统一复用原版主题阴影（构建、OPPO浅色主题真机验证完成）
+
+- **根因**：高清适配后的改进版、图标包、在线和自定义图标从原始源一次采样到最终纹理，但该新入口没有再经过原版 `data/L` 的 `HolographicOutlineHelper`。因此源 PNG 自带阴影时看起来有阴影，没有烘焙阴影时就贴在宫格背景上；这不是主题随机失效，而是同一桌面混用了“素材自带阴影”和“无阴影最终纹理”两条视觉链。
+- **修复**：managed 普通桌面静态源先一次采样为当前 Cell 的最终物理 artwork，再读取原版当前 `dark/light/transparent` 模式、`ICON_SHADOW_RADIUS(_TRANSPARENT)` 和 `ICON_SHADOW_COLOR[mode]`，反射复用原版 `L.a(Bitmap, Canvas, radius, color)` 生成两层阴影，并按原版 `(texture-artwork)/4` 纵向锚点合成最终纹理。源图可见像素保持不变，仅在阴影蒙版中清除 alpha 小于128的旧外部投影，避免把烘焙阴影再次扩散。缓存键升级为 `raster:v6`，不会继续命中旧的无阴影 `v5` 纹理。
+- **边界**：只接管普通桌面的 managed 静态图标。默认 APK 图标继续原版链；动态天气/日历/时钟、打开文件夹、关闭文件夹预览、特殊黑白纹理、Cell位置、文字、宫格资源和动画均未修改。没有引入 SceneNode 二次放大，也没有恢复低分辨率最终阴影图缓存。
+- **验证**：`git diff --check`、`build.bat`、APK `v1.5.5/30` badging及v1/v2/v3签名通过。OPPO PDCM00 `1080×2304/480dpi` 覆盖安装并冷启动成功；浅色主题日志确认 `mode=1 radii=[9,3] generatedLayers=2`，受管图标均命中 `STATIC_ICON_ORIGINAL_SHADOW_COMPOSED`，未见 `STATIC_ICON_ORIGINAL_SHADOW_FAILED`、fallback、`FATAL EXCEPTION` 或 `VerifyError`。真机截图确认电话本、手机管家、小布助手等原先偏平的图标已出现当前主题对应的柔影。
+- **风险**：阴影轮廓统一，但图标内部材质和素材自身已经烘焙的高 alpha 立体明暗不会被抹除；不同形状的可见阴影强弱仍会自然不同。暗色和透明主题、图标包与自定义源的完整真机矩阵尚未逐项可见验收。
+
+#### 设置页截图范围英文本地化补齐（构建、英文1440×3120模拟器关键页面验证完成）
+
+- **根因**：`values/strings.xml` 已有大量英文基线，但 maintained 兼容宿主仍直接写入中文。英文系统因此会在强迫症角标、授权弹窗、主题卡片、图标设置弹窗、应用分身、隐私密码、宫格切换和检查更新弹窗中混入中文；图标页还用中文标题字符串判断行类型，直接翻译会使箭头和副标题标签逻辑失效。
+- **修复**：为上述页面新增成对的默认英文与 `values-zh-rCN` 中文资源，Java 统一通过 maintained `Resources` 获取；主题卡片按 `ThemeEntry.id + "_name"` 映射显示名，文艺系列补齐稳定资源键；图标页以 `rowType` 判断“图标样式/桌面图标大小”，不再依赖显示语言；更新弹窗的无版本、最新版本、新版本、无 APK、失败和下载状态均改为格式化资源。
+- **边界**：未修改设置页布局尺寸、功能开关语义、主题 id/包名、图标来源存储、隐私密码数据、宫格迁移与 Launcher 重载逻辑；未提交、未推送。
+- **验证**：`build.bat` 完整构建成功，APK `versionName=v1.5.5 / versionCode=30`，v1/v2/v3 签名通过。只覆盖安装到 `emulator-5556`（`1440×3120`、`en-US`），未操作 1080P 真机；UIAutomator/截图确认主页宫格、OCD 角标、通知授权弹窗、应用分身空态、隐私密码输入、图标设置列表、图标来源弹窗和图标大小弹窗均显示英文。主题名称由已编译资源和稳定 id 映射验证，主题页未完成本次可见触发；检查更新网络各分支未逐项触发。
+
+#### 普通桌面高分辨率图标与一次性高清纹理基线（构建、1440×3120模拟器当前20宫格验证完成）
+
+- **根因**：用户提供的两张截图分别为 `1440×3120` 与 `1080×2400`。当前 `values-sw411dp` 使用 `dock_width=1440`，但 12/20 宫格图标内容和阴影尺寸曾被统一降为与 1080 资源相同的 `160/205`、`118/152`；`LayoutPropertyAdapter` 为避免普通桌面再次被放大污染，整体适配倍率最大为 `1.0`，因此 1440 Cell 变宽后图标不会补偿放大。对照 `clean_launcher_raw` 确认原版 1440 基线应为 12 宫格 `192/246`、20 宫格 `138/178`。
+- **修复**：只恢复 `launcher/assets/layout/portrait/values-sw411dp/MODE_12` 与 `MODE_20` 的原版高分辨率内容组输入：图标 `192/246`、名称偏移 `-131`、设置按钮 `134`；图标 `138/178`、名称偏移 `-100`、设置按钮 `134`。2160×1080、2242×1080、2340×1080、`values-xhdpi` 和 `values-xxhdpi` 等 1080 坐标系资源保持不变。中间宽度设备仍由现有适配器按 `实际宽度/1440` 向下等比适配，超过原版 1440 手机基线时不无限放大。
+- **高清链**：未增加 SceneNode 局部 scale。默认 APK 图标继续由原版 `e.s.a(Drawable)` 按适配后的 `icon_size_origin` 直接绘制目标 Bitmap，再由原版阴影链生成对应 `icon_size_with_shadow` 纹理；没有先生成固定 1080 小图。改进版、图标包、在线 PNG 和自定义源由 `IconRasterDiagnostics.resolveNormalIconRasterSpec()` 读取同一最终尺寸并结合 Surface 像素倍率，`composeStaticIconTexture()` 从保留的源图一次采样到最终物理纹理。桌面设置按钮使用相同 `rasterScale`。因此 1440 的 12 宫格目标为内容 `192`、纹理 `246`，存在额外物理 Surface 倍率时继续生成更高物理像素纹理，而不是把旧 `160` SceneNode 放大。源 APK 自身只提供低分辨率位图时仍受源素材上限约束；受管源会记录 `ICON_LOW_RES_SOURCE_LIMITED`。
+- **边界**：没有修改普通桌面 Cell 中心、行列数、文字字号、Dock 高度、打开文件夹、文件夹 Timeline、动画 duration、`Eb.update()`、`Ra.T()` 或用户 50%～150% 图标比例；关闭文件夹预览只随普通桌面外框使用同一最终尺寸，不增加独立二次倍率。
+- **验证与风险**：资源矩阵静态检查确认只有 `values-sw411dp` 的 12/20 宫格基线变化，1080 系列保持原值；`git diff --check`、`build.bat`、最终 APK 资源反读、`aapt2 dump badging` 和 v1/v2/v3 签名检查通过。`1440×3120/560dpi` 的 `emulator-5556` 覆盖安装成功，保留原有20宫格配置回到桌面；图标及文字完整、设置按钮日志为 `logicalSettingButton=134/finalTexture=134×134`，截图未见小纹理放大模糊，日志无 `AndroidRuntime/FATAL EXCEPTION/VerifyError`。未改动已连接的 1080 vivo。仍需在 1220/1260/1440 真机、12宫格、默认/改进版/图标包/自定义源、50%/100%/150%、动态天气日历和关闭文件夹预览中做可见验收。
+
+#### 普通桌面静态纹理真实Cell尺寸与缓存隔离修复（构建、1080/1440模拟验证完成）
+
+- **根因**：`NormalIconRasterSpec` 曾使用 `max(scaleX, scaleY)`；全面屏的 Surface 高度会因系统栏与逻辑窗口不同，使图标纹理大于真实节点并被裁切。普通桌面主 Cell 还会先按旧 `ItemInfo.Ne()` 键命中 SMEngine 纹理，再从数据库 `iconData` 旧最终阴影图缩放到当前节点；12/20宫格、分辨率或用户图标比例变化后，容易复用错误尺寸，出现图标大小漂移、边缘碎片和先小后放大的模糊。
+- **修复**：额外物理倍率改为横向 `scaleX`，高度只影响可用区域，不影响图标尺寸。普通桌面静态应用 Cell 的纹理键升级为 `raster:v5`，包含包名、组件、用户、源图哈希、内容/纹理尺寸、分辨率、density、图标比例、宫格和主题。managed 源跳过旧最终阴影图，从 `iconRawData` 原始源或当前有效 Drawable 直接一次合成到调用方传入的真实 Cell 纹理边长；普通 PackageManager 默认图标继续保留原版阴影链。模式8文件夹页、`FolderInfo` 关闭预览、动态天气/日历/时钟和特殊黑白路径均明确排除。
+- **验证**：`git diff --check` 与 `build.bat` 通过；修复一次设备启动发现的 `g.cb()` 临时寄存器类型合流 `VerifyError` 后重新构建、覆盖安装并冷启动成功。1440×3120/560dpi 的 Surface 为1440×2892，日志确认 `rasterScale=1.0`，真实Cell输出 `230/295`；1080×2400/480dpi 输出 `192/246`。两张截图图标完整、竖线碎片消失，最终日志无 `AndroidRuntime/FATAL EXCEPTION/VerifyError`。模拟器已恢复1440×3120/560dpi。
+- **风险**：仓库部分旧锤子 PNG 只有 `168×168` 或 `192×192`，在用户放大比例使目标内容超过源图时仍只能插值，日志会记录 `ICON_LOW_RES_SOURCE_LIMITED`；必须补充真实更高分辨率原素材才能进一步提高清晰度，代码不会把该情况宣称为高清。vivo X21A 覆盖安装仍被系统以 `Failure [-200]` 拒绝，实际1080真机及12/20切换、50%/150%、动态图标、主题和文件夹回归仍待验收。
 
 ### 2026-07-29
 
@@ -831,7 +917,6 @@
 
 - 修复“应用图标”设置页最多只显示 120 项的问题：移除硬编码上限，已解析且符合显示条件的应用现在全部展示。
 - 修复澎湃 OS 返回“非空但不完整”应用列表时无法补全的问题：当前用户始终合并 `PackageManager` 与 `LauncherApps` 的桌面 Activity 并按组件去重；分身/工作资料应用仍受相应功能开关控制。设置页枚举和全局改进版图标切换统一使用该结果，应用数量不再影响是否参与图标匹配。
-- 开启操作日志时新增设备厂商/型号/Android 版本、默认桌面组件、主题四路持久化值、PackageManager 应用数量、用户配置与 LauncherApps 活动数量快照。
 - 应用图标页新增加载耗时、原始数量、显示数量、过滤数量以及被过滤组件日志，便于直接定位具体缺失应用。
 - 主题切换新增切换前状态、主题包安装状态、原版调用结果、消息入队结果、切换后四路持久化值和桌面动画就绪状态。
 - Android 普通应用仍只能读取本进程/系统允许范围内的 logcat；完整系统日志仍需电脑 ADB，这是系统权限边界而非记录器遗漏。
@@ -1187,7 +1272,6 @@
 - OPPO 实机截图进一步确认：旧快捷方式错误地把桌面自身的中转 Activity 标记为 user 999，导致系统尝试在未安装 Launcher 的分身用户中启动中转页，点击无响应。现改为快捷方式归属 user 0，由中转页再通过 `LauncherApps.startMainActivity` 启动真实 user 999 应用，并增加 `startActivityAsUser` 反射兜底及启动结果日志。
 - 分身图标不再使用 ColorOS 已经套过圆框和厂商分身角标的 `LauncherActivityInfo` 图标；优先读取 user 0 的原始 Activity/Application 图标，只叠加锤子面具角标。安装正确快捷方式前会先清理旧版无效条目。
 - OPPO ADB 日志显示通知监听授权后曾发生 `binding died`，打开系统设置只是间接触发重新绑定。Launcher 每次恢复时现主动检查授权、请求 `NotificationListenerService.requestRebind` 并重放角标，无需再次点击“前往设置”。
-- “关于手机/关于桌面”的操作日志新增“发送”按钮：结束记录后，可将结构化操作日志与配套的本应用 logcat 合并为文字，通过系统分享发送。界面明确提示受 Android 权限限制，应用内日志不能替代电脑 ADB 的全系统日志。
 - 分身诊断新增 profile 数量、userId、serial、LauncherActivityInfo 数量、组件名、开关状态、快捷方式 URI、直接处理/广播兜底结果及异常记录。
 - 分身快捷方式安装/删除优先在桌面进程内反射调用原版 `com.smartisanos.launcher.a.L` 处理器，避免 OPPO 等系统拦截或延迟自发快捷方式广播；直接调用失败时仍保留定向广播兜底。
 - “隐藏图标上的角标”不再只保存设置值：切换时直接同步 `Constants.SHOW_MESSAGE_FLAG = !hidden` 并刷新桌面，Launcher 每次恢复前也重新应用持久化值，避免进程重建后失效。

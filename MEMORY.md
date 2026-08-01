@@ -450,6 +450,35 @@ com.smartisanos.launcher.theme.aero
 
 ---
 
+## 启动与窗口兼容记忆
+
+### 默认桌面设置
+
+Shizuku 默认桌面通道已移除，不能恢复。vivo Android 9 已验证其 Shell 设置在按 Home 后会被厂商 `HOMERECOVERY` 覆盖，无法提供可靠跨 ROM 结果。默认桌面入口只能保留 Android 10+ Role 与系统默认应用设置；不得在启动、恢复、广播或后台任务中自动修改 HOME。
+
+### 桌面备份与恢复
+
+`table_pageinfos.pageIndex` 不是唯一键，也不能假定为非负；原版数据库可含特殊页、预分配空页和相同索引的记录。备份/恢复校验必须以 `_id` 为页表唯一身份，并完整保留 `pageIndex/status/containment`。恢复追加当前新增应用时，应以实际含根级图标的最后一页为基准，不能以页表的预分配容量作为最后页面。备份与恢复只能使用 SAF，恢复继续走既有 `:reload` 首帧确认链；未完成 Android 8–16 多 ROM 真机矩阵前不得声称全机型已验证。
+
+### 关于页使用小技巧
+
+“关于”页不再提供操作日志、文件扫描、录制或分享入口，也不得创建 `operation_logs`。静态“使用小技巧”复用 `setting_follow_view.xml` 的分组标题、间距、颜色和 `setting_item_up` / `more_item_middle` / `setting_item_down` 列表背景，内容只由中英文 strings 资源提供，不添加后台任务或跳转逻辑。
+
+原版 Launcher 的 `LauncherActivityTheme -> @style/Animation` 在二进制资源表中曾引用 Smartisan framework 私有动画资源 `0x010a0177/0x010a0178`。普通 Android framework 不保证存在这些ID；vivo Android 9已确认会在WindowManager窗口布局阶段反复抛`Resources$NotFoundException`，表现为Launcher进程和Surface仍在但屏幕只剩系统壁纸。
+
+当前兼容基线是只把该样式中9个task/wallpaper过渡引用改为`@null`，保持原版“Launcher窗口不做系统Activity过渡”的意图。不得用固定延迟、强制重启、重复`requestRender()`或修改Launcher内部动画掩盖此问题。
+
+`launcher/resources.arsc`是当前构建直接复制的二进制资源表。以后若从原版APK刷新或替换该文件，必须运行：
+
+```powershell
+python tools/patch_launcher_window_animation_resources.py launcher/resources.arsc
+python tools/patch_launcher_window_animation_resources.py launcher/resources.arsc --check
+```
+
+并对最终`build/launcher-signed.apk`执行`aapt2 dump resources`，确认`style/Animation`相关项均为`@null`且包内不再存在`0x010a0177/0x010a0178`。只检查文本`clean_launcher/res/values/styles.xml`不够，因为最终判断以二进制`resources.arsc`为准。
+
+---
+
 ## 动态天气和日历记忆
 
 动态天气和日历保留 Smartisan 原版 activeicon 分层和切换回调。
@@ -476,6 +505,14 @@ com.smartisanos.launcher.theme.aero
 ## 图标和资源长期记忆
 
 在线图标仓库和主 Launcher 仓库是分开的。
+
+普通桌面图标尺寸必须区分资源坐标系：当前用户已确认正常的 1080 坐标系保持 12 宫格 `160/205`、20 宫格 `118/152`；1440 坐标系 `values-sw411dp` 使用原版 12 宫格 `192/246`、20 宫格 `138/178`。不得为了统一数值再次把 1440 基线降成 1080 尺寸，也不得解除 `LayoutPropertyAdapter` 的整体放大上限去污染普通桌面。
+
+高分辨率图标不得先生成 1080/低分辨率纹理，再通过 SceneNode scale 放大。默认 APK 图标继续由原版 Drawable 转换和阴影链按适配后的最终 `icon_size_origin/icon_size_with_shadow` 生成；改进版、图标包、在线 PNG 和自定义源从保留的源图直接合成最终物理纹理。Surface 物理像素与 SMEngine 逻辑窗口不一致时，继续使用 `NormalIconRasterSpec.rasterScale` 生成对应物理像素。源素材自身分辨率不足时只能记录限制并回退，不能把插值放大描述为高清。
+
+普通桌面物理纹理的额外 raster 比例只能取渲染 Surface 与 Launcher 逻辑窗口的横向比例 `scaleX`；全面屏的状态栏、导航栏会使 `scaleY` 偏大或偏小，高度比例不得参与图标大小。SMEngine 静态纹理缓存必须按包名/组件/用户、源图哈希、宫格模式、最终尺寸、分辨率、density 和图标比例隔离。普通桌面的 managed 静态源使用当前 Cell 的真实纹理边长从原始源图一次合成；打开文件夹、关闭文件夹预览、动态天气/日历/时钟和特殊黑白链不得被该入口接管。
+
+普通桌面的 managed 静态源不能只把源 PNG 画入最终纹理后依赖素材自带阴影；否则图标包、在线图和改进版素材会因是否烘焙阴影而视觉不一致。正确链路是在最终物理 artwork 上复用原版 `HolographicOutlineHelper` 和当前 dark/light/transparent 阴影常量，再把图标本体覆盖到同一最终纹理。低 alpha 外部像素只从阴影蒙版剔除，不能裁剪或重采样可见图标本体，也不能恢复先生成低分辨率阴影图再放大的旧路径。
 
 在线图标路径规则：
 

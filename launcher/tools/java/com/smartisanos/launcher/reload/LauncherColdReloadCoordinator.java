@@ -18,6 +18,8 @@ import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.UUID;
 
+import com.smartisanos.launcher.backup.BackupOperationLock;
+
 /** Coordinates only the process/window handoff; it never changes Launcher business state. */
 public final class LauncherColdReloadCoordinator {
     private static final String TAG = "LauncherColdReload";
@@ -72,16 +74,35 @@ public final class LauncherColdReloadCoordinator {
         return beginReload(context, "ACTIVE_ICON_SETTINGS_CHANGE", -1, readThemeMode(context));
     }
 
+    /** Starts the existing opaque process handoff for an already journaled restore. */
+    public static boolean beginBackupRestoreReload(Context context, String operationToken,
+            boolean rollback, int gridMode) {
+        if (context == null || operationToken == null || operationToken.length() == 0) {
+            return false;
+        }
+        return beginReload(context, rollback ? "BACKUP_RESTORE_ROLLBACK" : "BACKUP_RESTORE",
+                gridMode, readThemeMode(context), -1, -1, operationToken);
+    }
+
     private static boolean beginReload(Context context, String reason, int gridMode, String themeMode) {
         return beginReload(context, reason, gridMode, themeMode, -1, -1);
     }
 
     private static boolean beginReload(Context context, String reason, int gridMode, String themeMode,
             int oldIconSize, int newIconSize) {
+        return beginReload(context, reason, gridMode, themeMode, oldIconSize, newIconSize, null);
+    }
+
+    private static boolean beginReload(Context context, String reason, int gridMode, String themeMode,
+            int oldIconSize, int newIconSize, String requestedToken) {
         if (context == null) {
             return false;
         }
-        String token = UUID.randomUUID().toString();
+        if (BackupOperationLock.isBusyForDifferentOwner(requestedToken)) {
+            log("RELOAD_REJECTED_BUSY", requestedToken, reason, gridMode, themeMode);
+            return false;
+        }
+        String token = requestedToken == null ? UUID.randomUUID().toString() : requestedToken;
         persistExpectedLauncherToken(context, token, reason, gridMode, themeMode);
         if ("ICON_SIZE_CHANGE".equals(reason)) {
             registerIconSizeContext(token, oldIconSize, newIconSize, Process.myPid(), -1);
@@ -237,6 +258,11 @@ public final class LauncherColdReloadCoordinator {
         ready.putExtra(ReloadProtocol.EXTRA_THEME_MODE,
                 activity.getIntent().getStringExtra(ReloadProtocol.EXTRA_THEME_MODE));
         activity.sendBroadcast(ready);
+        String reason = activity.getIntent().getStringExtra(ReloadProtocol.EXTRA_RELOAD_REASON);
+        if ("BACKUP_RESTORE".equals(reason) || "BACKUP_RESTORE_ROLLBACK".equals(reason)) {
+            com.smartisanos.launcher.backup.DesktopRestoreController
+                    .onLauncherFirstFrame(activity, token, reason);
+        }
         clearExpectedLauncherToken(activity, token);
         log("FIRST_FRAME_READY", token,
                 activity.getIntent().getStringExtra(ReloadProtocol.EXTRA_RELOAD_REASON),
@@ -325,6 +351,11 @@ public final class LauncherColdReloadCoordinator {
                             gridMode, themeMode);
                     if ("ICON_SIZE_CHANGE".equals(reason)) {
                         log("OLD_LAUNCHER_PID_TERMINATED", token, reason, gridMode, themeMode);
+                    }
+                    if ("BACKUP_RESTORE".equals(reason)
+                            || "BACKUP_RESTORE_ROLLBACK".equals(reason)) {
+                        com.smartisanos.launcher.backup.DesktopRestoreController
+                                .applyPreparedAfterOldProcessExit(current, token, reason);
                     }
                     startLauncher(current, token, reason, gridMode, themeMode);
                 } catch (Throwable error) {

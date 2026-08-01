@@ -58,6 +58,7 @@ import android.os.UserHandle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
+import android.provider.DocumentsContract;
 import android.text.Editable;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -97,6 +98,11 @@ import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.smartisanos.launcher.reload.LauncherColdReloadCoordinator;
+import com.smartisanos.launcher.backup.BackupArchiveReader;
+import com.smartisanos.launcher.backup.BackupRestoreResult;
+import com.smartisanos.launcher.backup.DesktopBackupController;
+import com.smartisanos.launcher.backup.DesktopRestoreController;
+import com.smartisanos.launcher.backup.RestoreMergePlanner;
 
 import com.smartisanos.home.settings.PreviewSettingItemView;
 import com.smartisanos.home.settings.SettingItemSwitch;
@@ -109,6 +115,7 @@ import com.smartisanos.home.widget.sys.Title;
 import com.smartisanos.launcher.data.redirectIcon.RedirectIconDB;
 import com.smartisanos.launcher.data.redirectIcon.RedirectIconInfo;
 import smartisanos.widget.SwitchEx;
+import smartisanos.widget.SettingItemText;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -116,7 +123,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.lang.ref.WeakReference;
@@ -155,18 +161,6 @@ public final class MaintainedLauncherSettingsHost {
     private static File sSettingsApk;
     private static Dialog sLauncherReloadDialog;
     private static final String SETTINGS_ASSET = "settings_maintained/maintained-settings-res.apk";
-    private static final String OPERATION_LOG_PREFS = "launcher_operation_log_prefs";
-    private static final String PREF_OPERATION_LOG_ACTIVE = "operation_log_active";
-    private static final String PREF_OPERATION_LOG_FILE = "operation_log_file";
-    private static final String OPERATION_LOG_DIR = "operation_logs";
-    private static final Object OPERATION_LOG_LOCK = new Object();
-    private static BufferedWriter sOperationLogWriter;
-    private static File sOperationLogFile;
-    private static File sOperationLogcatFile;
-    private static Thread sOperationLogcatThread;
-    private static java.lang.Process sOperationLogcatProcess;
-    private static Thread.UncaughtExceptionHandler sPreviousUncaughtExceptionHandler;
-    private static boolean sOperationLogHandlerInstalled;
     private static final String SETTINGS_PKG = "com.smartisanos.home";
     private static final String QUICK_SEARCH_PKG = "com.smartisanos.quicksearch";
     private static final String QUICK_SEARCH_DOWNLOAD_URL =
@@ -199,6 +193,10 @@ public final class MaintainedLauncherSettingsHost {
     private static final String KEY_DYNAMIC_WEATHER_CALENDAR =
             "launcher_dynamic_weather_calendar_enabled";
     private static final int REQUEST_DYNAMIC_WEATHER_LOCATION = 2414;
+    private static final int REQUEST_BACKUP_TREE = 54031;
+    private static final int REQUEST_BACKUP_CREATE_DOCUMENT = 54032;
+    private static final int REQUEST_RESTORE_DOCUMENT = 54033;
+    private static Dialog sBackupProgressDialog;
     private static final String PREF_DYNAMIC_WEATHER_LOCATION_REQUESTED =
             "dynamic_weather_location_permission_requested";
     private static final String KEY_BADGE_HIDE = "launcher_hide_badge";
@@ -455,7 +453,6 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void show(Activity activity, int restoreScrollY, boolean animateBack) {
         try {
-            resumeOperationLogIfNeeded(activity);
             cancelScheduledLauncherRestart(activity);
             Intent intent = activity.getIntent();
             if (intent != null && UPDATE_INSTALL_ACTION.equals(intent.getAction())) {
@@ -503,7 +500,7 @@ public final class MaintainedLauncherSettingsHost {
         final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             public void run() {
-                if (app == null || isOperationLogActive(app)) {
+                if (app == null) {
                     return;
                 }
                 new Thread(new Runnable() {
@@ -1215,7 +1212,13 @@ public final class MaintainedLauncherSettingsHost {
         });
         click(activity, resources, root, "setting_switch_launcher", new View.OnClickListener() {
             public void onClick(View v) {
-                openDefaultHomeSettings(activity);
+                showDefaultHomeOptions(activity);
+            }
+        });
+        click(activity, resources, root, "item_id_desktop_backup", new View.OnClickListener() {
+            public void onClick(View v) {
+                sMainSettingsScrollY = currentScrollY(activity);
+                showDesktopBackupPage(activity, true);
             }
         });
         hide(resources, root, "setting_share");
@@ -2813,6 +2816,10 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static boolean onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_BACKUP_TREE || requestCode == REQUEST_BACKUP_CREATE_DOCUMENT
+                || requestCode == REQUEST_RESTORE_DOCUMENT) {
+            return onBackupActivityResult(activity, requestCode, resultCode, data);
+        }
         if (requestCode == 10) {
             return onWallpaperPicked(activity, resultCode, data);
         }
@@ -4203,6 +4210,34 @@ public final class MaintainedLauncherSettingsHost {
         return id == 0 ? fallback : resources.getString(id);
     }
 
+    private static String getString(Context context, String name, String fallback) {
+        Resources resources = context instanceof Activity
+                ? getMaintainedResources((Activity) context) : null;
+        if (resources == null) {
+            try {
+                resources = createSettingsContext(context).getResources();
+            } catch (Throwable ignored) {
+            }
+        }
+        return resources == null ? fallback : getString(resources, name, fallback);
+    }
+
+    private static String getFormattedString(Resources resources, String name,
+            String fallback, Object... args) {
+        int id = resources.getIdentifier(name, "string", SETTINGS_PKG);
+        return id == 0
+                ? String.format(java.util.Locale.getDefault(), fallback, args)
+                : resources.getString(id, args);
+    }
+
+    private static String themeDisplayName(Resources resources, ThemeEntry entry) {
+        if (entry == null) {
+            return "";
+        }
+        String resourceName = entry.id.toLowerCase(java.util.Locale.US) + "_name";
+        return getString(resources, resourceName, entry.name);
+    }
+
     private static int drawable(Resources resources, String name) {
         if (name == null) {
             return 0;
@@ -4232,8 +4267,8 @@ public final class MaintainedLauncherSettingsHost {
         if (grid12 == null || grid20 == null) {
             return;
         }
-        grid12.setTitleText("十二宫格");
-        grid20.setTitleText("二十宫格");
+        grid12.setTitleText(getString(resources, "grid_12_title", "十二宫格"));
+        grid20.setTitleText(getString(resources, "grid_20_title", "二十宫格"));
         grid12.setPreviewResource(drawable(resources, "grids_9_preview_normal"));
         grid20.setPreviewResource(drawable(resources, "grids_16_preview_normal"));
         updateGridChecks(activity, grid12, grid20);
@@ -5460,7 +5495,7 @@ public final class MaintainedLauncherSettingsHost {
         }
         final SettingItemSwitch item = (SettingItemSwitch) view;
         sBadgeReminderSwitch = new WeakReference<SettingItemSwitch>(item);
-        item.setTitle("角标提醒");
+        item.setTitle(getString(resources, "obsession_hide_badge", "角标提醒"));
         item.setChecked(!readSystemBool(activity, KEY_BADGE_HIDE, true));
         bindSwitchControlOnly(item, new View.OnClickListener() {
             public void onClick(View v) {
@@ -5535,14 +5570,23 @@ public final class MaintainedLauncherSettingsHost {
         sBadgeNotificationAccessDialogShowing = true;
         Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_DIALOG_SHOWN targetSwitch=" + target
                 + " notificationAccess=false oldUiChecked=" + item.isChecked());
+        Resources resources = getMaintainedResources(activity);
         String message = BADGE_PENDING_REMINDER.equals(target)
-                ? "角标提醒需要读取应用通知，请在系统设置中允许“锤子桌面”访问通知。"
-                : "紧贴屏幕横扫清除角标需要通知使用权，请在系统设置中允许“锤子桌面”访问通知。";
-        showConfirmDialog(activity, "需要通知使用权", message, "取消", "前往设置",
+                ? getString(resources, "notification_access_badge_message",
+                        "角标提醒需要读取应用通知，请在系统设置中允许“锤子桌面”访问通知。")
+                : getString(resources, "notification_access_swipe_message",
+                        "紧贴屏幕横扫清除角标需要通知使用权，请在系统设置中允许“锤子桌面”访问通知。");
+        showConfirmDialog(activity,
+                getString(resources, "notification_access_required_title", "需要通知使用权"),
+                message,
+                getString(resources, "cancel", "取消"),
+                getString(resources, "notification_access_open_settings", "前往设置"),
                 new View.OnClickListener() {
                     public void onClick(View v) {
                         if (!writeBadgeNotificationAccessPending(activity, target)) {
-                            Toast.makeText(activity, "无法保存授权等待状态", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(activity, getString(activity,
+                                    "notification_access_pending_save_failed", "无法保存授权等待状态"),
+                                    Toast.LENGTH_SHORT).show();
                             return;
                         }
                         Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_SETTINGS_OPENED targetSwitch="
@@ -5574,7 +5618,8 @@ public final class MaintainedLauncherSettingsHost {
                 Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_DENIED_ON_RETURN targetSwitch="
                         + pending + " notificationAccess=false");
                 disableBadgeSettingWithoutNotificationAccess(activity, pending);
-                Toast.makeText(activity, "未授予通知使用权，功能无法开启", Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity, getString(activity, "notification_access_denied",
+                        "未授予通知使用权，功能无法开启"), Toast.LENGTH_SHORT).show();
             }
         }
         synchronizeBadgeSettingsWithNotificationAccess(activity, access);
@@ -6185,13 +6230,18 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showSettingsPagePasswordVerify(final Activity activity, final Runnable onVerified) {
-        showSettingsPasswordPad(activity, "验证隐私密码", "输入密码", new PasswordPadCallback() {
+        final Resources resources = getMaintainedResources(activity);
+        showSettingsPasswordPad(activity,
+                getString(resources, "privacy_password_verify_title", "验证隐私密码"),
+                getString(resources, "privacy_password_enter", "输入密码"),
+                new PasswordPadCallback() {
             @Override
             public void onComplete(String value, Runnable reset) {
                 String saved = activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
                         .getString("password_hash", "");
                 if (!saved.equals(launcherPagePasswordHash(value))) {
-                    Toast.makeText(activity, "密码错误", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(activity, getString(resources,
+                            "privacy_password_incorrect", "密码错误"), Toast.LENGTH_SHORT).show();
                     reset.run();
                     return;
                 }
@@ -6207,23 +6257,34 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showSettingsPagePasswordSet(final Activity activity, boolean changing, final Runnable onSaved) {
-        final String title = changing ? "修改隐私密码" : "设置隐私密码";
+        final Resources resources = getMaintainedResources(activity);
+        final String title = changing
+                ? getString(resources, "privacy_password_change_title", "修改隐私密码")
+                : getString(resources, "privacy_password_set_title", "设置隐私密码");
         final String[] first = new String[1];
-        showSettingsPasswordPad(activity, title, "输入新密码", new PasswordPadCallback() {
+        showSettingsPasswordPad(activity, title,
+                getString(resources, "privacy_password_enter_new", "输入新密码"),
+                new PasswordPadCallback() {
             @Override
             public void onComplete(String value, Runnable reset) {
                 first[0] = value;
-                showSettingsPasswordPad(activity, title, "再次输入密码", new PasswordPadCallback() {
+                showSettingsPasswordPad(activity, title,
+                        getString(resources, "privacy_password_enter_again", "再次输入密码"),
+                        new PasswordPadCallback() {
                     @Override
                     public void onComplete(String value, Runnable reset) {
                         if (!value.equals(first[0])) {
-                            Toast.makeText(activity, "两次输入的密码不一致", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(activity, getString(resources,
+                                    "privacy_password_mismatch", "两次输入的密码不一致"),
+                                    Toast.LENGTH_SHORT).show();
                             reset.run();
                             return;
                         }
                         activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
                                 .edit().putString("password_hash", launcherPagePasswordHash(value)).commit();
-                        Toast.makeText(activity, "隐私密码已保存", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(activity, getString(resources,
+                                "privacy_password_saved", "隐私密码已保存"),
+                                Toast.LENGTH_SHORT).show();
                         if (onSaved != null) {
                             onSaved.run();
                         } else {
@@ -6245,16 +6306,19 @@ public final class MaintainedLauncherSettingsHost {
             setBackground(root, resources, "background");
 
             View title = inflate(activity, context, "title_layout");
-            bindTitleBar(activity, resources, title, "应用分身", "PROFILE_APPS", backToMainAction(activity));
+            bindTitleBar(activity, resources, title,
+                    getString(resources, "profile_apps_title", "应用分身"),
+                    "PROFILE_APPS", backToMainAction(activity));
             root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
             ScrollView scroll = new ScrollView(context);
             final LinearLayout content = new LinearLayout(context);
             content.setOrientation(LinearLayout.VERTICAL);
             content.setPadding(0, settingDimen(resources, "settings_section_content_top", dp(context, 18)), 0, dp(context, 28));
-            content.addView(privacySectionLabel(context, "系统可用的分身应用"));
+            content.addView(privacySectionLabel(context,
+                    getString(resources, "profile_apps_section", "系统可用的分身应用")));
             final TextView status = new TextView(context);
-            status.setText("正在读取分身应用…");
+            status.setText(getString(resources, "profile_apps_loading", "正在读取分身应用…"));
             status.setTextColor(0xff8b8b8b);
             status.setTextSize(16);
             status.setGravity(Gravity.CENTER);
@@ -6276,7 +6340,8 @@ public final class MaintainedLauncherSettingsHost {
                             content.removeView(status);
                             if (entries.isEmpty()) {
                                 TextView empty = new TextView(context);
-                                empty.setText("未发现分身应用，或当前系统不支持读取分身应用");
+                                empty.setText(getString(resources, "profile_apps_empty",
+                                        "未发现分身应用，或当前系统不支持读取分身应用"));
                                 empty.setTextColor(0xff8b8b8b);
                                 empty.setTextSize(16);
                                 empty.setGravity(Gravity.CENTER);
@@ -6291,7 +6356,8 @@ public final class MaintainedLauncherSettingsHost {
                                 if (TextUtils.isEmpty(title)) {
                                     title = entry.packageName;
                                 }
-                                item.setTitle(title + "分身");
+                                item.setTitle(getFormattedString(resources, "profile_app_suffix",
+                                        "%1$s分身", title));
                                 item.setChecked(isProfileAppEnabled(app, entry));
                                 setBackground(item, resources, "selector_setting_sub_item_bg_single");
                                 View.OnClickListener click = new View.OnClickListener() {
@@ -6317,7 +6383,8 @@ public final class MaintainedLauncherSettingsHost {
             }, "ProfileAppsSettings").start();
         } catch (Throwable t) {
             t.printStackTrace();
-            Toast.makeText(activity, "应用分身页面加载失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, getString(activity, "profile_apps_load_failed",
+                    "应用分身页面加载失败"), Toast.LENGTH_SHORT).show();
             show(activity, sMainSettingsScrollY);
         }
     }
@@ -6337,7 +6404,9 @@ public final class MaintainedLauncherSettingsHost {
             setBackground(root, resources, "background");
 
             View title = inflate(activity, context, "title_layout");
-            bindTitleBar(activity, resources, title, "隐私密码", "PRIVACY_SETTINGS", backToMainAction(activity));
+            bindTitleBar(activity, resources, title,
+                    getString(resources, "privacy_password_title", "隐私密码"),
+                    "PRIVACY_SETTINGS", backToMainAction(activity));
             root.addView(title, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -6347,9 +6416,12 @@ public final class MaintainedLauncherSettingsHost {
             root.addView(content, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
-            content.addView(privacySectionLabel(context, "隐私密码相关设置"));
+            content.addView(privacySectionLabel(context,
+                    getString(resources, "privacy_password_settings_section", "隐私密码相关设置")));
             LinearLayout settingsCard = privacyCard(context);
-            settingsCard.addView(privacyRow(activity, context, resources, "修改密码", "selector_setting_sub_item_bg_single",
+            settingsCard.addView(privacyRow(activity, context, resources,
+                    getString(resources, "privacy_password_change", "修改密码"),
+                    "selector_setting_sub_item_bg_single",
                     new View.OnClickListener() {
                         public void onClick(View v) {
                             showSettingsPagePasswordSet(activity, true);
@@ -6361,7 +6433,7 @@ public final class MaintainedLauncherSettingsHost {
             content.addView(fill, new LinearLayout.LayoutParams(1, 0, 1f));
 
             TextView close = new TextView(context);
-            close.setText("关闭密码");
+            close.setText(getString(resources, "privacy_password_disable", "关闭密码"));
             close.setTextColor(Color.WHITE);
             close.setTextSize(21);
             close.setGravity(Gravity.CENTER);
@@ -6371,7 +6443,9 @@ public final class MaintainedLauncherSettingsHost {
                 public void onClick(View v) {
                     activity.getSharedPreferences("launcher_page_lock", Context.MODE_PRIVATE)
                             .edit().remove("password_hash").commit();
-                    Toast.makeText(activity, "隐私密码已关闭", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(activity, getString(resources,
+                            "privacy_password_disabled", "隐私密码已关闭"),
+                            Toast.LENGTH_SHORT).show();
                     show(activity, sMainSettingsScrollY);
                 }
             });
@@ -6383,7 +6457,8 @@ public final class MaintainedLauncherSettingsHost {
             setSettingsContentView(activity, context, resources, root, forward);
         } catch (Throwable t) {
             t.printStackTrace();
-            Toast.makeText(activity, "隐私密码页面加载失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, getString(activity, "privacy_password_page_failed",
+                    "隐私密码页面加载失败"), Toast.LENGTH_SHORT).show();
             show(activity, sMainSettingsScrollY);
         }
     }
@@ -7499,24 +7574,30 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void confirmLauncherMode(final Activity activity, final int mode) {
+        Resources resources = getMaintainedResources(activity);
         int current = readLauncherMode(activity);
         if (current == mode) {
-            Toast.makeText(activity, "当前已经是" + mode + "宫格", Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity, getFormattedString(resources,
+                    "grid_mode_already_selected", "当前已经是%1$d宫格",
+                    Integer.valueOf(mode)), Toast.LENGTH_SHORT).show();
             return;
         }
         String message;
         if (current == 20 && mode == 12) {
-            message = "单个二十宫格（包括隐藏与加密板块）内的图标如果超过十二个，"
-                    + "切换到十二宫格后，会被自动按顺序放入两个十二宫格内，而之后再切换回"
-                    + "二十宫格时，这两个板块内的应用不会自动回到一个板块内。"
-                    + "更改此项设置需要重新载入桌面。";
+            message = getString(resources, "grid_switch_20_to_12_message",
+                    "单个二十宫格（包括隐藏与加密板块）内的图标如果超过十二个，"
+                            + "切换到十二宫格后，会被自动按顺序放入两个十二宫格内，而之后再切换回"
+                            + "二十宫格时，这两个板块内的应用不会自动回到一个板块内。"
+                            + "更改此项设置需要重新载入桌面。");
         } else {
-            message = "更改此项设置需要重新载入桌面。";
+            message = getString(resources, "grid_switch_reload_message",
+                    "更改此项设置需要重新载入桌面。");
         }
-        showConfirmDialog(activity, "切换桌面宫格",
+        showConfirmDialog(activity,
+                getString(resources, "grid_switch_title", "切换桌面宫格"),
                 message,
-                "取消",
-                "切换",
+                getString(resources, "cancel", "取消"),
+                getString(resources, "grid_switch_action", "切换"),
                 new View.OnClickListener() {
                     public void onClick(View v) {
                         saveLauncherMode(activity, mode);
@@ -7532,7 +7613,8 @@ public final class MaintainedLauncherSettingsHost {
         int pageMode = pageModeForLauncherCellCount(mode);
         if (!writeLauncherModePref(context, mode)) {
             logOperation(context, "GRID_MIGRATION", "private_pref_commit_failed mode=" + mode);
-            Toast.makeText(context, "桌面宫格设置保存失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, getString(context, "grid_mode_save_failed",
+                    "桌面宫格设置保存失败"), Toast.LENGTH_SHORT).show();
             return;
         }
         int multiBlockMode = mode == 20 ? 0x50 : 0x30;
@@ -8157,7 +8239,9 @@ public final class MaintainedLauncherSettingsHost {
                 }
             }
             if (name != null) {
-                name.setText(i == 0 ? "当前" : entries[i].name);
+                name.setText(i == 0
+                        ? getString(resources, "current_theme_tag", "当前")
+                        : themeDisplayName(resources, entries[i]));
             }
             item.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) {
@@ -8410,12 +8494,25 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showConfirmDialog(final Activity activity, String title, String message, String negative, String positive, final View.OnClickListener positiveClick) {
-        showConfirmDialog(activity, title, message, negative, positive, positiveClick, null);
+        showConfirmDialog(activity, title, message, negative, positive, null, positiveClick, null);
     }
 
     private static void showConfirmDialog(final Activity activity, String title, String message,
             String negative, String positive, final View.OnClickListener positiveClick,
             final Runnable dismissed) {
+        showConfirmDialog(activity, title, message, negative, positive, null, positiveClick, dismissed);
+    }
+
+    private static void showChoiceDialog(final Activity activity, String title, String message,
+            String negative, String positive, final View.OnClickListener negativeClick,
+            final View.OnClickListener positiveClick) {
+        showConfirmDialog(activity, title, message, negative, positive,
+                negativeClick, positiveClick, null);
+    }
+
+    private static void showConfirmDialog(final Activity activity, String title, String message,
+            String negative, String positive, final View.OnClickListener negativeClick,
+            final View.OnClickListener positiveClick, final Runnable dismissed) {
         final Dialog dialog = new Dialog(activity);
         if (dismissed != null) {
             dialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
@@ -8460,6 +8557,9 @@ public final class MaintainedLauncherSettingsHost {
         cancel.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 dialog.dismiss();
+                if (negativeClick != null) {
+                    negativeClick.onClick(v);
+                }
             }
         });
         TextView ok = smartisanDialogActionButton(activity, positive, true, 1);
@@ -9364,6 +9464,10 @@ public final class MaintainedLauncherSettingsHost {
         return "默认动画";
     }
 
+    private static void showDefaultHomeOptions(Activity activity) {
+        openDefaultHomeSettings(activity);
+    }
+
     private static void openDefaultHomeSettings(Activity activity) {
         logOperation(activity, "ACTION", "open_default_home_settings");
         if (requestHomeRole(activity)) return;
@@ -9371,8 +9475,46 @@ public final class MaintainedLauncherSettingsHost {
         if (startAction(activity, "android.settings.MANAGE_DEFAULT_APPS_SETTINGS")) return;
         if (startAction(activity, "miui.intent.action.PREFERRED_APPLICATION_SETTINGS")) return;
         if (startAction(activity, Settings.ACTION_SETTINGS)) return;
-        Toast.makeText(activity, "请在系统设置中将锤子桌面设为默认桌面", Toast.LENGTH_LONG).show();
+        showInfoDialog(activity,
+                getString(getMaintainedResources(activity), "set_to_default_home_title", "设置默认桌面"),
+                getString(getMaintainedResources(activity), "default_home_open_settings_failed",
+                        "无法直接打开默认桌面设置，请在系统设置中将锤子桌面设为默认桌面。"));
     }
+
+    private static Dialog showSmartisanProgressDialog(Activity activity, String message) {
+        try {
+            Class<?> dialogClass = Class.forName("smartisanos.app.SmartisanProgressDialog");
+            Object value = dialogClass.getConstructor(Context.class).newInstance(activity);
+            int drawableId = activity.getResources().getIdentifier(
+                    "loading_progress", "drawable", activity.getPackageName());
+            if (drawableId != 0) {
+                dialogClass.getMethod("setIndeterminateDrawableResource", int.class)
+                        .invoke(value, drawableId);
+            }
+            dialogClass.getMethod("setCancelable", boolean.class).invoke(value, false);
+            dialogClass.getMethod("setCanceledOnTouchOutside", boolean.class).invoke(value, false);
+            dialogClass.getMethod("setMessage", String.class).invoke(value, message);
+            dialogClass.getMethod("show").invoke(value);
+            return value instanceof Dialog ? (Dialog) value : null;
+        } catch (Throwable error) {
+            Log.w(LOG_TAG, "Unable to show Smartisan progress dialog", error);
+            return null;
+        }
+    }
+
+    private static void dismissDialog(Dialog dialog) {
+        if (dialog == null) return;
+        try {
+            if (dialog.isShowing()) dialog.dismiss();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static boolean canShowDialog(Activity activity) {
+        return activity != null && !activity.isFinishing()
+                && (Build.VERSION.SDK_INT < 17 || !activity.isDestroyed());
+    }
+
 
     private static boolean requestHomeRole(Activity activity) {
         if (Build.VERSION.SDK_INT < 29) {
@@ -9476,7 +9618,10 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void checkForUpdates(final Activity activity) {
         logOperation(activity, "ACTION", "check_for_updates");
-        Toast.makeText(activity, "正在检查更新...", Toast.LENGTH_SHORT).show();
+        final Resources resources = getMaintainedResources(activity);
+        final String checkTitle = getString(resources, "check_update_title", "检查更新");
+        Toast.makeText(activity, getString(resources, "update_checking", "正在检查更新…"),
+                Toast.LENGTH_SHORT).show();
         final Handler handler = new Handler(Looper.getMainLooper());
         new Thread(new Runnable() {
             public void run() {
@@ -9489,9 +9634,11 @@ public final class MaintainedLauncherSettingsHost {
                     conn.setRequestProperty("Accept", "application/vnd.github+json");
                     int code = conn.getResponseCode();
                     if (code == 404) {
-                        postUpdateInfo(handler, activity, "检查更新",
-                                "当前仓库还没有发布 Release\n当前版本：" + appVersion(activity)
-                                        + "\n\n后续在 GitHub 发布 APK 后，这里会提示下载更新。");
+                        postUpdateInfo(handler, activity, checkTitle,
+                                getFormattedString(resources, "update_no_published_release",
+                                        "当前仓库还没有发布 Release\n当前版本：%1$s"
+                                                + "\n\n后续发布桌面 APK 后，这里会提示下载更新。",
+                                        appVersion(activity)));
                         return;
                     }
                     if (code < 200 || code >= 300) {
@@ -9500,8 +9647,10 @@ public final class MaintainedLauncherSettingsHost {
                     String json = readText(conn.getInputStream());
                     JSONObject release = softwareReleaseFromResponse(json);
                     if (release == null) {
-                        postUpdateInfo(handler, activity, "检查更新",
-                                "当前没有找到桌面软件 Release\n当前版本：" + appVersion(activity));
+                        postUpdateInfo(handler, activity, checkTitle,
+                                getFormattedString(resources, "update_no_release",
+                                        "当前没有找到桌面软件 Release\n当前版本：%1$s",
+                                        appVersion(activity)));
                         return;
                     }
                     final String tag = release.optString("tag_name", "");
@@ -9545,30 +9694,40 @@ public final class MaintainedLauncherSettingsHost {
                             String current = appVersionName(activity);
                             int versionComparison = compareVersionTag(tag, current);
                             if (finalApkUrl == null) {
-                                showInfoDialog(activity, "检查更新",
-                                        "已找到线上版本：" + finalName
-                                                + "\n但该 Release 没有桌面主 APK 安装包\n当前版本：" + appVersion(activity));
+                                showInfoDialog(activity, checkTitle,
+                                        getFormattedString(resources, "update_release_without_apk",
+                                                "已找到线上版本：%1$s\n但该 Release 没有桌面主 APK 安装包"
+                                                        + "\n当前版本：%2$s",
+                                                finalName, appVersion(activity)));
                                 return;
                             }
                             if (versionComparison <= 0) {
-                                showInfoDialog(activity, "检查更新",
-                                        "当前已是最新版本\n版本：" + appVersion(activity));
+                                showInfoDialog(activity, checkTitle,
+                                        getFormattedString(resources, "update_current_latest",
+                                                "当前已是最新版本\n版本：%1$s",
+                                                appVersion(activity)));
                                 return;
                             }
-                            String message = "发现线上版本：" + finalName
-                                    + "\n当前版本：" + appVersion(activity);
+                            String message = getFormattedString(resources, "update_found_message",
+                                    "发现线上版本：%1$s\n当前版本：%2$s",
+                                    finalName, appVersion(activity));
                             if (finalBody != null && finalBody.length() > 0) {
                                 message += "\n\n" + finalBody;
                             }
                             final CachedUpdateDownload cached = cachedUpdateDownload(activity, tag, finalApkName);
-                            String positive = "下载";
+                            String positive = getString(resources,
+                                    "launcher_update_download_action", "下载");
                             if (cached != null && cached.status == DownloadManager.STATUS_SUCCESSFUL) {
-                                positive = "安装";
+                                positive = getString(resources,
+                                        "launcher_update_install_action", "安装");
                             } else if (cached != null && (cached.status == DownloadManager.STATUS_RUNNING
                                     || cached.status == DownloadManager.STATUS_PENDING)) {
-                                positive = "下载中";
+                                positive = getString(resources, "update_downloading", "下载中");
                             }
-                            showConfirmDialog(activity, "发现新版本", message, "取消", positive, new View.OnClickListener() {
+                            showConfirmDialog(activity,
+                                    getString(resources, "update_available_title", "发现新版本"),
+                                    message, getString(resources, "cancel", "取消"), positive,
+                                    new View.OnClickListener() {
                                 public void onClick(View v) {
                                     if (cached != null && cached.status == DownloadManager.STATUS_SUCCESSFUL) {
                                         installApk(activity, cached.downloadId);
@@ -9576,7 +9735,10 @@ public final class MaintainedLauncherSettingsHost {
                                     }
                                     if (cached != null && (cached.status == DownloadManager.STATUS_RUNNING
                                             || cached.status == DownloadManager.STATUS_PENDING)) {
-                                        Toast.makeText(activity, "更新包正在后台下载，请稍后安装", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(activity, getString(resources,
+                                                "update_download_in_background",
+                                                "更新包正在后台下载，请稍后安装"),
+                                                Toast.LENGTH_SHORT).show();
                                         return;
                                     }
                                     downloadUpdateApk(activity, finalApkUrl, finalApkName, tag);
@@ -9586,9 +9748,10 @@ public final class MaintainedLauncherSettingsHost {
                     });
                 } catch (Throwable t) {
                     final String error = shortError(t);
-                    postUpdateInfo(handler, activity, "检查更新",
-                            "无法获取线上版本信息\n当前版本：" + appVersion(activity)
-                                    + "\n\n" + error);
+                    postUpdateInfo(handler, activity, checkTitle,
+                            getFormattedString(resources, "update_info_failed",
+                                    "无法获取线上版本信息\n当前版本：%1$s\n\n%2$s",
+                                    appVersion(activity), error));
                 } finally {
                     if (conn != null) {
                         conn.disconnect();
@@ -10634,7 +10797,6 @@ public final class MaintainedLauncherSettingsHost {
             bindBackTitle(activity, resources, root, "view_title",
                     getString(resources, "setting_about_us", "关于我们"), "ABOUT", backToMainAction(activity));
             hide(resources, root, "setting_more_product");
-            bindOperationLogSection(activity, root, resources);
             tuneScrollBars(root);
             setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
@@ -10702,59 +10864,6 @@ public final class MaintainedLauncherSettingsHost {
         });
         row.addView(install, new LinearLayout.LayoutParams(dp(activity, 118), dp(activity, 48)));
         parent.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 92)));
-    }
-
-    private static void bindOperationLogSection(final Activity activity, View root, Resources resources) {
-        LinearLayout content = aboutContent(root, resources);
-        if (content == null) {
-            return;
-        }
-        addAboutSectionTitle(activity, content, "操作日志");
-        TextView status = text(activity, operationLogStatus(activity), 13, 0xff8a8f99, false);
-        status.setPadding(dp(activity, 20), 0, dp(activity, 20), dp(activity, 8));
-        status.setLineSpacing(dp(activity, 2), 1.0f);
-        content.addView(status, new LinearLayout.LayoutParams(-1, -2));
-
-        LinearLayout actions = new LinearLayout(activity);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setPadding(dp(activity, 20), 0, dp(activity, 20), 0);
-        final boolean active = isOperationLogActive(activity);
-        TextView toggle = aboutActionButton(activity, active ? "结束并保存" : "开始记录", active ? 0xffd85b5b : 0xff5f8fe8);
-        toggle.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                if (isOperationLogActive(activity)) {
-                    stopOperationLog(activity, "user_stop");
-                    Toast.makeText(activity, "日志已保存", Toast.LENGTH_SHORT).show();
-                } else {
-                    startOperationLog(activity);
-                    Toast.makeText(activity, "已开始记录操作日志", Toast.LENGTH_SHORT).show();
-                }
-                showAboutPage(activity);
-            }
-        });
-        actions.addView(toggle, new LinearLayout.LayoutParams(0, dp(activity, 48), 1.0f));
-
-        TextView refresh = aboutActionButton(activity, "刷新列表", 0xff555d6d);
-        refresh.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                showAboutPage(activity);
-            }
-        });
-        LinearLayout.LayoutParams refreshLp = new LinearLayout.LayoutParams(0, dp(activity, 48), 1.0f);
-        refreshLp.leftMargin = dp(activity, 10);
-        actions.addView(refresh, refreshLp);
-        content.addView(actions, new LinearLayout.LayoutParams(-1, dp(activity, 58)));
-
-        File[] logs = operationLogFiles(activity);
-        if (logs.length == 0) {
-            TextView empty = text(activity, "暂无日志。开始记录后，日志会按日期保存在应用私有目录；结束记录后可直接发送。", 14, 0xff999999, false);
-            empty.setPadding(dp(activity, 20), dp(activity, 8), dp(activity, 20), dp(activity, 16));
-            content.addView(empty, new LinearLayout.LayoutParams(-1, -2));
-            return;
-        }
-        for (int i = 0; i < logs.length && i < 8; i++) {
-            addOperationLogRow(activity, content, logs[i]);
-        }
     }
 
     private static PendingIntent updateInstallPendingIntent(Context context, File file, long downloadId) {
@@ -10844,241 +10953,6 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static LinearLayout aboutContent(View root, Resources resources) {
-        View scroll = byId(root, resources, "about_us_scrollview");
-        if (scroll instanceof ScrollView) {
-            View child = ((ScrollView) scroll).getChildAt(0);
-            if (child instanceof LinearLayout) {
-                return (LinearLayout) child;
-            }
-        }
-        return null;
-    }
-
-    private static void addAboutSectionTitle(Context context, LinearLayout parent, String title) {
-        parent.addView(settingsSectionHeader(context, context.getResources(), title));
-    }
-
-    private static TextView aboutActionButton(Context context, String label, int color) {
-        TextView button = text(context, label, 15, color, false);
-        button.setGravity(Gravity.CENTER);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0xfffbfbfb);
-        bg.setStroke(1, 0xffd8d8d8);
-        bg.setCornerRadius(dp(context, 4));
-        button.setBackgroundDrawable(bg);
-        return button;
-    }
-
-    private static void addOperationLogRow(final Activity activity, LinearLayout parent, final File file) {
-        LinearLayout row = new LinearLayout(activity);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(activity, 20), dp(activity, 4), dp(activity, 20), dp(activity, 4));
-
-        LinearLayout labels = new LinearLayout(activity);
-        labels.setOrientation(LinearLayout.VERTICAL);
-        TextView name = text(activity, file.getName(), 14, 0xff555d6d, false);
-        TextView meta = text(activity, readableBytes(file.length()) + "  " + formatTime(file.lastModified()), 12, 0xff9a9fa8, false);
-        labels.addView(name, new LinearLayout.LayoutParams(-1, -2));
-        labels.addView(meta, new LinearLayout.LayoutParams(-1, -2));
-        row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1.0f));
-
-        TextView view = aboutActionButton(activity, "查看", 0xff5f8fe8);
-        view.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                showOperationLogPreview(activity, file);
-            }
-        });
-        row.addView(view, new LinearLayout.LayoutParams(dp(activity, 62), dp(activity, 42)));
-
-        TextView share = aboutActionButton(activity, "发送", 0xff5f8fe8);
-        share.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                shareOperationLog(activity, file);
-            }
-        });
-        LinearLayout.LayoutParams shareLp = new LinearLayout.LayoutParams(dp(activity, 62), dp(activity, 42));
-        shareLp.leftMargin = dp(activity, 6);
-        row.addView(share, shareLp);
-
-        TextView delete = aboutActionButton(activity, "删除", 0xffd85b5b);
-        delete.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                if (file.equals(sOperationLogFile) && isOperationLogActive(activity)) {
-                    Toast.makeText(activity, "正在记录的日志不能删除", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (file.delete()) {
-                    Toast.makeText(activity, "已删除日志", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(activity, "删除失败", Toast.LENGTH_SHORT).show();
-                }
-                showAboutPage(activity);
-            }
-        });
-        LinearLayout.LayoutParams deleteLp = new LinearLayout.LayoutParams(dp(activity, 62), dp(activity, 42));
-        deleteLp.leftMargin = dp(activity, 6);
-        row.addView(delete, deleteLp);
-        parent.addView(row, new LinearLayout.LayoutParams(-1, dp(activity, 62)));
-    }
-
-    private static void startOperationLog(Context context) {
-        synchronized (OPERATION_LOG_LOCK) {
-            try {
-                File dir = operationLogDir(context);
-                if (!dir.exists()) {
-                    dir.mkdirs();
-                }
-                String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date());
-                sOperationLogFile = new File(dir, "operation-" + stamp + ".log");
-                sOperationLogcatFile = new File(dir, "operation-logcat-" + stamp + ".log");
-                sOperationLogWriter = new BufferedWriter(new OutputStreamWriter(
-                        new FileOutputStream(sOperationLogFile, true), "UTF-8"));
-                context.getSharedPreferences(OPERATION_LOG_PREFS, Context.MODE_PRIVATE).edit()
-                        .putBoolean(PREF_OPERATION_LOG_ACTIVE, true)
-                        .putString(PREF_OPERATION_LOG_FILE, sOperationLogFile.getAbsolutePath())
-                        .apply();
-                installOperationLogExceptionHandler(context.getApplicationContext() == null
-                        ? context : context.getApplicationContext());
-                writeOperationLogLocked("START", "package=" + context.getPackageName()
-                        + ", version=" + appVersionName(context)
-                        + ", sdk=" + Build.VERSION.SDK_INT);
-                writeOperationLogLocked("INFO", "main_log=" + sOperationLogFile.getAbsolutePath());
-                writeOperationLogLocked("INFO", "logcat_log=" + sOperationLogcatFile.getAbsolutePath());
-                startOperationLogcatThread();
-                pruneOperationLogs(context, 30);
-                final Context diagnosticContext = context.getApplicationContext() == null
-                        ? context : context.getApplicationContext();
-                new Thread(new Runnable() {
-                    public void run() {
-                        writeDiagnosticSnapshot(diagnosticContext, "recording_started");
-                    }
-                }, "LauncherDiagnosticSnapshot").start();
-            } catch (Throwable t) {
-                closeQuietly(sOperationLogWriter);
-                sOperationLogWriter = null;
-                Toast.makeText(context, "无法开始记录日志：" + shortError(t), Toast.LENGTH_LONG).show();
-            }
-        }
-    }
-
-    private static void stopOperationLog(Context context, String reason) {
-        synchronized (OPERATION_LOG_LOCK) {
-            if (sOperationLogWriter == null) {
-                File active = activeOperationLogFile(context);
-                if (active != null) {
-                    appendText(active, operationLogLine("END", "recovered_after_process_restart, reason=" + reason));
-                }
-            } else {
-                writeOperationLogLocked("END", "reason=" + reason);
-            }
-            context.getSharedPreferences(OPERATION_LOG_PREFS, Context.MODE_PRIVATE).edit()
-                    .putBoolean(PREF_OPERATION_LOG_ACTIVE, false)
-                    .remove(PREF_OPERATION_LOG_FILE)
-                    .apply();
-            stopOperationLogcatThread();
-            closeQuietly(sOperationLogWriter);
-            sOperationLogWriter = null;
-            sOperationLogFile = null;
-            sOperationLogcatFile = null;
-        }
-    }
-
-    private static boolean isOperationLogActive(Context context) {
-        if (sOperationLogWriter != null) {
-            return true;
-        }
-        return context.getSharedPreferences(OPERATION_LOG_PREFS, Context.MODE_PRIVATE)
-                .getBoolean(PREF_OPERATION_LOG_ACTIVE, false);
-    }
-
-    private static String operationLogStatus(Context context) {
-        File dir = operationLogDir(context);
-        String path = dir.getAbsolutePath();
-        if (isOperationLogActive(context)) {
-            File active = activeOperationLogFile(context);
-            return "正在记录。日志目录：" + path
-                    + (active == null ? "" : "\n当前文件：" + active.getName());
-        }
-        return "未记录。开启后会写入关键操作、分身发现过程、异常及本应用可读取的 logcat。"
-                + "\n结束后点击“发送”，会把主日志和配套 logcat 合并为文字发送。"
-                + "\n受 Android 权限限制，它不能代替电脑 ADB 读取全部系统和其他应用日志。"
-                + "\nADB 路径：" + path;
-    }
-
-    private static File activeOperationLogFile(Context context) {
-        String path = context.getSharedPreferences(OPERATION_LOG_PREFS, Context.MODE_PRIVATE)
-                .getString(PREF_OPERATION_LOG_FILE, null);
-        if (path == null || path.length() == 0) {
-            return null;
-        }
-        return new File(path);
-    }
-
-    private static File operationLogDir(Context context) {
-        return new File(context.getFilesDir(), OPERATION_LOG_DIR);
-    }
-
-    private static File[] operationLogFiles(Context context) {
-        File dir = operationLogDir(context);
-        File[] files = dir.listFiles();
-        if (files == null) {
-            return new File[0];
-        }
-        ArrayList<File> result = new ArrayList<File>();
-        for (int i = 0; i < files.length; i++) {
-            File file = files[i];
-            if (file != null && file.isFile() && file.getName().startsWith("operation-")
-                    && !file.getName().startsWith("operation-logcat-")
-                    && file.getName().endsWith(".log")) {
-                result.add(file);
-            }
-        }
-        Collections.sort(result, new Comparator<File>() {
-            public int compare(File a, File b) {
-                long diff = b.lastModified() - a.lastModified();
-                return diff == 0 ? b.getName().compareTo(a.getName()) : (diff > 0 ? 1 : -1);
-            }
-        });
-        return result.toArray(new File[result.size()]);
-    }
-
-    private static void pruneOperationLogs(Context context, int keep) {
-        File[] files = operationLogFiles(context);
-        for (int i = keep; i < files.length; i++) {
-            try {
-                files[i].delete();
-            } catch (Throwable ignored) {
-            }
-        }
-    }
-
-    private static void resumeOperationLogIfNeeded(Context context) {
-        if (context == null || !isOperationLogActive(context)) {
-            return;
-        }
-        installOperationLogExceptionHandler(context.getApplicationContext() == null
-                ? context : context.getApplicationContext());
-        logOperation(context, "RESUME_CHECK", "settings_host_loaded");
-    }
-
-    private static void installOperationLogExceptionHandler(final Context context) {
-        if (sOperationLogHandlerInstalled) {
-            return;
-        }
-        sPreviousUncaughtExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
-        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-            public void uncaughtException(Thread thread, Throwable ex) {
-                logOperation(context, "UNCAUGHT", threadName(thread) + " " + stackTraceText(ex));
-                if (sPreviousUncaughtExceptionHandler != null) {
-                    sPreviousUncaughtExceptionHandler.uncaughtException(thread, ex);
-                }
-            }
-        });
-        sOperationLogHandlerInstalled = true;
-    }
-
     public static void logFlingUpReset(String reason, boolean rk, boolean sk, boolean tk) {
         String detail = "reason=" + reason + " beforeRk=" + rk + " beforeSk=" + sk + " beforeTk=" + tk
                 + " afterRk=false afterSk=false afterTk=false";
@@ -11086,180 +10960,12 @@ public final class MaintainedLauncherSettingsHost {
         android.util.Log.d("FlingUpGesture", "FLING_UP_STATE_RESET " + detail);
     }
 
-    private static void logOperation(Context context, String event, String detail) {
-        if (context == null || !isOperationLogActive(context)) {
-            return;
-        }
-        synchronized (OPERATION_LOG_LOCK) {
-            try {
-                if (sOperationLogWriter == null) {
-                    File active = activeOperationLogFile(context);
-                    if (active == null) {
-                        return;
-                    }
-                    sOperationLogFile = active;
-                    sOperationLogWriter = new BufferedWriter(new OutputStreamWriter(
-                            new FileOutputStream(active, true), "UTF-8"));
-                    writeOperationLogLocked("RESUME", "writer_reopened");
-                }
-                writeOperationLogLocked(event, detail);
-            } catch (Throwable ignored) {
-            }
-        }
+    private static void logOperation(Context ignoredContext, String event, String detail) {
+        // Existing diagnostics callers stay side-effect-free here so settings
+        // behavior is unchanged.
     }
-
-    private static void writeOperationLogLocked(String event, String detail) {
-        if (sOperationLogWriter == null) {
-            return;
-        }
-        try {
-            sOperationLogWriter.write(operationLogLine(event, detail));
-            sOperationLogWriter.flush();
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private static String operationLogLine(String event, String detail) {
-        return formatTime(System.currentTimeMillis()) + " [" + event + "] "
-                + (detail == null ? "" : detail) + "\n";
-    }
-
-    private static void startOperationLogcatThread() {
-        if (sOperationLogcatFile == null || sOperationLogcatThread != null) {
-            return;
-        }
-        final File out = sOperationLogcatFile;
-        sOperationLogcatThread = new Thread(new Runnable() {
-            public void run() {
-                BufferedReader reader = null;
-                BufferedWriter writer = null;
-                try {
-                    sOperationLogcatProcess = Runtime.getRuntime().exec(new String[]{"logcat", "-v", "threadtime"});
-                    reader = new BufferedReader(new InputStreamReader(sOperationLogcatProcess.getInputStream()));
-                    writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(out, true), "UTF-8"));
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        writer.write(line);
-                        writer.newLine();
-                        writer.flush();
-                    }
-                } catch (Throwable t) {
-                    appendText(out, operationLogLine("LOGCAT_ERROR", shortError(t)));
-                } finally {
-                    closeQuietly(reader);
-                    closeQuietly(writer);
-                }
-            }
-        }, "LauncherOperationLogcat");
-        sOperationLogcatThread.start();
-    }
-
-    private static void stopOperationLogcatThread() {
-        try {
-            if (sOperationLogcatProcess != null) {
-                sOperationLogcatProcess.destroy();
-            }
-        } catch (Throwable ignored) {
-        }
-        sOperationLogcatProcess = null;
-        sOperationLogcatThread = null;
-    }
-
-    private static void showOperationLogPreview(Activity activity, File file) {
-        showInfoDialog(activity, file.getName(), tailText(file, 6000));
-    }
-
-    private static void shareOperationLog(Activity activity, File file) {
-        try {
-            String stamp = file.getName().substring("operation-".length());
-            File logcat = new File(file.getParentFile(), "operation-logcat-" + stamp);
-            StringBuilder body = new StringBuilder();
-            body.append("锤子桌面诊断日志\n\n=== 操作日志 ===\n")
-                    .append(tailText(file, 90000));
-            if (logcat.exists()) {
-                body.append("\n\n=== 应用可读取的 logcat ===\n")
-                        .append(tailText(logcat, 90000));
-            }
-            Intent send = new Intent(Intent.ACTION_SEND);
-            send.setType("text/plain");
-            send.putExtra(Intent.EXTRA_SUBJECT, "锤子桌面诊断日志 " + stamp);
-            send.putExtra(Intent.EXTRA_TEXT, body.toString());
-            activity.startActivity(Intent.createChooser(send, "发送诊断日志"));
-        } catch (Throwable t) {
-            Toast.makeText(activity, "发送日志失败：" + shortError(t), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private static String tailText(File file, int maxChars) {
-        BufferedReader reader = null;
-        try {
-            StringBuilder builder = new StringBuilder();
-            reader = new BufferedReader(new InputStreamReader(new java.io.FileInputStream(file), "UTF-8"));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                builder.append(line).append('\n');
-                if (builder.length() > maxChars) {
-                    builder.delete(0, builder.length() - maxChars);
-                }
-            }
-            return builder.length() == 0 ? "空日志" : builder.toString();
-        } catch (Throwable t) {
-            return "读取失败：" + shortError(t);
-        } finally {
-            closeQuietly(reader);
-        }
-    }
-
-    private static void appendText(File file, String text) {
-        BufferedWriter writer = null;
-        try {
-            writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true), "UTF-8"));
-            writer.write(text);
-            writer.flush();
-        } catch (Throwable ignored) {
-        } finally {
-            closeQuietly(writer);
-        }
-    }
-
-    private static String stackTraceText(Throwable throwable) {
-        if (throwable == null) {
-            return "";
-        }
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        java.io.PrintWriter writer = new java.io.PrintWriter(out);
-        throwable.printStackTrace(writer);
-        writer.flush();
-        return out.toString();
-    }
-
-    private static String threadName(Thread thread) {
-        return thread == null ? "unknown-thread" : thread.getName();
-    }
-
-    private static String readableBytes(long bytes) {
-        if (bytes < 1024L) {
-            return bytes + " B";
-        }
-        long kb = bytes / 1024L;
-        if (kb < 1024L) {
-            return kb + " KB";
-        }
-        return (kb / 1024L) + " MB";
-    }
-
     private static String formatTime(long time) {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date(time));
-    }
-
-    private static void closeQuietly(java.io.Closeable closeable) {
-        if (closeable == null) {
-            return;
-        }
-        try {
-            closeable.close();
-        } catch (Throwable ignored) {
-        }
     }
 
     private static void addFollowRow(Context context, LinearLayout parent, String left, String right) {
@@ -11279,6 +10985,465 @@ public final class MaintainedLauncherSettingsHost {
         View line = new View(context);
         line.setBackgroundColor(0xffeeeeee);
         parent.addView(line, new LinearLayout.LayoutParams(-1, 1));
+    }
+
+    private static void showDesktopBackupPage(final Activity activity, boolean forward) {
+        try {
+            SettingsResourceContext context = createSettingsContext(activity);
+            Resources resources = context.getResources();
+            View root = inflate(activity, context, "setting_backup_restore");
+            bindBackTitle(activity, resources, root, "backup_title",
+                    getString(resources, "desktop_backup_title", "桌面备份与恢复"),
+                    "DESKTOP_BACKUP", backToMainAction(activity));
+            SharedPreferences prefs = activity.getSharedPreferences(
+                    DesktopBackupController.PREFS, Context.MODE_PRIVATE);
+            TextView locationValue = (TextView) find(resources, root, "backup_location_value");
+            TextView backupNowValue = (TextView) find(resources, root, "backup_now_value");
+            TextView undoValue = (TextView) find(resources, root, "undo_last_restore_value");
+            View undoRow = find(resources, root, "undo_last_restore");
+            String locationName = prefs.getString(DesktopBackupController.KEY_TREE_DISPLAY_NAME, "");
+            String locationUri = prefs.getString(DesktopBackupController.KEY_TREE_URI, "");
+            if (!TextUtils.isEmpty(locationUri)) {
+                locationName = DesktopBackupController.directoryDisplayPath(activity, Uri.parse(locationUri));
+            }
+            if (TextUtils.isEmpty(locationName)) {
+                locationName = getString(resources, "backup_not_selected", "尚未选择");
+            } else if ("已选择目录".equals(locationName)) {
+                locationName = getString(resources, "backup_location_selected", "已选择目录");
+            }
+            if (locationValue != null) locationValue.setText(locationName);
+            long lastBackup = prefs.getLong(DesktopBackupController.KEY_LAST_BACKUP_TIME, 0L);
+            boolean incomplete = prefs.getBoolean("last_backup_incomplete", false);
+            if (backupNowValue != null) backupNowValue.setText(incomplete
+                    ? getString(resources, "backup_last_incomplete", "上次备份未完成")
+                    : (lastBackup == 0L
+                    ? getString(resources, "backup_last_none", "上次备份：暂无")
+                    : getFormattedString(resources, "backup_last_format", "上次备份：%1$s",
+                            backupDate(lastBackup))));
+            boolean canUndo = DesktopRestoreController.hasUndoSnapshot(activity);
+            if (undoValue != null) {
+                undoValue.setText(canUndo ? backupDate(new File(activity.getFilesDir(),
+                        "backup_restore/rollback_latest/archive.slauncherbackup").lastModified())
+                        : getString(resources, "backup_no_undo", "暂无可撤销内容"));
+            }
+            if (undoRow != null) {
+                undoRow.setEnabled(canUndo);
+                undoRow.setAlpha(canUndo ? 1f : 0.55f);
+            }
+            click(activity, resources, root, "backup_location", new View.OnClickListener() {
+                public void onClick(View v) { openBackupTree(activity); }
+            });
+            click(activity, resources, root, "backup_now", new View.OnClickListener() {
+                public void onClick(View v) { startBackupFromSavedLocation(activity); }
+            });
+            click(activity, resources, root, "restore_from_backup", new View.OnClickListener() {
+                public void onClick(View v) { openRestoreDocument(activity); }
+            });
+            if (canUndo) click(activity, resources, root, "undo_last_restore", new View.OnClickListener() {
+                public void onClick(View v) { confirmUndoRestore(activity); }
+            });
+            setSettingsContentView(activity, context, resources, root, forward);
+            String message = prefs.getString("pending_restore_message", "");
+            if (!TextUtils.isEmpty(message)) {
+                prefs.edit().remove("pending_restore_message").commit();
+                showInfoDialog(activity,
+                        getString(resources, "desktop_backup_title", "桌面备份与恢复"),
+                        pendingRestoreMessage(resources, message));
+            }
+        } catch (Throwable error) {
+            Log.w(LOG_TAG, "Unable to show desktop backup page", error);
+            Resources resources = getMaintainedResources(activity);
+            showInfoDialog(activity,
+                    getString(resources, "desktop_backup_title", "桌面备份与恢复"),
+                    getString(resources, "backup_page_open_failed", "无法打开备份页面"));
+        }
+    }
+
+    private static SettingItemText settingText(Resources resources, View root, String name) {
+        View view = find(resources, root, name);
+        return view instanceof SettingItemText ? (SettingItemText) view : null;
+    }
+
+    private static String backupDate(long time) {
+        if (time <= 0L) return "暂无";
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date(time));
+    }
+
+    private static void openBackupTree(Activity activity) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+            activity.startActivityForResult(intent, REQUEST_BACKUP_TREE);
+        } catch (Throwable error) {
+            Resources resources = getMaintainedResources(activity);
+            showChoiceDialog(activity,
+                    getString(resources, "file_manager_open_failed_title", "无法打开系统文件管理器"),
+                    getString(resources, "backup_tree_unsupported", "当前文件管理器不支持目录授权，可以改用每次另存备份。"),
+                    getString(resources, "cancel", "取消"),
+                    getString(resources, "backup_save_each_time", "每次另存"), null,
+                    new View.OnClickListener() {
+                        public void onClick(View v) { createBackupDocument(activity); }
+                    });
+        }
+    }
+
+    private static void createBackupDocument(Activity activity) {
+        try {
+            String name = "SmartisanLauncher_" + new SimpleDateFormat(
+                    "yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".slauncherbackup";
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("application/zip");
+            intent.putExtra(Intent.EXTRA_TITLE, name);
+            activity.startActivityForResult(intent, REQUEST_BACKUP_CREATE_DOCUMENT);
+        } catch (Throwable error) {
+            Resources resources = getMaintainedResources(activity);
+            showInfoDialog(activity, getString(resources, "backup_dialog_title", "桌面备份"),
+                    getString(resources, "file_manager_open_failed", "无法打开系统文件管理器"));
+        }
+    }
+
+    private static void openRestoreDocument(Activity activity) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("application/zip");
+            intent.putExtra(Intent.EXTRA_MIME_TYPES,
+                    new String[] {"application/zip", "application/octet-stream"});
+            String tree = activity.getSharedPreferences(DesktopBackupController.PREFS, 0)
+                    .getString(DesktopBackupController.KEY_TREE_URI, "");
+            if (!TextUtils.isEmpty(tree) && Build.VERSION.SDK_INT >= 26) {
+                intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(tree));
+            }
+            activity.startActivityForResult(intent, REQUEST_RESTORE_DOCUMENT);
+        } catch (Throwable error) {
+            Resources resources = getMaintainedResources(activity);
+            showInfoDialog(activity, getString(resources, "restore_from_backup", "从备份恢复"),
+                    getString(resources, "file_manager_open_failed", "无法打开系统文件管理器"));
+        }
+    }
+
+    private static void startBackupFromSavedLocation(Activity activity) {
+        String value = activity.getSharedPreferences(DesktopBackupController.PREFS, 0)
+                .getString(DesktopBackupController.KEY_TREE_URI, "");
+        if (TextUtils.isEmpty(value)) {
+            openBackupTree(activity);
+            return;
+        }
+        startBackup(activity, Uri.parse(value), false);
+    }
+
+    private static void startBackup(final Activity activity, Uri destination, boolean direct) {
+        final Resources resources = getMaintainedResources(activity);
+        showBackupProgress(activity,
+                getString(resources, "backup_progress", "正在备份桌面…"), true);
+        DesktopBackupController.Listener listener = new DesktopBackupController.Listener() {
+            public void onState(String state, boolean cancellable) {
+                updateBackupProgressMessage(backupStateMessage(resources, state));
+            }
+            public void onComplete(BackupRestoreResult result) {
+                dismissBackupProgress();
+                if (!canShowDialog(activity)) return;
+                if (result.success) {
+                    activity.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
+                            .putBoolean("last_backup_incomplete", false).commit();
+                    showInfoDialog(activity,
+                            getString(resources, "backup_dialog_title", "桌面备份"),
+                            backupResultMessage(resources, result));
+                    showDesktopBackupPage(activity, false);
+                } else if ("BACKUP_CANCELLED".equals(result.errorCode)) {
+                    showDesktopBackupPage(activity, false);
+                } else if ("BACKUP_LOCATION_READ_ONLY".equals(result.errorCode)
+                        || "BACKUP_LOCATION_PERMISSION_LOST".equals(result.errorCode)) {
+                    showChoiceDialog(activity,
+                            getString(resources, "backup_location_unavailable", "备份位置不可用"),
+                            backupResultMessage(resources, result),
+                            getString(resources, "backup_choose_again", "重新选择"),
+                            getString(resources, "backup_save_each_time", "每次另存"),
+                            new View.OnClickListener() {
+                                public void onClick(View v) { openBackupTree(activity); }
+                            }, new View.OnClickListener() {
+                                public void onClick(View v) { createBackupDocument(activity); }
+                            });
+                } else showInfoDialog(activity,
+                        getString(resources, "backup_dialog_title", "桌面备份"),
+                        backupResultMessage(resources, result));
+            }
+        };
+        if (direct) DesktopBackupController.startBackupToDocument(activity, destination, listener);
+        else DesktopBackupController.startBackupToTree(activity, destination, listener);
+    }
+
+    private static boolean onBackupActivityResult(Activity activity, int requestCode,
+            int resultCode, Intent data) {
+        if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) return true;
+        Uri uri = data.getData();
+        if (requestCode == REQUEST_BACKUP_TREE) {
+            if (!DesktopBackupController.persistTreePermission(activity, uri, data.getFlags())) {
+                Resources resources = getMaintainedResources(activity);
+                showChoiceDialog(activity,
+                        getString(resources, "backup_permission_failed_title", "目录授权失败"),
+                        getString(resources, "backup_permission_failed_message", "所选目录没有可持久使用的读写权限，可以重新选择或使用每次另存。"),
+                        getString(resources, "backup_choose_again", "重新选择"),
+                        getString(resources, "backup_save_each_time", "每次另存"),
+                        new View.OnClickListener() {
+                            public void onClick(View v) { openBackupTree(activity); }
+                        }, new View.OnClickListener() {
+                            public void onClick(View v) { createBackupDocument(activity); }
+                        });
+            } else showDesktopBackupPage(activity, false);
+            return true;
+        }
+        if (requestCode == REQUEST_BACKUP_CREATE_DOCUMENT) {
+            startBackup(activity, uri, true);
+            return true;
+        }
+        if (requestCode == REQUEST_RESTORE_DOCUMENT) {
+            Resources resources = getMaintainedResources(activity);
+            showBackupProgress(activity,
+                    getString(resources, "restore_preparing", "正在准备恢复…"), true);
+            DesktopRestoreController.validateSelectedFile(activity, uri, restoreListener(activity));
+            return true;
+        }
+        return false;
+    }
+
+    private static DesktopRestoreController.Listener restoreListener(final Activity activity) {
+        final Resources resources = getMaintainedResources(activity);
+        return new DesktopRestoreController.Listener() {
+            public void onState(String state, boolean cancellable) {
+                updateBackupProgressMessage(restoreStateMessage(resources, state));
+            }
+            public void onPreview(BackupArchiveReader.ValidatedBackup backup,
+                    RestoreMergePlanner.Plan plan) {
+                dismissBackupProgress();
+                showRestorePreviewPage(activity, backup, plan);
+            }
+            public void onComplete(BackupRestoreResult result) {
+                dismissBackupProgress();
+                if (canShowDialog(activity) && !"BACKUP_CANCELLED".equals(result.errorCode))
+                    showInfoDialog(activity,
+                            getString(resources, "restore_dialog_title", "桌面恢复"),
+                            restoreResultMessage(resources, result));
+            }
+        };
+    }
+
+    private static void showRestorePreviewPage(final Activity activity,
+            BackupArchiveReader.ValidatedBackup backup, RestoreMergePlanner.Plan plan) {
+        try {
+            SettingsResourceContext context = createSettingsContext(activity);
+            Resources resources = context.getResources();
+            View root = inflate(activity, context, "setting_backup_restore_preview");
+            bindBackTitle(activity, resources, root, "restore_preview_title",
+                    getString(resources, "restore_preview_title", "恢复桌面备份"),
+                    "RESTORE_PREVIEW", new Runnable() {
+                        public void run() {
+                            DesktopRestoreController.discardPreparedRestore(activity);
+                            showDesktopBackupPage(activity, false);
+                        }
+                    });
+            View titleView = find(resources, root, "restore_preview_title");
+            if (titleView instanceof Title) {
+                Title title = (Title) titleView;
+                title.setOkButtonText(getString(resources, "restore_start", "开始恢复"));
+                title.setOkButtonListener(new View.OnClickListener() {
+                    public void onClick(View v) { confirmStartRestore(activity); }
+                });
+            }
+            setBackupValue(resources, root, "preview_backup_time", backupDate(backup.manifest.createdAt));
+            setBackupValue(resources, root, "preview_source_version", backup.manifest.launcherVersionName);
+            setBackupValue(resources, root, "preview_format_version", String.valueOf(backup.manifest.formatVersion));
+            setBackupValue(resources, root, "preview_grid_mode", backup.manifest.gridMode == 20
+                    ? getString(resources, "grid_mode_20", "二十宫格")
+                    : getString(resources, "grid_mode_12", "十二宫格"));
+            setBackupValue(resources, root, "preview_page_count", String.valueOf(backup.pageCount()));
+            setBackupValue(resources, root, "preview_folder_count", String.valueOf(plan.folderCount));
+            setBackupValue(resources, root, "preview_app_count", String.valueOf(Math.max(0,
+                    backup.itemCount() - plan.folderCount - plan.shortcutCount)));
+            setBackupValue(resources, root, "preview_shortcut_count", String.valueOf(plan.shortcutCount));
+            setBackupValue(resources, root, "preview_custom_icon_count", String.valueOf(backup.customIconCount()));
+            setBackupValue(resources, root, "preview_theme_name", backup.theme.optString("themeId",
+                    getString(resources, "backup_default_theme", "默认主题")));
+            setBackupValue(resources, root, "preview_preserved_count", String.valueOf(plan.preservedNewAppCount));
+            setBackupValue(resources, root, "preview_preserved_shortcut_count", String.valueOf(plan.preservedNewShortcutCount));
+            setBackupValue(resources, root, "preview_missing_app_count", String.valueOf(plan.missingAppCount));
+            setBackupValue(resources, root, "preview_missing_icon_pack_count", String.valueOf(plan.missingIconPackCount));
+            setBackupValue(resources, root, "preview_missing_theme_count", String.valueOf(plan.missingThemePackageCount));
+            setBackupValue(resources, root, "preview_permission_count", String.valueOf(plan.permissionCount));
+            setSettingsContentView(activity, context, resources, root, true);
+        } catch (Throwable error) {
+            Log.w(LOG_TAG, "Unable to show restore preview", error);
+            Resources resources = getMaintainedResources(activity);
+            showInfoDialog(activity,
+                    getString(resources, "restore_preview_title", "恢复桌面备份"),
+                    getString(resources, "restore_preview_failed", "无法显示恢复预览"));
+        }
+    }
+
+    private static void setBackupValue(Resources resources, View root, String id, String value) {
+        TextView item = (TextView) find(resources, root, id + "_value");
+        if (item != null) item.setText(value == null ? "" : value);
+    }
+
+    private static void confirmStartRestore(final Activity activity) {
+        final Resources resources = getMaintainedResources(activity);
+        showConfirmDialog(activity,
+                getString(resources, "restore_preview_title", "恢复桌面备份"),
+                getString(resources, "restore_confirm_message", "恢复将替换当前桌面布局和已备份的桌面设置。\n当前新安装的应用和有效快捷方式将保留到桌面末尾。\n恢复前会自动保存当前状态。\n恢复后可以撤销。\n当前壁纸不会改变。"),
+                getString(resources, "cancel", "取消"),
+                getString(resources, "restore_action", "恢复"), new View.OnClickListener() {
+                    public void onClick(View v) {
+                        showBackupProgress(activity,
+                                getString(resources, "restore_preparing", "正在准备恢复…"), true);
+                        DesktopRestoreController.beginPreparedRestore(activity, restoreListener(activity));
+                    }
+                });
+    }
+
+    private static void confirmUndoRestore(final Activity activity) {
+        final Resources resources = getMaintainedResources(activity);
+        showConfirmDialog(activity,
+                getString(resources, "undo_last_restore", "撤销上次恢复"),
+                getString(resources, "undo_restore_confirm_message", "桌面将恢复到上次恢复操作之前的状态。\n恢复完成后所做的布局和设置修改也会被替换。"),
+                getString(resources, "cancel", "取消"),
+                getString(resources, "undo_action", "撤销"), new View.OnClickListener() {
+                    public void onClick(View v) {
+                        showBackupProgress(activity,
+                                getString(resources, "restore_original_progress", "正在恢复原桌面…"), false);
+                        if (!DesktopRestoreController.beginUndo(activity, restoreListener(activity))) {
+                            dismissBackupProgress();
+                            showInfoDialog(activity,
+                                    getString(resources, "undo_last_restore", "撤销上次恢复"),
+                                    getString(resources, "backup_no_undo", "暂无可撤销内容"));
+                        }
+                    }
+                });
+    }
+
+    private static String backupStateMessage(Resources resources, String state) {
+        if ("WAITING_DATABASE".equals(state) || "EXPORTING_LAYOUT".equals(state)) {
+            return getString(resources, "backup_progress_exporting", "正在读取桌面布局…");
+        }
+        if ("BUILDING_ARCHIVE".equals(state)) {
+            return getString(resources, "backup_progress_archiving", "正在生成备份文件…");
+        }
+        if ("COPYING_TO_DESTINATION".equals(state)) {
+            return getString(resources, "backup_progress_copying", "正在保存备份文件…");
+        }
+        return getString(resources, "backup_progress", "正在备份桌面…");
+    }
+
+    private static String restoreStateMessage(Resources resources, String state) {
+        if ("CREATING_ROLLBACK".equals(state)) {
+            return getString(resources, "restore_rollback_progress", "正在保存当前桌面状态…");
+        }
+        if ("WAITING_TRANSITION".equals(state)) {
+            return getString(resources, "restore_progress", "正在恢复桌面…");
+        }
+        return getString(resources, "restore_preparing", "正在准备恢复…");
+    }
+
+    private static String backupResultMessage(Resources resources, BackupRestoreResult result) {
+        if (result != null && result.success) {
+            return getString(resources, "backup_success", "桌面备份已完成");
+        }
+        String code = result == null ? "" : result.errorCode;
+        if ("BACKUP_LOCATION_PERMISSION_LOST".equals(code)) {
+            return getString(resources, "backup_error_permission_lost", "备份目录授权已失效，请重新选择。");
+        }
+        if ("BACKUP_LOCATION_READ_ONLY".equals(code)) {
+            return getString(resources, "backup_error_read_only", "所选目录不可写，请重新选择或使用每次另存。");
+        }
+        if ("BACKUP_NO_SPACE".equals(code)) {
+            return getString(resources, "backup_error_no_space", "存储空间不足，无法完成备份。");
+        }
+        if ("BACKUP_VERIFY_FAILED".equals(code)) {
+            return getString(resources, "backup_error_verify", "备份文件校验失败。");
+        }
+        return getString(resources, "backup_error_general", "桌面备份失败，请稍后重试。");
+    }
+
+    private static String restoreResultMessage(Resources resources, BackupRestoreResult result) {
+        if (result != null && result.success) {
+            return getString(resources, "restore_success", "桌面恢复已完成。");
+        }
+        String code = result == null ? "" : result.errorCode;
+        if ("RESTORE_FORMAT_TOO_NEW".equals(code)) {
+            return getString(resources, "restore_error_too_new", "该备份由更高版本创建，请升级桌面后恢复。");
+        }
+        if ("RESTORE_CHECKSUM_FAILED".equals(code)) {
+            return getString(resources, "restore_error_checksum", "备份文件校验失败，无法恢复。");
+        }
+        if ("RESTORE_FILE_UNREADABLE".equals(code)) {
+            return getString(resources, "restore_error_unreadable", "无法读取所选备份文件。");
+        }
+        if ("RESTORE_ROLLBACK_FAILED".equals(code)) {
+            return getString(resources, "restore_error_undo", "无法撤销上次恢复。");
+        }
+        if ("RESTORE_ROLLBACK_CREATE_FAILED".equals(code)) {
+            return getString(resources, "restore_error_rollback_create", "无法创建恢复前状态，桌面未作修改。");
+        }
+        return getString(resources, "restore_error_invalid", "备份文件无效或已损坏。");
+    }
+
+    private static String pendingRestoreMessage(Resources resources, String code) {
+        if ("UNDO_COMPLETE".equals(code)) {
+            return getString(resources, "undo_success", "已撤销上次桌面恢复。");
+        }
+        if ("RESTORE_COMPLETE".equals(code)) {
+            return getString(resources, "restore_success", "桌面恢复已完成。");
+        }
+        if ("RESTORE_ROLLED_BACK".equals(code)) {
+            return getString(resources, "restore_failed_rolled_back", "桌面恢复失败，已恢复到操作前状态。");
+        }
+        if ("RESTORE_RECOVERY_ROLLED_BACK".equals(code)) {
+            return getString(resources, "restore_interrupted_rolled_back", "上次桌面恢复被中断，已恢复到操作前状态。");
+        }
+        return code;
+    }
+
+    private static void showBackupProgress(final Activity activity, String message,
+            final boolean cancellableBeforeTransition) {
+        dismissBackupProgress();
+        sBackupProgressDialog = showSmartisanProgressDialog(activity, message);
+        if (sBackupProgressDialog != null && cancellableBeforeTransition) {
+            sBackupProgressDialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
+                public boolean onKey(DialogInterface dialog, int keyCode, android.view.KeyEvent event) {
+                    if (keyCode == android.view.KeyEvent.KEYCODE_BACK
+                            && event.getAction() == android.view.KeyEvent.ACTION_UP) {
+                        Resources resources = getMaintainedResources(activity);
+                        showConfirmDialog(activity,
+                                getString(resources, "cancel_operation_title", "取消操作"),
+                                getString(resources, "cancel_operation_message", "是否取消本次操作？"),
+                                getString(resources, "continue_operation", "继续"),
+                                getString(resources, "cancel_operation_action", "取消"),
+                                new View.OnClickListener() {
+                                    public void onClick(View v) {
+                                        DesktopBackupController.cancelRunningBackup();
+                                        DesktopRestoreController.cancelBeforeTransition();
+                                    }
+                                });
+                    }
+                    return keyCode == android.view.KeyEvent.KEYCODE_BACK;
+                }
+            });
+        }
+    }
+
+    private static void updateBackupProgressMessage(String message) {
+        Dialog dialog = sBackupProgressDialog;
+        if (dialog == null) return;
+        try { dialog.getClass().getMethod("setMessage", String.class).invoke(dialog, message); }
+        catch (Throwable ignored) {}
+    }
+
+    private static void dismissBackupProgress() {
+        dismissDialog(sBackupProgressDialog);
+        sBackupProgressDialog = null;
     }
 
     private static void showDynamicWeatherPage(final Activity activity) {
@@ -11690,7 +11855,9 @@ public final class MaintainedLauncherSettingsHost {
 
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
-        TextView ok = smartisanDialogActionButton(activity, "确定", true, 0);
+        TextView ok = smartisanDialogActionButton(activity,
+                getString(getMaintainedResources(activity), "activity_title_confirm", "确定"),
+                true, 0);
         ok.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 dialog.dismiss();
@@ -12354,12 +12521,13 @@ public final class MaintainedLauncherSettingsHost {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setLayoutParams(new AbsListView.LayoutParams(-1, dp(context, 112)));
 
-        root.addView(iconHeaderRow(activity, context, resources, "图标样式", iconSourceSubtitle(activity),
+        root.addView(iconHeaderRow(activity, context, resources,
+                getString(resources, "icon_style_title", "图标样式"), iconSourceSubtitle(activity),
                 "selector_setting_sub_item_bg_top", new View.OnClickListener() {
             public void onClick(View v) {
                 showGlobalIconSourceDialog(activity);
             }
-        }, false),
+        }, false, 1),
                 new LinearLayout.LayoutParams(-1, dp(context, 56)));
 
         View.OnClickListener iconSizeClick = new View.OnClickListener() {
@@ -12367,8 +12535,10 @@ public final class MaintainedLauncherSettingsHost {
                 showIconSizeDialog(activity);
             }
         };
-        View iconSizeRow = iconHeaderRow(activity, context, resources, "桌面图标大小", iconSizeSubtitle(activity),
-                "selector_setting_sub_item_bg_bottom", iconSizeClick, false);
+        View iconSizeRow = iconHeaderRow(activity, context, resources,
+                getString(resources, "desktop_icon_size_title", "桌面图标大小"),
+                iconSizeSubtitle(activity),
+                "selector_setting_sub_item_bg_bottom", iconSizeClick, false, 2);
         iconSizeRow.setClickable(true);
         iconSizeRow.setOnClickListener(iconSizeClick);
         root.addView(iconSizeRow, new LinearLayout.LayoutParams(-1, dp(context, 56)));
@@ -12377,7 +12547,7 @@ public final class MaintainedLauncherSettingsHost {
 
     private static View iconHeaderRow(final Activity activity, Context context, Resources resources, String titleText,
                                       String subtitleText, String bgName, View.OnClickListener click,
-                                      boolean switchRow) {
+                                      boolean switchRow, int rowType) {
         if (switchRow) {
             final SettingItemSwitch item = new SettingItemSwitch(context);
             item.setTitle(titleText);
@@ -12412,8 +12582,8 @@ public final class MaintainedLauncherSettingsHost {
         title.setTextSize(18);
         texts.addView(title, new LinearLayout.LayoutParams(-2, -1));
 
-        boolean iconSizeRow = "桌面图标大小".equals(titleText);
-        boolean iconSourceRow = "图标样式".equals(titleText);
+        boolean iconSourceRow = rowType == 1;
+        boolean iconSizeRow = rowType == 2;
         if (iconSizeRow || iconSourceRow) {
             ImageView arrow = new ImageView(context);
             int arrowId = resources.getIdentifier("setting_next", "drawable", SETTINGS_PKG);
@@ -12451,7 +12621,14 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static String iconSourceSubtitle(Context context) {
-        return IconSourceManager.label(context, IconSourceManager.get(context));
+        IconSourceManager.Selection selection = IconSourceManager.get(context);
+        if (selection.type == IconSourceManager.Type.IMPROVED) {
+            return getString(context, "improved_icon_text", "改进版图标");
+        }
+        if (selection.type == IconSourceManager.Type.PACK) {
+            return IconPackManager.getIconPackLabel(context, selection.packageName);
+        }
+        return getString(context, "default_icon_text", "默认图标");
     }
 
     /** Shows a transactional global-source chooser. Nothing is persisted until Apply is tapped. */
@@ -12471,7 +12648,9 @@ public final class MaintainedLauncherSettingsHost {
         root.setOrientation(LinearLayout.VERTICAL);
         prepareSmartisanDialogRoot(activity, root);
 
-        TextView title = text(context, "选择图标样式", 18, 0xff333333, true);
+        TextView title = text(context,
+                getString(resources, "choose_icon_style_title", "选择图标样式"),
+                18, 0xff333333, true);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, dp(context, 54)));
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
@@ -12490,13 +12669,17 @@ public final class MaintainedLauncherSettingsHost {
         choiceScroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
         choiceScroll.addView(choices, new ScrollView.LayoutParams(-1, -2));
         root.addView(choiceScroll, new LinearLayout.LayoutParams(-1, dp(context, 113)));
-        final TextView scanning = text(context, "正在读取图标包…", 14, 0xff9d9fa6, false);
+        final TextView scanning = text(context,
+                getString(resources, "icon_pack_scanning", "正在读取图标包…"),
+                14, 0xff9d9fa6, false);
         scanning.setGravity(Gravity.CENTER);
         root.addView(scanning, new LinearLayout.LayoutParams(-1, dp(context, 42)));
 
         final ArrayList<IconSourceOption> options = new ArrayList<IconSourceOption>();
-        options.add(new IconSourceOption(IconSourceManager.Selection.defaultIcon(), "默认图标"));
-        options.add(new IconSourceOption(IconSourceManager.Selection.improved(), "改进版图标"));
+        options.add(new IconSourceOption(IconSourceManager.Selection.defaultIcon(),
+                getString(resources, "default_icon_text", "默认图标")));
+        options.add(new IconSourceOption(IconSourceManager.Selection.improved(),
+                getString(resources, "improved_icon_text", "改进版图标")));
         rebuildGlobalIconSourceOptions(activity, context, resources, choices, choiceScroll, preview,
                 temporary, options);
         refreshGlobalIconPreview(activity, context, resources, preview, temporary[0]);
@@ -12505,9 +12688,11 @@ public final class MaintainedLauncherSettingsHost {
         LinearLayout buttons = new LinearLayout(context);
         buttons.setGravity(Gravity.CENTER);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
-        TextView cancel = smartisanDialogActionButton(context, "取消", false, -1);
+        TextView cancel = smartisanDialogActionButton(context,
+                getString(resources, "cancel", "取消"), false, -1);
         cancel.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { dialog.dismiss(); } });
-        TextView apply = smartisanDialogActionButton(context, "应用", true, 1);
+        TextView apply = smartisanDialogActionButton(context,
+                getString(resources, "apply", "应用"), true, 1);
         apply.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 applyGlobalIconSource(activity, temporary[0]);
@@ -12907,6 +13092,7 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void showIconSizeDialog(final Activity activity) {
         final int current = normalizeIconSizePercent(readIconSizePercent(activity));
+        final Resources resources = getMaintainedResources(activity);
         final Dialog dialog = new Dialog(activity);
         LinearLayout root = new LinearLayout(activity);
         prepareSmartisanDialogRoot(activity, root);
@@ -12914,7 +13100,7 @@ public final class MaintainedLauncherSettingsHost {
         TextView title = new TextView(activity);
         title.setGravity(Gravity.CENTER);
         title.setSingleLine(true);
-        title.setText("桌面图标大小");
+        title.setText(getString(resources, "desktop_icon_size_title", "桌面图标大小"));
         title.setTextColor(0xff333333);
         title.setTextSize(18);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -12945,9 +13131,12 @@ public final class MaintainedLauncherSettingsHost {
         LinearLayout preview = new LinearLayout(activity);
         preview.setGravity(Gravity.CENTER);
         preview.setOrientation(LinearLayout.HORIZONTAL);
-        final TextView smallPreview = iconSizePreviewText(activity, "小", 15);
-        final TextView standardPreview = iconSizePreviewText(activity, "中", 22);
-        final TextView largePreview = iconSizePreviewText(activity, "大", 29);
+        final TextView smallPreview = iconSizePreviewText(activity,
+                getString(resources, "size_small", "小"), 15);
+        final TextView standardPreview = iconSizePreviewText(activity,
+                getString(resources, "size_medium", "中"), 22);
+        final TextView largePreview = iconSizePreviewText(activity,
+                getString(resources, "size_large", "大"), 29);
         preview.addView(smallPreview, new LinearLayout.LayoutParams(0, dp(activity, 72), 1));
         preview.addView(standardPreview, new LinearLayout.LayoutParams(0, dp(activity, 72), 1));
         preview.addView(largePreview, new LinearLayout.LayoutParams(0, dp(activity, 72), 1));
@@ -12980,8 +13169,10 @@ public final class MaintainedLauncherSettingsHost {
         LinearLayout buttons = new LinearLayout(activity);
         buttons.setGravity(Gravity.CENTER);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
-        TextView cancel = smartisanDialogActionButton(activity, "取消", false, -1);
-        TextView ok = smartisanDialogActionButton(activity, "确定", true, 1);
+        TextView cancel = smartisanDialogActionButton(activity,
+                getString(resources, "cancel", "取消"), false, -1);
+        TextView ok = smartisanDialogActionButton(activity,
+                getString(resources, "activity_title_confirm", "确定"), true, 1);
         buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
         buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 56)));
         buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
@@ -14494,7 +14685,7 @@ public final class MaintainedLauncherSettingsHost {
                 }
             }
             if (name != null) {
-                name.setText(entry.name);
+                name.setText(themeDisplayName(resources, entry));
             }
             
             boolean installed = local || entry.local || packageInstalled(activity, entry.pkg);
@@ -14504,7 +14695,8 @@ public final class MaintainedLauncherSettingsHost {
             boolean current = entry.id.equals(currentThemeId);
             if (installed) {
                 if (downloading != null) {
-                    downloading.setText(current ? "当前" : "");
+                    downloading.setText(current
+                            ? getString(resources, "current_theme_tag", "当前") : "");
                     downloading.setVisibility(current ? View.VISIBLE : View.GONE);
                 }
                 if (progress != null) {
@@ -15014,11 +15206,11 @@ public final class MaintainedLauncherSettingsHost {
                 }
             }
             if (!redrawn.isEmpty()) {
-                rows.add(new IconSection("已重绘"));
+                rows.add(new IconSection(getString(resources, "icon_redrawn", "已重绘")));
                 rows.addAll(redrawn);
             }
             if (!unredrawn.isEmpty()) {
-                rows.add(new IconSection("未重绘"));
+                rows.add(new IconSection(getString(resources, "icon_original", "未重绘")));
                 rows.addAll(unredrawn);
             }
         }

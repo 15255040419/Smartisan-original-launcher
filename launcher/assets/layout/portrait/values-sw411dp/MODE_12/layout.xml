@@ -82,8 +82,8 @@
   <integer name="folder_preview_top_margin_3_3">29</integer>
   <integer name="icon_offset_y">8</integer>
   <integer name="icon_offset_y_without_app_name">0</integer>
-  <integer name="icon_size_origin">160</integer>
-  <integer name="icon_size_with_shadow">205</integer>
+  <integer name="icon_size_origin">192</integer>
+  <integer name="icon_size_with_shadow">246</integer>
   <integer name="lock_icon_height">102</integer>
   <integer name="lock_icon_width">126</integer>
   <integer name="magnify_stencil_radius">70</integer>
@@ -92,7 +92,7 @@
   <integer name="magnify_y_offset">35</integer>
   <integer name="max_dot_num">36</integer>
   <integer name="multi_select_distance">6</integer>
-  <integer name="name_off_set_y">-108</integer>
+  <integer name="name_off_set_y">-131</integer>
   <integer name="page_cell_col_num">3</integer>
   <integer name="page_cell_row_num">4</integer>
   <integer name="page_height_trans">1600</integer>
@@ -112,7 +112,7 @@
   <integer name="page_view_margin_top">0</integer>
   <integer name="page_view_margin_top_trans">54</integer>
   <integer name="page_width_trans">1056</integer>
-  <integer name="setting_button">110</integer>
+  <integer name="setting_button">134</integer>
   <integer name="text_font_size">36</integer>
   <integer name="title_page_spacing">2</integer>
   <integer name="trash_display_height">123</integer>

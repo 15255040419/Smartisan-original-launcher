@@ -3140,9 +3140,11 @@
 
     iget v4, v4, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_back_size:F
 
-    float-to-int v5, v4
+    invoke-static {v4}, Lcom/smartisanos/launcher/theme/ActiveIconRasterSpec;->physicalArtworkWidth(F)I
 
-    float-to-int v4, v4
+    move-result v5
+
+    move v4, v5
 
     .line 8
     invoke-virtual {v0}, Landroid/graphics/Bitmap;->getConfig()Landroid/graphics/Bitmap$Config;
@@ -3158,6 +3160,18 @@
     new-instance v5, Landroid/graphics/Canvas;
 
     invoke-direct {v5, v4}, Landroid/graphics/Canvas;-><init>(Landroid/graphics/Bitmap;)V
+
+    iget-object v7, p0, Lcom/smartisanos/launcher/view/activeicon/m;->Nn:Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    iget v7, v7, Lcom/smartisanos/launcher/data/LayoutProperty;->calendar_back_size:F
+
+    const-string v8, "calendar"
+
+    invoke-static {v8, v7}, Lcom/smartisanos/launcher/theme/ActiveIconRasterSpec;->cachedArtworkScale(Ljava/lang/String;F)F
+
+    move-result v7
+
+    invoke-virtual {v5, v7, v7}, Landroid/graphics/Canvas;->scale(FF)V
 
     .line 11
     new-instance v6, Landroid/graphics/Paint;

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:smartisanos="http://schemas.android.com/apk/res-auto"
+    xmlns:setting="http://schemas.android.com/apk/res/com.smartisanos.home"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fitsSystemWindows="true" android:background="@drawable/background">
+    <com.smartisanos.home.widget.sys.Title android:id="@+id/backup_title"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_alignParentTop="true" setting:title_titlex="@string/desktop_backup_title" />
+    <ScrollView android:id="@+id/backup_scroll" android:layout_width="match_parent"
+        android:layout_height="match_parent" android:layout_below="@id/backup_title"
+        android:overScrollMode="always" android:fillViewport="true">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:paddingBottom="24dp">
+            <RelativeLayout android:id="@+id/backup_location"
+                android:layout_width="match_parent" android:layout_height="72dp"
+                android:layout_marginTop="12dp" android:background="@drawable/selector_setting_sub_item_bg_top">
+                <TextView android:id="@+id/backup_location_title" android:layout_width="match_parent" android:layout_height="match_parent"
+                    android:layout_toLeftOf="@id/backup_location_value"
+                    android:paddingLeft="@dimen/setting_item_text_left" android:gravity="center_vertical"
+                    android:text="@string/backup_location" android:textSize="@dimen/setting_item_text_size"
+                    android:textColor="@drawable/more_item_color_bg" />
+                <ImageView android:id="@+id/backup_location_arrow" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:layout_alignParentRight="true"
+                    android:layout_centerVertical="true" android:src="@drawable/setting_next" />
+                <TextView android:id="@+id/backup_location_value" android:layout_width="180dp"
+                    android:layout_height="wrap_content" android:layout_toLeftOf="@id/backup_location_arrow"
+                    android:layout_centerVertical="true" android:layout_marginRight="6dp"
+                    android:maxLines="2" android:gravity="right|center_vertical" android:ellipsize="end"
+                    android:textSize="@dimen/more_text_size_15"
+                    android:textColor="@drawable/more_item_right_color_bg" />
+            </RelativeLayout>
+            <RelativeLayout android:id="@+id/backup_now"
+                android:layout_width="match_parent" android:layout_height="82dp"
+                android:background="@drawable/selector_setting_sub_item_bg_bottom">
+                <TextView android:id="@+id/backup_now_title" android:layout_width="match_parent" android:layout_height="match_parent"
+                    android:layout_toLeftOf="@id/backup_now_value"
+                    android:paddingLeft="@dimen/setting_item_text_left" android:gravity="center_vertical"
+                    android:text="@string/backup_now" android:textSize="@dimen/setting_item_text_size"
+                    android:textColor="@drawable/more_item_color_bg" />
+                <ImageView android:id="@+id/backup_now_arrow" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:layout_alignParentRight="true"
+                    android:layout_centerVertical="true" android:src="@drawable/setting_next" />
+                <TextView android:id="@+id/backup_now_value" android:layout_width="180dp"
+                    android:layout_height="wrap_content" android:layout_toLeftOf="@id/backup_now_arrow"
+                    android:layout_centerVertical="true" android:layout_marginRight="6dp"
+                    android:maxLines="2" android:gravity="right|center_vertical" android:ellipsize="end"
+                    android:textSize="@dimen/more_text_size_15"
+                    android:textColor="@drawable/more_item_right_color_bg" />
+            </RelativeLayout>
+            <RelativeLayout android:id="@+id/restore_from_backup"
+                android:layout_width="match_parent" android:layout_height="72dp"
+                android:layout_marginTop="12dp" android:background="@drawable/selector_setting_sub_item_bg_top">
+                <TextView android:id="@+id/undo_last_restore_title" android:layout_width="match_parent" android:layout_height="match_parent"
+                    android:layout_toLeftOf="@id/undo_last_restore_value"
+                    android:paddingLeft="@dimen/setting_item_text_left" android:gravity="center_vertical"
+                    android:text="@string/restore_from_backup" android:textSize="@dimen/setting_item_text_size"
+                    android:textColor="@drawable/more_item_color_bg" />
+                <ImageView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_alignParentRight="true" android:layout_centerVertical="true"
+                    android:src="@drawable/setting_next" />
+            </RelativeLayout>
+            <RelativeLayout android:id="@+id/undo_last_restore"
+                android:layout_width="match_parent" android:layout_height="72dp"
+                android:background="@drawable/selector_setting_sub_item_bg_bottom">
+                <TextView android:layout_width="wrap_content" android:layout_height="match_parent"
+                    android:paddingLeft="@dimen/setting_item_text_left" android:gravity="center_vertical"
+                    android:text="@string/undo_last_restore" android:textSize="@dimen/setting_item_text_size"
+                    android:textColor="@drawable/more_item_color_bg" />
+                <ImageView android:id="@+id/undo_last_restore_arrow" android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" android:layout_alignParentRight="true"
+                    android:layout_centerVertical="true" android:src="@drawable/setting_next" />
+                <TextView android:id="@+id/undo_last_restore_value" android:layout_width="180dp"
+                    android:layout_height="wrap_content" android:layout_toLeftOf="@id/undo_last_restore_arrow"
+                    android:layout_centerVertical="true" android:layout_marginRight="6dp"
+                    android:maxLines="2" android:gravity="right|center_vertical" android:ellipsize="end"
+                    android:textSize="@dimen/more_text_size_15"
+                    android:textColor="@drawable/more_item_right_color_bg" />
+            </RelativeLayout>
+            <com.smartisanos.home.widget.sys.TipsView android:id="@+id/backup_tips"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" android:text="@string/desktop_backup_tips"
+                style="@style/SettingItemTipsStyle" />
+        </LinearLayout>
+    </ScrollView>
+    <include android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_below="@id/backup_title" layout="@layout/title_bar_shadow" />
+</RelativeLayout>
