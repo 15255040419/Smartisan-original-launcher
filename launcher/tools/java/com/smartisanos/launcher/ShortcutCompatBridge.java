@@ -64,7 +64,19 @@ public final class ShortcutCompatBridge {
 
             Bitmap source = (Bitmap) getField(item, "icon");
             String iconSource = "shortcut";
-            Bitmap normalized = normalizeShortcutBitmap(context, source);
+            Bitmap normalized = null;
+            // Android's compatibility converter may already have substituted the host-app
+            // icon.  For provider-owned shortcuts, LauncherApps is the only authoritative
+            // source for the provider's per-shortcut artwork (including its own badge/frame).
+            if (isProviderDecoratedShortcut(packageName)) {
+                LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+                Drawable drawable = apps == null ? null
+                        : apps.getShortcutIconDrawable(shortcut,
+                                context.getResources().getDisplayMetrics().densityDpi);
+                normalized = normalizeShortcutBitmap(context, drawableToBitmap(drawable));
+                if (normalized != null) iconSource = "launcher_apps_provider";
+            }
+            if (normalized == null) normalized = normalizeShortcutBitmap(context, source);
             if (normalized == null) {
                 iconSource = "launcher_apps_retry";
                 LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
@@ -189,9 +201,14 @@ public final class ShortcutCompatBridge {
     public static void reconcilePinned(Context context, List<ShortcutInfo> shortcuts, UserHandle user) {
         if (context == null || shortcuts == null) return;
         long serial = userSerial(context, user);
+        Log.i(TAG, "PIN_RECONCILE_BEGIN count=" + shortcuts.size()
+                + " userId=" + userIdentifier(user) + " userSerial=" + serial);
         for (ShortcutInfo shortcut : shortcuts) {
             if (shortcut == null || !shortcut.isPinned()) continue;
-            if (isStored(context, shortcut, serial)) continue;
+            boolean stored = isStored(context, shortcut, serial);
+            Log.i(TAG, "PIN_RECONCILE_ITEM packageName=" + shortcut.getPackage()
+                    + " shortcutId=" + shortcut.getId() + " stored=" + stored);
+            if (stored) continue;
             Object item = createItem(context, shortcut, serial);
             if (item == null) continue;
             Log.i(TAG, "PIN_RECONCILE_DATABASE_MISSING packageName=" + shortcut.getPackage()

@@ -136,18 +136,19 @@ public final class IconRasterDiagnostics {
     }
 
     /**
-     * Keeps native managed artwork intact. Default PackageManager artwork is
-     * reloaded only when a previous grid mode left a differently-sized source
-     * bitmap, then rendered directly into the current original artwork canvas.
+     * Keeps a desktop icon's native artwork intact.  Both managed sources and
+     * ordinary PackageManager drawables are rendered directly into the final
+     * physical artwork canvas; neither may first become an
+     * icon_size_origin-sized intermediate bitmap.
      */
     public static Bitmap prepareStaticSource(Object itemInfo, Bitmap cachedSource) {
-        boolean managed = MaintainedLauncherSettingsHost.hasEffectiveManagedIcon(itemInfo);
+        boolean highResolutionDesktop = shouldUseHighResolutionDesktopRaster(itemInfo);
         NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
         int logicalArtwork = currentLayoutSize("icon_size_origin");
-        int required = managed && spec != null ? spec.artworkWidth : logicalArtwork;
+        int required = highResolutionDesktop && spec != null ? spec.artworkWidth : logicalArtwork;
         if (required <= 0) return cachedSource;
         if (cachedSource != null && !cachedSource.isRecycled()) {
-            boolean sufficient = managed
+            boolean sufficient = highResolutionDesktop
                     ? cachedSource.getWidth() >= required && cachedSource.getHeight() >= required
                     : cachedSource.getWidth() == required && cachedSource.getHeight() == required;
             if (sufficient) return cachedSource;
@@ -155,7 +156,7 @@ public final class IconRasterDiagnostics {
 
         Drawable drawable = loadCurrentDesktopDrawable(itemInfo);
         if (drawable != null) {
-            if (managed) {
+            if (highResolutionDesktop) {
                 Bitmap nativeSource = sourceBitmap(drawable);
                 if (nativeSource != null) {
                     recycleIfOwned(cachedSource, nativeSource);
@@ -200,12 +201,21 @@ public final class IconRasterDiagnostics {
     }
 
     public static boolean useManagedDesktopPipeline(Object itemInfo) {
+        return shouldUseHighResolutionDesktopRaster(itemInfo)
+                && MaintainedLauncherSettingsHost.hasEffectiveManagedIcon(itemInfo);
+    }
+
+    /**
+     * The direct high-resolution texture path is a normal-desktop property,
+     * not a managed-icon property.  Managed artwork was upgraded first, which
+     * left default APK drawables on the old logical-bitmap path on 2K screens.
+     */
+    public static boolean shouldUseHighResolutionDesktopRaster(Object itemInfo) {
         return itemInfo != null
                 && !itemInfo.getClass().getName().endsWith(".FolderInfo")
                 && !itemField(itemInfo, "packageName").isEmpty()
                 && currentPageMode() != currentFolderMode()
-                && !isOriginalActiveIcon(itemInfo)
-                && MaintainedLauncherSettingsHost.hasEffectiveManagedIcon(itemInfo);
+                && !isOriginalActiveIcon(itemInfo);
     }
 
     private static Drawable loadCurrentDesktopDrawable(Object itemInfo) {

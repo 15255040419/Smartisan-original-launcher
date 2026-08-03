@@ -326,6 +326,11 @@
 
     .line 27
     :cond_d
+    # Clear any screen-off lifecycle fallback as soon as the original unlock
+    # receiver sees the real broadcast, including while a settings Activity
+    # currently covers Launcher.
+    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->noteOriginalUnlockBroadcast()V
+
     invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->shouldSkipUnlockAnimation()Z
 
     move-result p1
@@ -335,7 +340,6 @@
     return-void
 
     :cond_codex_unlock_state_ready
-    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->noteOriginalUnlockBroadcast()V
 
     sget-boolean p1, Lcom/smartisanos/launcher/va;->DBG:Z
 

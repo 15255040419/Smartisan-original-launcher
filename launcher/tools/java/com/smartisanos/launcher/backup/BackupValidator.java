@@ -101,10 +101,14 @@ public final class BackupValidator {
         JSONObject settings = checkedJson(new File(output, "settings.json"), MAX_ENTRY_BYTES);
         JSONObject theme = checkedJson(new File(output, "theme.json"), 1024 * 1024L);
         JSONObject icons = checkedJson(new File(output, "icons/redirects.json"), MAX_ENTRY_BYTES);
+        File shortcutIndex = new File(output, "icons/shortcuts.json");
+        JSONObject shortcutIcons = shortcutIndex.isFile()
+                ? checkedJson(shortcutIndex, MAX_ENTRY_BYTES) : ShortcutIconBackupCodec.empty();
         checkedJson(new File(output, "pending_items.json"), MAX_ENTRY_BYTES);
         validateCustomIcons(output, icons);
+        ShortcutIconBackupCodec.validate(layout, shortcutIcons, output);
         return new BackupArchiveReader.ValidatedBackup(archive, output, manifest, layout,
-                settings, theme, icons);
+                settings, theme, icons, shortcutIcons);
     }
 
     private static void assertZipCentralDirectory(File archive) throws Exception {

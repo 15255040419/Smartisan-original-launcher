@@ -36,7 +36,11 @@ public final class LauncherSettingBridge {
     // v1 treated pb.path() values as filesystem paths. They are normally theme-asset
     // paths. v4 also switches ActiveIcon shadows to the original static shadow
     // generator, so keep corrected products isolated from stale software-blur entries.
-    private static final String ACTIVE_ICON_SHADOW_CACHE_DIR = "active_icon_shadow_v5";
+    // v7 anchors the larger, centered live-shadow sibling around the original
+    // ActiveIcon background. Its canvas is not the static icon texture, so it
+    // uses symmetric sibling padding rather than the static texture's 1/4
+    // artwork placement.
+    private static final String ACTIVE_ICON_SHADOW_CACHE_DIR = "active_icon_shadow_v7";
     public static final String KEY_DYNAMIC_WEATHER_CALENDAR =
             "launcher_dynamic_weather_calendar_enabled";
 
@@ -305,13 +309,13 @@ public final class LauncherSettingBridge {
 
     /**
      * Renders the ActiveIcon shadow with the same original helper and vertical
-     * anchor used by managed static icons. The returned bitmap contains only
+     * anchor used by regular static icons. The returned bitmap contains only
      * the two generated shadow layers; the live background remains a separate
      * original ActiveIcon SceneNode.
      */
     private static Bitmap createActiveIconShadowWithOriginalGenerator(
             Bitmap silhouette, EffectiveIconShadowSpec spec, float physicalScale,
-            int canvasSize, int artworkPadding) {
+            int canvasSize) {
         if (silhouette == null || spec == null || canvasSize <= 0) {
             return null;
         }
@@ -321,6 +325,13 @@ public final class LauncherSettingBridge {
         Canvas canvas = new Canvas(result);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG
                 | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+        // The shadow texture belongs to a SceneNode that is larger than, but
+        // centered on, the original live background node. Place the silhouette
+        // at the symmetric in-canvas padding so it overlaps that background;
+        // the original helper's +sqrt(radius) placement then remains below the
+        // artwork. The static texture's 1/4 anchor would lift this sibling's
+        // shadow above the live icon.
+        float artworkTop = (canvasSize - silhouette.getHeight()) * 0.5f;
         int generated = 0;
         for (int i = 0; i < spec.radii.length && i < spec.colors.length; i++) {
             float radius = spec.radii[i] * safeScale;
@@ -333,8 +344,7 @@ public final class LauncherSettingBridge {
                 continue;
             }
             float shadowLeft = (canvasSize - shadow.getWidth()) * 0.5f;
-            float shadowTop = artworkPadding - Math.round(radius)
-                    + Math.round(Math.sqrt(radius));
+            float shadowTop = artworkTop + Math.round(Math.sqrt(radius));
             if (spec.mode == SHADOW_TRANSPARENT) {
                 shadowTop += 2.0f * safeScale;
             }
@@ -351,7 +361,7 @@ public final class LauncherSettingBridge {
                 + " artwork=" + silhouette.getWidth() + 'x' + silhouette.getHeight()
                 + " texture=" + canvasSize + 'x' + canvasSize
                 + " physicalScale=" + safeScale
-                + " artworkPadding=" + artworkPadding);
+                + " artworkTop=" + artworkTop);
         return result;
     }
 
@@ -552,7 +562,7 @@ public final class LauncherSettingBridge {
             source.recycle();
             Bitmap shadowSilhouette = createStaticShadowSilhouette(silhouette);
             Bitmap shadow = createActiveIconShadowWithOriginalGenerator(
-                    shadowSilhouette, spec, physicalScale, canvasSize, padding);
+                    shadowSilhouette, spec, physicalScale, canvasSize);
             if (shadowSilhouette != silhouette && !shadowSilhouette.isRecycled()) {
                 shadowSilhouette.recycle();
             }

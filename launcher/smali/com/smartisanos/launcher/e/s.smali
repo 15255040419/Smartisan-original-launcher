@@ -2624,7 +2624,7 @@
 
     .line 60
     :cond_1
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->hasEffectiveManagedIcon(Ljava/lang/Object;)Z
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->shouldUseHighResolutionDesktopRaster(Ljava/lang/Object;)Z
 
     move-result v9
 

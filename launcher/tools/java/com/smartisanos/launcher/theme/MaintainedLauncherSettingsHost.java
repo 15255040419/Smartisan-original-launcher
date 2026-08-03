@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.AlertDialog;
+import android.app.AppOpsManager;
 import android.app.Dialog;
 import android.app.DownloadManager;
 import android.app.Notification;
@@ -11,6 +12,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.WallpaperManager;
+import android.app.usage.UsageStats;
+import android.app.usage.UsageStatsManager;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.ComponentName;
@@ -86,7 +89,6 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.GridView;
-import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -154,6 +156,7 @@ public final class MaintainedLauncherSettingsHost {
     private static WeakReference<SettingItemSwitch> sDynamicWeatherLocationPermissionItem;
     private static WeakReference<SettingItemSwitch> sBadgeReminderSwitch;
     private static WeakReference<SettingItemSwitch> sBadgeSwipeCleanSwitch;
+    private static WeakReference<SettingItemSwitch> sSearchCommonAppsSwitch;
     private static boolean sBadgeNotificationAccessDialogShowing;
     private static volatile Resources sSettingsResources;
     private static boolean sSettingsResourcesWarmPending;
@@ -188,6 +191,10 @@ public final class MaintainedLauncherSettingsHost {
     private static final String PREF_IMPROVED_ICON_ENABLED = "launcher_improved_icon_enabled";
     private static final String KEY_LEGACY_SEARCH_PAGE_ENABLED = "launcher_search_page_enabled";
     public static final String KEY_SWIPE_UP_SEARCH_ENABLED = "swipe_up_search_enabled";
+    private static final String KEY_SEARCH_COMMON_APPS_ENABLED =
+            "launcher_search_common_apps_enabled";
+    private static final String PREF_SEARCH_USAGE_ACCESS_PENDING =
+            "search_usage_access_pending";
     public static final String KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED =
             "swipe_down_system_panels_enabled";
     private static final String KEY_DYNAMIC_WEATHER_CALENDAR =
@@ -196,7 +203,12 @@ public final class MaintainedLauncherSettingsHost {
     private static final int REQUEST_BACKUP_TREE = 54031;
     private static final int REQUEST_BACKUP_CREATE_DOCUMENT = 54032;
     private static final int REQUEST_RESTORE_DOCUMENT = 54033;
+    private static final int REQUEST_BACKUP_STORAGE_PERMISSION = 54034;
+    private static final int STORAGE_PICKER_NONE = 0;
+    private static final int STORAGE_PICKER_BACKUP_TREE = 1;
+    private static final int STORAGE_PICKER_RESTORE_DOCUMENT = 2;
     private static Dialog sBackupProgressDialog;
+    private static int sPendingStoragePicker = STORAGE_PICKER_NONE;
     private static final String PREF_DYNAMIC_WEATHER_LOCATION_REQUESTED =
             "dynamic_weather_location_permission_requested";
     private static final String KEY_BADGE_HIDE = "launcher_hide_badge";
@@ -1117,7 +1129,7 @@ public final class MaintainedLauncherSettingsHost {
         bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
         bindBadgeVisibilitySwitch(activity, resources, root);
         bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", false);
-        bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
+        bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
         bindSwitch(activity, resources, root, "setting_dynamic_weather",
                 KEY_DYNAMIC_WEATHER_CALENDAR, false);
         bindSwitch(activity, resources, root, "multi_block_fast_launch_app", "fast_launch_app_on", true);
@@ -1337,6 +1349,10 @@ public final class MaintainedLauncherSettingsHost {
         return readSystemBool(context, KEY_SWIPE_UP_SEARCH_ENABLED, true);
     }
 
+    private static boolean isSearchCommonAppsEnabled(Context context) {
+        return readSystemBool(context, KEY_SEARCH_COMMON_APPS_ENABLED, false);
+    }
+
     public static void openLauncherSearchFromSwipeUp(Context context) {
         if (!isSwipeUpSearchEnabled(context)) {
             Log.i(LOG_TAG, "SWIPE_UP_SEARCH_DISABLED");
@@ -1436,6 +1452,15 @@ public final class MaintainedLauncherSettingsHost {
         emptyPanel.setOrientation(LinearLayout.VERTICAL);
         emptyPanel.setPadding(0, dp(activity, 22), 0, 0);
         root.addView(emptyPanel, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        // Restore the original search-page shortcut presentation as one fixed row.
+        // It deliberately binds only five already-loaded launcher activities.
+        final LinearLayout commonApps = new LinearLayout(activity);
+        commonApps.setOrientation(LinearLayout.HORIZONTAL);
+        commonApps.setGravity(Gravity.CENTER);
+        commonApps.setVisibility(isSearchCommonAppsEnabled(activity) ? View.VISIBLE : View.GONE);
+        emptyPanel.addView(commonApps, new LinearLayout.LayoutParams(-1, dp(activity, 92)));
+        final int commonItemWidth = activity.getResources().getDisplayMetrics().widthPixels / 5;
 
         RelativeLayout historyTitle = new RelativeLayout(activity);
         TextView history = new TextView(activity);
@@ -1553,6 +1578,9 @@ public final class MaintainedLauncherSettingsHost {
                         }
                         all.clear();
                         all.addAll(loaded);
+                        if (isSearchCommonAppsEnabled(activity)) {
+                            addSearchCommonApps(activity, commonApps, all, commonItemWidth);
+                        }
                         chipBox.removeAllViews();
                         addSearchHistoryChips(activity, chipBox, all);
                         CharSequence currentQuery = query.getText();
@@ -1600,6 +1628,40 @@ public final class MaintainedLauncherSettingsHost {
         labelLp.topMargin = dp(activity, 5);
         item.addView(label, labelLp);
         return item;
+    }
+
+    /**
+     * Adds five frequently used normal apps to the fixed search-page row. Usage
+     * data is collected by the already-running background loader; this method
+     * creates no additional package scan, scroll listener, or delayed work.
+     */
+    private static void addSearchCommonApps(final Activity activity, LinearLayout commonApps,
+                                            ArrayList<SearchEntry> entries, int itemWidth) {
+        commonApps.removeAllViews();
+        HashMap<String, Boolean> seenPackages = new HashMap<String, Boolean>();
+        int added = 0;
+        while (added < 5) {
+            SearchEntry selected = null;
+            for (int i = 0; i < entries.size(); i++) {
+                SearchEntry entry = entries.get(i);
+                if (entry == null || entry.isPinnedShortcut()
+                        || seenPackages.containsKey(entry.packageName)) {
+                    continue;
+                }
+                if (selected == null || entry.usageForegroundTime > selected.usageForegroundTime
+                        || (entry.usageForegroundTime == selected.usageForegroundTime
+                        && entry.label.compareToIgnoreCase(selected.label) < 0)) {
+                    selected = entry;
+                }
+            }
+            if (selected == null) {
+                break;
+            }
+            seenPackages.put(selected.packageName, Boolean.TRUE);
+            commonApps.addView(searchShortcut(activity, selected, itemWidth),
+                    new LinearLayout.LayoutParams(itemWidth, -1));
+            added++;
+        }
     }
 
     private static void addSearchHistoryChips(final Activity activity, LinearLayout chipBox,
@@ -1693,6 +1755,7 @@ public final class MaintainedLauncherSettingsHost {
         try {
             PackageManager pm = context.getPackageManager();
             final ArrayList<String> history = readSearchHistory(context);
+            final HashMap<String, Long> usageForegroundTimes = readUsageForegroundTimes(context);
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
             List<ResolveInfo> infos = pm.queryIntentActivities(intent, 0);
@@ -1717,6 +1780,7 @@ public final class MaintainedLauncherSettingsHost {
                 String title = label == null ? pkg : label.toString();
                 SearchEntry entry = new SearchEntry(title, pkg, cls, userId, icon);
                 entry.historyRank = history.indexOf(entry.key);
+                entry.usageForegroundTime = usageForegroundTime(usageForegroundTimes, pkg);
                 out.add(entry);
             }
             List<ProfileAppEntry> profileApps = discoverProfileApps(context, false);
@@ -1736,6 +1800,8 @@ public final class MaintainedLauncherSettingsHost {
                         profile.componentName.getClassName(), profile.userId, icon,
                         profile.profileUser, profile.profileSerial);
                 entry.historyRank = history.indexOf(entry.key);
+                entry.usageForegroundTime = usageForegroundTime(usageForegroundTimes,
+                        profile.packageName);
                 out.add(entry);
             }
             loadPinnedShortcutSearchEntries(context, pm, history, out);
@@ -2266,6 +2332,12 @@ public final class MaintainedLauncherSettingsHost {
 
     public static void noteOriginalUnlockBroadcast() {
         sLastOriginalUnlockUptime = android.os.SystemClock.uptimeMillis();
+        // USER_PRESENT/action_keyguard_to_dismiss can arrive while the
+        // Launcher Activity is covered by a settings Activity.  That original
+        // event has already consumed the actual screen-off cycle; retaining
+        // the flag would make a later Back-to-Home resume look like another
+        // unlock and replay the original animation.
+        sLauncherPausedForScreenOff = false;
     }
 
     public static boolean shouldSkipUnlockAnimation() {
@@ -4638,6 +4710,121 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    private static boolean hasUsageStatsAccess(Context context) {
+        if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return false;
+        }
+        try {
+            Object service = context.getSystemService(Context.APP_OPS_SERVICE);
+            if (!(service instanceof AppOpsManager)) {
+                return false;
+            }
+            int mode = ((AppOpsManager) service).checkOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.getPackageName());
+            return mode == AppOpsManager.MODE_ALLOWED;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static void showUsageStatsAccessDialog(final Activity activity) {
+        if (activity == null || activity.isFinishing()) {
+            return;
+        }
+        final Resources resources;
+        try {
+            resources = createSettingsContext(activity).getResources();
+        } catch (Throwable ignored) {
+            return;
+        }
+        showConfirmDialog(activity,
+                getString(resources, "search_usage_access_title", "Usage Access"),
+                getString(resources, "search_usage_access_message",
+                        "Allow usage access to sort the five common apps by actual usage. "
+                                + "Search remains available if you do not allow it."),
+                getString(resources, "cancel", "Cancel"),
+                getString(resources, "search_usage_access_action", "Go to Settings"),
+                new View.OnClickListener() {
+                    public void onClick(View v) {
+                        try {
+                            activity.startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+                        } catch (Throwable error) {
+                            Toast.makeText(activity, getString(resources,
+                                    "search_usage_access_failed", "Unable to open Usage Access settings"),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+    }
+
+    private static void bindSearchCommonAppsSwitch(final Activity activity,
+            Resources resources, View root) {
+        View view = find(resources, root, "item_id_search_common_apps_enabled");
+        if (!(view instanceof SettingItemSwitch)) {
+            return;
+        }
+        final SettingItemSwitch item = (SettingItemSwitch) view;
+        sSearchCommonAppsSwitch = new WeakReference<SettingItemSwitch>(item);
+        boolean enabled = readSystemBool(activity, KEY_SEARCH_COMMON_APPS_ENABLED, false);
+        if (enabled && !hasUsageStatsAccess(activity)) {
+            enabled = false;
+            writeBoolSetting(activity, KEY_SEARCH_COMMON_APPS_ENABLED, false);
+        }
+        item.setChecked(enabled);
+        bindSwitchControlOnly(item, new View.OnClickListener() {
+            public void onClick(View v) {
+                toggleSearchCommonAppsSwitch(activity, item);
+            }
+        });
+    }
+
+    private static void toggleSearchCommonAppsSwitch(final Activity activity,
+            final SettingItemSwitch item) {
+        boolean next = !item.isChecked();
+        if (!next) {
+            item.setCheckedAnimated(false);
+            writeBoolSetting(activity, KEY_SEARCH_COMMON_APPS_ENABLED, false);
+            applyLauncherSettingChange(activity, KEY_SEARCH_COMMON_APPS_ENABLED);
+            return;
+        }
+        if (hasUsageStatsAccess(activity)) {
+            item.setCheckedAnimated(true);
+            writeBoolSetting(activity, KEY_SEARCH_COMMON_APPS_ENABLED, true);
+            applyLauncherSettingChange(activity, KEY_SEARCH_COMMON_APPS_ENABLED);
+            return;
+        }
+        // Never show the switch as enabled before the system grants Usage Access.
+        item.setChecked(false);
+        writeBoolSetting(activity, KEY_SEARCH_COMMON_APPS_ENABLED, false);
+        requestSearchUsageAccess(activity);
+    }
+
+    private static void requestSearchUsageAccess(final Activity activity) {
+        if (activity == null || activity.isFinishing()) return;
+        final Resources resources = getMaintainedResources(activity);
+        showConfirmDialog(activity,
+                getString(resources, "search_usage_access_title", "使用情况访问"),
+                getString(resources, "search_usage_access_message",
+                        "允许锤子桌面访问应用使用情况后，可按实际使用频率排列 5 个常用应用。"),
+                getString(resources, "cancel", "取消"),
+                getString(resources, "search_usage_access_action", "前往设置"),
+                new View.OnClickListener() {
+                    public void onClick(View v) {
+                        activity.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                                .edit().putBoolean(PREF_SEARCH_USAGE_ACCESS_PENDING, true).apply();
+                        try {
+                            activity.startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+                        } catch (Throwable error) {
+                            activity.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                                    .edit().remove(PREF_SEARCH_USAGE_ACCESS_PENDING).apply();
+                            Toast.makeText(activity, getString(resources,
+                                    "search_usage_access_failed", "无法打开使用情况访问设置"),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+    }
+
     private static void migrateSearchGestureSetting(Context context) {
         if (context == null || hasBoolSetting(context, KEY_SWIPE_UP_SEARCH_ENABLED)) {
             return;
@@ -4909,6 +5096,30 @@ public final class MaintainedLauncherSettingsHost {
 
     public static void onRequestPermissionsResult(Activity activity, int requestCode,
             String[] permissions, int[] grantResults) {
+        if (requestCode == REQUEST_BACKUP_STORAGE_PERMISSION) {
+            int pendingPicker = sPendingStoragePicker;
+            sPendingStoragePicker = STORAGE_PICKER_NONE;
+            boolean granted = hasLegacyStoragePermission(activity);
+            Log.i(LOG_TAG, "BACKUP_STORAGE_PERMISSION_RESULT granted=" + granted
+                    + " pendingPicker=" + pendingPicker);
+            if (!granted) {
+                if (activity != null) {
+                    Resources resources = getMaintainedResources(activity);
+                    showInfoDialog(activity,
+                            getString(resources, "desktop_backup_title", "桌面备份与恢复"),
+                            getString(resources, "backup_storage_permission_required",
+                                    "需要存储空间权限才能打开系统文件管理器。"));
+                }
+                return;
+            }
+            if (activity == null) return;
+            if (pendingPicker == STORAGE_PICKER_BACKUP_TREE) {
+                launchBackupTreePicker(activity);
+            } else if (pendingPicker == STORAGE_PICKER_RESTORE_DOCUMENT) {
+                launchRestoreDocumentPicker(activity);
+            }
+            return;
+        }
         if (requestCode != REQUEST_DYNAMIC_WEATHER_LOCATION) {
             return;
         }
@@ -5604,6 +5815,32 @@ public final class MaintainedLauncherSettingsHost {
     public static void onSettingsHostResumed(Activity activity) {
         if (activity == null) {
             return;
+        }
+        SharedPreferences settings = activity.getSharedPreferences("launcher_settings",
+                Context.MODE_PRIVATE);
+        if (settings.getBoolean(PREF_SEARCH_USAGE_ACCESS_PENDING, false)) {
+            settings.edit().remove(PREF_SEARCH_USAGE_ACCESS_PENDING).apply();
+            boolean access = hasUsageStatsAccess(activity);
+            SettingItemSwitch item = sSearchCommonAppsSwitch == null
+                    ? null : sSearchCommonAppsSwitch.get();
+            if (access) {
+                writeBoolSetting(activity, KEY_SEARCH_COMMON_APPS_ENABLED, true);
+                if (item != null) item.setCheckedAnimated(true);
+                applyLauncherSettingChange(activity, KEY_SEARCH_COMMON_APPS_ENABLED);
+                Log.i(LOG_TAG, "SEARCH_USAGE_ACCESS_GRANTED commonApps=true");
+            } else {
+                writeBoolSetting(activity, KEY_SEARCH_COMMON_APPS_ENABLED, false);
+                if (item != null) item.setChecked(false);
+                Log.i(LOG_TAG, "SEARCH_USAGE_ACCESS_DENIED commonApps=false");
+            }
+        }
+        if (!hasUsageStatsAccess(activity)
+                && readSystemBool(activity, KEY_SEARCH_COMMON_APPS_ENABLED, false)) {
+            writeBoolSetting(activity, KEY_SEARCH_COMMON_APPS_ENABLED, false);
+            SettingItemSwitch item = sSearchCommonAppsSwitch == null
+                    ? null : sSearchCommonAppsSwitch.get();
+            if (item != null) item.setChecked(false);
+            Log.i(LOG_TAG, "SEARCH_USAGE_ACCESS_REVOKED commonApps=false");
         }
         String pending = readBadgeNotificationAccessPending(activity);
         boolean access = com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity);
@@ -8524,9 +8761,9 @@ public final class MaintainedLauncherSettingsHost {
         LinearLayout root = new LinearLayout(activity);
         prepareSmartisanDialogRoot(activity, root);
 
-        TextView titleView = text(activity, title, 18, 0xff333333, true);
+        TextView titleView = smartisanDialogTitle(activity, title);
         titleView.setGravity(Gravity.CENTER);
-        root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+        root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
 
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
@@ -8569,10 +8806,10 @@ public final class MaintainedLauncherSettingsHost {
                 positiveClick.onClick(v);
             }
         });
-        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 56), 1.0f));
-        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 56)));
-        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 56), 1.0f));
-        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 47), 1.0f));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 47)));
+        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 47), 1.0f));
+        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
 
         dialog.setContentView(root);
         Window window = dialog.getWindow();
@@ -9502,6 +9739,41 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    /** Reads Android's aggregate foreground time when the ROM grants launcher usage access. */
+    private static HashMap<String, Long> readUsageForegroundTimes(Context context) {
+        HashMap<String, Long> result = new HashMap<String, Long>();
+        if (context == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return result;
+        }
+        try {
+            Object service = context.getSystemService(Context.USAGE_STATS_SERVICE);
+            if (!(service instanceof UsageStatsManager)) {
+                return result;
+            }
+            long end = System.currentTimeMillis();
+            long begin = end - 30L * 24L * 60L * 60L * 1000L;
+            java.util.Map<String, UsageStats> stats = ((UsageStatsManager) service)
+                    .queryAndAggregateUsageStats(begin, end);
+            if (stats == null) {
+                return result;
+            }
+            for (java.util.Map.Entry<String, UsageStats> item : stats.entrySet()) {
+                UsageStats stat = item.getValue();
+                if (item.getKey() != null && stat != null) {
+                    result.put(item.getKey(), Long.valueOf(stat.getTotalTimeInForeground()));
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return result;
+    }
+
+    private static long usageForegroundTime(HashMap<String, Long> usageForegroundTimes,
+                                            String packageName) {
+        Long value = usageForegroundTimes.get(packageName);
+        return value == null ? 0L : value.longValue();
+    }
+
     private static void dismissDialog(Dialog dialog) {
         if (dialog == null) return;
         try {
@@ -10126,9 +10398,8 @@ public final class MaintainedLauncherSettingsHost {
             LinearLayout root = new LinearLayout(activity);
             prepareSmartisanDialogRoot(activity, root);
 
-            TextView titleView = text(activity, title, 18, 0xff333333, true);
-            titleView.setGravity(Gravity.CENTER);
-            root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+            TextView titleView = smartisanDialogTitle(activity, title);
+            root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
             root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
             int padding = dp(activity, 26);
@@ -10158,7 +10429,7 @@ public final class MaintainedLauncherSettingsHost {
                     dialog.dismiss();
                 }
             });
-            root.addView(backgroundButton, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+            root.addView(backgroundButton, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
             dialog.setContentView(root);
             Window window = dialog.getWindow();
             if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
@@ -10324,6 +10595,7 @@ public final class MaintainedLauncherSettingsHost {
                     com.smartisanos.home.settings.icons.IconPackManager
                             .preloadSelectedIconPackAsync(activity);
                 }
+                consumeDeferredRestoreStatusToast(activity);
                 completePendingReloadAfterFirstFrame();
                 com.smartisanos.launcher.diagnostics.LauncherStartupDiagnostics
                         .mark("LAUNCH_DEFERRED_TASKS_END");
@@ -11007,7 +11279,9 @@ public final class MaintainedLauncherSettingsHost {
                 locationName = DesktopBackupController.directoryDisplayPath(activity, Uri.parse(locationUri));
             }
             if (TextUtils.isEmpty(locationName)) {
-                locationName = getString(resources, "backup_not_selected", "尚未选择");
+                locationName = prefs.getBoolean("backup_use_app_directory", false)
+                        ? getString(resources, "backup_app_directory", "应用专用目录")
+                        : getString(resources, "backup_system_directory_option", "使用手机系统目录");
             } else if ("已选择目录".equals(locationName)) {
                 locationName = getString(resources, "backup_location_selected", "已选择目录");
             }
@@ -11031,13 +11305,13 @@ public final class MaintainedLauncherSettingsHost {
                 undoRow.setAlpha(canUndo ? 1f : 0.55f);
             }
             click(activity, resources, root, "backup_location", new View.OnClickListener() {
-                public void onClick(View v) { openBackupTree(activity); }
+                public void onClick(View v) { showBackupLocationChoice(activity); }
             });
             click(activity, resources, root, "backup_now", new View.OnClickListener() {
                 public void onClick(View v) { startBackupFromSavedLocation(activity); }
             });
             click(activity, resources, root, "restore_from_backup", new View.OnClickListener() {
-                public void onClick(View v) { openRestoreDocument(activity); }
+                public void onClick(View v) { startRestoreFromSavedLocation(activity); }
             });
             if (canUndo) click(activity, resources, root, "undo_last_restore", new View.OnClickListener() {
                 public void onClick(View v) { confirmUndoRestore(activity); }
@@ -11046,9 +11320,8 @@ public final class MaintainedLauncherSettingsHost {
             String message = prefs.getString("pending_restore_message", "");
             if (!TextUtils.isEmpty(message)) {
                 prefs.edit().remove("pending_restore_message").commit();
-                showInfoDialog(activity,
-                        getString(resources, "desktop_backup_title", "桌面备份与恢复"),
-                        pendingRestoreMessage(resources, message));
+                // Older builds used this key to show a delayed full-page dialog.
+                // Current restores report at completion using the original toast.
             }
         } catch (Throwable error) {
             Log.w(LOG_TAG, "Unable to show desktop backup page", error);
@@ -11070,6 +11343,50 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void openBackupTree(Activity activity) {
+        if (!ensureStoragePermissionForPicker(activity, STORAGE_PICKER_BACKUP_TREE)) return;
+        launchBackupTreePicker(activity);
+    }
+
+    /**
+     * Old-target Android 8-12 ROMs can reject their vendor DocumentsUI before it
+     * receives focus when the launcher has not been granted its declared storage
+     * permission.  Android 13+ uses the SAF URI grant only and must not be blocked
+     * by the obsolete broad-storage permission.
+     */
+    private static boolean ensureStoragePermissionForPicker(Activity activity, int picker) {
+        if (activity == null || Build.VERSION.SDK_INT < 23 || Build.VERSION.SDK_INT >= 33
+                || hasLegacyStoragePermission(activity)) {
+            return true;
+        }
+        sPendingStoragePicker = picker;
+        try {
+            activity.requestPermissions(new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQUEST_BACKUP_STORAGE_PERMISSION);
+        } catch (Throwable error) {
+            sPendingStoragePicker = STORAGE_PICKER_NONE;
+            Log.w(LOG_TAG, "BACKUP_STORAGE_PERMISSION_REQUEST_FAILED", error);
+            Resources resources = getMaintainedResources(activity);
+            showInfoDialog(activity,
+                    getString(resources, "desktop_backup_title", "桌面备份与恢复"),
+                    getString(resources, "backup_storage_permission_required",
+                            "需要存储空间权限才能打开系统文件管理器。"));
+        }
+        return false;
+    }
+
+    private static boolean hasLegacyStoragePermission(Activity activity) {
+        if (activity == null || Build.VERSION.SDK_INT < 23 || Build.VERSION.SDK_INT >= 33) {
+            return true;
+        }
+        try {
+            return activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static void launchBackupTreePicker(Activity activity) {
         try {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -11078,46 +11395,46 @@ public final class MaintainedLauncherSettingsHost {
                     | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
             activity.startActivityForResult(intent, REQUEST_BACKUP_TREE);
         } catch (Throwable error) {
+            Log.w(LOG_TAG, "BACKUP_TREE_PICKER_OPEN_FAILED", error);
             Resources resources = getMaintainedResources(activity);
-            showChoiceDialog(activity,
-                    getString(resources, "file_manager_open_failed_title", "无法打开系统文件管理器"),
-                    getString(resources, "backup_tree_unsupported", "当前文件管理器不支持目录授权，可以改用每次另存备份。"),
-                    getString(resources, "cancel", "取消"),
-                    getString(resources, "backup_save_each_time", "每次另存"), null,
-                    new View.OnClickListener() {
-                        public void onClick(View v) { createBackupDocument(activity); }
-                    });
-        }
-    }
-
-    private static void createBackupDocument(Activity activity) {
-        try {
-            String name = "SmartisanLauncher_" + new SimpleDateFormat(
-                    "yyyyMMdd_HHmmss", Locale.US).format(new Date()) + ".slauncherbackup";
-            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.setType("application/zip");
-            intent.putExtra(Intent.EXTRA_TITLE, name);
-            activity.startActivityForResult(intent, REQUEST_BACKUP_CREATE_DOCUMENT);
-        } catch (Throwable error) {
-            Resources resources = getMaintainedResources(activity);
-            showInfoDialog(activity, getString(resources, "backup_dialog_title", "桌面备份"),
+            showInfoDialog(activity,
+                    getString(resources, "desktop_backup_title", "桌面备份与恢复"),
                     getString(resources, "file_manager_open_failed", "无法打开系统文件管理器"));
         }
     }
 
+    private static void showBackupLocationChoice(final Activity activity) {
+        Resources resources = getMaintainedResources(activity);
+        showBackupStorageChoice(activity, false,
+                getString(resources, "backup_location_title", "备份位置"));
+    }
+
+    private static void useAppBackupDirectory(Activity activity) {
+        activity.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
+                .remove(DesktopBackupController.KEY_TREE_URI)
+                .remove(DesktopBackupController.KEY_TREE_DISPLAY_NAME)
+                .remove(DesktopBackupController.KEY_LAST_BACKUP_DOCUMENT_URI)
+                .putBoolean("backup_use_app_directory", true)
+                .commit();
+        showDesktopBackupPage(activity, false);
+    }
+
+    private static void createBackupDocument(Activity activity) {
+        startBackupToAppDirectory(activity);
+    }
+
     private static void openRestoreDocument(Activity activity) {
+        if (!ensureStoragePermissionForPicker(activity, STORAGE_PICKER_RESTORE_DOCUMENT)) return;
+        launchRestoreDocumentPicker(activity);
+    }
+
+    private static void launchRestoreDocumentPicker(Activity activity) {
         try {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             intent.setType("application/zip");
             intent.putExtra(Intent.EXTRA_MIME_TYPES,
                     new String[] {"application/zip", "application/octet-stream"});
-            String tree = activity.getSharedPreferences(DesktopBackupController.PREFS, 0)
-                    .getString(DesktopBackupController.KEY_TREE_URI, "");
-            if (!TextUtils.isEmpty(tree) && Build.VERSION.SDK_INT >= 26) {
-                intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse(tree));
-            }
             activity.startActivityForResult(intent, REQUEST_RESTORE_DOCUMENT);
         } catch (Throwable error) {
             Resources resources = getMaintainedResources(activity);
@@ -11126,21 +11443,155 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    private static void startRestoreFromSavedLocation(Activity activity) {
+        File[] backups = DesktopBackupController.appBackups(activity);
+        showRestoreSourceChoice(activity, backups);
+    }
+
+    private static void showRestoreSourceChoice(final Activity activity, final File[] backups) {
+        Resources resources = getMaintainedResources(activity);
+        showBackupStorageChoice(activity, true,
+                getString(resources, "restore_from_backup", "从备份恢复"),
+                backups);
+    }
+
+    /** Shared Smartisan-style storage selector for backup and restore. */
+    private static void showBackupStorageChoice(final Activity activity, final boolean restore,
+            String title) {
+        showBackupStorageChoice(activity, restore, title, null);
+    }
+
+    private static void showBackupStorageChoice(final Activity activity, final boolean restore,
+            String title, final File[] backups) {
+        final Resources resources = getMaintainedResources(activity);
+        MaintainedBackupStorageDialog.show(activity, resources, title,
+                getString(resources, "backup_system_directory_option", "使用手机系统目录"),
+                getString(resources, "backup_system_directory_description", "备份文件保存到手机系统目录，卸载桌面后仍可保留。"),
+                getString(resources, "backup_app_directory_option", "使用应用专用目录"),
+                getString(resources, "backup_app_directory_description", "备份文件保存到应用目录，卸载桌面后会一并删除。"),
+                getString(resources, "cancel", "取消"),
+                getString(resources, "activity_title_confirm", "确定"),
+                new MaintainedBackupStorageDialog.Listener() {
+                    public void onSystemDirectory() {
+                        if (restore) openRestoreDocument(activity);
+                        else openBackupTree(activity);
+                    }
+                    public void onAppDirectory() {
+                        if (restore) {
+                            if (backups != null && backups.length != 0) {
+                                showAppBackupSelection(activity, backups);
+                            } else {
+                                showInfoDialog(activity,
+                                        getString(resources, "restore_from_backup", "从备份恢复"),
+                                        getString(resources, "restore_no_app_backup", "应用专用目录中暂无备份记录。"));
+                            }
+                        } else {
+                            useAppBackupDirectory(activity);
+                        }
+                    }
+                });
+    }
+
+    private static void startRestorePreview(Activity activity, Uri source) {
+        Resources resources = getMaintainedResources(activity);
+        showBackupProgress(activity, getString(resources, "restore_preparing", "正在准备恢复…"), true);
+        DesktopRestoreController.validateSelectedFile(activity, source, restoreListener(activity));
+    }
+
+    /**
+     * File selection stays in the launcher process.  It intentionally does not open
+     * DocumentsUI: several vendor file managers fail before returning a result.
+     */
+    private static void showAppBackupSelection(final Activity activity, File[] backups) {
+        final Dialog dialog = new Dialog(activity);
+        LinearLayout root = new LinearLayout(activity);
+        prepareSmartisanDialogRoot(activity, root);
+        TextView title = smartisanDialogTitle(activity, getString(getMaintainedResources(activity),
+                "restore_from_backup", "从备份恢复"));
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+        ScrollView scroll = new ScrollView(activity);
+        scroll.setFillViewport(true);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setHorizontalFadingEdgeEnabled(false);
+        LinearLayout items = new LinearLayout(activity);
+        items.setOrientation(LinearLayout.VERTICAL);
+        items.setGravity(Gravity.FILL_HORIZONTAL);
+        int max = Math.min(backups.length, 12);
+        for (int i = 0; i < max; i++) {
+            final File backup = backups[i];
+            TextView item = text(activity, backupDate(backup.lastModified()), 16, 0xff4d556b, false);
+            item.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+            item.setSingleLine(true);
+            item.setEllipsize(TextUtils.TruncateAt.END);
+            item.setPadding(dp(activity, 20), 0, dp(activity, 20), 0);
+            // The full-page setting backgrounds carry edge insets intended for a
+            // 1080px-wide settings card.  Inside this dialog they shift the text.
+            // Use the existing Smartisan dialog-row selector instead.
+            item.setBackgroundDrawable(smartisanDialogListRowBackground());
+            item.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    dialog.dismiss();
+                    startRestorePreview(activity, Uri.fromFile(backup));
+                }
+            });
+            items.addView(item, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+        }
+        scroll.addView(items, new ScrollView.LayoutParams(-1, -2));
+        root.addView(scroll, new LinearLayout.LayoutParams(-1,
+                Math.min(dp(activity, 56 * max), dp(activity, 420))));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+        TextView cancel = smartisanDialogActionButton(activity,
+                getString(getMaintainedResources(activity), "cancel", "取消"), false, 0);
+        cancel.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { dialog.dismiss(); }
+        });
+        root.addView(cancel, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
+        dialog.setContentView(root);
+        Window window = dialog.getWindow();
+        if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
+        dialog.show();
+        Window shown = dialog.getWindow();
+        if (shown != null) {
+            int width = Math.min(dp(activity, 380),
+                    activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 32));
+            shown.setLayout(width, -2);
+        }
+    }
+
     private static void startBackupFromSavedLocation(Activity activity) {
-        String value = activity.getSharedPreferences(DesktopBackupController.PREFS, 0)
-                .getString(DesktopBackupController.KEY_TREE_URI, "");
+        SharedPreferences prefs = activity.getSharedPreferences(DesktopBackupController.PREFS, 0);
+        String value = prefs.getString(DesktopBackupController.KEY_TREE_URI, "");
         if (TextUtils.isEmpty(value)) {
-            openBackupTree(activity);
+            if (prefs.getBoolean("backup_use_app_directory", false)) {
+                startBackupToAppDirectory(activity);
+            } else {
+                showBackupLocationChoice(activity);
+            }
             return;
         }
         startBackup(activity, Uri.parse(value), false);
+    }
+
+    private static void startBackupToAppDirectory(final Activity activity) {
+        final Resources resources = getMaintainedResources(activity);
+        showBackupProgress(activity, getString(resources, "backup_progress", "正在备份桌面…"), true);
+        DesktopBackupController.startBackupToAppDirectory(activity, backupListener(activity, resources));
     }
 
     private static void startBackup(final Activity activity, Uri destination, boolean direct) {
         final Resources resources = getMaintainedResources(activity);
         showBackupProgress(activity,
                 getString(resources, "backup_progress", "正在备份桌面…"), true);
-        DesktopBackupController.Listener listener = new DesktopBackupController.Listener() {
+        DesktopBackupController.Listener listener = backupListener(activity, resources);
+        if (direct) DesktopBackupController.startBackupToDocument(activity, destination, listener);
+        else DesktopBackupController.startBackupToTree(activity, destination, listener);
+    }
+
+    private static DesktopBackupController.Listener backupListener(final Activity activity,
+            final Resources resources) {
+        return new DesktopBackupController.Listener() {
             public void onState(String state, boolean cancellable) {
                 updateBackupProgressMessage(backupStateMessage(resources, state));
             }
@@ -11173,8 +11624,6 @@ public final class MaintainedLauncherSettingsHost {
                         backupResultMessage(resources, result));
             }
         };
-        if (direct) DesktopBackupController.startBackupToDocument(activity, destination, listener);
-        else DesktopBackupController.startBackupToTree(activity, destination, listener);
     }
 
     private static boolean onBackupActivityResult(Activity activity, int requestCode,
@@ -11194,7 +11643,11 @@ public final class MaintainedLauncherSettingsHost {
                         }, new View.OnClickListener() {
                             public void onClick(View v) { createBackupDocument(activity); }
                         });
-            } else showDesktopBackupPage(activity, false);
+            } else {
+                activity.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
+                        .putBoolean("backup_use_app_directory", false).commit();
+                showDesktopBackupPage(activity, false);
+            }
             return true;
         }
         if (requestCode == REQUEST_BACKUP_CREATE_DOCUMENT) {
@@ -11224,10 +11677,12 @@ public final class MaintainedLauncherSettingsHost {
             }
             public void onComplete(BackupRestoreResult result) {
                 dismissBackupProgress();
-                if (canShowDialog(activity) && !"BACKUP_CANCELLED".equals(result.errorCode))
-                    showInfoDialog(activity,
-                            getString(resources, "restore_dialog_title", "桌面恢复"),
-                            restoreResultMessage(resources, result));
+                if (result != null && !"BACKUP_CANCELLED".equals(result.errorCode)
+                        && !result.success) {
+                    // Success is reported by the freshly loaded desktop after its
+                    // first frame; pre-transition failures report immediately here.
+                    showRestoreResultToast(activity, result);
+                }
             }
         };
     }
@@ -11403,7 +11858,62 @@ public final class MaintainedLauncherSettingsHost {
         if ("RESTORE_RECOVERY_ROLLED_BACK".equals(code)) {
             return getString(resources, "restore_interrupted_rolled_back", "上次桌面恢复被中断，已恢复到操作前状态。");
         }
+        if ("RESTORE_ROLLBACK_FAILED".equals(code)) {
+            return getString(resources, "restore_error_undo", "无法撤销上次恢复。");
+        }
         return code;
+    }
+
+    /** Shows restore feedback through the original launcher bottom-toast manager. */
+    public static void showRestoreStatusToast(Context context, String statusCode) {
+        if (context == null || TextUtils.isEmpty(statusCode)) return;
+        Resources resources;
+        try {
+            resources = settingsResources(context);
+        } catch (Throwable ignored) {
+            resources = context.getResources();
+        }
+        showOriginalLauncherToast(context, pendingRestoreMessage(resources, statusCode));
+    }
+
+    /** Used only for errors that occur before a restore can cold-reload Home. */
+    public static void showRestoreResultToast(Context context, BackupRestoreResult result) {
+        if (context == null || result == null) return;
+        Resources resources;
+        try {
+            resources = settingsResources(context);
+        } catch (Throwable ignored) {
+            resources = context.getResources();
+        }
+        showOriginalLauncherToast(context, restoreResultMessage(resources, result));
+    }
+
+    private static void consumeDeferredRestoreStatusToast(Context context) {
+        if (context == null) return;
+        SharedPreferences prefs = context.getSharedPreferences(
+                DesktopBackupController.PREFS, Context.MODE_PRIVATE);
+        String status = prefs.getString("pending_restore_toast", "");
+        if (TextUtils.isEmpty(status)) return;
+        // Commit before display: a process restart while the Toast is visible must
+        // not replay an already delivered result on the next desktop launch.
+        prefs.edit().remove("pending_restore_toast").commit();
+        showRestoreStatusToast(context, status);
+    }
+
+    private static void showOriginalLauncherToast(Context context, String message) {
+        if (TextUtils.isEmpty(message)) return;
+        try {
+            // Bb is the original ToastManager. It serializes replacement toasts and
+            // preserves the Smartisan large-screen ToastSmt branch when applicable.
+            Class.forName("com.smartisanos.launcher.Bb")
+                    .getMethod("h", String.class, Integer.TYPE)
+                    .invoke(null, message, Integer.valueOf(Toast.LENGTH_SHORT));
+        } catch (Throwable ignored) {
+            try {
+                Toast.makeText(context.getApplicationContext(), message, Toast.LENGTH_SHORT).show();
+            } catch (Throwable ignoredAgain) {
+            }
+        }
     }
 
     private static void showBackupProgress(final Activity activity, String message,
@@ -11773,10 +12283,11 @@ public final class MaintainedLauncherSettingsHost {
             bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
             bindBadgeVisibilitySwitch(activity, resources, root);
             bindBadgeSwipeCleanSwitch(activity, resources, root);
-            bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", true);
+            bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
             migrateSearchGestureSetting(activity);
             bindSwitch(activity, resources, root, "item_id_search_page_enabled",
                     KEY_SWIPE_UP_SEARCH_ENABLED, true);
+            bindSearchCommonAppsSwitch(activity, resources, root);
             bindSwitch(activity, resources, root, "item_id_swipe_down_system_panels",
                     KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED, true);
             synchronizeBadgeSettingsWithNotificationAccess(activity,
@@ -11828,9 +12339,9 @@ public final class MaintainedLauncherSettingsHost {
         LinearLayout root = new LinearLayout(activity);
         prepareSmartisanDialogRoot(activity, root);
 
-        TextView titleView = text(activity, title, 18, 0xff333333, true);
+        TextView titleView = smartisanDialogTitle(activity, title);
         titleView.setGravity(Gravity.CENTER);
-        root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+        root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
 
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
@@ -11863,7 +12374,7 @@ public final class MaintainedLauncherSettingsHost {
                 dialog.dismiss();
             }
         });
-        root.addView(ok, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+        root.addView(ok, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
 
         dialog.setContentView(root);
         Window window = dialog.getWindow();
@@ -12648,11 +13159,9 @@ public final class MaintainedLauncherSettingsHost {
         root.setOrientation(LinearLayout.VERTICAL);
         prepareSmartisanDialogRoot(activity, root);
 
-        TextView title = text(context,
-                getString(resources, "choose_icon_style_title", "选择图标样式"),
-                18, 0xff333333, true);
-        title.setGravity(Gravity.CENTER);
-        root.addView(title, new LinearLayout.LayoutParams(-1, dp(context, 54)));
+        TextView title = smartisanDialogTitle(context,
+                getString(resources, "choose_icon_style_title", "选择图标样式"));
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(context, 53)));
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
         final LinearLayout preview = new LinearLayout(context);
@@ -12699,10 +13208,10 @@ public final class MaintainedLauncherSettingsHost {
                 dialog.dismiss();
             }
         });
-        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(context, 56), 1));
-        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(context, 56)));
-        buttons.addView(apply, new LinearLayout.LayoutParams(0, dp(context, 56), 1));
-        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(context, 56)));
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(context, 47), 1));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(context, 47)));
+        buttons.addView(apply, new LinearLayout.LayoutParams(0, dp(context, 47), 1));
+        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(context, 47)));
         dialog.setContentView(root);
         Window window = dialog.getWindow();
         if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
@@ -12744,13 +13253,7 @@ public final class MaintainedLauncherSettingsHost {
             final IconSourceOption option = options.get(i);
             final boolean selected = sameIconSource(temporary[0], option.selection);
             RelativeLayout row = new RelativeLayout(context);
-            String background = i == 0 ? (options.size() == 1
-                    ? "selector_setting_sub_item_bg_single" : "selector_setting_sub_item_bg_top")
-                    : (i == options.size() - 1 ? "selector_setting_sub_item_bg_bottom"
-                    : "selector_setting_sub_item_bg_middle");
-            int backgroundId = resources.getIdentifier(background, "drawable", SETTINGS_PKG);
-            row.setBackgroundDrawable(backgroundId == 0 ? smartisanDialogListRowBackground()
-                    : resources.getDrawable(backgroundId));
+            row.setBackgroundDrawable(smartisanDialogListRowBackground());
             row.setClickable(true);
             row.setFocusable(true);
             row.setClipChildren(false);
@@ -12764,19 +13267,17 @@ public final class MaintainedLauncherSettingsHost {
             label.setSingleLine(true);
             label.setEllipsize(TextUtils.TruncateAt.END);
             RelativeLayout.LayoutParams labelLp = new RelativeLayout.LayoutParams(-1, -1);
-            labelLp.leftMargin = dp(context, 24);
-            labelLp.rightMargin = dp(context, 56);
+            labelLp.leftMargin = dp(context, 20);
+            labelLp.rightMargin = dp(context, 52);
             row.addView(label, labelLp);
 
-            ImageView selectedMark = new ImageView(context);
-            selectedMark.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            selectedMark.setImageDrawable(safeDrawable(resources,
-                    drawable(resources, "preview_picture_selected")));
-            selectedMark.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
-            RelativeLayout.LayoutParams markLp = new RelativeLayout.LayoutParams(dp(context, 22), dp(context, 22));
+            MaintainedBackupStorageDialog.SmartisanChoiceDot selectedMark =
+                    new MaintainedBackupStorageDialog.SmartisanChoiceDot(activity);
+            selectedMark.setChecked(selected);
+            RelativeLayout.LayoutParams markLp = new RelativeLayout.LayoutParams(dp(context, 26), dp(context, 26));
             markLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
             markLp.addRule(RelativeLayout.CENTER_VERTICAL);
-            markLp.rightMargin = dp(context, 24);
+            markLp.rightMargin = dp(context, 20);
             row.addView(selectedMark, markLp);
 
             final IconSourceManager.Selection selection = option.selection;
@@ -12808,13 +13309,13 @@ public final class MaintainedLauncherSettingsHost {
                 dividerLp.rightMargin = dp(context, 24);
                 row.addView(divider, dividerLp);
             }
-            choices.addView(row, new LinearLayout.LayoutParams(-1, dp(context, 54)));
+            choices.addView(row, new LinearLayout.LayoutParams(-1, dp(context, 60)));
         }
         ViewGroup.LayoutParams current = choiceScroll.getLayoutParams();
         if (current instanceof LinearLayout.LayoutParams) {
             int available = activity.getResources().getDisplayMetrics().heightPixels - dp(context, 300);
             int max = Math.max(dp(context, 112), Math.min(dp(context, 280), available));
-            current.height = Math.min(max, Math.max(dp(context, 54), options.size() * dp(context, 54)));
+            current.height = Math.min(max, Math.max(dp(context, 60), options.size() * dp(context, 60)));
             choiceScroll.setLayoutParams(current);
         }
     }
@@ -13097,14 +13598,9 @@ public final class MaintainedLauncherSettingsHost {
         LinearLayout root = new LinearLayout(activity);
         prepareSmartisanDialogRoot(activity, root);
 
-        TextView title = new TextView(activity);
-        title.setGravity(Gravity.CENTER);
-        title.setSingleLine(true);
-        title.setText(getString(resources, "desktop_icon_size_title", "桌面图标大小"));
-        title.setTextColor(0xff333333);
-        title.setTextSize(18);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+        TextView title = smartisanDialogTitle(activity,
+                getString(resources, "desktop_icon_size_title", "桌面图标大小"));
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
         root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
         LinearLayout content = new LinearLayout(activity);
@@ -13173,10 +13669,10 @@ public final class MaintainedLauncherSettingsHost {
                 getString(resources, "cancel", "取消"), false, -1);
         TextView ok = smartisanDialogActionButton(activity,
                 getString(resources, "activity_title_confirm", "确定"), true, 1);
-        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
-        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 56)));
-        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 56), 1));
-        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 47), 1));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 47)));
+        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 47), 1));
+        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
 
         seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
@@ -13261,17 +13757,17 @@ public final class MaintainedLauncherSettingsHost {
         return view;
     }
 
-    private static View smartisanDivider(Context context) {
+    static View smartisanDivider(Context context) {
         View view = new View(context);
         view.setBackgroundColor(0xffdfdfdf);
         return view;
     }
 
-    private static void prepareSmartisanDialogRoot(Context context, LinearLayout root) {
+    static void prepareSmartisanDialogRoot(Context context, LinearLayout root) {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(0, 0, 0, 0);
         GradientDrawable background = new GradientDrawable();
-        background.setColor(0xfffbfbfb);
+        background.setColor(0xffffffff);
         background.setCornerRadius(dp(context, 8));
         root.setBackgroundDrawable(background);
         // The action row is a child view. Clip it to the shared panel outline
@@ -13281,16 +13777,24 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static TextView smartisanDialogActionButton(Context context, String text, boolean primary, int side) {
+    static TextView smartisanDialogActionButton(Context context, String text, boolean primary, int side) {
         TextView button = new TextView(context);
         button.setGravity(Gravity.CENTER);
         button.setSingleLine(true);
         button.setText(text);
         button.setTextColor(primary ? 0xff5f8fe9 : 0xff5f6268);
-        button.setTextSize(13);
+        button.setTextSize(14);
         button.setTypeface(null, android.graphics.Typeface.NORMAL);
         button.setBackgroundDrawable(smartisanButtonBackground(context, side));
         return button;
+    }
+
+    /** Shared SmartisanDialog title bar: 53dp, #f2f2f2, centered 18sp bold. */
+    static TextView smartisanDialogTitle(Context context, String title) {
+        TextView view = text(context, title, 18, 0xff5c5c5c, true);
+        view.setGravity(Gravity.CENTER);
+        view.setBackgroundColor(0xfff2f2f2);
+        return view;
     }
 
     private static Drawable smartisanButtonBackground(Context context, int side) {
@@ -13617,6 +14121,87 @@ public final class MaintainedLauncherSettingsHost {
         return IconSourceManager.get(context).type == IconSourceManager.Type.IMPROVED;
     }
 
+    /**
+     * A restored archive contains the user's icon-source selection and per-app
+     * choices, but deliberately not the disposable downloaded PNG cache.  Run
+     * cache repair only after the new Launcher has presented its first frame.
+     * This preserves custom/resource/pack/original choices and puts all I/O on
+     * the existing low-priority fetch workers.
+     */
+    public static void rehydrateImprovedIconsAfterRestore(Context context) {
+        if (context == null) return;
+        final Context app = context.getApplicationContext() == null ? context
+                : context.getApplicationContext();
+        if (!isImprovedIconEnabled(app)) return;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    android.os.Process.setThreadPriority(
+                            android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    if (!isImprovedIconEnabled(app)) return;
+                    Intent intent = new Intent(Intent.ACTION_MAIN);
+                    intent.addCategory(Intent.CATEGORY_LAUNCHER);
+                    List<ResolveInfo> apps = queryLauncherActivitiesWithProfiles(
+                            app.getPackageManager(), intent, 0);
+                    Resources resources = settingsResources(app);
+                    IconPreviewRepository repository = IconPreviewRepository.get(app);
+                    java.util.LinkedHashSet<String> sources =
+                            new java.util.LinkedHashSet<String>();
+                    java.util.LinkedHashSet<String> readyPackages =
+                            new java.util.LinkedHashSet<String>();
+                    for (int i = 0; i < apps.size(); i++) {
+                        ResolveInfo info = apps.get(i);
+                        ActivityInfo ai = info == null ? null : info.activityInfo;
+                        if (ai == null || TextUtils.isEmpty(ai.packageName)
+                                || TextUtils.isEmpty(ai.name) || !shouldShowIconEntry(info)) {
+                            continue;
+                        }
+                        RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(
+                                app, ai.packageName, ai.name);
+                        // Explicit choices are already represented in the backup and
+                        // must never be overwritten or downloaded as an auto icon.
+                        if (redirect != null && !RedirectIconDB.MODE_AUTO.equals(
+                                RedirectIconDB.modeOf(redirect))) {
+                            continue;
+                        }
+                        IconPreviewRepository.ImprovedCandidate candidate =
+                                repository.resolveImprovedCandidate(ai.packageName, ai.name);
+                        if (candidate.exists && !TextUtils.isEmpty(candidate.sourceId)) {
+                            sources.add(candidate.sourceId);
+                            // Re-emit the normal app-icon update for artwork that is
+                            // already available locally.  Without this, a restore
+                            // left the desktop using the original database cache
+                            // until the user toggled improved icons manually.
+                            if (libraryIconAvailable(app, resources, candidate.sourceId)) {
+                                readyPackages.add(ai.packageName);
+                            }
+                        }
+                    }
+                    int queued = 0;
+                    for (String source : sources) {
+                        if (!libraryIconAvailable(app, resources, source)
+                                && !shouldSkipSmartisanIconFetch(app, source)) {
+                            scheduleSmartisanIconFetch(app, source);
+                            queued++;
+                        }
+                    }
+                    if (!readyPackages.isEmpty()) {
+                        new Handler(Looper.getMainLooper()).post(new Runnable() {
+                            @Override public void run() {
+                                applyIconChanges(app, readyPackages);
+                            }
+                        });
+                    }
+                    Log.i(LOG_TAG, "RESTORE_IMPROVED_ICON_REHYDRATE sources=" + sources.size()
+                            + " ready=" + readyPackages.size() + " queued=" + queued);
+                } catch (Throwable error) {
+                    Log.w(LOG_TAG, "RESTORE_IMPROVED_ICON_REHYDRATE_FAILED", error);
+                }
+            }
+        }, "RestoreImprovedIconHydrate").start();
+    }
+
     private static void setImprovedIconEnabled(Context context, boolean enabled) {
         IconSourceManager.set(context, enabled
                 ? IconSourceManager.Selection.improved()
@@ -13828,14 +14413,8 @@ public final class MaintainedLauncherSettingsHost {
             LinearLayout root = new LinearLayout(activity);
             prepareSmartisanDialogRoot(activity, root);
 
-            TextView title = new TextView(activity);
-            title.setGravity(Gravity.CENTER);
-            title.setSingleLine(true);
-            title.setText("选择图标包");
-            title.setTextColor(0xff333333);
-            title.setTextSize(18);
-            title.setTypeface(null, Typeface.BOLD);
-            root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
+            TextView title = smartisanDialogTitle(activity, "选择图标包");
+            root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
             root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
             LinearLayout list = new LinearLayout(activity);
@@ -13892,7 +14471,7 @@ public final class MaintainedLauncherSettingsHost {
                     dialog.dismiss();
                 }
             });
-            root.addView(cancel, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
+            root.addView(cancel, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
 
             dialog.setContentView(root);
             Window window = dialog.getWindow();
@@ -13998,12 +14577,12 @@ public final class MaintainedLauncherSettingsHost {
                 iconSourceSubtitle(activity));
     }
 
-    private static Drawable smartisanDialogListRowBackground() {
+    static Drawable smartisanDialogListRowBackground() {
         StateListDrawable states = new StateListDrawable();
         states.addState(new int[]{android.R.attr.state_pressed},
                 new android.graphics.drawable.ColorDrawable(0xffedf2fb));
         states.addState(new int[]{},
-                new android.graphics.drawable.ColorDrawable(0xfffafafa));
+                new android.graphics.drawable.ColorDrawable(0xffffffff));
         return states;
     }
 
@@ -14421,7 +15000,7 @@ public final class MaintainedLauncherSettingsHost {
         return button;
     }
 
-    private static TextView text(Context context, String value, int sp, int color, boolean bold) {
+    static TextView text(Context context, String value, int sp, int color, boolean bold) {
         TextView tv = new TextView(context);
         tv.setText(value);
         tv.setTextSize(sp);
@@ -14454,7 +15033,7 @@ public final class MaintainedLauncherSettingsHost {
         return header;
     }
 
-    private static int dp(Context context, int value) {
+    static int dp(Context context, int value) {
         return (int) (value * context.getResources().getDisplayMetrics().density + 0.5f);
     }
 
@@ -16807,6 +17386,16 @@ public final class MaintainedLauncherSettingsHost {
     public static boolean hasEffectiveManagedIcon(Object itemInfo) {
         if (itemInfo == null) return false;
         try {
+            // QuickLaunchItem owns a provider-supplied final bitmap.  It may share
+            // WeChat/Alipay's package name, but it is not an application Cell and
+            // must never be converted to the selected global app-icon source.
+            java.lang.reflect.Field itemTypeField = itemInfo.getClass().getField("itemType");
+            Object itemType = itemTypeField.get(itemInfo);
+            if (itemType instanceof Number && ((Number) itemType).byteValue() == 1) {
+                android.util.Log.i("LauncherIconRaster",
+                        "EFFECTIVE_ICON_SOURCE shortcut sourceType=ORIGINAL_SHORTCUT_BITMAP");
+                return false;
+            }
             java.lang.reflect.Field packageField = itemInfo.getClass().getField("packageName");
             java.lang.reflect.Field componentField = itemInfo.getClass().getField("componentName");
             String packageName = String.valueOf(packageField.get(itemInfo));
@@ -17130,6 +17719,7 @@ public final class MaintainedLauncherSettingsHost {
         final String t9Code;
         final Drawable icon;
         int historyRank = -1;
+        long usageForegroundTime;
         int lastScore;
 
         SearchEntry(String label, String packageName, String className, int userId, Drawable icon) {

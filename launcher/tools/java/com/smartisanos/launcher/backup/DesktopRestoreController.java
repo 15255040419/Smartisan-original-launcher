@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.util.Log;
 
 import com.smartisanos.launcher.reload.LauncherColdReloadCoordinator;
+import com.smartisanos.launcher.theme.MaintainedLauncherSettingsHost;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -179,8 +180,10 @@ public final class DesktopRestoreController {
             org.json.JSONObject theme = ThemeBackupCodec.encode(context);
             org.json.JSONObject icons = IconBackupCodec.encode(context,
                     new File(rollbackDirectory, "icons/custom"));
+            org.json.JSONObject shortcutIcons = ShortcutIconBackupCodec.encode(layout.value,
+                    new File(rollbackDirectory, "icons/shortcuts"));
             File rollbackArchive = BackupArchiveWriter.write(rollbackDirectory, manifest,
-                    layout.value, settings, theme, icons, cancel);
+                    layout.value, settings, theme, icons, shortcutIcons, cancel);
             BackupValidator.validateAndExtract(rollbackArchive, new File(rollbackDirectory, "verified"));
             BackupFileUtils.deleteRecursively(new File(rollbackDirectory, "verified"));
             entry.rollbackPath = rollbackArchive.getAbsolutePath();
@@ -251,9 +254,6 @@ public final class DesktopRestoreController {
         try {
             applyArchive(context, source, entry, journal, undo);
             journal.write(entry, RestoreOperationJournal.State.COMMITTED, null);
-            context.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
-                    .putString("pending_restore_message", undo ? "UNDO_COMPLETE" : "RESTORE_COMPLETE")
-                    .commit();
             return true;
         } catch (Throwable error) {
             Log.e(TAG, "RESTORE_FAILED token=" + shortToken(token), error);
@@ -264,8 +264,6 @@ public final class DesktopRestoreController {
                     journal.write(entry, RestoreOperationJournal.State.ROLLING_BACK, null);
                     applyArchive(context, new File(entry.rollbackPath), entry, journal, true);
                     journal.write(entry, RestoreOperationJournal.State.ROLLED_BACK, null);
-                    context.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
-                            .putString("pending_restore_message", "RESTORE_ROLLED_BACK").commit();
                     return true;
                 } catch (Throwable rollbackError) {
                     journal.write(entry, RestoreOperationJournal.State.ROLLING_BACK,
@@ -273,6 +271,10 @@ public final class DesktopRestoreController {
                     Log.e(TAG, "RECOVERY_FAILED token=" + shortToken(token), rollbackError);
                 }
             }
+            // The reload process has no Settings window to own a dialog. Persist a
+            // one-shot bottom-toast result for the next rendered desktop frame.
+            context.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
+                    .putString("pending_restore_toast", "RESTORE_ROLLBACK_FAILED").commit();
             return false;
         }
     }
@@ -286,7 +288,8 @@ public final class DesktopRestoreController {
         journal.write(entry, RestoreOperationJournal.State.APPLYING_DATABASE, null);
         File pending = new File(new File(context.getFilesDir(), "backup_restore"), "pending_items.json");
         LayoutSnapshotImporter.ImportResult result = LayoutSnapshotImporter.restore(context,
-                backup.layout, backup.manifest.gridMode, pending);
+                backup.layout, backup.manifest.gridMode, pending, backup.shortcutIcons,
+                backup.extractedRoot);
         journal.write(entry, RestoreOperationJournal.State.DATABASE_COMMITTED, null);
         journal.write(entry, RestoreOperationJournal.State.APPLYING_PREFERENCES, null);
         String oldTheme = context.getSharedPreferences("launcher_settings", 0).getString("launcher_theme", "");
@@ -312,6 +315,17 @@ public final class DesktopRestoreController {
         if (!token.equals(entry.operationToken)) return;
         if (entry.state != RestoreOperationJournal.State.COMMITTED
                 && entry.state != RestoreOperationJournal.State.ROLLED_BACK) return;
+        String resultCode = entry.state == RestoreOperationJournal.State.ROLLED_BACK
+                ? "RESTORE_ROLLED_BACK"
+                : (entry.undo ? "UNDO_COMPLETE" : "RESTORE_COMPLETE");
+        // This is the first actual desktop frame after the restore. Use the original
+        // launcher toast here rather than deferring a dialog until Backup & Restore
+        // is opened again. The online icon cache is disposable, so start its existing
+        // background hydration only after this frame is visible.
+        MaintainedLauncherSettingsHost.showRestoreStatusToast(context, resultCode);
+        if ("RESTORE_COMPLETE".equals(resultCode)) {
+            MaintainedLauncherSettingsHost.rehydrateImprovedIconsAfterRestore(context);
+        }
         journal.write(entry, RestoreOperationJournal.State.CLEANING, null);
         BackupFileUtils.deleteRecursively(new File(entry.stagingPath));
         BackupFileUtils.deleteRecursively(new File(new File(context.getCacheDir(), "restore_apply"), token));

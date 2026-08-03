@@ -17,7 +17,7 @@ public final class BackupArchiveWriter {
     private BackupArchiveWriter() {}
 
     public static File write(File staging, BackupManifest manifest, JSONObject layout,
-            JSONObject settings, JSONObject theme, JSONObject icons,
+            JSONObject settings, JSONObject theme, JSONObject icons, JSONObject shortcutIcons,
             DesktopBackupController.CancellationToken cancellation) throws Exception {
         BackupFileUtils.ensureDirectory(staging);
         BackupFileUtils.writeJson(new File(staging, "manifest.json"), manifest.toJson());
@@ -25,6 +25,7 @@ public final class BackupArchiveWriter {
         BackupFileUtils.writeJson(new File(staging, "settings.json"), settings);
         BackupFileUtils.writeJson(new File(staging, "theme.json"), theme);
         BackupFileUtils.writeJson(new File(staging, "icons/redirects.json"), icons);
+        BackupFileUtils.writeJson(new File(staging, "icons/shortcuts.json"), shortcutIcons);
         JSONObject pending = new JSONObject();
         pending.put("version", 1);
         pending.put("items", new JSONArray());

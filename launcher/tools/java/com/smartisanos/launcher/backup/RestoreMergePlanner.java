@@ -2,6 +2,7 @@ package com.smartisanos.launcher.backup;
 
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -36,14 +37,14 @@ public final class RestoreMergePlanner {
             backupKeys.add(stableKey(item));
             if (item.optInt("itemType", -1) == 2) plan.folderCount++;
             if (isShortcut(item)) plan.shortcutCount++;
-            if (hasComponent(item) && !isInstalled(context, item)) plan.missingAppCount++;
+            if (isRestoreCandidate(item) && !isInstalled(context, item)) plan.missingAppCount++;
         }
         SQLiteDatabase db = LayoutSnapshotExporter.database(false);
         Cursor cursor = db.query("table_iteminfos", null, null, null, null, null, null);
         try {
             while (cursor.moveToNext()) {
                 JSONObject item = cursorRow(cursor);
-                if (hasComponent(item) && isInstalled(context, item)
+                if (isRestoreCandidate(item) && isInstalled(context, item)
                         && !backupKeys.contains(stableKey(item))) {
                     plan.preservedNewItemCount++;
                     if (isShortcut(item)) plan.preservedNewShortcutCount++;
@@ -71,7 +72,9 @@ public final class RestoreMergePlanner {
     static boolean isInstalled(Context context, JSONObject item) {
         String pkg = item.optString("packageName", "");
         String cmp = item.optString("componentName", "");
-        if (pkg.length() == 0 || cmp.length() == 0) return true;
+        if (pkg.length() == 0) return true;
+        if (isShortcut(item)) return packageInstalled(context, pkg);
+        if (cmp.length() == 0) return true;
         try {
             ComponentName component = ComponentName.unflattenFromString(cmp);
             if (component == null) component = new ComponentName(pkg, cmp);
@@ -86,8 +89,14 @@ public final class RestoreMergePlanner {
     }
 
     static String stableKey(JSONObject item) {
+        String shortcut = shortcutIdentity(item);
+        if (shortcut.length() != 0) {
+            // A pinned shortcut's component is the bridge Activity and may differ across
+            // releases.  Package + shortcut id + profile is its stable original identity.
+            return "shortcut|" + shortcut;
+        }
         return item.optInt("user", 0) + "|" + item.optString("packageName", "") + "|"
-                + item.optString("componentName", "") + "|" + shortcutIdentity(item) + "|"
+                + item.optString("componentName", "") + "||"
                 + item.optInt("itemType", -1);
     }
 
@@ -96,16 +105,38 @@ public final class RestoreMergePlanner {
                 && item.optString("componentName", "").length() != 0;
     }
 
+    static boolean isRestoreCandidate(JSONObject item) {
+        // Original QuickLaunch rows may intentionally omit componentName; their
+        // package/shortcut/profile identity is still sufficient to merge safely.
+        return hasComponent(item) || isShortcut(item);
+    }
+
     static boolean isShortcut(JSONObject item) {
         String intent = item.optString("intent", "");
         return intent.contains("shortcut_id") || intent.contains("shortcutId")
-                || intent.contains("android.intent.extra.shortcut.ID");
+                || intent.contains("android.intent.extra.shortcut.ID")
+                || intent.contains("smartisan.shortcut.id");
     }
 
     private static String shortcutIdentity(JSONObject item) {
         if (!isShortcut(item)) return "";
-        String intent = item.optString("intent", "");
-        return Integer.toHexString(intent.hashCode());
+        String packageName = item.optString("packageName", "");
+        String shortcutId = item.optString("data1", "");
+        long userSerial = Long.MIN_VALUE;
+        try {
+            Intent intent = Intent.parseUri(item.optString("intent", ""), 0);
+            String sourcePackage = intent.getStringExtra("smartisan.shortcut.package");
+            if (sourcePackage != null && sourcePackage.length() != 0) packageName = sourcePackage;
+            String sourceId = intent.getStringExtra("smartisan.shortcut.id");
+            if (sourceId == null || sourceId.length() == 0) sourceId = intent.getStringExtra("shortcut_id");
+            if (sourceId != null && sourceId.length() != 0) shortcutId = sourceId;
+            userSerial = intent.getLongExtra("smartisan.shortcut.user_serial", Long.MIN_VALUE);
+        } catch (Throwable ignored) {
+            // Older original shortcuts still have data1 and the database user column.
+        }
+        if (packageName.length() == 0 || shortcutId.length() == 0) return "";
+        long profile = userSerial != Long.MIN_VALUE ? userSerial : item.optLong("user", 0L);
+        return packageName + "|" + shortcutId + "|" + profile;
     }
 
     private static JSONObject cursorRow(Cursor cursor) throws Exception {

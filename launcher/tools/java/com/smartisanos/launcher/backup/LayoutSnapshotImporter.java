@@ -14,6 +14,7 @@ import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public final class LayoutSnapshotImporter {
@@ -35,17 +36,24 @@ public final class LayoutSnapshotImporter {
     private LayoutSnapshotImporter() {}
 
     public static ImportResult restore(Context context, JSONObject layout, int gridMode,
-            File pendingFile) throws Exception {
+            File pendingFile, JSONObject shortcutIcons, File extractionRoot) throws Exception {
         LayoutSnapshotExporter.validate(layout);
         SQLiteDatabase database = LayoutSnapshotExporter.database(true);
         JSONArray backupPages = layout.getJSONArray("pages");
         JSONArray backupItems = layout.getJSONArray("items");
         List<JSONObject> currentItems = readCurrentItems(database);
+        // Keep the provider-rendered bitmap for existing QuickLaunchItems before
+        // rebuilding the tables.  This is also the compatibility path for older
+        // archives that predate icons/shortcuts.json: restoring a layout must not
+        // turn a shortcut into its host app icon merely because table_icons was
+        // rebuilt or the improved-icon mode is enabled.
+        Map<String, ContentValues> shortcutFallback =
+                ShortcutIconBackupCodec.captureCurrent(database, currentItems);
         Set<String> backupKeys = new HashSet<String>();
         for (int i = 0; i < backupItems.length(); i++) backupKeys.add(RestoreMergePlanner.stableKey(backupItems.getJSONObject(i)));
         ArrayList<JSONObject> preserved = new ArrayList<JSONObject>();
         for (JSONObject item : currentItems) {
-            if (RestoreMergePlanner.hasComponent(item) && RestoreMergePlanner.isInstalled(context, item)
+            if (RestoreMergePlanner.isRestoreCandidate(item) && RestoreMergePlanner.isInstalled(context, item)
                     && !backupKeys.contains(RestoreMergePlanner.stableKey(item))) preserved.add(item);
         }
 
@@ -82,7 +90,7 @@ public final class LayoutSnapshotImporter {
                         maxCell = Math.max(maxCell, item.optInt("cellIndex", -1));
                     }
                 }
-                if (RestoreMergePlanner.hasComponent(item) && !RestoreMergePlanner.isInstalled(context, item)) {
+                if (RestoreMergePlanner.isRestoreCandidate(item) && !RestoreMergePlanner.isInstalled(context, item)) {
                     pending.put(pendingRecord(item));
                     result.missing++;
                     continue;
@@ -130,6 +138,8 @@ public final class LayoutSnapshotImporter {
                 database.insertOrThrow("table_iteminfos", null, values);
                 result.preserved++;
             }
+            ShortcutIconBackupCodec.restore(database, layout, shortcutIcons, extractionRoot,
+                    shortcutFallback);
             verifyDatabase(database);
             database.setTransactionSuccessful();
         } finally { database.endTransaction(); }

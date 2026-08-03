@@ -17,16 +17,20 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-08-01）
+## 当前状态总览（2026-08-03）
+
+- 2026-08-03 弹窗视觉统一：参考开源 [SmartisanDialog](https://github.com/liying2008/SmartisanDialog) 的公开布局规范，在现有 apktool/javac 构建链中本地复用，不引入 AppCompat/RecyclerView 运行时依赖。备份/恢复目录选择器改为标题栏 53dp、#f2f2f2 标题背景、72dp 可换行单选行、两个选项之间的淡色分割线、右侧 26dp Smartisan 浅色圆点、选项说明和 47dp 底部按钮；通用确认/提示、备份记录选择、图标大小、图标包及图标样式弹窗同步使用统一白色圆角面板、标题栏、分割线、按钮字号和高度，图标样式弹窗保留顶部预览图。恢复记录列表改为填充弹窗宽度、固定左对齐并截断超长单行日期，避免日期文本溢出或互相遮挡。业务回调、备份路径和权限逻辑不变。`build.bat`、`git diff --check` 已通过；当前无在线 ADB，尚未完成真机截图矩阵。
+
+- 桌面备份与恢复的小程序图标持久化缺口已修复：此前布局快照只导出 `table_iteminfos`，恢复却会清空 `table_icons`，使 `QuickLaunchItem` 的逐快捷方式最终位图丢失，只能退回微信/支付宝宿主图标。现在仅对 `itemType=1` 的 QuickLaunchItem 导出并恢复其 `table_icons` 的 dark/light/transparent 图标 BLOB 和元数据；普通应用图标、在线缓存和改进版图标缓存仍不进入备份。新建备份会包含 `icons/shortcuts.json` 与受校验的二进制位图，恢复与自动回滚均在同一数据库事务内还原。恢复前还会按“来源包名 + shortcutId + userSerial”暂存当前快捷方式位图，兼容旧备份或缺失记录，确保重建数据库不会把小程序替换成宿主图标；改进版图标刷新只允许更新 `itemType=0` 普通应用。恢复后的改进版缓存会在首帧后主动刷新已存在的本地资源，网络资源仍由原有后台队列补齐，不需要手动切换开关。旧备份没有这些位图且当前快捷方式也不存在时，无法凭空恢复已丢失的小程序封面；重新从提供方添加可由 `ShortcutCompatBridge` 重新写入。微信/支付宝新添加路径优先使用 `LauncherApps.getShortcutIconDrawable()` 的逐快捷方式资源，避免兼容转换器先返回宿主应用图标。备份位置首选系统文件夹：Android 8–12 在首次启动系统 DocumentsUI 前请求声明的存储空间权限，授权回调后再打开目录/文件选择器；Android 13+ 继续依赖 SAF 的 URI 授权，不被废弃的广域存储权限阻塞。所选树 URI 持久保存，卸载桌面后备份仍在；应用专用目录仅为用户主动选择的回退。OPPO PDCM00 已覆盖安装，实际拉起 `com.google.android.documentsui/.picker.PickActivity` 并显示 `/Download/备份`；无 Launcher `FATAL EXCEPTION`。新的快捷方式外观与完整备份/恢复闭环仍需用户真机确认。
 
 - 桌面备份与恢复已完成可用性修复：入口位于“设置默认桌面”下、“关于我们”上，管理页和恢复预览页复用现有锤子设置行、`setting_next` 箭头、Title 和统一弹窗/进度框。原版数据库的 `table_pageinfos.pageIndex` 允许负值、预分配空页和重复值，不能作为唯一键；现按 `_id` 校验，并以实际根级图标页计算预览页数，恢复时避免新页 `_id` 冲突。`table_pageinfos.pageTitle`（桌面编辑模式页面分组标题）和 `table_iteminfos.title`（含文件夹标题）同样随布局快照读写。vivo X21A Android 9 截图已确认真实备份、恢复和撤销入口可用；`emulator-5554` Android 17 已完成构建/覆盖安装。Android 12 及其他 ROM 仍需在本修复包上复测，当前不能宣称所有设备均已真机验收。
 - “关于”页已移除仅供该页使用的操作日志录制、扫描、预览、合并与分享链，也不再创建 `operation_logs`；公共 `android.util.Log` 和其他诊断链保持不变。原位置改为静态“使用小技巧”，按桌面手势、动态天气和日历、强迫症选项、小程序和快捷方式四组呈现，复用 `setting_follow_view.xml` 的标题/边距/颜色与 `setting_item_up`、`more_item_middle`、`setting_item_down` 背景。中英文资源均已补齐；Android 17 1440×3120 模拟器确认 About 可进入、四组可滚动到底、最后一组未被导航栏遮挡且没有操作日志条目。Android 8/12/14/16 仍待真实设备矩阵，不能据此宣称全部已验收。
 - vivo X21A Android 9 首次安装后或从其他界面返回 Launcher 偶发只显示系统壁纸的问题已定位并修复：原版 `LauncherActivityTheme -> @style/Animation` 在二进制 `resources.arsc` 中仍引用 Smartisan framework 私有动画 `0x010a0177/0x010a0178`，vivo Android 9 的 WindowManager 加载不存在的资源时会在窗口布局阶段反复抛 `Resources$NotFoundException`，但 Launcher 进程、Activity 和 Surface 仍存活，因此表现为空白而不是应用崩溃。当前资源表仅将对应的9个 task/wallpaper过渡项改为 `@null`，不修改 Launcher 内部动画。最终 APK 已确认不再包含两个私有资源 ID；vivo 覆盖安装后完成5次强停冷启动、8次设置页返回和一次 ART verify，桌面均可见且日志无 `FATAL EXCEPTION`、`NullPointerException`、`VerifyError`、资源缺失或 WindowManager 布局异常。最终 APK 的101个 framework资源引用及Manifest的41个framework引用与该 Android 9 framework逐项比对均无缺失；SDK30/34/36资源表比对也无缺失。Android 6/8及其他厂商真机仍属于未覆盖矩阵，不能据此宣称所有ROM零风险。
 - Shizuku 更换默认桌面功能已完全移除：vivo Android 9 已确认 `cmd package set-home-activity` 即使即时返回成功，按 Home 后仍会被系统 `HOMERECOVERY` 恢复为厂商桌面，不能作为可靠跨 ROM 能力交付。设置页“设置默认桌面”恢复为原有 Android 10+ Role / 系统默认应用设置链；APK 不再包含 Shizuku Provider、权限、元数据、UserService、离线依赖或二进制 Manifest 修补器。
-- 动态天气/日历的兼容阴影已从独立 `BlurMaskFilter` 收敛到普通 managed 静态图标已经验证的原版 `data/L.a(Bitmap, Canvas, radius, color)` 生成器：继续读取同一组 dark/light/transparent 半径与颜色，每层物理半径随 `ActiveIconRasterSpec` 缩放，实时节点与缓存帧共用同一 `DynamicShadowNode` 阴影纹理；动态开启时仅隐藏该 Cell 的普通阴影，关闭后恢复。输入轮廓与静态链相同，只在阴影蒙版中清除 alpha 小于128的旧外部投影，不裁剪动态底板。旧软件模糊缓存已通过 `active_icon_shadow_v5` 隔离。OPPO PDCM00 已确认 v4 原版生成器两层阴影比旧软件模糊更接近普通图标，v5 完整轮廓链已构建成功；随后 OPPO ADB 断开，v5 最终真机截图仍待复验。不得以经验 Alpha 倍率继续加深，也不得恢复现代 Android 上会导致 GLThread 崩溃的原版私有 `sc[27] + MutiTexMaterial` 链。
+- 动态天气/日历的兼容阴影已从独立 `BlurMaskFilter` 收敛到普通静态图标已经验证的原版 `data/L.a(Bitmap, Canvas, radius, color)` 生成器：继续读取同一组 dark/light/transparent 半径与颜色，每层物理半径随 `ActiveIconRasterSpec` 缩放，实时节点与缓存帧共用同一 `DynamicShadowNode` 阴影纹理；动态开启时仅隐藏该 Cell 的普通阴影，关闭后恢复。输入轮廓与静态链相同，只在阴影蒙版中清除 alpha 小于128的旧外部投影，不裁剪动态底板。v7 修正实时节点阴影的纵向锚点：动态阴影是更大且居中的独立 sibling，底板必须在其对称 padding 内与原 ActiveIcon 背景重合，再使用原始 `+sqrt(radius)` 向下投影；不得把静态单纹理的 1/4 artworkTop 套进该节点，否则阴影会跑到图标上方。缓存目录切换到 `active_icon_shadow_v7` 避免复用旧位置缓存；未增加经验 Alpha/半径倍率。OPPO PDCM00 已确认 v4 原版生成器两层阴影比旧软件模糊更接近普通图标，v7 已完成代码修复，最终真机截图仍待复验。不得恢复现代 Android 上会导致 GLThread 崩溃的原版私有 `sc[27] + MutiTexMaterial` 链。
 - maintained 设置页的英文本地化已补齐截图范围：强迫症角标与通知使用权弹窗、主题名称、图标样式/图标大小及其弹窗、已重绘分组、应用分身空态、隐私密码设置/输入页、宫格名称与切换确认、检查更新结果均从设置资源读取，不再由 Java 直接写死中文。主题显示名以稳定 theme id 映射对应 string，仅改变 UI 文案，不改变主题包名、主题 id 或提交链；图标页行类型判断也已从中文标题比较改为稳定类型值。中文资源保持原文，默认资源提供英文。`1440×3120 / en-US` 模拟器已覆盖安装并可见确认 `12-Cell Grid / 20-Cell Grid`、`Badge Reminders`、通知授权弹窗、应用分身空态、隐私密码输入页、Icon Settings 主列表、图标样式弹窗和图标大小弹窗均为英文；未见 Launcher `FATAL EXCEPTION` / `VerifyError`。主题页与检查更新各异常分支未完成逐项可见触发。
 
-- 普通桌面高分辨率图标基线已恢复：1080 坐标系继续保持用户已确认正常的 12 宫格 `160/205`、20 宫格 `118/152`；仅 1440 坐标系 `values-sw411dp` 恢复 `clean_launcher_raw` 原版 12 宫格 `192/246`、20 宫格 `138/178`，应用名称偏移分别恢复为 `-131/-100`，桌面设置按钮恢复为 `134`。`LayoutPropertyAdapter` 继续以资源 `dock_width=1440` 为基准只向下适配中间分辨率，不移除最大 `1.0` 的安全上限。默认 APK 图标由原版 Drawable 转换链按最终 `icon_size_origin` 直接栅格化；改进版、图标包、在线及自定义源继续由 `IconRasterDiagnostics` 从源图一次采样到最终物理纹理，桌面设置按钮使用相同物理倍率。没有新增“先缩小再放大”的节点倍率；1080 资源、打开文件夹、关闭预览内部比例、Cell 坐标、文字字号及动画均未修改。1440×3120 模拟器已完成覆盖安装和当前20宫格可见验证，12宫格及其他高分辨率真机仍待验收。
+- 普通桌面高分辨率图标基线已恢复：1080 坐标系继续保持用户已确认正常的 12 宫格 `160/205`、20 宫格 `118/152`；仅 1440 坐标系 `values-sw411dp` 恢复 `clean_launcher_raw` 原版 12 宫格 `192/246`、20 宫格 `138/178`，应用名称偏移分别恢复为 `-131/-100`，桌面设置按钮恢复为 `134`。`LayoutPropertyAdapter` 继续以资源 `dock_width=1440` 为基准只向下适配中间分辨率，不移除最大 `1.0` 的安全上限。普通桌面主 Cell 的改进版、图标包、在线、自定义和默认 APK Drawable 现在统一由 `IconRasterDiagnostics` 从原始 Drawable/Bitmap 一次采样到最终物理纹理；默认 APK 不再先生成 `icon_size_origin` 的中间 Bitmap 再放大。桌面设置按钮使用相同物理倍率。没有新增节点放大倍率；1080 资源、打开文件夹、关闭预览内部比例、Cell 坐标、文字字号及动画均未修改。1440×3120 模拟器已完成覆盖安装和当前20宫格可见验证，默认 APK 的高分辨率真机截图仍待验收。
 - 普通桌面静态纹理跨分辨率链已进一步收敛：物理倍率只取 `SurfaceWidth / Constants.window_width`，不再让全面屏系统栏造成的高度差误放大或误缩小图标；SMEngine 缓存键加入组件、用户、源图哈希、宫格模式、最终尺寸、分辨率、density 和图标比例。managed 静态源在普通桌面主 Cell 入口按该 Cell 的真实目标边长直接从原图合成，随后在同一最终物理尺寸上复用原版 `HolographicOutlineHelper` 与当前 dark/light/transparent 阴影参数，不再依赖各源 PNG 是否自带烘焙阴影；低 alpha 外部像素只从阴影蒙版剔除，不裁剪图标本体。动态图标、打开文件夹、关闭文件夹预览和特殊黑白链保持原版分流。1440×3120/560dpi 与 1080×2400/480dpi 模拟验证中，目标内容/纹理分别为 `230/295` 与 `192/246`，视觉 dp 基本一致，截图中的竖线碎片消失；OPPO PDCM00 浅色主题真机确认每个受管静态图标生成两层原版阴影。192px 以下旧素材仍受原图分辨率上限约束并明确记录 `ICON_LOW_RES_SOURCE_LIMITED`。
 
 - 文件夹综合自适应误入普通桌面的回归已修复：实验性的 `FolderLayoutMetrics` 已移除；`FolderCellPositionAdapter` 只在当前容器精确为 `com.smartisanos.launcher.view.b.t` 且模式精确为 `PAGE_1_3X3_MODE_FOLDER(8)` 时复制坐标数组，普通 Page 原样返回。`LayoutPropertyAdapter` 的 `_folder` 分支只记录原始资源值并直接返回，不修改共享 `LayoutProperty`。打开文件夹的内部静态几何由只读 `FolderVisualGeometry` 计算：原版三列 X、书架、图标尺寸和 XML 基准保持不变，应用文字以图标可见底边为锚点并使用 `appLabelGap=20`，图标与文字作为内容组在每层居中；标题以书架可见顶部为锚点使用 `titleGap=300`；分页节点以书架实心外框下沿为锚点使用 `indicatorGap=44`，不再把长投影当底边。只读 `FolderSceneMetrics` 仅输出整体 `uniformScale/translateX/translateY/safeClipRect`，OPPO PDCM00 1080×2400 输出 `1/0/0`。OPPO 已覆盖安装验证 12 宫格 3×4、20 宫格 4×5及两种模式下的打开文件夹，普通桌面无书架污染且无 `AndroidRuntime`；设备最终恢复为 12 宫格。
@@ -41,17 +45,17 @@
 
 - 2026-07-23 OPPO PDCM00 真机确认应用图标页原先因 `View.setTag(int, Object)` 传入系统 `android.R.id.*` 崩溃的问题已消失：改为 Adapter 内 `IconRowHolder` 保存 `boundOfficialKey`、`boundEffectiveKey` 与 `bindGeneration`，异步回调仅在键与 generation 同时匹配时局部更新。连续进入/返回 10 次、顶部到底部往返滚动 5 次均未见 Launcher 的 `IllegalArgumentException`、`View.setTag`、`VerifyError` 或 `AndroidRuntime` 崩溃。全局样式弹窗和单应用候选页均改走同一 Repository；最终覆盖安装日志保存为 `build/app_icon_final_log.txt`。
 
-- Android 8+ `REQUEST_PIN_SHORTCUT` 兼容链已完成本地构建级修复：确认原版 `DatabaseUpdater.Action.maa` 是静态字段，实际枚举为 `EVENT_INSTALL_OR_UPDATE_SHORTCUT`，不再错误地把 `maa` 当枚举名。桥接层在原版转换后恢复 `ShortcutInfo.getUserHandle().getIdentifier()` 到 `ItemInfo.userId`，并将原版 `QuickLaunchItem` 去重查询收紧为 `intent + user`；分身与主用户的相同 `packageName + shortcutId` 因而不会共用记录。快捷方式图标依次尝试原图、`LauncherApps`、原版默认、来源应用，并强制经过原版 `e.s.a(context, bitmap, packageName, userId)` 合成；合成失败不写入裸图标。确认页的二进制 Manifest 现强制使用原版框架 `Theme.Translucent.NoTitleBar`，不再继承原 `PinShortcutActivity` 的 no-display 窗口属性。构建、签名和最终二进制 Manifest 已验证。vivo X21A 已识别主用户与 `999` 分身用户且微信已安装，但新 APK 覆盖安装仍返回 `Failure [-200]`，尚未完成确认页、主微信/分身微信、支付宝及重启/删除矩阵真机验收，不能标记为完成。
+- Android 8+ `REQUEST_PIN_SHORTCUT` 兼容链继续复用 v1.5.5 已有实现：`ShortcutCompatBridge` 保留微信/支付宝提供方已经装饰好的快捷方式位图并标记 `smartisan.shortcut.final_icon`，`QuickLaunchItem.z()` 对该标记只序列化最终位图；其他普通快捷方式仍走原版 `d.j.o() -> e.s.a()` 合成。2026-08-02 曾在未完成真机闭环时删除这两处兼容路径，导致“请求已添加但桌面不显示”的回归，现已撤销。原版 `DatabaseUpdater.Action.maa -> EVENT_INSTALL_OR_UPDATE_SHORTCUT` 写库、profile 身份、数据库确认和失败回滚逻辑保持不变。恢复合并仍以普通应用既有身份、以及小程序的 `来源包名 + shortcutId + userSerial` 判重。主用户微信/支付宝需在本修复包上复测；分身用户若未安装 Launcher，系统无法跨用户解析确认 Activity，属于独立平台限制，不能用于否定主用户链路。
 
 - 2026-07-28 已进一步收敛 Android O+ PIN 快捷方式的“系统已 pinned、桌面无 Cell”不一致：OPPO PDCM00 日志确认微信分身 `u999` 的请求可被系统置为 pinned，但该 profile 无法解析 Launcher 的 `CONFIRM_PIN_SHORTCUT` Activity，故不会进入确认/落库；主用户请求则可进入 Activity。确认 Activity 已恢复“一请求一 Activity”模型（移除 `singleTop`、意图队列和 `onNewIntent` 复用，增加 `stateNotNeeded=true`），并恢复原版 DatabaseUpdater 参数约定的 `[QuickLaunchItem, Activity/Context]`。`EVENT_INSTALL_OR_UPDATE_SHORTCUT` 仍负责原版 Intent 维度 upsert；`request.accept()` 或反射返回不再视为提交成功，必须在有限轮次内查到原版快捷方式数据库行，否则仅解除本次 `packageName + shortcutId + user` 的 pin。Launcher 初始模型就绪后会在后台对已 pinned 快捷方式按 profile 对账，补建“pinned 存在、数据库缺失”的条目，不阻塞首帧。`PIN_*` 日志已分离 Activity、request、accept、入库派发、数据库确认、失败和回滚阶段。2026-07-28 已完成构建、签名、ADB 覆盖安装和 Launcher 重启；主/分身微信、支付宝、取消、删除后重加、杀进程/重启等真机矩阵尚未完成，不能标记为完全修复。
 
-- PIN 快捷方式删除与图标合成的本轮修复已完成构建级验证：系统卸载快速路径现在先按 `ItemInfo.itemType` 分流，`QuickLaunchItem(1)` 继续使用原版 `EVENT_UNINSTALL_SHORTCUT`，不会调用 `UninstallCompat` 卸载来源应用；删除后从启动 Intent 读取 `packageName + shortcutId + userSerial`，按真实 profile 解除该 pinned ID。微信和支付宝的 Android PIN 输入图标被视为已带来源装饰，只做透明边缘归一化而跳过第二次 `e.s.a()` 合成；其他快捷方式保持原版合成器和 `final_icon=true`。构建、签名通过；同一 vivo 覆盖安装仍为 `Failure [-200]`，删除/重启/主分身与单框视觉尚未真机验收。
+- PIN 快捷方式删除仍按 `ItemInfo.itemType` 分流，`QuickLaunchItem(1)` 继续使用原版 `EVENT_UNINSTALL_SHORTCUT`，不会调用 `UninstallCompat` 卸载来源应用；删除后从启动 Intent 读取 `packageName + shortcutId + userSerial`，按真实 profile 解除该 pinned ID。微信/支付宝的提供方装饰图标继续使用 v1.5.5 的 `final_icon` 直通，避免再次破坏已能添加和显示圆环的兼容链；其他 PIN 快捷方式只执行一次原版合成。删除/重启、主用户微信/支付宝及视觉一致性仍待本修复包真机验收。
 
 - 桌面设置“桌面设置”齿轮按钮高清物理纹理合成修复已完成：`Ec.wz()` 使用 `LayoutProperty.setting_button` 逻辑画布大小和 `NormalIconRasterSpec` 的 `rasterScale` 物理缩放比例合成 high-res 纹理。按下状态下支持 60 度齿轮旋转和内阴影，且在合成异常或未就绪时能够安全回退到原版低分辨率流程。2026-07-21 已在 12 宫格、20 宫格和主题切换等场景下通过打包、签名和 aapt 校验，真机回归及截图验证待进行。
 
 - 启动兼容性审计已完成首轮可执行收敛：`LauncherApplication -> ja -> Launcher -> J` 启动主链不再直接校验 `IActivityObserver`、`ActivityManagerNative`、`IWindowManager` 或 `SmtPCUtils` 的隐藏类型；锤子专属 Activity 观察、外接屏、全局动画缩放与锁屏位置查询均降级为不影响桌面启动的默认行为。`SmartisanInstallManager` 初始化或 `LauncherApps` 服务不可用时只禁用安装/下载协作功能并输出完整诊断，不中断 Application。2026-07-18 已在 Android 12 Google 模拟器完成覆盖安装、冷启动与首帧日志检查；小米、OPPO、vivo、三星、摩托罗拉、华为、一加及 Android 6/8/11/13/15/16 真机回归待验证。
 - SMEngine 动画推进已收敛为 `AnimationFrameRateController` 的稳定固定步长：默认 60fps，使用无分配 EMA 忽略首帧、恢复帧和大于 25ms 的异常长帧，连续 24 个稳定样本后按迟滞切换 60/90/120/144 档；`Eb.update()` 每帧只把 `20×60/effectiveRenderFps` 传给 `Ra.T()`，不追赶长帧。暂停、恢复和 Surface 重建均重置采样。确定性测试得到 60/90/120/144 对应 `20/13.333333/10/8.333333`，偶发 40ms 长帧不会改变 120 档；OPPO 当前仅能实测 60Hz，其他刷新率仍需真机矩阵。
-- 解锁触发链已恢复到 `V1.5.3` 标签对应的 `25d20c4c`：移除了 `UnlockAnimationCoordinator` 的 generation、提前 claim 与动画回调拦截。`ia` 重新按原始广播顺序处理，生命周期兜底恢复为 v1.5.3 的“真实熄屏确认 + 原始广播时间戳去重 + 原版 `action_keyguard_on`/`USER_PRESENT` 事件”。动画推进以同日 `AnimationFrameRateController` 的稳定固定步长结论为准；未恢复旧的真实长帧直接推进。触发链已构建并签名，锁屏/快速锁屏、90/120/144Hz和多ROM矩阵仍待验证。
+- 解锁触发链已恢复到 `V1.5.3` 标签对应的 `25d20c4c`：移除了 `UnlockAnimationCoordinator` 的 generation、提前 claim 与动画回调拦截。`ia` 重新按原始广播顺序处理，生命周期兜底恢复为 v1.5.3 的“真实熄屏确认 + 原始广播时间戳去重 + 原版 `action_keyguard_on`/`USER_PRESENT` 事件”。真实 `USER_PRESENT/action_keyguard_to_dismiss` 即使发生在设置 Activity 覆盖 Launcher 期间，也会先清除已经消费的 screen-off 标记；否则随后从设置返回 Home 会把陈旧标记误判为新解锁。动画推进以同日 `AnimationFrameRateController` 的稳定固定步长结论为准；未恢复旧的真实长帧直接推进。触发链已构建并签名，锁屏/快速锁屏、设置页返回、90/120/144Hz和多ROM矩阵仍待验证。
 
 - 2026-07-28 已将上滑搜索的数据源扩展到当前 Launcher 已固定的 PIN 小程序快捷方式；快捷方式使用 `packageName + shortcutId + user` 独立记录、匹配和启动，不与普通 Activity 搜索条目混用。构建通过但尚无设备完成“添加到桌面 → 搜索 → 启动”的真机闭环。应用图标的桌面、列表右侧预览和单应用顶部预览已继续收敛到同一有效来源解析；动态天气/日历的尺寸与阴影视觉仍待用户真机验收，未标记为已修复。
 - 构建产物为 `build\launcher-signed.apk`；构建、zipalign、v1/v2/v3 签名和 ADB 覆盖安装均已验证。
@@ -90,6 +94,42 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-08-03
+
+#### 搜索页常用应用的使用情况访问门控
+
+- “显示搜索页常用应用”现在独立复用角标提醒的权限门控逻辑：绑定设置项时先检查 `AppOpsManager.OPSTR_GET_USAGE_STATS`，没有使用情况访问权限时强制保持关闭，不提前写入开启值。
+- 用户点击开启且未授权时只显示锤子风格提示，并提供前往系统设置；取消、返回未授权或之后撤销权限都会保持/同步为关闭。只有从系统设置返回并确认权限已授予后，才写入开启值、更新开关状态并应用搜索页设置。
+- 搜索页本身不依赖该权限，未授权时仍可正常打开；权限仅用于按实际使用频率显示固定的 5 个常用应用。中英文提示资源已复用现有 `search_usage_access_*` 字符串。
+- `build.bat` 与 `git diff --check` 已通过；当前无在线 ADB，尚未完成 Android 8–16 真机权限授予、取消、撤销和返回场景矩阵。
+
+#### 备份恢复与小程序快捷方式图标隔离
+
+- 根因收敛：恢复会重建 `table_iteminfos/table_icons`，而旧备份或缺失的 `shortcuts.json` 没有逐快捷方式位图；随后桌面重新加载时只能从来源应用回退，表现为微信头像/失去圆环。普通改进版图标刷新本身只查询 `itemType=0`，但恢复前没有保留旧快捷方式缓存，导致兼容边界不完整。
+- 修复：恢复事务删除数据库前按“来源包名 + shortcutId + userSerial”暂存当前 `QuickLaunchItem(itemType=1)` 的 `table_icons` BLOB；恢复优先使用备份中的逐快捷方式记录，旧备份或记录缺失时按稳定身份回填当前原始位图。改进版图标恢复后仅对已有本地资源主动刷新普通应用，快捷方式仍由原版最终位图链路消费。
+- 验证：`build.bat` 完整构建、重打包、对齐和签名成功；`git diff --check` 通过。当前 ADB 无在线设备，尚未完成真机备份/恢复与动态图标切换截图回归。
+
+#### 备份目录选择器与设置项默认值
+
+- 备份位置和恢复来源现在共用锤子风格的双选项对话框：中间选择“使用手机系统目录”或“使用应用专用目录”，默认系统目录；底部固定为“取消 / 确定”。确认系统目录后才启动存储权限和 DocumentsUI，确认应用目录后分别进入应用备份记录或应用专用备份流程。
+- 新安装或缺少历史键时，“显示搜索页常用应用”和“解锁动画”均默认关闭；已有用户显式保存的开关值不被覆盖。中英文资源均已补齐。
+- `build.bat` 和 `git diff --check` 已通过；当前无在线 ADB 设备，未完成真机对话框截图和 Android 8–16 矩阵验证。
+- 选项行改为独立的圆点控件与文字横向布局，增加与正文一致的左侧内边距，避免圆点贴近弹窗边缘；备份行为和默认值不变。
+- 目录选择弹窗已拆到 `MaintainedBackupStorageDialog.java`，宿主仅保留入口和备份/恢复回调；选择圆点改为固定颜色和线宽的轻量自绘控件，避免不同 ROM 的原生 RadioButton 样式漂移。宿主减少约 77 行，完整构建通过。
+- 复测发现上一版将 66dp 误用于左侧内缩，导致高密度设备圆点偏右；现改为 11dp 行内边距 + 30dp 圆点容器，使圆点中心与正文 26dp 起始线一致。
+
+### 2026-08-02
+
+#### PIN 小程序图标、恢复去重与冷重载白闪
+
+- **跨 Launcher 残留 pin 边界（OPPO Android 12 真机）**：用户复测出现“新小程序可以弹窗并显示、以前添加过但当前桌面已无图标的小程序不再弹窗”。`dumpsys shortcut` 确认当前默认桌面及 shortcut access 均为 `com.smartisanos.launcher`；新成功的小程序 ID 归 Smartisan Launcher，而两个旧 ID 仍归 `com.android.launcher`。Android 只允许当前 Launcher 查询和维护属于自己的 pinned IDs，`LauncherApps.getShortcuts(FLAG_MATCH_PINNED)` 因此只返回新成功的 1 项；旧系统桌面残留的两个 ID 不会进入 Smartisan 的确认 Activity、回调或对账链。不得把这种跨 Launcher 所有权残留误判为 `QuickLaunchItem`、圆环合成或数据库补建失败，也不得通过清空微信全部 shortcuts、清除系统桌面数据等破坏性方式静默修复。安全恢复需要旧 Launcher 主动解除对应 pin，或由用户明确授权清理系统 ShortcutService 中微信的旧 shortcut 状态。
+- **搜索页常用应用与使用情况访问**：恢复原版搜索栏与“搜索历史”之间的应用入口，但不恢复旧版一次创建最多 20 项、滚动吸附和延迟 Runnable 的实现。继续复用既有后台 `loadSearchEntries()` 与 `searchShortcut()`；数据到达后在固定单行只生成 5 个不同包名的普通应用，优先读取系统过去 30 天的前台使用时长，不使用搜索历史排序。强迫症选项中“上滑打开搜索页”下新增独立的“显示搜索页常用应用”开关；关闭后不创建该行。APK 已有 `PACKAGE_USAGE_STATS` 声明但没有可自动授予的运行时权限：当用户打开搜索页或常用应用开关、且常用应用已启用而 Usage Access 未授予时，显示现有锤子样式确认框；只有用户点“去设置”才启动系统 `ACTION_USAGE_ACCESS_SETTINGS`，取消不会阻断搜索。ROM 未向 Launcher 授予 UsageStats 时仍安全回退为稳定名称顺序；不联网、不在主线程扫描/解码。
+- **【已废弃】删除 v1.5.5 `final_icon` 直通、强制所有 PIN 快捷方式重新经过原版合成的试验方案。**
+- **当前修复**：用户复测确认该试验会让新添加快捷方式完全不显示，而 v1.5.5 可以添加并显示圆环。现恢复 v1.5.5 的位图归一化、微信/支付宝提供方装饰识别和 `final_icon` 序列化路径；保留后来增加的请求确认、profile 身份、数据库落库确认与失败回滚，不回退其他 PIN 兼容修复。
+- **恢复去重**：`RestoreMergePlanner` 以前只认识 `shortcut_id/shortcutId`，遗漏了当前兼容 Intent 的 `smartisan.shortcut.id`，并对完整 Intent 做哈希；因此同一个小程序被当作“当前新增条目”保留后，又从备份恢复一次。现在解析兼容 Intent，按 `来源包名 + shortcutId + userSerial` 生成稳定键；普通应用仍按既有组件键处理。备份中已有的普通应用/同一小程序不会再把当前同一项附加回去。
+- **逐帧证据与白闪修复**：用户提供的 720×1600、约 46fps、1.834s 视频共抽取 84 帧；第 34 帧（约 0.72s）左侧 `0–63px` 出现约 99% 高亮的系统启动窗口残片，下一帧已进入黑色加载面。根因是私有 `:reload` Activity 的系统预览仍为白色 `Theme.NoTitleBar.Fullscreen`，而 Java 仅在 `onCreate()` 后设黑。文本 Manifest 和实际注入的二进制 Manifest 均改为 Android 公共 `Theme.Black.NoTitleBar.Fullscreen`（`@0x0103000a`），与现有黑色 Loading 根一致；未改变 token、旧 PID、首帧握手、Loading 布局或任一动画时长。
+- **验证与风险**：`build.bat` 完整通过；最终 `build\\launcher-signed.apk` 为 `v1.5.5/30`，`aapt2 dump xmltree` 确认 `ReloadTransitionActivity` 的二进制 theme 为 `@0x0103000a`，`apksigner` v1/v2/v3 验证通过。尚未在已连接设备执行实际恢复（会改写用户当前桌面），因此小程序圆环、同一小程序恢复不重复和白闪消失仍需在该 APK 上完成一次真实恢复验收。
+
 ### 2026-08-01
 
 #### 关于页：移除操作日志并新增使用小技巧
@@ -104,6 +144,7 @@
 - **修复**：页表改为以原版 SQLite 主键 `_id` 做唯一性校验，保留原始 `pageIndex/status/containment`；恢复校验同样只验证 `_id`，新增保留应用时按实际已使用的根级页追加，并为真正新增页分配新的 `_id`。布局快照继续按原版列白名单读写 `table_pageinfos.pageTitle` 和 `table_iteminfos.title`，所以页面分组标题、文件夹标题、文件夹内容及位置会一起轮转。预览的“桌面板块数量”改为实际含根级内容的页面数，不再显示页表预分配容量。
 - **界面**：首页入口移到“设置默认桌面”下、“关于我们”上；管理页去除手工 `>`，统一使用 `setting_next`，标题和右侧值采用一级设置的字号/颜色，右侧值与箭头留出固定但紧凑的间距，标题会自动让位。已选择的 SAF 目录显示其 document-id 路径（如 `/Download/LauncherBackup`），而不是泛化的“已选择目录”；这不是假定存在可访问的真实文件系统路径。恢复预览页同步使用相同的行高、字重、颜色和卡片宽度。说明明确列出会备份的页面/文件夹/位置/设置/主题/名称/图标，以及不会备份的壁纸、应用数据、账户、权限、默认桌面、密码、天气缓存和定位信息。
 - **进度与恢复**：备份、校验和恢复均继续复用 `SmartisanProgressDialog` 显示阶段状态；恢复确认后仍走既有 `:reload` 冷重载，桌面首帧后再结束过渡，备份本身不重载桌面。
+- **恢复结果与图标**：恢复成功、撤销成功或自动回滚均在新桌面真实首帧后通过原版 `Bb` / `ToastSmt` 底部轻提示立即显示；恢复准备阶段的失败也直接使用同一提示，不再把结果暂存到下次进入“桌面备份与恢复”页面后弹出大对话框。备份会保存全局图标来源、已选图标包、单应用图标模式及自定义 PNG，但不打包可再下载的在线改进图标缓存；恢复到“改进版图标”后，首帧可见再以既有后台下载队列补齐缺失缓存，保留自定义、资源、图标包和系统原图选择，不在主线程、恢复校验或首帧中联网/解码。
 - **验证边界**：用户提供的 vivo X21A Android 9 截图已显示 2026-08-01 的成功备份、恢复预览和可撤销状态；本地 `build.bat` 和 Android 17 模拟器覆盖安装通过。Android 12 及 Android 8/10/11/13–16 的真实 SAF Provider、恢复、撤销、杀进程恢复仍需逐机复测，不能用单机成功代替全机型承诺。
 
 #### 移除 Shizuku 默认桌面通道
@@ -301,7 +342,7 @@
 
 - **删除分流与去重图标修复（2026-07-23）**：`na.run()` 的普通 Android `UninstallCompat.requestUninstall(packageName)` 快速路径此前只判断单项删除和包名，错误拦截了 `itemType=1` 的 `QuickLaunchItem`，所以拖入微信/支付宝小程序会打开来源应用卸载器。现先检查 `itemType`：只有普通应用（`0`）仍走系统卸载；快捷方式回到原版确认与 `ia -> DatabaseUpdater.Action.naa -> F.b()` 链。快捷方式确认文案改为“删除快捷方式 / 是否删除“名称”？ / 删除”，普通应用既有文案和系统卸载入口未改。
 - **原版删除与 unpin**：`ia` 原有 `naa`（`EVENT_UNINSTALL_SHORTCUT`）分发完成后才调用桥接日志/unpin helper；helper 从当前项目 Intent 读取 package、shortcut ID、user serial，以 `UserManager.getUserForSerialNumber()` 恢复真实 profile（仅 item userId 与进程主用户相同才允许主用户 fallback），读取 pinned 列表、仅移除当前 ID，再写回剩余 IDs。unpin 失败只记录 `SHORTCUT_UNPIN_FAILED`，不回滚已完成的本地删除，也不会触发来源应用卸载。
-- **图标**：微信、支付宝 PIN 输入图标已携带来源框/角标，桥接层记录 `SHORTCUT_ICON_FINAL_MODE mode=source_already_decorated` 后直接保存归一化位图，避免第二次 `e.s.a()`；普通快捷方式仍走原版 `e.s.a()`。`smartisan.shortcut.final_icon=true` 继续写入，因此恢复链不应再次套框。
+- **【已废弃】快捷方式图标的来源已装饰、`final_icon` 直通与跳过原版合成方案。**
 - **验证**：`build.bat` 成功完成 Smali、Java compatibility host、二进制 Manifest 注入、zipalign 和签名；`apksigner verify --verbose` 确认 v1/v2/v3。vivo X21A 在线，但安全的 `adb install -r build\\launcher-signed.apk` 仍返回 `Failure [-200]`；未卸载、未清数据，故未获得删除、unpin、主/分身隔离、普通应用卸载回归及微信/支付宝单框的真机证据。
 
 - **确认页生命周期崩溃修复（2026-07-23）**：真机日志已确认崩溃发生在 `PIN_SHORTCUT_DIALOG_SHOWN` 之后、任何 `accept()`、用户解析、图标合成和数据库调用之前：`PinShortcutConfirmActivity did not call finish() prior to onResume() completing`。根因是 `tools/patch_pin_shortcut_manifest.py` 只把原版 no-display `PinShortcutActivity` 改名，却保留其不可显示窗口属性；新的确认页需要承载 `AlertDialog`。补丁脚本现在读取/覆盖已有 `android:theme`，或在缺失时追加 typed reference `0x01/0x01030010`（`@android:style/Theme.Translucent.NoTitleBar`）。未修改 `ShortcutCompatBridge`、`DatabaseUpdater`、`QuickLaunchItem`、分身身份/图标框或 `ShortcutLaunchActivity`。
@@ -309,7 +350,7 @@
 
 - **根因**：兼容桥接层此前将原版 `DatabaseUpdater.Action.maa` 当作枚举名传给 `Enum.valueOf()`；而 `maa` 实际为静态字段，指向 `EVENT_INSTALL_OR_UPDATE_SHORTCUT`，因此确认页 `accept()` 即使成功，桌面数据库派发仍会失败。原版 `d.j.c()` 转换快捷方式时还会把 `ItemInfo.userId` 重置为 `-1`，会破坏分身身份；原图为空时也没有完整复用原版快捷方式图标框路径。
 - **修复**：`ShortcutCompatBridge` 反射读取 `maa` 字段并校验其枚举名/ordinal 后，继续调用原版 `F.b(action, null, items)`，不重建 Model、PageView 或数据库写入。转换完成后从 `ShortcutInfo.getUserHandle()` 读取 identifier，写回 `ItemInfo.userId`，并记录 `SHORTCUT_USER_RESOLVED`。原版 `QuickLaunchItem` 插入前去重原本只按 Intent，因此仅在该快捷方式入口将查询收紧为 `intent + user`，并保持普通应用的通用去重不变；数据库保存链同时持久化 `user` 与 `shortcutId`。`ShortcutLaunchActivity` 保持以 `UserManager.getUserForSerialNumber(userSerial)` 恢复句柄，分身记录不允许退回 `Process.myUserHandle()`。
-- **图标**：依次使用快捷方式原图、`LauncherApps.getShortcutIconDrawable()`、原版 `contact_shortcut`、来源应用图标；得到位图后必须经原版 `e.s.a(context, normalizedBitmap, packageName, userId)` 合成。包名分别记录 `wechat_shortcut`、`alipay_shortcut` 或 `contact_shortcut`，合成返回空时拒绝创建，避免分身微信写入裸图标或主微信应用图标。
+- **【已废弃】快捷方式图标归一化后由桥接层提前合成的方案。**
 - **验证**：`build.bat` 已通过 apktool、Java 宿主编译、二进制 Manifest 注入及 v1/v2/v3 签名；`aapt2 dump badging` 确认产物为 `com.smartisanos.launcher`、versionCode `29`、versionName `v1.5.4`，最终 Manifest 含导出的 `PinShortcutConfirmActivity`、`CONFIRM_PIN_SHORTCUT` 过滤器和非导出的 `ShortcutLaunchActivity`。`git diff --check` 通过。
 - **真机状态与风险**：ADB 可见 vivo X21A、主用户 `0` 和分身用户 `999`，且已安装 `com.tencent.mm`；对新 `build\\launcher-signed.apk` 执行覆盖安装被系统拒绝，返回 `Failure [-200]`。因此未在新代码上验证主/分身同一小程序可同时存在、各自启动、重启保留、独立删除/更新，也未验证支付宝图标框。不得把本项宣布为真机完成。
 
@@ -383,7 +424,7 @@
 - **根因与边界**：原版现代 `CONFIRM_PIN_SHORTCUT` 入口由 `PinShortcutActivity` 转交 `d/e` 悬浮 Dialog；该 Dialog 调用 `window.setType(0x7f6)`（`TYPE_APPLICATION_OVERLAY`），且原 Activity 随后立即 `finish()`。普通 Android 非特权 Launcher 不能可靠显示该窗口，异常被旧链吞掉时不会执行 `PinItemRequest.accept()` 或原版数据库安装动作。旧 `INSTALL_SHORTCUT` / `UNINSTALL_SHORTCUT` 仍由 `LauncherReceiver -> L -> DatabaseUpdater` 处理，本轮未改动。
 - **现代入口**：最终二进制 Manifest 只保留 `PinShortcutConfirmActivity` 作为 exported 的 `CONFIRM_PIN_SHORTCUT` 接收者；其 Activity Window 承载原版资源标题、文案和确定/取消按钮，不依赖悬浮窗权限或 2038。Activity 对每个 `packageName|shortcutId|userSerial` 请求串行确认，取消/返回不 accept，确定时先构造完整项目、再 exactly-once `accept()`，成功后才提交原版 `DatabaseUpdater$Action.maa`。
 - **持久化与启动**：现代项目仍使用原版 `QuickLaunchItem`、数据库写入和受影响页面更新链。保存的 Intent 不保存小程序 URL 或参数，只保存 `smartisan.shortcut.package`、`smartisan.shortcut.id`、`smartisan.shortcut.user_serial`，并通过内部 `ShortcutLaunchActivity -> LauncherApps.startShortcut()` 启动。仅明确标记为主用户的无 serial 项允许回退到 `Process.myUserHandle()`；不能把未知 profile 启动到主用户。
-- **图标**：添加阶段仅标准化内部图标的 Alpha 有效边界、等比居中到原版 LayoutProperty 画布，再调用原版 `e/s.a()` 合成一次专属外框。已恢复当前代码缺失、但 clean 原版保留的 `com.tencent.mm -> wechat_shortcut` 分支；支付宝继续使用 `alipay_shortcut`。带 `smartisan.shortcut.final_icon` 标记的 `QuickLaunchItem` 数据库恢复直接使用最终 Bitmap，避免再次套框或阴影；普通应用/应用分身现有图标链未修改。
+- **【已废弃】快捷方式图标 Alpha 裁切、提前合成与 `final_icon` 数据库直通方案。**
 - **兼容层限制**：Java compatibility host 的编译 classpath 不可静态引用原始 APK Dex 中的混淆类，因此仅通过已核对的反射入口调用 `d/k -> d/j.c -> QuickLaunchItem`、`e/s.a()` 与 `F.b(DatabaseUpdater$Action.maa, ...)`；没有新增第二套数据库、Model 或页面插入逻辑。
 - **验证**：`build.bat` 成功；Java compatibility host 已编译并注入 `classes2.dex`；`apksigner verify --verbose` 确认 v1/v2/v3；最终 APK 二进制 Manifest 确认仅有 `PinShortcutConfirmActivity` 接收 `CONFIRM_PIN_SHORTCUT`，并保留 `LauncherReceiver` 的 `INSTALL_SHORTCUT` / `UNINSTALL_SHORTCUT` 以及内部 `ShortcutLaunchActivity`。当前无 ADB 设备，尚未取得微信、支付宝实际使用 PIN 或 legacy 协议的日志，也未执行添加、取消、重复、删除、主题/在线图标刷新、分身及多用户真机回归。
 

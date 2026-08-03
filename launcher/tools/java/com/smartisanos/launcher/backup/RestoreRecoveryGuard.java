@@ -31,8 +31,6 @@ public final class RestoreRecoveryGuard {
                     || entry.state == RestoreOperationJournal.State.CLEANING) {
                 BackupFileUtils.deleteRecursively(new File(entry.stagingPath));
                 journal.reset();
-                context.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
-                        .putString("pending_restore_message", "RESTORE_COMPLETE").commit();
                 return;
             }
             if (entry.state == RestoreOperationJournal.State.ROLLED_BACK) {
@@ -47,11 +45,13 @@ public final class RestoreRecoveryGuard {
             }
             journal.reset();
             context.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
-                    .putString("pending_restore_message", "RESTORE_RECOVERY_ROLLED_BACK").commit();
+                    .putString("pending_restore_toast", "RESTORE_RECOVERY_ROLLED_BACK").commit();
             Log.i(TAG, "RECOVERY_ROLLBACK_COMPLETE");
         } catch (Throwable error) {
             journal.write(entry, RestoreOperationJournal.State.ROLLING_BACK,
                     "RESTORE_ROLLBACK_FAILED");
+            context.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
+                    .putString("pending_restore_toast", "RESTORE_ROLLBACK_FAILED").commit();
             Log.e(TAG, "RECOVERY_FAILED", error);
         }
     }

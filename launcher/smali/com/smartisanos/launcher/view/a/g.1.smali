@@ -16798,6 +16798,22 @@
     goto :goto_0
 
     :cond_codex_normal_icon
+    # itemType=1 is QuickLaunchItem. Its iconRawData is the provider's final
+    # shortcut artwork (including the original Smartisan ring/frame), not the
+    # host application's icon. Never send it through the managed app-icon path.
+    iget-object v5, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
+
+    iget-byte v5, v5, Lcom/smartisanos/launcher/data/ItemInfo;->itemType:B
+
+    const/4 v6, 0x1
+
+    if-ne v5, v6, :cond_codex_managed_static_icon
+
+    move-object v1, v0
+
+    goto :goto_0
+
+    :cond_codex_managed_static_icon
     iget-object v2, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
     iget-object v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;

@@ -34,7 +34,7 @@ def main():
     affinity_attr = index("taskAffinity")
     orientation_attr = index("screenOrientation")
     activity_value = index(ACTIVITY)
-    theme_value = index("@android:style/Theme.NoTitleBar.Fullscreen")
+    theme_value = index("@android:style/Theme.Black.NoTitleBar.Fullscreen")
     process_value = index(":reload")
     affinity_value = index("com.smartisanos.launcher.reload")
     false_value = index("false")
@@ -79,20 +79,26 @@ def main():
                 attrs = pos + 36
                 is_reload = False
                 has_orientation = False
+                attrs_copy = []
                 for offset in range(count):
                     attr = attrs + offset * 20
                     if u32(rebuilt, attr + 4) == name_attr and u32(rebuilt, attr + 16) == activity_value:
                         is_reload = True
                     if u32(rebuilt, attr + 4) == orientation_attr:
                         has_orientation = True
+                    if u32(rebuilt, attr + 4) == theme_attr:
+                        attrs_copy.append(attribute(android_ns, theme_attr, theme_value, 0x01, 0x0103000A))
+                    else:
+                        attrs_copy.append(bytes(rebuilt[attr:attr + 20]))
                 if is_reload:
                     activity_at = pos
                     if not has_orientation:
-                        attrs_copy = [bytes(rebuilt[attrs + offset * 20:attrs + (offset + 1) * 20])
-                                     for offset in range(count)]
                         replacement = start_element(activity_tag, attrs_copy + [
                             attribute(android_ns, orientation_attr, portrait_value, 0x10, 1),
                         ], u32(rebuilt, pos + 8))
+                        rebuilt[pos:pos + chunk_size] = replacement
+                    else:
+                        replacement = start_element(activity_tag, attrs_copy, u32(rebuilt, pos + 8))
                         rebuilt[pos:pos + chunk_size] = replacement
                     break
             if chunk_size < 8:
