@@ -74,6 +74,7 @@ public final class SmartisanInstallManager {
             0L, 100L, 250L, 500L, 1000L, 2000L, 4000L
     };
     private static final long PACKAGE_READY_PENDING_NOTICE_MS = 12000L;
+    private static final long[] REMOVAL_VERIFY_DELAYS_MS = {500L, 1500L, 3000L};
     private static final String PENDING_PREFS = "smartisan_install_pending_v2";
     private static final String PENDING_EVENTS = "events";
     private static final String BASELINE_TIME = "baseline_time";
@@ -88,6 +89,8 @@ public final class SmartisanInstallManager {
     private static final Map<String, Long> DISPLAY_START_TIMES = new HashMap<String, Long>();
     private static final Map<String, PendingPackageEvent> PENDING_PACKAGE_EVENTS =
             new HashMap<String, PendingPackageEvent>();
+    private static final Map<String, PendingRemovalEvent> PENDING_REMOVALS =
+            new HashMap<String, PendingRemovalEvent>();
     private static boolean sStarted;
     private static boolean sModelReady;
     private static boolean sLauncherAppsRegistered;
@@ -154,9 +157,17 @@ public final class SmartisanInstallManager {
             return;
         }
         String packageName = intent.getData().getSchemeSpecificPart();
+        int eventUserId = intent.getIntExtra("android.intent.extra.user_handle", -1);
+        if (eventUserId < 0) {
+            int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
+            if (uid >= 0) {
+                eventUserId = userIdForUid(uid);
+            } else {
+                eventUserId = 0;
+            }
+        }
         enqueuePackageEvent(context, packageName, intent.getAction(),
-                intent.getBooleanExtra(Intent.EXTRA_REPLACING, false),
-                intent.getIntExtra("android.intent.extra.user_handle", 0), "manifest");
+                intent.getBooleanExtra(Intent.EXTRA_REPLACING, false), eventUserId, "manifest");
     }
 
     /** J.MESSAGE_COMPLETE: the original model has accepted its initial database state. */
@@ -343,7 +354,7 @@ public final class SmartisanInstallManager {
                         enqueuePackageEvent(context, pkg, Intent.ACTION_PACKAGE_ADDED,
                                 false, 0, "package_installer");
                     } else {
-                        onPackageRemoved(context, pkg, "package_installer_failed");
+                        clearFailedInstallPlaceholder(context, pkg, "package_installer_failed");
                     }
                 }
             }, sWorkerHandler == null ? new Handler(Looper.getMainLooper()) : sWorkerHandler);
@@ -377,7 +388,8 @@ public final class SmartisanInstallManager {
                             false, userId(user), "launcher_apps");
                 }
                 @Override public void onPackageRemoved(String packageName, UserHandle user) {
-                    SmartisanInstallManager.onPackageRemoved(context, packageName, "launcher_apps");
+                    SmartisanInstallManager.onPackageRemoved(context, packageName,
+                            userId(user), "launcher_apps");
                 }
                 @Override public void onPackagesAvailable(String[] packages, UserHandle user,
                                                           boolean replacing) {
@@ -677,10 +689,19 @@ public final class SmartisanInstallManager {
         }, delayMs + 3000L);
     }
 
-    private static void failOrRemove(Context context, String pkg) {
-        removeDownloadCell(context, pkg);
-        notifyOriginalPackageRemoved(pkg);
-        MaintainedLauncherSettingsHost.clearCachedImprovedIcon(context, pkg);
+    private static void clearFailedInstallPlaceholder(Context context, String pkg,
+                                                      String source) {
+        Log.i(TAG, "INSTALL_SESSION_FAILED_PLACEHOLDER_ONLY pkg=" + pkg
+                + " source=" + source + " decision=retain_formal_app");
+        // A failed PackageInstaller session is not an uninstall.  Only touch the
+        // original temporary download row when this package was actually tracked
+        // by the download pipeline; never synthesize a remove for a normal app.
+        if (hasDownloadPlaceholder(context, pkg)) {
+            removeDownloadCell(context, pkg);
+        } else {
+            Log.i(TAG, "INSTALL_SESSION_FAILED_PLACEHOLDER_ONLY pkg=" + pkg
+                    + " placeholderPresent=false");
+        }
         forgetDisplay(null, pkg);
     }
 
@@ -695,7 +716,7 @@ public final class SmartisanInstallManager {
             com.smartisanos.home.settings.icons.IconPackManager.invalidateIconPackList();
         } catch (Throwable ignored) {}
         if (Intent.ACTION_PACKAGE_REMOVED.equals(action) && !replacing) {
-            onPackageRemoved(context, packageName, source);
+            onPackageRemoved(context, packageName, userId, source);
             return;
         }
         if (!Intent.ACTION_PACKAGE_ADDED.equals(action)
@@ -723,15 +744,173 @@ public final class SmartisanInstallManager {
     }
 
     private static void onPackageRemoved(Context context, String packageName, String source) {
+        onPackageRemoved(context, packageName, 0, source);
+    }
+
+    private static void onPackageRemoved(Context context, String packageName, int userId,
+                                         String source) {
         if (TextUtils.isEmpty(packageName)) {
             return;
         }
+        String key = removalKey(packageName, userId);
         synchronized (LOCK) {
-            PENDING_PACKAGE_EVENTS.remove(packageName);
+            if (PENDING_REMOVALS.containsKey(key)) {
+                Log.i(TAG, "REMOVE_EVENT_DEDUPED pkg=" + packageName + " user=" + userId
+                        + " source=" + source);
+                return;
+            }
+            PendingPackageEvent pending = PENDING_PACKAGE_EVENTS.get(packageName);
+            if (pending != null && (userId < 0 || pending.userId == userId)) {
+                PENDING_PACKAGE_EVENTS.remove(packageName);
+            }
+            PENDING_REMOVALS.put(key, new PendingRemovalEvent(packageName, userId, source));
         }
         persistPendingEvents(context);
-        Log.i(TAG, "INSTALL_EVENT_REMOVED pkg=" + packageName + " source=" + source);
-        failOrRemove(context, packageName);
+        Log.i(TAG, "REMOVE_EVENT_RECEIVED pkg=" + packageName + " user=" + userId
+                + " source=" + source + " replacing=false");
+        scheduleRemovalVerification(context, key, 0);
+    }
+
+    private static void scheduleRemovalVerification(final Context context, final String key,
+                                                     final int attempt) {
+        Handler handler = sWorkerHandler;
+        if (handler == null) {
+            Log.w(TAG, "REMOVE_VERIFY_QUERY_FAILED key=" + key + " reason=no_worker");
+            return;
+        }
+        long delay = attempt < REMOVAL_VERIFY_DELAYS_MS.length
+                ? REMOVAL_VERIFY_DELAYS_MS[attempt] : 0L;
+        handler.postDelayed(new Runnable() {
+            @Override public void run() {
+                verifyPendingRemoval(context, key, attempt);
+            }
+        }, delay);
+        Log.i(TAG, "REMOVE_VERIFY_SCHEDULED key=" + key + " attempt=" + attempt
+                + " delayMs=" + delay);
+    }
+
+    private static void verifyPendingRemoval(Context context, String key, int attempt) {
+        PendingRemovalEvent event;
+        synchronized (LOCK) {
+            event = PENDING_REMOVALS.get(key);
+        }
+        if (event == null) {
+            return;
+        }
+        int state = packagePresence(context, event.packageName, event.userId);
+        Log.i(TAG, "REMOVE_VERIFY_BEGIN pkg=" + event.packageName + " user=" + event.userId
+                + " attempt=" + attempt + " state=" + state);
+        if (state == 0) {
+            Log.i(TAG, "REMOVE_ABORTED_APP_STILL_INSTALLED pkg=" + event.packageName
+                    + " user=" + event.userId + " attempt=" + attempt);
+            finishPendingRemoval(context, key, false);
+            enqueuePackageEvent(context, event.packageName, Intent.ACTION_PACKAGE_CHANGED,
+                    false, event.userId, "removal_abort_refresh");
+            return;
+        }
+        if (state < 0 && attempt + 1 < REMOVAL_VERIFY_DELAYS_MS.length) {
+            Log.w(TAG, "REMOVE_VERIFY_QUERY_FAILED pkg=" + event.packageName
+                    + " user=" + event.userId + " attempt=" + attempt);
+            scheduleRemovalVerification(context, key, attempt + 1);
+            return;
+        }
+        if (state < 0) {
+            Log.w(TAG, "REMOVE_ABORTED_QUERY_UNKNOWN pkg=" + event.packageName
+                    + " user=" + event.userId + " decision=retain");
+            finishPendingRemoval(context, key, false);
+            return;
+        }
+        Log.i(TAG, "REMOVE_CONFIRMED pkg=" + event.packageName + " user=" + event.userId
+                + " attempt=" + attempt);
+        finishPendingRemoval(context, key, true);
+        removeConfirmedInstalledApp(context, event.packageName, event.userId);
+    }
+
+    /** Returns 1=absent, 0=present, -1=unknown. Unknown never authorizes deletion. */
+    private static int packagePresence(Context context, String packageName, int userId) {
+        if (context == null || TextUtils.isEmpty(packageName)) return -1;
+        try {
+            if (userId == 0) {
+                PackageManager pm = context.getPackageManager();
+                pm.getPackageInfo(packageName, 0);
+                Intent intent = new Intent(Intent.ACTION_MAIN);
+                intent.addCategory(Intent.CATEGORY_LAUNCHER);
+                intent.setPackage(packageName);
+                List matches = pm.queryIntentActivities(intent, 0);
+                int activityCount = matches == null ? 0 : matches.size();
+                Log.i(TAG, "REMOVE_VERIFY_PACKAGE_PRESENT pkg=" + packageName + " user=0"
+                        + " activityCount=" + activityCount + " installed=true");
+                return 0;
+            }
+            if (Build.VERSION.SDK_INT < 21) return -1;
+            LauncherApps apps = (LauncherApps) context.getSystemService(
+                    Context.LAUNCHER_APPS_SERVICE);
+            if (apps == null) return -1;
+            UserHandle profile = userHandleForId(userId);
+            if (profile == null) return -1;
+            List activities = apps.getActivityList(packageName, profile);
+            // A profile package with no visible launcher entry is not safe to delete:
+            // it may be paused, unavailable or still being updated.
+            if (activities != null && !activities.isEmpty()) {
+                Log.i(TAG, "REMOVE_VERIFY_ACTIVITY_PRESENT pkg=" + packageName + " user="
+                        + userId + " activityCount=" + activities.size());
+                return 0;
+            }
+            try {
+                context.getPackageManager().getPackageInfo(packageName, 0);
+                return -1;
+            } catch (PackageManager.NameNotFoundException missingFromDevice) {
+                return 1;
+            }
+        } catch (PackageManager.NameNotFoundException missing) {
+            return 1;
+        } catch (Throwable error) {
+            Log.w(TAG, "REMOVE_VERIFY_QUERY_FAILED pkg=" + packageName + " user=" + userId
+                    + " type=" + error.getClass().getSimpleName(), error);
+            return -1;
+        }
+    }
+
+    private static void finishPendingRemoval(Context context, String key, boolean confirmed) {
+        synchronized (LOCK) {
+            PENDING_REMOVALS.remove(key);
+        }
+        persistPendingEvents(context);
+    }
+
+    private static String removalKey(String packageName, int userId) {
+        return packageName + "#" + userId;
+    }
+
+    private static void removeConfirmedInstalledApp(Context context, String packageName,
+                                                     int userId) {
+        Log.i(TAG, "REMOVE_DATABASE_BEGIN pkg=" + packageName + " user=" + userId);
+        if (userId == 0) {
+            notifyOriginalPackageRemoved(packageName);
+            MaintainedLauncherSettingsHost.clearCachedImprovedIcon(context, packageName);
+        } else {
+            notifyOriginalUserPackageRemoved(packageName, userId);
+        }
+        forgetDisplay(null, packageName);
+        Log.i(TAG, "REMOVE_DATABASE_COMPLETE pkg=" + packageName + " user=" + userId);
+    }
+
+    private static void notifyOriginalUserPackageRemoved(String packageName, int userId) {
+        UserHandle user = userHandleForId(userId);
+        if (user == null) {
+            Log.w(TAG, "REMOVE_DATABASE_SKIPPED pkg=" + packageName + " user=" + userId
+                    + " reason=user_handle_unavailable");
+            return;
+        }
+        try {
+            Class<?> cls = Class.forName("com.smartisanos.launcher.c.a");
+            Method method = cls.getMethod("onPackageRemoved", String.class, UserHandle.class);
+            method.invoke(null, packageName, user);
+        } catch (Throwable error) {
+            // Never fall back to Aa.D here: it is a package-wide main-user delete.
+            Log.w(TAG, "REMOVE_DATABASE_FAILED pkg=" + packageName + " user=" + userId
+                    + " reason=profile_callback", error);
+        }
     }
 
     private static void processPendingEvents(final Context context, String trigger) {
@@ -891,6 +1070,16 @@ public final class SmartisanInstallManager {
         deletePendingIcon(context, pkg);
     }
 
+    private static boolean hasDownloadPlaceholder(Context context, String pkg) {
+        synchronized (LOCK) {
+            if (DISPLAY_START_TIMES.containsKey(pkg) || PACKAGE_DISPLAY_PACKAGES.containsKey(pkg)
+                    || PENDING_LABEL_PACKAGES.containsValue(pkg)) {
+                return true;
+            }
+        }
+        return hasPendingIcon(context, pkg);
+    }
+
     private static void rememberDisplayStart(String displayPkg) {
         if (TextUtils.isEmpty(displayPkg)) {
             return;
@@ -1005,7 +1194,9 @@ public final class SmartisanInstallManager {
             Class<?> cls = Class.forName("com.smartisanos.launcher.Aa");
             Method method = cls.getMethod("D", String.class);
             method.invoke(null, pkg);
-        } catch (Throwable ignored) {
+        } catch (Throwable error) {
+            Log.w(TAG, "REMOVE_DATABASE_FAILED pkg=" + pkg + " user=0 reason=main_callback",
+                    error);
         }
     }
 
@@ -1106,10 +1297,43 @@ public final class SmartisanInstallManager {
 
     private static int userId(UserHandle user) {
         if (user == null) {
-            return 0;
+            return -1;
         }
         try {
-            return user.hashCode();
+            Method method = UserHandle.class.getMethod("getIdentifier");
+            Object value = method.invoke(user);
+            return value instanceof Integer ? ((Integer) value).intValue() : -1;
+        } catch (Throwable ignored) {
+            // hashCode is not a user id and must never be used for database routing.
+            return -1;
+        }
+    }
+
+    /** API 23 lacks the public UserHandle.of(int) helper; keep the bridge reflective. */
+    private static UserHandle userHandleForId(int id) {
+        if (id < 0) return null;
+        try {
+            Method method = UserHandle.class.getMethod("of", Integer.TYPE);
+            Object value = method.invoke(null, Integer.valueOf(id));
+            return value instanceof UserHandle ? (UserHandle) value : null;
+        } catch (Throwable ignored) {
+            try {
+                java.lang.reflect.Constructor<?> constructor =
+                        UserHandle.class.getDeclaredConstructor(Integer.TYPE);
+                constructor.setAccessible(true);
+                Object value = constructor.newInstance(Integer.valueOf(id));
+                return value instanceof UserHandle ? (UserHandle) value : null;
+            } catch (Throwable ignoredAgain) {
+                return null;
+            }
+        }
+    }
+
+    private static int userIdForUid(int uid) {
+        try {
+            Method method = UserHandle.class.getMethod("getUserId", Integer.TYPE);
+            Object value = method.invoke(null, Integer.valueOf(uid));
+            return value instanceof Integer ? ((Integer) value).intValue() : 0;
         } catch (Throwable ignored) {
             return 0;
         }
@@ -1157,6 +1381,20 @@ public final class SmartisanInstallManager {
             } catch (Throwable ignored) {
                 return null;
             }
+        }
+    }
+
+    private static final class PendingRemovalEvent {
+        final String packageName;
+        final int userId;
+        final String source;
+        final long receivedAt;
+
+        PendingRemovalEvent(String packageName, int userId, String source) {
+            this.packageName = packageName;
+            this.userId = userId;
+            this.source = source;
+            this.receivedAt = System.currentTimeMillis();
         }
     }
 
