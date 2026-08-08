@@ -18,6 +18,8 @@ import android.util.Log;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -98,6 +100,7 @@ public final class ShortcutCompatBridge {
                         + " shortcutId=" + shortcutId + " userId=" + userId);
                 return null;
             }
+            savePortableSource(context, packageName, shortcutId, userSerial, normalized);
             Log.i(TAG, "SHORTCUT_ICON_INPUT iconSource=" + iconSource + " package=" + packageName
                     + " shortcutId=" + shortcutId + " userId=" + userId);
             Log.i(TAG, "SHORTCUT_ICON_NORMALIZED package=" + packageName + " shortcutId=" + shortcutId
@@ -195,6 +198,72 @@ public final class ShortcutCompatBridge {
             Log.e(TAG, "PIN_DATABASE_ROW_QUERY_FAILED package=" + shortcut.getPackage()
                     + " shortcutId=" + shortcut.getId() + " userSerial=" + userSerial, error);
             return false;
+        }
+    }
+
+    /** Checks the target profile's real pinned shortcut before a restore creates a Cell. */
+    public static boolean isPinnedAvailable(Context context, String packageName,
+                                            String shortcutId, long userSerial) {
+        if (context == null || packageName == null || packageName.length() == 0
+                || shortcutId == null || shortcutId.length() == 0) return false;
+        try {
+            UserManager users = (UserManager) context.getSystemService(Context.USER_SERVICE);
+            UserHandle user = users == null ? null : users.getUserForSerialNumber(userSerial);
+            if (user == null && userSerial == userSerial(context, Process.myUserHandle())) {
+                user = Process.myUserHandle();
+            }
+            LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (apps == null || user == null) return false;
+            LauncherApps.ShortcutQuery query = new LauncherApps.ShortcutQuery()
+                    .setPackage(packageName)
+                    .setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED);
+            List<ShortcutInfo> values = apps.getShortcuts(query, user);
+            if (values != null) for (ShortcutInfo value : values) {
+                if (value != null && shortcutId.equals(value.getId())) return true;
+            }
+        } catch (Throwable error) {
+            Log.w(TAG, "RESTORE_SHORTCUT_QUERY_FAILED package=" + packageName
+                    + " shortcutId=" + shortcutId + " userSerial=" + userSerial,
+                    error);
+        }
+        return false;
+    }
+
+    public static File portableSourceFile(Context context, String packageName,
+                                          String shortcutId, long userSerial) {
+        if (context == null || packageName == null || shortcutId == null) return null;
+        String name = Integer.toHexString(key(packageName, shortcutId, userSerial).hashCode()) + ".png";
+        return new File(new File(context.getFilesDir(), "shortcut_sources"), name);
+    }
+
+    public static void savePortableSource(Context context, String packageName,
+                                          String shortcutId, long userSerial, Bitmap source) {
+        if (source == null || source.isRecycled()) return;
+        File file = portableSourceFile(context, packageName, shortcutId, userSerial);
+        if (file == null) return;
+        try {
+            File parent = file.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) return;
+            FileOutputStream output = new FileOutputStream(file);
+            try { source.compress(Bitmap.CompressFormat.PNG, 100, output); }
+            finally { output.close(); }
+        } catch (Throwable error) {
+            Log.w(TAG, "SHORTCUT_SOURCE_SAVE_FAILED package=" + packageName
+                    + " shortcutId=" + shortcutId + " userSerial=" + userSerial, error);
+        }
+    }
+
+    public static Bitmap composePortableSource(Context context, Bitmap source,
+                                               String packageName, int userId) {
+        if (source == null || source.isRecycled()) return null;
+        if (isProviderDecoratedShortcut(packageName)) return source;
+        try {
+            Class<?> compositor = Class.forName("com.smartisanos.launcher.e.s");
+            return (Bitmap) compositor.getMethod("a", Context.class, Bitmap.class, String.class, int.class)
+                    .invoke(null, context, source, packageName, Integer.valueOf(userId));
+        } catch (Throwable error) {
+            Log.w(TAG, "SHORTCUT_SOURCE_COMPOSE_FAILED package=" + packageName, error);
+            return null;
         }
     }
 

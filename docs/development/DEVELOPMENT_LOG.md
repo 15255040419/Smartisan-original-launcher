@@ -17,7 +17,13 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-08-03）
+## 当前状态总览（2026-08-07）
+
+- 2026-08-07 最新 vivo X21A 1080P 真机截图推翻了此前“普通 DEFAULT 图标视觉大小已统一”的表述：录音机、相机、电子邮件等普通图标的可见视觉占比仍小于 aShell You、微信、Jovi 物联。普通 DEFAULT 的 alpha visible bounds optical normalization 仍为【待修复】，本轮只修正文档，不修改运行时实现、不构建、不安装。`DoppelgangerCompat`、Backup/Restore、Shortcut、Desktop Settings、ActiveIcon、Folder、当前分身面具外观和 Backup schema 冻结，后续不得借此问题联动修改。
+
+- 2026-08-07 最新真机证据将此前 DEFAULT-only optical normalization 标记为【失败实验，待收敛】：IMPROVED 同样存在视觉大小不一致；DEFAULT/IMPROVED 切换后已有分身 Item 不刷新；IMPROVED 分身 NEW 标记仍在但面具丢失，说明 managed 最终纹理绕过了 Profile-aware 面具装饰。后续普通应用必须由统一 Source Resolver 输出 RAW source，再进入唯一 Static Application Composer，统一执行 Optical Geometry、Physical Raster、分身装饰、原版阴影、Final Texture 和 Profile-aware Cache。本轮停止继续扩展 DEFAULT-only 分叉，先审计当前未提交 diff。
+
+- 2026-08-07 普通应用 Static Application Composer 已完成首轮收敛：`e/s` 的 DEFAULT 与 managed 最终纹理入口统一调用 `IconRasterDiagnostics.composeStaticApplicationIconTexture()`；来源解析每次优先按现有桌面 Item 的包名、组件和 userId 重新取当前 DEFAULT/IMPROVED/PACK/CUSTOM/RESOURCE source，`iconRawData` 仅作解析失败回退，避免切换来源后复用旧图。最终链统一按 alpha cutoff 128、target visible ratio 0.90、当前 1080P 物理 artwork、分身面具、原版阴影生成 SMEngine texture；缓存 key 加入 sourceType/sourceIdentity、组件、userId、源哈希、尺寸、模式、主题、normalization 和 badge 版本。普通更新查询改为枚举所有 `itemType=0` 的实际数据库 Item，并以 `component#userId` 匹配 `LauncherApps` profile 活动，覆盖主用户和分身，不重建 Item、不改 Shortcut/Backup/Folder/ActiveIcon。vivo X21A Android 9 真机覆盖安装后首次发现 `A.b()` 的 Smali 寄存器类型 VerifyError，已修复 `v3` 字符串和 `v3/v4` 宽寄存器复用；再次构建、覆盖安装、冷启动无 Launcher crash，最新 1080P 截图确认主微信与分身微信可见尺寸统一、分身面具恢复、桌面设置仍为齿轮。DEFAULT/IMPROVED 各五次来源切换的完整截图和 1440 真机验证仍待完成。
 
 - 2026-08-03 安装/卸载事件误删桌面图标的保护已收敛：`PackageInstaller.SessionCallback.onFinished(false)` 现在只清理确实存在的临时下载占位，不再调用正式卸载数据库删除；`PACKAGE_REMOVED` 事件必须经过 500/1500/3000ms 三次确认，主用户以 `PackageManager` 仍可解析为保留，查询异常也保留，只有确认包已不存在才调用原版删除入口。`LauncherApps.Callback` 和清单广播均保留真实 user/profile 身份，profile 删除走原版 `c.a.onPackageRemoved(packageName, UserHandle)`，绝不把 profile 事件降级为主用户的包级删除。移除事件按 `package + user` 去重，替换安装仍由 `EXTRA_REPLACING` 排除。构建和签名已通过；当前 ADB 设备无相关历史日志，尚未完成卸载/失败安装真机矩阵。
 
@@ -247,7 +253,7 @@
 #### 应用图标有效来源与分组口径收敛（构建完成，真机待验收）
 
 - **问题**：桌面、应用图标列表右侧预览、单应用页顶部预览和“已重绘/未重绘”分组此前各自使用候选缓存、系统原图或数据库状态，导致同一应用在三个位置显示不一致；同包多 Activity 的拨号/联系人还可能因标签或包名兜底而串图。
-- **收敛**：保留全局 `DEFAULT` / `IMPROVED` / `PACK:<package>` 单选和单应用手动覆盖优先级，统一由当前有效来源解析桌面、列表与单应用顶部预览；分组改按实际可解析的当前图标判断。系统图标映射改为组件优先，并只对系统应用应用标签别名，避免第三方同名应用或同包双 Activity 被错误套图。普通静态图标不再通过 `alphaVisibleBounds` 再次推导几何，最终尺寸仍由原版静态图标管线负责。
+- **收敛状态**：保留全局 `DEFAULT` / `IMPROVED` / `PACK:<package>` 单选和单应用手动覆盖优先级，统一由当前有效来源解析桌面、列表与单应用顶部预览；分组改按实际可解析的当前图标判断。系统图标映射改为组件优先，并只对系统应用应用标签别名，避免第三方同名应用或同包双 Activity 被错误套图。**【待修复】**普通 DEFAULT 尚未完成基于 `alphaVisibleBounds` 的 optical normalization；此前“不再推导几何”的结论已被最新 1080P 真机截图否定，本轮只记录，不改实现。
 - **动态状态**：天气、日历、时钟在动态开关开启时由原版 ActiveIcon 链显示，分组不再把它们误判为缺少静态候选。此前针对 ActiveIcon 的比例、alpha 阈值、阴影参数和 PNG 尺寸试验均已撤回；当前没有把动态天气/日历视觉一致性标记为完成。
 - **验证与风险**：`build.bat`、Java 宿主编译、Smali 回编译、签名和 `git diff --check` 通过。OPPO PDCM00 未连接，仍需在默认/改进版/图标包切换、拨号/联系人、12/20 宫格与三个主题下，由用户核对桌面、列表及单应用页的实际一致性。
 
@@ -2107,3 +2113,8 @@ ADB 结论：
 
 - 应用图标页当前仍由 `ThemeChooserActivity` 承载 maintained 风格兼容页，还不是完整迁移的原生 Smartisan Settings Activity。
 - 图标自动识别资源和 Smartisan 网络图标链路仍建议继续做更多应用回归，尤其是系统应用、Google 应用和第三方应用混合安装场景。
+# 2026-08-07 — Icon/Profile/Backup final convergence
+
+完成桌面图标、分身面具、Shortcut 和桌面备份恢复的第一轮最终收敛：备份布局项增加 `identityKind/sourceUserId/sourceProfileSerial` 语义字段，恢复不再直接信任旧 `user`；分身通过当前 `LauncherApps Profile + launcher_profile_apps` 重新解析，缺失时跳过并记录；Shortcut 新格式保存 `shortcut_sources` 的 Portable Source，旧 `table_icons` 仅作为最后 legacy fallback；恢复后不恢复普通最终纹理，raster key 升至 `raster:v8`。桌面设置普通静态 Composer 已隔离，继续走原版 `Ec.wz()` 齿轮链路，英文默认名统一为 `Desktop Settings`。
+
+验证：`build.bat` 成功；通过 `/data/local/tmp/launcher-signed.apk` 覆盖安装返回 `Success`；vivo X21A / Android 9 冷启动无 `FATAL EXCEPTION` / `VerifyError`，PID 存活；实机截图确认桌面设置为齿轮，微信分身出现一次面具且主微信无面具。完整 Backup -> Restore、Android 11/12+、跨分辨率矩阵仍待执行。

@@ -2609,7 +2609,7 @@
 .end method
 
 .method public static a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;Z)Lcom/smartisanos/smengine/Da;
-    .locals 10
+    .locals 11
 
     const/4 v0, 0x0
 
@@ -2624,6 +2624,7 @@
 
     .line 60
     :cond_1
+    move-object v10, p0
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->shouldUseHighResolutionDesktopRaster(Ljava/lang/Object;)Z
 
     move-result v9
@@ -2927,7 +2928,7 @@
     :goto_3
     if-eqz v9, :cond_codex_original_texture
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->composeStaticIconTexture(Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+    invoke-static {v10, p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->composeStaticApplicationIconTexture(Ljava/lang/Object;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
 
     move-result-object p0
 
@@ -3057,15 +3058,7 @@
 
     if-eqz v3, :cond_codex_original_static_load
 
-    invoke-static {v3, p5}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->composeStaticIconTexture(Landroid/graphics/Bitmap;I)Landroid/graphics/Bitmap;
-
-    move-result-object p0
-
-    if-eqz p4, :cond_codex_managed_ready
-
-    const/16 v2, 0x23
-
-    invoke-static {p0, v2}, Lcom/smartisanos/launcher/e/s;->c(Landroid/graphics/Bitmap;I)Landroid/graphics/Bitmap;
+    invoke-static {p1, v3}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->composeStaticApplicationIconTexture(Ljava/lang/Object;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
 
     move-result-object p0
 

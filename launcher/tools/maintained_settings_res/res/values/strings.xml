@@ -127,10 +127,10 @@
     <string name="launcher_multi_block_mode_summary">Multiple Screen View</string>
     <string name="launcher_multi_block_mode_tips_36">Click the menu button or pinch in the home screen to bring up multiple screen view.</string>
     <string name="launcher_multi_block_mode_tips_81">Click the menu button or pinch in the home screen to bring up multiple screen view.</string>
-    <string name="launcher_setting">Launcher Settings</string>
-    <string name="launcher_setting_name">Launcher Settings</string>
-    <string name="launcher_settings_options">Launcher Settings</string>
-    <string name="launcher_settings_title">Launcher Settings</string>
+    <string name="launcher_setting">Desktop Settings</string>
+    <string name="launcher_setting_name">Desktop Settings</string>
+    <string name="launcher_settings_options">Desktop Settings</string>
+    <string name="launcher_settings_title">Desktop Settings</string>
     <string name="launcher_theme_sub_text">Set Launcher Theme</string>
     <string name="launcher_theme_text">Launcher Theme</string>
     <string name="launcher_unlock_anim">Launcher Unlock Animation</string>

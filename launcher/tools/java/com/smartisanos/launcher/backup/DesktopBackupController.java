@@ -243,16 +243,20 @@ public final class DesktopBackupController {
 
             state(operation, journal, entry, BackupOperationJournal.State.WAITING_DATABASE,
                     "WAITING_DATABASE", true);
-            final JSONObjectHolder layout = exportLayoutAtDatabaseSafePoint(operation.cancellation);
+            final JSONObjectHolder layout = exportLayoutAtDatabaseSafePoint(context, operation.cancellation);
             operation.cancellation.throwIfCancelled();
             state(operation, journal, entry, BackupOperationJournal.State.EXPORTING_LAYOUT,
                     "EXPORTING_LAYOUT", true);
             int gridMode = readGridMode(context);
             BackupManifest manifest = BackupManifest.create(context, gridMode);
+            Log.i(TAG, "BACKUP_SCHEMA formatVersion=" + manifest.formatVersion
+                    + " iconSourceSchemaVersion=" + manifest.iconSourceSchemaVersion
+                    + " shortcutSourceSchemaVersion=" + manifest.shortcutSourceSchemaVersion
+                    + " profileIdentitySchemaVersion=" + manifest.profileIdentitySchemaVersion);
             org.json.JSONObject settings = PreferenceBackupCodec.encode(context);
             org.json.JSONObject theme = ThemeBackupCodec.encode(context);
             org.json.JSONObject icons = IconBackupCodec.encode(context, new File(staging, "icons/custom"));
-            org.json.JSONObject shortcutIcons = ShortcutIconBackupCodec.encode(layout.value,
+            org.json.JSONObject shortcutIcons = ShortcutIconBackupCodec.encode(context, layout.value,
                     new File(staging, "icons/shortcuts"));
 
             state(operation, journal, entry, BackupOperationJournal.State.BUILDING_ARCHIVE,
@@ -308,7 +312,8 @@ public final class DesktopBackupController {
         }
     }
 
-    static JSONObjectHolder exportLayoutAtDatabaseSafePoint(final CancellationToken token)
+    static JSONObjectHolder exportLayoutAtDatabaseSafePoint(final Context context,
+            final CancellationToken token)
             throws Exception {
         final JSONObjectHolder holder = new JSONObjectHolder();
         final CountDownLatch latch = new CountDownLatch(1);
@@ -321,7 +326,7 @@ public final class DesktopBackupController {
             public void run() {
                 try {
                     token.throwIfCancelled();
-                    holder.value = LayoutSnapshotExporter.exportStableSnapshot();
+                    holder.value = LayoutSnapshotExporter.exportStableSnapshot(context);
                     holder.itemCount = holder.value.getJSONArray("items").length();
                 } catch (Throwable error) { holder.error = error; }
                 finally { latch.countDown(); }

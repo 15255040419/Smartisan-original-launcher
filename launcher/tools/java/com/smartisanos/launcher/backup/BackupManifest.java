@@ -9,7 +9,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public final class BackupManifest {
-    public static final int FORMAT_VERSION = 1;
+    public static final int FORMAT_VERSION = 2;
     public static final int DATABASE_SCHEMA_VERSION = 12;
 
     public int formatVersion = FORMAT_VERSION;
@@ -22,6 +22,9 @@ public final class BackupManifest {
     public int screenWidth;
     public int screenHeight;
     public int densityDpi;
+    public int iconSourceSchemaVersion = 2;
+    public int shortcutSourceSchemaVersion = 2;
+    public int profileIdentitySchemaVersion = 1;
 
     public static BackupManifest create(Context context, int gridMode) {
         BackupManifest manifest = new BackupManifest();
@@ -54,6 +57,9 @@ public final class BackupManifest {
         json.put("screenWidth", screenWidth);
         json.put("screenHeight", screenHeight);
         json.put("densityDpi", densityDpi);
+        json.put("iconSourceSchemaVersion", iconSourceSchemaVersion);
+        json.put("shortcutSourceSchemaVersion", shortcutSourceSchemaVersion);
+        json.put("profileIdentitySchemaVersion", profileIdentitySchemaVersion);
         return json;
     }
 
@@ -69,6 +75,9 @@ public final class BackupManifest {
         manifest.screenWidth = json.getInt("screenWidth");
         manifest.screenHeight = json.getInt("screenHeight");
         manifest.densityDpi = json.getInt("densityDpi");
+        manifest.iconSourceSchemaVersion = json.optInt("iconSourceSchemaVersion", 1);
+        manifest.shortcutSourceSchemaVersion = json.optInt("shortcutSourceSchemaVersion", 1);
+        manifest.profileIdentitySchemaVersion = json.optInt("profileIdentitySchemaVersion", 0);
         return manifest;
     }
 }

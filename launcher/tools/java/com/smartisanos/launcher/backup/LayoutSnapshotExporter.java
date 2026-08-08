@@ -2,6 +2,9 @@ package com.smartisanos.launcher.backup;
 
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.content.Context;
+
+import com.smartisanos.launcher.profile.DoppelgangerCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -21,6 +24,10 @@ public final class LayoutSnapshotExporter {
     private LayoutSnapshotExporter() {}
 
     public static JSONObject exportStableSnapshot() throws Exception {
+        return exportStableSnapshot(null);
+    }
+
+    public static JSONObject exportStableSnapshot(Context context) throws Exception {
         SQLiteDatabase database = database(false);
         database.beginTransactionNonExclusive();
         try {
@@ -28,13 +35,38 @@ public final class LayoutSnapshotExporter {
             root.put("schemaVersion", BackupManifest.DATABASE_SCHEMA_VERSION);
             root.put("pages", readTable(database, "table_pageinfos", PAGE_COLUMNS,
                     "pageIndex ASC, _id ASC"));
-            root.put("items", readTable(database, "table_iteminfos", ITEM_COLUMNS,
-                    "pageIndex ASC, cellIndex ASC, folderIndex ASC, _id ASC"));
+            JSONArray items = readTable(database, "table_iteminfos", ITEM_COLUMNS,
+                    "pageIndex ASC, cellIndex ASC, folderIndex ASC, _id ASC");
+            annotateIdentity(context, items);
+            root.put("items", items);
             validate(root);
             database.setTransactionSuccessful();
             return root;
         } finally {
             database.endTransaction();
+        }
+    }
+
+    private static void annotateIdentity(Context context, JSONArray items) throws Exception {
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.getJSONObject(i);
+            String packageName = item.optString("packageName", "");
+            String componentName = item.optString("componentName", "");
+            int sourceUserId = item.optInt("user", 0);
+            long sourceSerial = sourceUserId > 0 && context != null
+                    ? DoppelgangerCompat.profileSerialForUserId(context, sourceUserId) : 0L;
+            boolean shortcut = RestoreMergePlanner.isShortcut(item);
+            boolean doppelganger = context != null && sourceUserId > 0
+                    && DoppelgangerCompat.isDoppelganger(context, packageName,
+                    componentName, sourceUserId);
+            item.put("identityKind", shortcut
+                    ? (doppelganger ? DoppelgangerCompat.KIND_DOPPELGANGER_SHORTCUT
+                    : DoppelgangerCompat.KIND_PRIMARY_SHORTCUT)
+                    : (doppelganger ? DoppelgangerCompat.KIND_DOPPELGANGER_APP
+                    : DoppelgangerCompat.KIND_PRIMARY_APP));
+            item.put("sourceUserId", sourceUserId);
+            item.put("sourceProfileSerial", sourceSerial);
+            item.put("diagnosticOnly", true);
         }
     }
 

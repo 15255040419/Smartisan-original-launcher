@@ -2415,6 +2415,12 @@ public final class MaintainedLauncherSettingsHost {
      */
     public static Drawable loadIconForDesktopItem(Context context, String packageName,
                                                   String className, String title) {
+        return loadIconForDesktopItem(context, packageName, className, title, 0);
+    }
+
+    /** Component-aware source resolver for an existing desktop item/profile. */
+    public static Drawable loadIconForDesktopItem(Context context, String packageName,
+                                                  String className, String title, int userId) {
         if (context == null || TextUtils.isEmpty(packageName)) {
             return null;
         }
@@ -2427,8 +2433,10 @@ public final class MaintainedLauncherSettingsHost {
             // of relying on the optional sSettingsResources warm cache in
             // iconOverrideDrawable(): when that cache is not ready, a selected
             // library icon silently falls back to the vendor application icon.
-            ResolveInfo resolved = resolveLauncherActivity(context.getPackageManager(), packageName,
-                    redirect == null ? className : redirect.componentName);
+            String resolvedClass = redirect == null ? className : redirect.componentName;
+            ResolveInfo resolved = userId > 0
+                    ? firstProfileResolveInfo(context, packageName, resolvedClass, userId)
+                    : resolveLauncherActivity(context.getPackageManager(), packageName, resolvedClass);
             if ("com.android.contacts".equals(packageName)) {
                 ActivityInfo resolvedActivity = resolved == null ? null : resolved.activityInfo;
                 String sourceId = smartisanSystemIconAlias(context, resolved);
@@ -2445,9 +2453,51 @@ public final class MaintainedLauncherSettingsHost {
             if (selected != null) {
                 return normalizeLauncherIcon(selected);
             }
+            if (userId > 0) {
+                Drawable profileIcon = profileLauncherIcon(context, packageName, resolvedClass, userId);
+                if (profileIcon != null) return normalizeLauncherIcon(profileIcon);
+            }
         } catch (Throwable ignored) {
         }
         return loadIconForComponent(context, packageName, className);
+    }
+
+    private static ResolveInfo firstProfileResolveInfo(Context context, String packageName,
+                                                       String className, int userId) {
+        List list = queryProfileLauncherActivities(context, packageName, userId);
+        if (list == null) return null;
+        for (Object value : list) {
+            if (!(value instanceof ResolveInfo)) continue;
+            ResolveInfo info = (ResolveInfo) value;
+            if (info.activityInfo == null) continue;
+            if (TextUtils.isEmpty(className) || className.equals(info.activityInfo.name)) return info;
+        }
+        return list.isEmpty() ? null : (list.get(0) instanceof ResolveInfo
+                ? (ResolveInfo) list.get(0) : null);
+    }
+
+    private static Drawable profileLauncherIcon(Context context, String packageName,
+                                                String className, int userId) {
+        try {
+            LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (apps == null) return null;
+            List<UserHandle> profiles = apps.getProfiles();
+            if (profiles == null) return null;
+            for (UserHandle profile : profiles) {
+                if (profile == null || userIdentifier(profile) != userId) continue;
+                List<LauncherActivityInfo> activities = apps.getActivityList(packageName, profile);
+                if (activities == null) return null;
+                for (LauncherActivityInfo activity : activities) {
+                    if (activity == null || activity.getComponentName() == null) continue;
+                    if (TextUtils.isEmpty(className)
+                            || className.equals(activity.getComponentName().getClassName())) {
+                        return activity.getIcon(0);
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     /**
@@ -3348,7 +3398,7 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static Context currentApplicationContext() {
+    public static Context currentApplicationContext() {
         try {
             Class<?> thread = Class.forName("android.app.ActivityThread");
             Object app = thread.getMethod("currentApplication").invoke(null);
@@ -3358,6 +3408,55 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         return null;
+    }
+
+    /** Stable source identity shared by previews, desktop source resolution and final cache keys. */
+    public static String desktopIconSourceType(Object itemInfo) {
+        Context context = currentApplicationContext();
+        if (context == null || itemInfo == null) return "DEFAULT";
+        String pkg = itemFieldValue(itemInfo, "packageName");
+        String component = itemFieldValue(itemInfo, "componentName");
+        RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, pkg, component);
+        String mode = RedirectIconDB.modeOf(redirect);
+        if (RedirectIconDB.MODE_CUSTOM.equals(mode)) return "CUSTOM";
+        if (RedirectIconDB.MODE_RESOURCE.equals(mode)) return "RESOURCE";
+        if (RedirectIconDB.MODE_PACK.equals(mode)) return "PACK";
+        IconSourceManager.Selection global = IconSourceManager.get(context);
+        if (global.type == IconSourceManager.Type.IMPROVED) return "IMPROVED";
+        if (global.type == IconSourceManager.Type.PACK) return "PACK";
+        return "DEFAULT";
+    }
+
+    public static String desktopIconSourceIdentity(Object itemInfo) {
+        Context context = currentApplicationContext();
+        if (context == null || itemInfo == null) return "default";
+        String pkg = itemFieldValue(itemInfo, "packageName");
+        String component = itemFieldValue(itemInfo, "componentName");
+        RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, pkg, component);
+        String mode = RedirectIconDB.modeOf(redirect);
+        if (RedirectIconDB.MODE_CUSTOM.equals(mode)) {
+            return "custom:" + (redirect == null || redirect.iconData == null
+                    ? 0 : redirect.iconData.length);
+        }
+        if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
+            return "resource:" + String.valueOf(RedirectIconDB.resourceNameOf(redirect));
+        }
+        if (RedirectIconDB.MODE_PACK.equals(mode)) {
+            return "pack:" + String.valueOf(RedirectIconDB.packNameOf(redirect));
+        }
+        IconSourceManager.Selection global = IconSourceManager.get(context);
+        return global.type == IconSourceManager.Type.PACK
+                ? "pack:" + String.valueOf(global.packageName)
+                : global.type == IconSourceManager.Type.IMPROVED ? "improved" : "default";
+    }
+
+    private static String itemFieldValue(Object itemInfo, String fieldName) {
+        try {
+            Object value = itemInfo.getClass().getField(fieldName).get(itemInfo);
+            return value == null ? "" : String.valueOf(value);
+        } catch (Throwable ignored) {
+            return "";
+        }
     }
 
     private static void bindWallpaperSettingIcon(Context context, Resources resources, View root) {

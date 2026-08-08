@@ -5,6 +5,10 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.util.AtomicFile;
+import android.util.Log;
+
+import com.smartisanos.launcher.ShortcutCompatBridge;
+import com.smartisanos.launcher.profile.DoppelgangerCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,6 +35,8 @@ public final class LayoutSnapshotImporter {
         public int restored;
         public int missing;
         public int preserved;
+        public int profileUnresolved;
+        public int shortcutUnresolved;
     }
 
     private LayoutSnapshotImporter() {}
@@ -78,7 +84,8 @@ public final class LayoutSnapshotImporter {
             long maxId = 0L;
             int maxCell = -1;
             for (int i = 0; i < backupItems.length(); i++) {
-                JSONObject item = backupItems.getJSONObject(i);
+                JSONObject item = remapIdentity(context, backupItems.getJSONObject(i), result);
+                if (item == null) continue;
                 maxId = Math.max(maxId, item.optLong("_id", 0L));
                 int pageIndex = item.optInt("pageIndex", -1);
                 if (pageIndex >= 0 && item.optInt("folderIndex", -1) < 0
@@ -89,6 +96,13 @@ public final class LayoutSnapshotImporter {
                     } else if (pageIndex == maxPage) {
                         maxCell = Math.max(maxCell, item.optInt("cellIndex", -1));
                     }
+                }
+                if (RestoreMergePlanner.isShortcut(item)
+                        && !shortcutAvailable(context, item)) {
+                    result.shortcutUnresolved++;
+                    Log.i("DesktopRestore", "RESTORE_ITEM_SKIPPED reason=SHORTCUT_SOURCE_UNAVAILABLE package="
+                            + item.optString("packageName", "") + " shortcutId=" + shortcutId(item));
+                    continue;
                 }
                 if (RestoreMergePlanner.isRestoreCandidate(item) && !RestoreMergePlanner.isInstalled(context, item)) {
                     pending.put(pendingRecord(item));
@@ -138,13 +152,66 @@ public final class LayoutSnapshotImporter {
                 database.insertOrThrow("table_iteminfos", null, values);
                 result.preserved++;
             }
-            ShortcutIconBackupCodec.restore(database, layout, shortcutIcons, extractionRoot,
+            ShortcutIconBackupCodec.restore(context, database, layout, shortcutIcons, extractionRoot,
                     shortcutFallback);
             verifyDatabase(database);
             database.setTransactionSuccessful();
         } finally { database.endTransaction(); }
         writePending(pendingFile, pending);
         return result;
+    }
+
+    private static JSONObject remapIdentity(Context context, JSONObject source,
+                                             ImportResult result) throws Exception {
+        JSONObject item = new JSONObject(source.toString());
+        int sourceUserId = item.optInt("sourceUserId", item.optInt("user", 0));
+        long sourceSerial = item.optLong("sourceProfileSerial", -1L);
+        String kind = item.optString("identityKind", "");
+        boolean doppelganger = DoppelgangerCompat.KIND_DOPPELGANGER_APP.equals(kind)
+                || DoppelgangerCompat.KIND_DOPPELGANGER_SHORTCUT.equals(kind)
+                || (kind.length() == 0 && sourceUserId > 0);
+        if (!doppelganger) {
+            item.put("user", 0);
+            return item;
+        }
+        DoppelgangerCompat.ResolvedProfile profile = DoppelgangerCompat.resolveDoppelganger(
+                context, item.optString("packageName", ""), item.optString("componentName", ""),
+                sourceSerial, sourceUserId);
+        if (profile == null) {
+            result.profileUnresolved++;
+            Log.i("DesktopRestore", "RESTORE_PROFILE_UNRESOLVED package="
+                    + item.optString("packageName", "") + " component="
+                    + item.optString("componentName", "") + " sourceUserId="
+                    + sourceUserId + " sourceSerial=" + sourceSerial);
+            return null;
+        }
+        item.put("user", profile.userId);
+        item.put("targetProfileSerial", profile.serial);
+        Log.i("DesktopRestore", "RESTORE_ITEM_WRITTEN identityKind=" + kind
+                + " package=" + item.optString("packageName", "") + " targetUserId="
+                + profile.userId + " targetSerial=" + profile.serial);
+        return item;
+    }
+
+    private static boolean shortcutAvailable(Context context, JSONObject item) {
+        String shortcutId = shortcutId(item);
+        if (shortcutId.length() == 0) return false;
+        long serial = item.optLong("targetProfileSerial", item.optLong("sourceProfileSerial", 0L));
+        return ShortcutCompatBridge.isPinnedAvailable(context, item.optString("packageName", ""),
+                shortcutId, serial);
+    }
+
+    private static String shortcutId(JSONObject item) {
+        String id = item.optString("data1", "");
+        if (id.length() != 0) return id;
+        try {
+            android.content.Intent intent = android.content.Intent.parseUri(
+                    item.optString("intent", ""), 0);
+            String value = intent.getStringExtra(ShortcutCompatBridge.EXTRA_ID);
+            return value == null ? "" : value;
+        } catch (Throwable ignored) {
+            return "";
+        }
     }
 
     private static List<JSONObject> readCurrentItems(SQLiteDatabase database) throws Exception {

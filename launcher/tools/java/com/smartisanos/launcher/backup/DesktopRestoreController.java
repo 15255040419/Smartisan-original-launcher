@@ -173,14 +173,14 @@ public final class DesktopRestoreController {
             BackupFileUtils.deleteRecursively(rollbackDirectory);
             BackupFileUtils.ensureDirectory(new File(rollbackDirectory, "icons/custom"));
             DesktopBackupController.JSONObjectHolder layout =
-                    DesktopBackupController.exportLayoutAtDatabaseSafePoint(cancel);
+                    DesktopBackupController.exportLayoutAtDatabaseSafePoint(context, cancel);
             cancel.throwIfCancelled();
             BackupManifest manifest = BackupManifest.create(context, readGridMode(context));
             org.json.JSONObject settings = PreferenceBackupCodec.encode(context);
             org.json.JSONObject theme = ThemeBackupCodec.encode(context);
             org.json.JSONObject icons = IconBackupCodec.encode(context,
                     new File(rollbackDirectory, "icons/custom"));
-            org.json.JSONObject shortcutIcons = ShortcutIconBackupCodec.encode(layout.value,
+            org.json.JSONObject shortcutIcons = ShortcutIconBackupCodec.encode(context, layout.value,
                     new File(rollbackDirectory, "icons/shortcuts"));
             File rollbackArchive = BackupArchiveWriter.write(rollbackDirectory, manifest,
                     layout.value, settings, theme, icons, shortcutIcons, cancel);
@@ -300,13 +300,17 @@ public final class DesktopRestoreController {
         }
         journal.write(entry, RestoreOperationJournal.State.APPLYING_ICONS, null);
         IconBackupCodec.restore(context, backup.icons, backup.extractedRoot);
+        Log.i(TAG, "RESTORE_CACHE_INVALIDATED oldRasterVersion=raster:v1-v7 newRasterVersion=raster:v8"
+                + " ordinaryTableIcons=cleared shortcutSource=preserved");
         journal.write(entry, RestoreOperationJournal.State.APPLYING_THEME, null);
         journal.write(entry, RestoreOperationJournal.State.VERIFYING, null);
-        LayoutSnapshotExporter.exportStableSnapshot();
+        LayoutSnapshotExporter.exportStableSnapshot(context);
         BackupFileUtils.deleteRecursively(extraction);
         Log.i(TAG, "RESTORE_VERIFY_COMPLETE token=" + shortToken(entry.operationToken)
                 + " itemCount=" + result.restored + " missingAppCount=" + result.missing
-                + " preservedNewItemCount=" + result.preserved);
+                + " preservedNewItemCount=" + result.preserved
+                + " profileUnresolved=" + result.profileUnresolved
+                + " shortcutUnresolved=" + result.shortcutUnresolved);
     }
 
     public static void onLauncherFirstFrame(Context context, String token, String reason) {

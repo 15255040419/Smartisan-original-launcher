@@ -180,7 +180,7 @@ public class Title extends RelativeLayout {
         titleView.setGravity(17);
         titleView.setTextColor(0xff555555);
         titleView.setTextSize(21);
-        titleView.setText(resourceText("launcher_setting_name", "桌面设置"));
+        titleView.setText(resourceText("launcher_setting_name", "Desktop Settings"));
         addView(titleView, new RelativeLayout.LayoutParams(-1, dp(51)));
         backView = new TextView(context);
         backView.setGravity(16);

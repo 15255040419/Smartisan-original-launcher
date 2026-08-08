@@ -71,7 +71,8 @@ public final class BackupValidator {
         if (manifest.formatVersion > BackupManifest.FORMAT_VERSION) {
             throw new BackupValidationException("RESTORE_FORMAT_TOO_NEW", "Backup format is newer");
         }
-        if (manifest.formatVersion != 1 || manifest.databaseSchemaVersion <= 0) {
+        if ((manifest.formatVersion != 1 && manifest.formatVersion != 2)
+                || manifest.databaseSchemaVersion <= 0) {
             throw new BackupValidationException("RESTORE_SCHEMA_UNSUPPORTED", "Unsupported schema");
         }
         JSONObject complete = checkedJson(new File(output, "complete.json"), 256 * 1024L);
