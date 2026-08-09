@@ -966,7 +966,16 @@ rg -n "onWallpaperPicked|saveGaussianWallpaperCopy|refreshLauncherWallpaperNow|r
 
 # 14. 阶段 9：图标加载
 
-状态：核心实现完成，基本验证完成（2026-07-15）；最终回归待完成。普通模式不再启动图标包扫描或 appfilter 解析；所选图标包解析、在线图标落盘均只合并更新受影响包名，不再以设置资源预热或图标缓存写入触发全量数据库刷新。已完成完整构建、v1/v2/v3 签名、`emulator-5556` 覆盖安装和 HOME 启动无新增 Java/native fatal；图标包、在线图标、单应用覆盖和动态天气/日历交互留待最终回归。
+状态：加载性能核心实现完成；图标 geometry/raster 架构已于 2026-08-08 冻结，最终跨分辨率回归待完成。普通模式不再启动图标包扫描或 appfilter 解析；所选图标包解析、在线图标落盘均只合并更新受影响包名，不再以设置资源预热或图标缓存写入触发全量数据库刷新。
+
+冻结规则：
+
+- DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 统一进入 `IconVisualMetrics -> SmartisanIconNormalizer -> Static Application Composer`；来源只提供 RAW，不得分叉尺寸算法。
+- 用户图标百分比只由 `LayoutProperty` 应用一次；不得恢复 `icon_size_origin_resize` 第二档、固定 `0.90` 缩小或 package/source/device 倍率。
+- Weather/Calendar 内部 ActiveIcon 完全冻结，只共享 root 外部 geometry；静态 fallback 共享相同外框但跳过普通形状 normalizer。
+- 桌面设置保留特殊 renderer，但服从同一用户尺寸与 physical raster 原则。
+- 跨分辨率验收比较 `visualEnvelope/cellWidth`，不是比较绝对像素；高清 RAW 只允许一次最终 Raster，低分辨率源必须标记 `SOURCE_LIMITED`。
+- 当前仅完成 vivo X21A 1080/12 宫格/当前 100% 真机基线；50/150、20 宫格、1440/2K 和中间分辨率未全部完成前，不得标记 `ICON_SYSTEM_VALIDATION_FROZEN=true`。
 
 ## 原版参考
 

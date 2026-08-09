@@ -17,13 +17,13 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-08-07）
+## 当前状态总览（2026-08-08）
 
-- 2026-08-07 最新 vivo X21A 1080P 真机截图推翻了此前“普通 DEFAULT 图标视觉大小已统一”的表述：录音机、相机、电子邮件等普通图标的可见视觉占比仍小于 aShell You、微信、Jovi 物联。普通 DEFAULT 的 alpha visible bounds optical normalization 仍为【待修复】，本轮只修正文档，不修改运行时实现、不构建、不安装。`DoppelgangerCompat`、Backup/Restore、Shortcut、Desktop Settings、ActiveIcon、Folder、当前分身面具外观和 Backup schema 冻结，后续不得借此问题联动修改。
+- 2026-08-08 图标系统按冻结架构完成 Phase 1 实现收敛：普通静态 DEFAULT/IMPROVED/PACK/CUSTOM/RESOURCE 统一由 `IconVisualMetrics -> SmartisanIconNormalizer -> Static Application Composer` 处理，`icon_size_origin_resize` 不再作为第二档尺寸，固定 `0.90` 缩小语义已移除，只有真实越界才执行 fit clamp。RAW Drawable 直接一次绘制到 physical artwork，分身装饰位于 normalizer/artwork 之后、原版阴影之前；ActiveIcon 内部内容冻结，仅根节点共享外部 geometry；桌面设置保留特殊 renderer 并共享用户尺寸。Weather/Calendar 在动态关闭后的静态 fallback 共享同一 `230/295` 外部 geometry，但不再进入普通静态 Normalizer，避免静态状态额外缩小约 3%；最终纹理键升级到 `raster:v12-weather-calendar-geometry`。vivo X21A Android 9、1080、12 宫格、100% 已确认静态 Weather/Calendar 的 `normalizerScale=1.0`、`resampleCount=1`，动态开关即时切换后外轮廓基本一致。动态图标内部未修改；50/150、20 宫格、1440/2K 按冻结阶段顺序仍未执行。
 
-- 2026-08-07 最新真机证据将此前 DEFAULT-only optical normalization 标记为【失败实验，待收敛】：IMPROVED 同样存在视觉大小不一致；DEFAULT/IMPROVED 切换后已有分身 Item 不刷新；IMPROVED 分身 NEW 标记仍在但面具丢失，说明 managed 最终纹理绕过了 Profile-aware 面具装饰。后续普通应用必须由统一 Source Resolver 输出 RAW source，再进入唯一 Static Application Composer，统一执行 Optical Geometry、Physical Raster、分身装饰、原版阴影、Final Texture 和 Profile-aware Cache。本轮停止继续扩展 DEFAULT-only 分叉，先审计当前未提交 diff。
+- 当前几何算法不包含 package/sourceType/device 专用倍率，跨设备只由 `sceneMode + cellWidth + gridMode + surfaceWidth + iconSizeSetting` 推导 logical/physical 尺寸；因此实现层已经统一，不会因换手机自动走另一套大小算法。但目前只有 vivo X21A 的 1080/12 宫格/100% 完成真机闭环，20 宫格、50/150、1440/2K 和至少一个 720 或 1220/1260 中间分辨率仍未按冻结矩阵验收，不能承诺所有手机已经通过，也不能写入 `ICON_SYSTEM_VALIDATION_FROZEN=true`。
 
-- 2026-08-07 普通应用 Static Application Composer 已完成首轮收敛：`e/s` 的 DEFAULT 与 managed 最终纹理入口统一调用 `IconRasterDiagnostics.composeStaticApplicationIconTexture()`；来源解析每次优先按现有桌面 Item 的包名、组件和 userId 重新取当前 DEFAULT/IMPROVED/PACK/CUSTOM/RESOURCE source，`iconRawData` 仅作解析失败回退，避免切换来源后复用旧图。最终链统一按 alpha cutoff 128、target visible ratio 0.90、当前 1080P 物理 artwork、分身面具、原版阴影生成 SMEngine texture；缓存 key 加入 sourceType/sourceIdentity、组件、userId、源哈希、尺寸、模式、主题、normalization 和 badge 版本。普通更新查询改为枚举所有 `itemType=0` 的实际数据库 Item，并以 `component#userId` 匹配 `LauncherApps` profile 活动，覆盖主用户和分身，不重建 Item、不改 Shortcut/Backup/Folder/ActiveIcon。vivo X21A Android 9 真机覆盖安装后首次发现 `A.b()` 的 Smali 寄存器类型 VerifyError，已修复 `v3` 字符串和 `v3/v4` 宽寄存器复用；再次构建、覆盖安装、冷启动无 Launcher crash，最新 1080P 截图确认主微信与分身微信可见尺寸统一、分身面具恢复、桌面设置仍为齿轮。DEFAULT/IMPROVED 各五次来源切换的完整截图和 1440 真机验证仍待完成。
+- 1080 原版截图复核确认“原版图标看起来更大”不是当前图标 geometry 整体偏小：两张原始截图宽度均为 1080、三列 Cell 宽度均为 360px；横向宫格线测得当前主宫格行高约 448px、原版约 452px，纵向留白已经一致。相同视频素材的绿色主体约 `164px vs 168px`，差约 2.4%；同类图标不存在统一小一档的证据。剩余观感主要来自原版蓝色高对比背景、较强阴影、粗白标签以及不同截图的图标组合。不得用全局放大或修改 Cell 行高补偿主题对比。
 
 - 2026-08-03 安装/卸载事件误删桌面图标的保护已收敛：`PackageInstaller.SessionCallback.onFinished(false)` 现在只清理确实存在的临时下载占位，不再调用正式卸载数据库删除；`PACKAGE_REMOVED` 事件必须经过 500/1500/3000ms 三次确认，主用户以 `PackageManager` 仍可解析为保留，查询异常也保留，只有确认包已不存在才调用原版删除入口。`LauncherApps.Callback` 和清单广播均保留真实 user/profile 身份，profile 删除走原版 `c.a.onPackageRemoved(packageName, UserHandle)`，绝不把 profile 事件降级为主用户的包级删除。移除事件按 `package + user` 去重，替换安装仍由 `EXTRA_REPLACING` 排除。构建和签名已通过；当前 ADB 设备无相关历史日志，尚未完成卸载/失败安装真机矩阵。
 
@@ -102,6 +102,36 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-08-08
+
+#### 图标系统文档冻结与旧专项审计清理
+
+- 结论：当前实现层已经统一普通静态来源、ActiveIcon 外部 geometry、Weather/Calendar 静态 fallback 和桌面设置物理栅格原则；“统一”指相同 Cell 下共享外部 geometry、用户百分比只应用一次、跨分辨率保持相同 `visualEnvelope/cellWidth`，不指所有形状具有完全相同的可见宽高或 normalizer 数值，也不指不同分辨率使用相同绝对 px。
+- 防回归：冻结架构、合成顺序、缓存键字段、禁止倍率和剩余验证矩阵已同步写入项目 `MEMORY.md` 与 `LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md`。删除已被当前实现取代且包含 DEFAULT-only、旧 `raster:v8` 和“optical normalization 尚未完成”等错误状态的 `ICON_PROFILE_RASTER_AUDIT_2026-08-07.md`；`LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md`、`LAUNCHER_STARTUP_BASELINE.md`、`ORIGINAL_BEHAVIOR_REFERENCE.md` 分别承担总体计划、启动实测和原版链路职责，继续保留。
+- 生产清理：关闭 `DEBUG_RASTER_DUMP`，诊断字段和按需导出代码保留，正式构建不再持续写入 `DEBUG_ARTWORK/DEBUG_TEXTURE/metrics.tsv`；需要专项验收时才临时启用，验收后必须恢复关闭。
+- 验证：`build.bat` 完整成功；最终 APK 为 `v1.5.5/30`，v1/v2/v3 签名验证通过。vivo X21A 保留数据覆盖安装返回 `Success`，HOME 冷启动 `Status: ok`，Launcher PID 存活，启动日志未见 `AndroidRuntime` fatal。本次未清 Launcher 数据、未移动桌面 Item。
+- 验收边界：vivo X21A 1080/12 宫格/当前 100% 是已完成真机基线；50/150、1080 20 宫格、1440/2K 12/20 宫格、720 或 1220/1260 中间分辨率、完整来源切换、冷启动和设备重启保持仍未全部完成。当前只能写“架构与算法统一”，不能写“所有手机均已验证”或 `ICON_SYSTEM_VALIDATION_FROZEN=true`。
+
+#### 当前 1080 与原版截图的图标尺度复核
+
+- 对比：两张原始截图均为 1080 宽，三列主宫格单格宽度均为 360px。按整幅横向宫格线测量，当前连续行高约 `448px`，原版约 `452px`，差不到 1%；留白无需再调。相同视频素材的绿色主体约 `164px` 对原版 `168px`，差约 2.4%，不存在所有图标统一小一档的证据。
+- 解释：所有普通静态来源共享同一个 `230/295` artwork/texture 外框与一次用户倍率，但 `SmartisanIconNormalizer` 会按 alpha 轮廓、面积和 fill ratio 为不同形状计算连续 optical scale，因此“外部几何与缩放流程统一”不等于每张图的 `normalizerScale` 数值完全相同，也不等于所有图标的可见宽高必须相同。视频当前诊断为 `normalizerScale=0.96914375`、`finalDrawDst=222.90305px`、`visibleAfter` 长边 217px、`resampleCount=1`；它没有命中额外 package/source/device 缩小。
+- 决策：保持冻结的 `230/295` 与统一 Composer，不改 Cell 行高，不增加全局、来源、包名或设备倍率。原版蓝色高对比背景、较强阴影和粗白标签会增加视觉重量，不应通过破坏 geometry 来补偿。
+
+#### Weather/Calendar 静态 fallback 与动态外轮廓统一
+
+- 根因：动态开关关闭后，vivo 天气与日历会回到普通静态 Composer，但仍被 `SmartisanIconNormalizer` 分别计算出 `0.9690595` 与 `0.97414947`；动态节点内部保持原版 `1.0`，因此静态外观比动态小约 3%，此前修改 ActiveIcon root 或缓存帧都没有命中这条静态显示链。
+- 修复：Weather/Calendar 静态 fallback 继续使用唯一的 `IconVisualMetrics` 外部 artwork/texture 和原版阴影，只跳过普通应用的 optical normalizer；没有加入 package/source/device 倍率，也没有修改 WeatherView、CalendarView、日期位置、天气内容、动画或 shadow 参数。纹理缓存版本升级为 `raster:v12-weather-calendar-geometry`，确保开关切换后不复用 v11 小纹理。
+- 验证：`build.bat` 完整成功，vivo X21A Android 9 覆盖安装成功（`lastUpdateTime=2026-08-08 21:54:20`）。1080/12 宫格/当前 100% 设置下，静态天气与日历均为 logical/physical `230/295`、`normalizerScale=1.0`、`resampleCount=1`；天气 visible width 从 217 增至 226，日历从 213 增至 219。动态开关 on/off 即时重载截图已完成，测试后恢复为关闭状态。
+- 风险：日历当前 improved RAW 为 192x192，诊断标记 `SOURCE_LIMITED=true`；这是素材清晰度上限，不应通过修改全局 geometry 补偿。20 宫格、50/150、1440/2K 和中间分辨率仍未验收，不能写入 `ICON_SYSTEM_VALIDATION_FROZEN=true`。
+
+#### 图标统一几何、静态合成与最终缓存收敛
+
+- 根因：普通静态来源存在两个入口；刷新调用尺寸不等于最终 texture 时，旧 `useManagedDesktopPipeline()` 只允许 managed 来源进入 composer，DEFAULT 会回到原始 resize/shadow 链，因此来源切换后仍出现大小不一致和旧纹理复用。
+- 修复：新增只读 `IconVisualMetrics` 和连续 alpha/hull/area `SmartisanIconNormalizer`；所有普通静态来源统一执行 RAW 解析、一次 physical artwork 绘制、分身装饰、原版阴影和 final texture。fallback 判断改为普通静态 Item 身份，不再以来源类型决定 geometry。ActiveIcon 只对根节点应用外部 scale，Weather/Calendar 内部布局、动画、阴影和内容未修改。
+- 验证：`build.bat` 完整打包、Manifest 注入、zipalign 和签名成功；vivo X21A Android 9 覆盖安装成功。1080/12 宫格/100% 的 DEFAULT 真机导出覆盖录音机、相机、邮件、aShell、微信和 Jovi 样本，logical/physical artwork/texture 均为 `230/295`、`resampleCount=1`；相机和微信 artwork 原图可见清晰。设备存在 user 999 分身微信，缓存键和分身装饰均保留 user/profile；本轮没有移动桌面 Item，因此未新增主/分身同屏截图。验收构建关闭临时 PNG 自动导出，诊断字段和导出实现保留供专项构建启用。
+- 风险：当前只完成 Phase 1；50/150、20 宫格、1440/2K、已安装图标包以及动态开关开启后的外部 geometry 仍按冻结顺序待后续阶段验证，不能据此宣称全部分辨率矩阵已经通过。
+
 ### 2026-08-03
 
 #### 搜索页常用应用的使用情况访问门控
@@ -175,23 +205,11 @@
 - **真机验证**：vivo安装器覆盖安装且保留数据后，执行5次`force-stop -> LauncherAlias`冷启动，全部`Status: ok`且前台为`smt_launcher`；执行8次`系统设置 -> Back`返回，全部回到同一Launcher窗口。`cmd package compile -m verify -f`成功，最终截图确认12宫格实际可见。完整测试日志未出现`FATAL EXCEPTION`、`AndroidRuntime`、`NullPointerException`、`VerifyError`、`Resources$NotFoundException`、`NoSuchMethodError`、`ClassNotFoundException`、`UnsatisfiedLinkError`、native fatal或Launcher ANR。
 - **风险边界**：本次已清除当前APK中同类“引用不存在的Android framework资源”问题，但静态审计不能证明所有厂商ROM和所有业务入口都不会崩溃。Android 6/8、三星/小米/华为/一加等真实设备未在本轮连接验证；动态天气、主题切换、宫格重载和低内存进程恢复仍按各专项矩阵验收，不能用本次启动通过替代。
 
-#### 动态天气/日历阴影复用静态原版生成器（v4 OPPO可见验证；v5构建完成待设备复验）
-
-- **根因**：动态图标兼容阴影与普通 managed 静态图标虽然读取相同的 `ICON_SHADOW_RADIUS(_TRANSPARENT)` 和 `ICON_SHADOW_COLOR[mode]`，但前者仍使用独立 `extractAlpha + BlurMaskFilter`，后者已经复用原版 `data/L.a()` / `HolographicOutlineHelper`。OPPO 浅色主题日志确认两者都是半径 `[9,3]`、颜色 `[0x12000000,0x12000000]`；差异来自生成器和轮廓预处理，不是动态节点少一层。
-- **原版边界**：Smartisan 原机的静态 Bitmap 阴影与动态 `sc[27] + MutiTexMaterial` GL 阴影并非同一调用链，只共享主题视觉目标。私有动态 GL 链依赖现代 Android 已移除的模糊接口和旧 Shader，已有 GLThread 崩溃证据，不能恢复。本轮继续保留 V1.5.3 ActiveIcon SceneNode、天气/日期刷新、广播、Timeline 和内部逻辑坐标，只以已验证的原版静态软件生成器作为安全兼容替代。
-- **修复**：动态底板先按 `ActiveIconRasterSpec` 直接栅格到最终物理 artwork；阴影蒙版与静态链一样清除 alpha 小于128的旧外部投影，再分别调用 `L.a()` 生成两层阴影并按相同纵向锚点合成到唯一 `DynamicShadowNode` 纹理。缓存目录升级为 `active_icon_shadow_v5`，缓存帧继续复用该阴影，不新增 Alpha 倍率、第三层阴影或 SceneNode 放大。
-- **验证**：`git diff --check` 与两次 `build.bat` 均通过。OPPO PDCM00 上 v4 日志确认日历和天气均为 `ACTIVE_ICON_ORIGINAL_SHADOW_COMPOSED generatedLayers=2`，物理 artwork/纹理为 `230×230/276×276`，日期31和天气内容正常，用户截图确认比旧软件模糊方案有所改善；未见 `FATAL EXCEPTION` 或 `VerifyError`。补齐静态同款 alpha 蒙版后的 v5 已构建、签名，但安装验证时 OPPO 从 ADB 断开，当前仅剩不允许覆盖安装的 vivo X21A，故不能把 v5 可见效果标记为真机完成。
-- **风险**：普通图标 PNG 内部可能自带高 alpha 材质阴影，动态图标只有 Launcher 生成的外投影，不能保证与每一张不同素材的内部明暗完全相同。后续只复验 v5 的 OPPO 浅色主题、暗色/透明主题和12/20宫格；如果生成外投影已一致，不再通过动态图标专用经验倍率追逐个别烘焙素材。
+#### 【已废弃】动态天气/日历阴影复用静态原版生成器（v4/v5）
 
 ### 2026-07-30
 
-#### 受管静态图标统一复用原版主题阴影（构建、OPPO浅色主题真机验证完成）
-
-- **根因**：高清适配后的改进版、图标包、在线和自定义图标从原始源一次采样到最终纹理，但该新入口没有再经过原版 `data/L` 的 `HolographicOutlineHelper`。因此源 PNG 自带阴影时看起来有阴影，没有烘焙阴影时就贴在宫格背景上；这不是主题随机失效，而是同一桌面混用了“素材自带阴影”和“无阴影最终纹理”两条视觉链。
-- **修复**：managed 普通桌面静态源先一次采样为当前 Cell 的最终物理 artwork，再读取原版当前 `dark/light/transparent` 模式、`ICON_SHADOW_RADIUS(_TRANSPARENT)` 和 `ICON_SHADOW_COLOR[mode]`，反射复用原版 `L.a(Bitmap, Canvas, radius, color)` 生成两层阴影，并按原版 `(texture-artwork)/4` 纵向锚点合成最终纹理。源图可见像素保持不变，仅在阴影蒙版中清除 alpha 小于128的旧外部投影，避免把烘焙阴影再次扩散。缓存键升级为 `raster:v6`，不会继续命中旧的无阴影 `v5` 纹理。
-- **边界**：只接管普通桌面的 managed 静态图标。默认 APK 图标继续原版链；动态天气/日历/时钟、打开文件夹、关闭文件夹预览、特殊黑白纹理、Cell位置、文字、宫格资源和动画均未修改。没有引入 SceneNode 二次放大，也没有恢复低分辨率最终阴影图缓存。
-- **验证**：`git diff --check`、`build.bat`、APK `v1.5.5/30` badging及v1/v2/v3签名通过。OPPO PDCM00 `1080×2304/480dpi` 覆盖安装并冷启动成功；浅色主题日志确认 `mode=1 radii=[9,3] generatedLayers=2`，受管图标均命中 `STATIC_ICON_ORIGINAL_SHADOW_COMPOSED`，未见 `STATIC_ICON_ORIGINAL_SHADOW_FAILED`、fallback、`FATAL EXCEPTION` 或 `VerifyError`。真机截图确认电话本、手机管家、小布助手等原先偏平的图标已出现当前主题对应的柔影。
-- **风险**：阴影轮廓统一，但图标内部材质和素材自身已经烘焙的高 alpha 立体明暗不会被抹除；不同形状的可见阴影强弱仍会自然不同。暗色和透明主题、图标包与自定义源的完整真机矩阵尚未逐项可见验收。
+#### 【已废弃】受管静态图标独立复用原版主题阴影（v6）
 
 #### 设置页截图范围英文本地化补齐（构建、英文1440×3120模拟器关键页面验证完成）
 
@@ -208,12 +226,7 @@
 - **边界**：没有修改普通桌面 Cell 中心、行列数、文字字号、Dock 高度、打开文件夹、文件夹 Timeline、动画 duration、`Eb.update()`、`Ra.T()` 或用户 50%～150% 图标比例；关闭文件夹预览只随普通桌面外框使用同一最终尺寸，不增加独立二次倍率。
 - **验证与风险**：资源矩阵静态检查确认只有 `values-sw411dp` 的 12/20 宫格基线变化，1080 系列保持原值；`git diff --check`、`build.bat`、最终 APK 资源反读、`aapt2 dump badging` 和 v1/v2/v3 签名检查通过。`1440×3120/560dpi` 的 `emulator-5556` 覆盖安装成功，保留原有20宫格配置回到桌面；图标及文字完整、设置按钮日志为 `logicalSettingButton=134/finalTexture=134×134`，截图未见小纹理放大模糊，日志无 `AndroidRuntime/FATAL EXCEPTION/VerifyError`。未改动已连接的 1080 vivo。仍需在 1220/1260/1440 真机、12宫格、默认/改进版/图标包/自定义源、50%/100%/150%、动态天气日历和关闭文件夹预览中做可见验收。
 
-#### 普通桌面静态纹理真实Cell尺寸与缓存隔离修复（构建、1080/1440模拟验证完成）
-
-- **根因**：`NormalIconRasterSpec` 曾使用 `max(scaleX, scaleY)`；全面屏的 Surface 高度会因系统栏与逻辑窗口不同，使图标纹理大于真实节点并被裁切。普通桌面主 Cell 还会先按旧 `ItemInfo.Ne()` 键命中 SMEngine 纹理，再从数据库 `iconData` 旧最终阴影图缩放到当前节点；12/20宫格、分辨率或用户图标比例变化后，容易复用错误尺寸，出现图标大小漂移、边缘碎片和先小后放大的模糊。
-- **修复**：额外物理倍率改为横向 `scaleX`，高度只影响可用区域，不影响图标尺寸。普通桌面静态应用 Cell 的纹理键升级为 `raster:v5`，包含包名、组件、用户、源图哈希、内容/纹理尺寸、分辨率、density、图标比例、宫格和主题。managed 源跳过旧最终阴影图，从 `iconRawData` 原始源或当前有效 Drawable 直接一次合成到调用方传入的真实 Cell 纹理边长；普通 PackageManager 默认图标继续保留原版阴影链。模式8文件夹页、`FolderInfo` 关闭预览、动态天气/日历/时钟和特殊黑白路径均明确排除。
-- **验证**：`git diff --check` 与 `build.bat` 通过；修复一次设备启动发现的 `g.cb()` 临时寄存器类型合流 `VerifyError` 后重新构建、覆盖安装并冷启动成功。1440×3120/560dpi 的 Surface 为1440×2892，日志确认 `rasterScale=1.0`，真实Cell输出 `230/295`；1080×2400/480dpi 输出 `192/246`。两张截图图标完整、竖线碎片消失，最终日志无 `AndroidRuntime/FATAL EXCEPTION/VerifyError`。模拟器已恢复1440×3120/560dpi。
-- **风险**：仓库部分旧锤子 PNG 只有 `168×168` 或 `192×192`，在用户放大比例使目标内容超过源图时仍只能插值，日志会记录 `ICON_LOW_RES_SOURCE_LIMITED`；必须补充真实更高分辨率原素材才能进一步提高清晰度，代码不会把该情况宣称为高清。vivo X21A 覆盖安装仍被系统以 `Failure [-200]` 拒绝，实际1080真机及12/20切换、50%/150%、动态图标、主题和文件夹回归仍待验收。
+#### 【已废弃】普通桌面静态纹理真实 Cell 尺寸与缓存隔离（v5）
 
 ### 2026-07-29
 
@@ -1975,48 +1988,7 @@ ADB 结论：
 
 ### 2026-06-02
 
-#### 桌面图标大小滑块接入 12 / 20 宫格
-
-背景：
-
-- 用户希望参考 `rianlu/smartisan-launcher-maintained` 的图标大小调节能力，但必须适配当前 original-port 的 12 / 20 宫格，而不是退回 maintained 的 9 / 16 宫格语义。
-- 用户要求设置入口放在应用图标页顶部“改进版图标”和“图标包”之间，并且调节后要立即生效。
-
-修复内容：
-
-- 应用图标设置页：
-  - 在顶部卡片组中新增“桌面图标大小”行，位于“改进版图标”和“图标包”之间。
-  - 三行共用 maintained 的 top / middle / bottom 卡片背景，保持为一个整体。
-  - 右侧显示当前百分比，例如 `100%`、`150%`。
-  - 点击“桌面图标大小”整行弹出滑块；“图标包”仍保持只点击右侧状态文字弹窗。
-- 图标大小弹窗：
-  - 使用 `SeekBar` 支持 50% - 150% 连续调节。
-  - 弹窗内实时显示当前百分比，按 `liying2008/SmartisanDialog` 的标准弹窗比例整理为 53dp 标题栏、内容区和 47dp 底部按钮区。
-  - 预览区不再使用具体图标，改为“小 / 中 / 大”三个文字，文字字号对应三档大小。
-  - 点击“小 / 中 / 大”所在等宽区域会立即把滑块跳到 50% / 100% / 150%，百分比同步刷新。
-  - 进度条、滑块和“确定”使用蓝色强调；“取消”保持灰色；底部按钮背景不会遮住弹窗圆角，上下四角保持一致圆角。
-  - 点击确定后写入 `launcher_icon_size` 本地 prefs；`Settings.Global` / `Settings.System` 只作为兼容兜底读取来源。
-- 桌面生效逻辑：
-  - 在 `Constants.initLayoutParams()` 中于 `initLayoutProperty()` 后应用图标大小比例。
-  - 通过 `LauncherSettingBridge.readIconSizePercent(Context)` 读取并规范化百分比，读取顺序与设置页保持一致：本地 prefs 优先，系统 Settings 兜底。
-  - 缩放 `LayoutProperty` 的 `icon_size_origin`、`icon_size_with_shadow`、`icon_size_origin_resize` 和 `name_off_set_y`。
-  - 覆盖 `layoutPropertyMap` 中所有桌面布局 mode，确保当前 12 宫格、20 宫格以及内部映射 mode 都能命中。
-  - 保存后安排 requestCode `1002` 的精确 Launcher 启动任务，结束设置任务并终止旧进程；新进程完整重建 `Constants`、网格点、普通应用节点和文件夹预览。设置页入口会取消残留 1002，避免修改后立刻进入设置又被顶回桌面。
-
-验证：
-
-- `build.bat` 构建通过，输出 `build\launcher-signed.apk`。
-- `adb install -r -d build\launcher-signed.apk` 安装到 `emulator-5554` 成功。
-- 进入“桌面设置 -> 应用图标”确认新增行显示在“改进版图标”和“图标包”之间，弹窗可正常打开。
-- 通过 UI 从 100% 调到 50%，确认后自动回桌面并重启，截图确认 12 宫格所有图标统一缩小。
-- 再通过 UI 从 50% 调到 150%，确认后自动回桌面并重启，截图确认相机、图库、设置、浏览器、文件、游戏中心、应用分身、Google、Root Explorer 和“桌面设置”全部统一放大。
-- 重新安装后打开图标大小弹窗，确认点击“小”直接跳到 50%，点击“大”直接跳到 150%，弹窗底部圆角和顶部圆角一致。
-
-涉及文件：
-
-- `launcher/tools/java/com/smartisanos/launcher/theme/MaintainedLauncherSettingsHost.java`
-- `launcher/tools/java/com/smartisanos/launcher/theme/LauncherSettingBridge.java`
-- `launcher/smali/com/smartisanos/launcher/data/Constants.smali`
+#### 【已废弃】桌面图标大小滑块旧接入方式（旧 LayoutProperty 多字段缩放）
 
 #### 桌面设置缺口第一批补齐
 
@@ -2113,8 +2085,3 @@ ADB 结论：
 
 - 应用图标页当前仍由 `ThemeChooserActivity` 承载 maintained 风格兼容页，还不是完整迁移的原生 Smartisan Settings Activity。
 - 图标自动识别资源和 Smartisan 网络图标链路仍建议继续做更多应用回归，尤其是系统应用、Google 应用和第三方应用混合安装场景。
-# 2026-08-07 — Icon/Profile/Backup final convergence
-
-完成桌面图标、分身面具、Shortcut 和桌面备份恢复的第一轮最终收敛：备份布局项增加 `identityKind/sourceUserId/sourceProfileSerial` 语义字段，恢复不再直接信任旧 `user`；分身通过当前 `LauncherApps Profile + launcher_profile_apps` 重新解析，缺失时跳过并记录；Shortcut 新格式保存 `shortcut_sources` 的 Portable Source，旧 `table_icons` 仅作为最后 legacy fallback；恢复后不恢复普通最终纹理，raster key 升至 `raster:v8`。桌面设置普通静态 Composer 已隔离，继续走原版 `Ec.wz()` 齿轮链路，英文默认名统一为 `Desktop Settings`。
-
-验证：`build.bat` 成功；通过 `/data/local/tmp/launcher-signed.apk` 覆盖安装返回 `Success`；vivo X21A / Android 9 冷启动无 `FATAL EXCEPTION` / `VerifyError`，PID 存活；实机截图确认桌面设置为齿轮，微信分身出现一次面具且主微信无面具。完整 Backup -> Restore、Android 11/12+、跨分辨率矩阵仍待执行。

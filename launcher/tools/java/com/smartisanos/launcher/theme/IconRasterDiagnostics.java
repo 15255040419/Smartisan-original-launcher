@@ -15,15 +15,20 @@ import com.smartisanos.launcher.profile.DoppelgangerCompat;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Arrays;
+import java.io.File;
+import java.io.FileOutputStream;
 
 /** Keeps normal static-icon cache-to-texture scaling observable and centralized. */
 public final class IconRasterDiagnostics {
     private static final String TAG = "LauncherIconRaster";
     private static final Set<String> REPORTED = new HashSet<String>();
-    private static final int OPTICAL_ALPHA_CUTOFF = 128;
-    private static final float OPTICAL_TARGET_VISIBLE_RATIO = 0.90f;
-    private static final String OPTICAL_NORMALIZATION_VERSION = "v1";
-    private static final String RASTER_CACHE_VERSION = "raster:v9-optical";
+    private static final int OPTICAL_ALPHA_CUTOFF = SmartisanIconNormalizer.ALPHA_THRESHOLD;
+    private static final String OPTICAL_NORMALIZATION_VERSION = SmartisanIconNormalizer.VERSION;
+    private static final String RASTER_CACHE_VERSION = "raster:v12-weather-calendar-geometry";
+    private static final String BADGE_VERSION = "badge:v1";
+    private static final String SHADOW_VERSION = "shadow:original-v1";
+    /** Enable only in an acceptance build; production builds do not write icon bitmaps. */
+    private static final boolean DEBUG_RASTER_DUMP = false;
 
     private static final class VisibleBounds {
         final int left;
@@ -218,8 +223,11 @@ public final class IconRasterDiagnostics {
     }
 
     public static boolean useManagedDesktopPipeline(Object itemInfo) {
-        return shouldUseHighResolutionDesktopRaster(itemInfo)
-                && MaintainedLauncherSettingsHost.hasEffectiveManagedIcon(itemInfo);
+        // This is the fallback entry used when a refresh call does not carry the
+        // final texture dimensions.  Source ownership must not decide geometry:
+        // DEFAULT, IMPROVED, PACK, CUSTOM and RESOURCE all use the same static
+        // application composer.
+        return shouldUseHighResolutionDesktopRaster(itemInfo);
     }
 
     /**
@@ -307,42 +315,15 @@ public final class IconRasterDiagnostics {
      * target such as the retired 181px path.
      */
     public static NormalIconRasterSpec resolveNormalIconRasterSpec() {
-        DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
-        int logicalArtwork = currentLayoutSize("icon_size_origin");
-        int logicalTexture = currentLayoutSize("icon_size_with_shadow");
-        if (logicalArtwork <= 0 || logicalTexture <= 0) {
-            return null;
-        }
-        int logicalWidth = Math.max(1, currentConstant("window_width", metrics.widthPixels));
-        int logicalHeight = Math.max(1, currentConstant("window_height", metrics.heightPixels));
-        float scaleX = metrics.widthPixels / (float) logicalWidth;
-        float scaleY = metrics.heightPixels / (float) logicalHeight;
-        /*
-         * The desktop scene is uniformly fitted into the render surface.  A
-         * taller screen is not a larger icon scale: status/navigation insets
-         * commonly make the physical/logical height ratio differ while the
-         * horizontal grid is already exact.  Using max(scaleX, scaleY) made
-         * icon textures larger than their SceneNodes on tall displays and the
-         * node then clipped the right/bottom artwork.  Conversely, taking the
-         * smaller axis shrinks icons when the app surface excludes system bars.
-         * Launcher grid geometry is width-owned, so its physical raster scale
-         * is the horizontal physical/logical ratio only. LayoutPropertyAdapter
-         * has already handled any short-screen fit in the logical dimensions.
-         */
-        float rasterScale = scaleX;
-        if (!(rasterScale > 0f) || Float.isInfinite(rasterScale)
-                || Float.isNaN(rasterScale)) {
-            rasterScale = 1f;
-        }
-        int artwork = (int) Math.ceil(logicalArtwork * rasterScale);
-        int texture = (int) Math.ceil(logicalTexture * rasterScale);
+        IconVisualMetrics metrics = IconVisualMetrics.resolve(currentPageMode());
+        if (metrics == null) return null;
         return new NormalIconRasterSpec(
-                logicalArtwork, logicalArtwork, logicalTexture, logicalTexture,
-                artwork, artwork, texture, texture,
-                (texture - artwork) * 0.5f,
-                rasterScale, "normal:v6:" + artwork + 'x' + texture + ':'
-                        + metrics.widthPixels + 'x' + metrics.heightPixels + ':'
-                        + currentPageMode());
+                metrics.logicalArtworkBox, metrics.logicalArtworkBox,
+                metrics.logicalTextureBox, metrics.logicalTextureBox,
+                metrics.physicalArtworkPx, metrics.physicalArtworkPx,
+                metrics.physicalTexturePx, metrics.physicalTexturePx,
+                (metrics.physicalTexturePx - metrics.physicalArtworkPx) * 0.5f,
+                metrics.physicalScale, metrics.id);
     }
 
     private static Bitmap composeTexture(Bitmap source, boolean opticalNormalize,
@@ -366,34 +347,54 @@ public final class IconRasterDiagnostics {
                     * (logicalArtwork / (float) logicalTexture)));
         }
         float contentInset = 0f;
-        if (opticalNormalize) {
-            int logicalResizedArtwork = currentLayoutSize("icon_size_origin_resize");
-            if (logicalResizedArtwork > 0 && logicalResizedArtwork < logicalArtwork) {
-                contentInset = (artwork - logicalResizedArtwork * rasterScale) * 0.5f;
-            }
-        }
-        float contentSize = Math.max(1f, artwork - contentInset * 2f);
-        VisibleBounds visibleBefore = opticalNormalize ? analyzeVisibleBounds(source) : null;
-        boolean normalizationApplied = opticalNormalize && visibleBefore != null
-                && visibleBefore.width() >= 2 && visibleBefore.height() >= 2;
+        float contentSize = artwork;
+        // Weather and Calendar keep their original internal artwork in both live and
+        // static modes.  Their static fallback shares the ordinary texture geometry,
+        // but must not acquire a second optical scale when the live controller is off.
+        boolean applyOpticalNormalizer = opticalNormalize
+                && !isWeatherCalendarArtwork(itemInfo);
+        SmartisanIconNormalizer.Result normalized = opticalNormalize
+                ? SmartisanIconNormalizer.analyze(source) : null;
+        VisibleBounds visibleBefore = normalized == null ? null
+                : new VisibleBounds(normalized.left, normalized.top,
+                        normalized.right, normalized.bottom);
+        boolean normalizationApplied = applyOpticalNormalizer && normalized != null
+                && normalized.width() >= 2 && normalized.height() >= 2;
         float sourceScale;
         float drawWidth;
         float drawHeight;
         float drawLeftInArtwork;
         float drawTopInArtwork;
-        float opticalScale = 1f;
+        float normalizerScale = 1f;
+        float fitScale = 1f;
+        float finalOpticalScale = 1f;
+        boolean fitClampApplied = false;
         if (normalizationApplied) {
+            float visibleLongSide = Math.max(visibleBefore.width(), visibleBefore.height());
+            // AOSP normalization is relative to the complete RAW canvas.  The
+            // alpha hull is used for optical area and centering, not as a
+            // second crop-to-fill scale.
             float baseScale = Math.min(contentSize / Math.max(1, source.getWidth()),
                     contentSize / Math.max(1, source.getHeight()));
-            float visiblePhysical = Math.max(visibleBefore.width(), visibleBefore.height()) * baseScale;
-            float targetVisible = contentSize * OPTICAL_TARGET_VISIBLE_RATIO;
-            opticalScale = targetVisible / Math.max(1f, visiblePhysical);
-            sourceScale = baseScale * opticalScale;
+            normalizerScale = normalized.scale;
+            float normalizedVisibleLongSide = visibleLongSide * baseScale * normalizerScale;
+            float maximumVisibleLongSide = Math.max(1f,
+                    artwork - SmartisanIconNormalizer.EDGE_GUARD_PX * 2f);
+            if (normalizedVisibleLongSide > maximumVisibleLongSide) {
+                fitScale = maximumVisibleLongSide / normalizedVisibleLongSide;
+                fitClampApplied = true;
+            }
+            finalOpticalScale = normalizerScale * fitScale;
+            sourceScale = baseScale * finalOpticalScale;
             if (!(sourceScale > 0f) || Float.isInfinite(sourceScale) || Float.isNaN(sourceScale)
                     || sourceScale < 0.25f || sourceScale > 4.0f) {
                 normalizationApplied = false;
-                opticalScale = 1f;
-                sourceScale = baseScale;
+                normalizerScale = 1f;
+                fitScale = 1f;
+                finalOpticalScale = 1f;
+                fitClampApplied = false;
+                sourceScale = Math.min(contentSize / Math.max(1, source.getWidth()),
+                        contentSize / Math.max(1, source.getHeight()));
             }
             drawWidth = source.getWidth() * sourceScale;
             drawHeight = source.getHeight() * sourceScale;
@@ -413,9 +414,36 @@ public final class IconRasterDiagnostics {
         Bitmap physicalArtwork = Bitmap.createBitmap(
                 artwork, artwork, Bitmap.Config.ARGB_8888);
         Canvas artworkCanvas = new Canvas(physicalArtwork);
-        artworkCanvas.drawBitmap(source, new Rect(0, 0, source.getWidth(), source.getHeight()),
-                new RectF(drawLeftInArtwork, drawTopInArtwork,
-                        drawLeftInArtwork + drawWidth, drawTopInArtwork + drawHeight), paint);
+        Drawable rawDrawable = itemInfo == null ? null : loadCurrentDesktopDrawable(itemInfo);
+        if (rawDrawable != null) {
+            if (rawDrawable instanceof android.graphics.drawable.BitmapDrawable) {
+                ((android.graphics.drawable.BitmapDrawable) rawDrawable).setFilterBitmap(true);
+            }
+            Rect oldBounds = new Rect(rawDrawable.getBounds());
+            rawDrawable.setBounds(Math.round(drawLeftInArtwork), Math.round(drawTopInArtwork),
+                    Math.round(drawLeftInArtwork + drawWidth),
+                    Math.round(drawTopInArtwork + drawHeight));
+            rawDrawable.draw(artworkCanvas);
+            rawDrawable.setBounds(oldBounds);
+        } else {
+            artworkCanvas.drawBitmap(source, new Rect(0, 0, source.getWidth(), source.getHeight()),
+                    new RectF(drawLeftInArtwork, drawTopInArtwork,
+                            drawLeftInArtwork + drawWidth, drawTopInArtwork + drawHeight), paint);
+        }
+        VisibleBounds visibleAfter = opticalNormalize ? analyzeVisibleBounds(physicalArtwork) : null;
+        if (isAcceptanceSample(itemInfo)) {
+            Log.w(TAG, "OPTICAL_FINAL_SCALE package=" + itemField(itemInfo, "packageName")
+                    + " normalizerScale=" + normalizerScale
+                    + " fitScale=" + fitScale
+                    + " finalScale=" + finalOpticalScale
+                    + " fitClampApplied=" + fitClampApplied
+                    + " visibleBefore=" + boundsString(visibleBefore)
+                    + " visibleAfter=" + boundsString(visibleAfter)
+                    + " artworkBox=" + artwork + 'x' + artwork
+                    + " finalDrawDst=" + drawLeftInArtwork + ',' + drawTopInArtwork + ','
+                    + drawWidth + 'x' + drawHeight);
+        }
+        debugDump(itemInfo, "ARTWORK", physicalArtwork);
         Bitmap decoratedArtwork = decorateProfileIcon(itemInfo, physicalArtwork);
         if (decoratedArtwork != null && decoratedArtwork != physicalArtwork) {
             physicalArtwork.recycle();
@@ -434,6 +462,10 @@ public final class IconRasterDiagnostics {
             Log.w(TAG, "ICON_STATIC_SHADOW_FALLBACK targetArtwork="
                     + artwork + " targetTexture=" + texture);
         }
+        debugDump(itemInfo, "TEXTURE", result);
+        debugMetrics(itemInfo, source, rawDrawable, visibleBefore, visibleAfter,
+                normalizerScale, fitClampApplied, drawLeftInArtwork, drawTopInArtwork,
+                drawWidth, drawHeight, logicalArtwork, logicalTexture, artwork, texture, result);
         Log.i(TAG, "ICON_PIPELINE_SELECTED pipeline="
                 + " pipeline=STATIC_APPLICATION_COMPOSER"
                 + " sourceType=" + MaintainedLauncherSettingsHost.desktopIconSourceType(itemInfo)
@@ -448,12 +480,136 @@ public final class IconRasterDiagnostics {
         }
         reportPhysicalOnce(source, artwork, texture, logicalArtwork, logicalTexture,
                 metrics, scaleX, scaleY);
-        if (opticalNormalize) {
+        if (applyOpticalNormalizer) {
             reportOpticalNormalizationOnce(itemInfo, source, visibleBefore, physicalArtwork,
-                    normalizationApplied, opticalScale, artwork, texture);
+                    normalizationApplied, finalOpticalScale, artwork, texture);
+        } else if (opticalNormalize && isAcceptanceSample(itemInfo)) {
+            Log.i(TAG, "OPTICAL_NORMALIZATION_BYPASS package="
+                    + itemField(itemInfo, "packageName")
+                    + " reason=weather_calendar_internal_artwork_frozen"
+                    + " externalGeometry=" + artwork + 'x' + artwork
+                    + " texture=" + texture + 'x' + texture);
         }
         physicalArtwork.recycle();
         return result;
+    }
+
+    private static boolean isWeatherCalendarArtwork(Object itemInfo) {
+        if (itemInfo == null) return false;
+        String packageName = itemField(itemInfo, "packageName");
+        if (packageName.isEmpty()) return false;
+        String componentName = itemField(itemInfo, "componentName");
+        String title = itemField(itemInfo, "title");
+        return WeatherBridge.isWeatherPackage(packageName, componentName, title)
+                || com.smartisanos.launcher.compat.CalendarAppDetector
+                        .isCalendarPackage(
+                                MaintainedLauncherSettingsHost.currentApplicationContext(),
+                                packageName);
+    }
+
+    private static boolean isAcceptanceSample(Object itemInfo) {
+        String pkg = itemField(itemInfo, "packageName");
+        String title = itemField(itemInfo, "title").toLowerCase();
+        return "com.android.bbksoundrecorder".equals(pkg)
+                || "com.android.camera".equals(pkg)
+                || "com.vivo.email".equals(pkg)
+                || "in.hridayan.ashell".equals(pkg)
+                || "com.tencent.mm".equals(pkg)
+                || "com.vivo.agent".equals(pkg)
+                || "com.vivo.gallery".equals(pkg)
+                || "com.vivo.wallet".equals(pkg)
+                || "com.android.VideoPlayer".equals(pkg)
+                || "com.bbk.cloud".equals(pkg)
+                || "com.vivo.weather".equals(pkg)
+                || "com.bbk.calendar".equals(pkg)
+                || "com.android.calendar".equals(pkg)
+                || title.contains("ashell") || title.contains("智慧生活")
+                || title.contains("jovi") || title.contains("相册")
+                || title.contains("钱包") || title.contains("视频")
+                || title.contains("云服务") || title.contains("天气")
+                || title.contains("日历") || title.contains("weather")
+                || title.contains("calendar");
+    }
+
+    private static String boundsString(VisibleBounds bounds) {
+        return bounds == null ? "none" : bounds.left + "," + bounds.top + ','
+                + bounds.right + ',' + bounds.bottom;
+    }
+
+    private static void debugDump(Object itemInfo, String stage, Bitmap bitmap) {
+        if (!DEBUG_RASTER_DUMP || !isAcceptanceSample(itemInfo)
+                || bitmap == null || bitmap.isRecycled()) return;
+        FileOutputStream stream = null;
+        try {
+            android.content.Context context = MaintainedLauncherSettingsHost.currentApplicationContext();
+            if (context == null) return;
+            File directory = context.getExternalFilesDir("icon_raster_debug");
+            if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) return;
+            String pkg = itemField(itemInfo, "packageName").replaceAll("[^A-Za-z0-9._-]", "_");
+            String user = itemField(itemInfo, "userId").replaceAll("[^A-Za-z0-9._-]", "_");
+            stream = new FileOutputStream(new File(directory,
+                    "DEBUG_" + stage + '_' + pkg + "_u" + user + ".png"));
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
+        } catch (Throwable error) {
+            Log.w(TAG, "DEBUG_RASTER_DUMP_FAILED stage=" + stage, error);
+        } finally {
+            if (stream != null) try { stream.close(); } catch (Throwable ignored) { }
+        }
+    }
+
+    private static void debugMetrics(Object itemInfo, Bitmap analysis, Drawable drawable,
+            VisibleBounds before, VisibleBounds after, float normalizerScale,
+            boolean fitClampApplied, float drawLeft, float drawTop, float drawWidth,
+            float drawHeight, int logicalArtwork, int logicalTexture, int physicalArtwork,
+            int physicalTexture, Bitmap finalTexture) {
+        if (!DEBUG_RASTER_DUMP || !isAcceptanceSample(itemInfo)) return;
+        String type = drawable == null ? "none" : drawable.getClass().getName();
+        Bitmap nativeBitmap = drawable instanceof android.graphics.drawable.BitmapDrawable
+                ? ((android.graphics.drawable.BitmapDrawable) drawable).getBitmap() : null;
+        int nativeWidth = nativeBitmap != null ? nativeBitmap.getWidth()
+                : drawable != null ? drawable.getIntrinsicWidth() : analysis.getWidth();
+        int nativeHeight = nativeBitmap != null ? nativeBitmap.getHeight()
+                : drawable != null ? drawable.getIntrinsicHeight() : analysis.getHeight();
+        boolean vector = type.contains("VectorDrawable");
+        boolean adaptive = type.contains("AdaptiveIconDrawable");
+        boolean cached = drawable == null;
+        boolean limited = !vector && !adaptive
+                && (nativeWidth < physicalArtwork || nativeHeight < physicalArtwork);
+        debugAppend("RASTER_SAMPLE\tpackage=" + itemField(itemInfo, "packageName")
+                + "\tcomponent=" + itemField(itemInfo, "componentName")
+                + "\tuserId=" + itemField(itemInfo, "userId")
+                + "\tsourceType=" + MaintainedLauncherSettingsHost.desktopIconSourceType(itemInfo)
+                + "\tsourceRoute=" + MaintainedLauncherSettingsHost.desktopIconSourceIdentity(itemInfo)
+                + "\tsourceNativeWidth=" + nativeWidth + "\tsourceNativeHeight=" + nativeHeight
+                + "\tsourceIsVector=" + vector + "\tsourceIsAdaptive=" + adaptive
+                + "\tsourceIsCachedBitmap=" + cached
+                + "\tlogicalArtwork=" + logicalArtwork + "\tlogicalTexture=" + logicalTexture
+                + "\tphysicalArtwork=" + physicalArtwork + "\tphysicalTexture=" + physicalTexture
+                + "\tanalysisSize=" + analysis.getWidth() + 'x' + analysis.getHeight()
+                + "\tnormalizerScale=" + normalizerScale
+                + "\tfitClampApplied=" + fitClampApplied
+                + "\tvisibleBefore=" + boundsString(before)
+                + "\tvisibleAfter=" + boundsString(after)
+                + "\tfinalDrawDst=" + drawLeft + ',' + drawTop + ',' + drawWidth + 'x' + drawHeight
+                + "\tregisteredTexturePx=" + finalTexture.getWidth() + 'x' + finalTexture.getHeight()
+                + "\tFLogicalSize=" + logicalTexture + 'x' + logicalTexture
+                + "\tresampleCount=1\tSOURCE_LIMITED=" + limited);
+    }
+
+    private static void debugAppend(String line) {
+        FileOutputStream stream = null;
+        try {
+            android.content.Context context = MaintainedLauncherSettingsHost.currentApplicationContext();
+            if (context == null) return;
+            File directory = context.getExternalFilesDir("icon_raster_debug");
+            if (directory == null || (!directory.isDirectory() && !directory.mkdirs())) return;
+            stream = new FileOutputStream(new File(directory, "metrics.tsv"), true);
+            stream.write((line + "\n").getBytes("UTF-8"));
+        } catch (Throwable error) {
+            Log.w(TAG, "DEBUG_RASTER_METRICS_FAILED", error);
+        } finally {
+            if (stream != null) try { stream.close(); } catch (Throwable ignored) { }
+        }
     }
 
     private static Bitmap decorateProfileIcon(Object itemInfo, Bitmap artwork) {
@@ -615,13 +771,13 @@ public final class IconRasterDiagnostics {
                 + " finalVisibleHeight=" + (after == null ? 0 : after.height())
                 + " finalVisibleRatio=" + Math.max(finalX, finalY)
                 + " beforeVisibleRatio=" + Math.max(beforeX, beforeY)
-                + " targetVisibleRatio=" + OPTICAL_TARGET_VISIBLE_RATIO
+                + " fitPolicy=ARTWORK_EDGE_GUARD_" + SmartisanIconNormalizer.EDGE_GUARD_PX
                 + " cacheVersion=" + RASTER_CACHE_VERSION);
         Log.w(TAG, "OPTICAL_NORMALIZATION package=" + packageName
                 + " component=" + component + " sourceType=DEFAULT_APK"
                 + " sourceSize=" + source.getWidth() + "x" + source.getHeight()
                 + " visibleRatioBefore=" + Math.max(beforeX, beforeY)
-                + " targetRatio=" + OPTICAL_TARGET_VISIBLE_RATIO + " scale=" + opticalScale
+                + " scale=" + opticalScale
                 + " normalizationCount=" + (applied ? 1 : 0)
                 + " sourceVisibleCenter=" + (before == null ? "0,0"
                         : before.centerX() + "," + before.centerY()));
@@ -660,13 +816,14 @@ public final class IconRasterDiagnostics {
         DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
         NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
         if (spec == null) return baseKey;
-        int logicalArtwork = currentLayoutSize("icon_size_origin");
+        int logicalArtwork = spec.logicalArtworkWidth;
+        int logicalTexture = spec.logicalTextureWidth;
         int artwork = spec.artworkWidth;
         int texture = spec.textureWidth;
         String packageName = itemField(itemInfo, "packageName");
         String componentName = itemField(itemInfo, "componentName");
         String userId = itemField(itemInfo, "userId");
-        String sourceHash = itemRawHash(itemInfo);
+        String sourceHash = resolvedSourceHash(itemInfo);
         String sourceType = MaintainedLauncherSettingsHost.desktopIconSourceType(itemInfo);
         String sourceIdentity = MaintainedLauncherSettingsHost.desktopIconSourceIdentity(itemInfo);
         int pageMode = currentPageMode();
@@ -677,14 +834,44 @@ public final class IconRasterDiagnostics {
         String key = baseKey + "#" + RASTER_CACHE_VERSION + ':' + packageName + ':' + componentName + ':' + userId + ':'
                 + sourceHash + ':' + sourceType + ':' + sourceIdentity + ':' + artwork + 'x' + artwork + ':' + texture + 'x' + texture
                 + ':' + metrics.widthPixels + 'x' + metrics.heightPixels + ':' + metrics.densityDpi
-                + ':' + iconPercent + ':' + pageMode + ':' + themeMode + ':' + pipeline
+                + ':' + logicalArtwork + 'x' + logicalTexture
+                + ':' + iconPercent + ':' + pageMode + ":grid=" + pageMode + ':' + themeMode + ':' + pipeline
                 + ":normalizationVersion=" + OPTICAL_NORMALIZATION_VERSION
                 + ":alphaCutoff=" + OPTICAL_ALPHA_CUTOFF
-                + ":targetVisibleRatio=" + OPTICAL_TARGET_VISIBLE_RATIO
-                + ":normalizationApplied=true:badgeVersion=v1";
+                + ":fitPolicy=artwork-edge-guard-" + SmartisanIconNormalizer.EDGE_GUARD_PX
+                + ":normalizationApplied=true:badgeVersion=" + BADGE_VERSION
+                + ":shadowVersion=" + SHADOW_VERSION;
         Log.i(TAG, "ICON_CACHE_PIPELINE_KEY packageName=" + packageName
                 + " pipeline=" + pipeline + " finalCacheKey=" + key);
         return key;
+    }
+
+    private static String resolvedSourceHash(Object itemInfo) {
+        Drawable drawable = loadCurrentDesktopDrawable(itemInfo);
+        Bitmap bitmap = null;
+        boolean owned = false;
+        try {
+            if (drawable instanceof android.graphics.drawable.BitmapDrawable) {
+                bitmap = ((android.graphics.drawable.BitmapDrawable) drawable).getBitmap();
+            } else if (drawable != null) {
+                bitmap = sourceBitmap(drawable);
+                owned = true;
+            }
+            if (bitmap == null || bitmap.isRecycled()) return itemRawHash(itemInfo);
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            int hash = 17;
+            int[] row = new int[Math.max(1, width)];
+            for (int y = 0; y < height; y++) {
+                bitmap.getPixels(row, 0, width, 0, y, width, 1);
+                hash = 31 * hash + Arrays.hashCode(row);
+            }
+            return width + "x" + height + ':' + Integer.toHexString(hash);
+        } catch (Throwable ignored) {
+            return itemRawHash(itemInfo);
+        } finally {
+            if (owned && bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
+        }
     }
 
     /** Returns a size-aware key only for ordinary desktop static application Cells. */

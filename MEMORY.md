@@ -506,13 +506,23 @@ python tools/patch_launcher_window_animation_resources.py launcher/resources.ars
 
 在线图标仓库和主 Launcher 仓库是分开的。
 
+图标系统的冻结架构以 `IconVisualMetrics -> SmartisanIconNormalizer -> Static Application Composer` 为唯一普通静态链。DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 只能改变 RAW source，不能拥有各自的 geometry、倍率、阴影或最终纹理算法；不得恢复 DEFAULT-only、managed-only、`icon_size_origin_resize` 第二档尺寸、固定 `0.90` 缩小、package/sourceType/device 专用倍率或旧最终 Bitmap 优先路径。
+
+统一的含义是：相同 `sceneMode/cellWidth/gridMode/surfaceWidth/iconSizeSetting` 得到同一个 logical/physical artwork/texture 外框，用户 50%～150% 比例只由 `LayoutProperty` 应用一次；不同形状仍由 `SmartisanIconNormalizer` 按 alpha 轮廓、面积和 fill ratio 计算连续 optical scale，因此不得要求所有图标的可见宽高或 `normalizerScale` 数值机械相同。跨分辨率比较必须看 `visualEnvelope/cellWidth`，不是要求 1080、1440 和 2K 使用相同绝对 px。
+
+普通静态最终顺序冻结为 `RAW -> normalizer -> physical artwork 一次绘制 -> clone/profile badge -> original shadow -> final texture`。最终缓存键必须隔离 component、user/profile、sourceType/sourceIdentity/sourceHash、scene/grid、icon size、logical/physical 尺寸、分辨率/density、normalizer、badge 和 shadow 版本。主应用与分身共用相同本体 geometry，分身只增加一次原版面具。
+
+Weather/Calendar 内部布局、内容、日期位置、阴影、timeline 和动画冻结；动态状态只允许通过 ActiveIcon root 外部 geometry 对齐普通静态外框。动态关闭后的 Weather/Calendar 静态 fallback 共享 `IconVisualMetrics` 与原版阴影，但跳过普通形状 normalizer，避免第二次 optical 缩小。桌面设置齿轮保留特殊 renderer，只共享同一用户尺寸与跨分辨率物理栅格原则。
+
+截至 2026-08-08，vivo X21A Android 9 的 1080/12 宫格/当前 100% 已完成静态来源、Weather/Calendar 静态/动态切换和 `230/295` 外部 geometry 验证；这只证明冻结实现的当前真机基线。50/150、1080 20 宫格、1440/2K 12/20 宫格、至少一个 720 或 1220/1260 中间分辨率、完整 CUSTOM/RESOURCE/图标包、冷启动与设备重启保持尚未全部完成，不得提前写 `ICON_SYSTEM_VALIDATION_FROZEN=true`，也不得把“算法已统一”表述成“所有手机已真机验收”。
+
 普通桌面图标尺寸必须区分资源坐标系：当前用户已确认正常的 1080 坐标系保持 12 宫格 `160/205`、20 宫格 `118/152`；1440 坐标系 `values-sw411dp` 使用原版 12 宫格 `192/246`、20 宫格 `138/178`。不得为了统一数值再次把 1440 基线降成 1080 尺寸，也不得解除 `LayoutPropertyAdapter` 的整体放大上限去污染普通桌面。
 
-高分辨率图标不得先生成 1080/低分辨率纹理，再通过 SceneNode scale 放大。默认 APK 图标继续由原版 Drawable 转换和阴影链按适配后的最终 `icon_size_origin/icon_size_with_shadow` 生成；改进版、图标包、在线 PNG 和自定义源从保留的源图直接合成最终物理纹理。Surface 物理像素与 SMEngine 逻辑窗口不一致时，继续使用 `NormalIconRasterSpec.rasterScale` 生成对应物理像素。源素材自身分辨率不足时只能记录限制并回退，不能把插值放大描述为高清。
+高分辨率图标不得先生成 1080/低分辨率纹理，再通过 SceneNode scale 放大。DEFAULT、IMPROVED、PACK、CUSTOM 和 RESOURCE 均从当前有效原始 Drawable/Bitmap 一次绘制到最终 physical artwork，再生成最终阴影纹理。Surface 物理像素与 SMEngine 逻辑窗口不一致时，继续使用横向 physical scale 生成对应物理像素。源素材自身分辨率不足时只能记录 `SOURCE_LIMITED`，不能把插值放大描述为高清。
 
-普通桌面物理纹理的额外 raster 比例只能取渲染 Surface 与 Launcher 逻辑窗口的横向比例 `scaleX`；全面屏的状态栏、导航栏会使 `scaleY` 偏大或偏小，高度比例不得参与图标大小。SMEngine 静态纹理缓存必须按包名/组件/用户、源图哈希、宫格模式、最终尺寸、分辨率、density 和图标比例隔离。普通桌面的 managed 静态源使用当前 Cell 的真实纹理边长从原始源图一次合成；打开文件夹、关闭文件夹预览、动态天气/日历/时钟和特殊黑白链不得被该入口接管。
+普通桌面物理纹理的额外 raster 比例只能取渲染 Surface 与 Launcher 逻辑窗口的横向比例 `scaleX`；全面屏的状态栏、导航栏会使 `scaleY` 偏大或偏小，高度比例不得参与图标大小。普通静态应用使用当前 Cell 的真实纹理边长从原始源一次合成；打开文件夹、关闭文件夹预览、动态时钟和特殊黑白链不得被该入口接管。
 
-普通桌面的 managed 静态源不能只把源 PNG 画入最终纹理后依赖素材自带阴影；否则图标包、在线图和改进版素材会因是否烘焙阴影而视觉不一致。正确链路是在最终物理 artwork 上复用原版 `HolographicOutlineHelper` 和当前 dark/light/transparent 阴影常量，再把图标本体覆盖到同一最终纹理。低 alpha 外部像素只从阴影蒙版剔除，不能裁剪或重采样可见图标本体，也不能恢复先生成低分辨率阴影图再放大的旧路径。
+普通静态源不能只把源 PNG 画入最终纹理后依赖素材自带阴影；否则不同来源会因是否烘焙阴影而视觉不一致。所有普通静态来源必须在最终 physical artwork 上复用原版 `HolographicOutlineHelper` 和当前 dark/light/transparent 阴影常量，再生成同一最终纹理。低 alpha 外部像素只从阴影蒙版剔除，不能裁剪或二次重采样可见图标本体。
 
 在线图标路径规则：
 

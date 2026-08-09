@@ -293,11 +293,9 @@ public final class MaintainedLauncherSettingsHost {
     public static volatile boolean sLauncherFrameReportPending;
     private static final String SMARTISAN_ICON_CACHE_PREFS = "online_icon_cache_v3";
     private static final String SMARTISAN_ICON_CACHE_DIR = "online_icon_cache_v3";
-    // Keep only the opaque artwork before the original launcher generates its
-    // dark/light/transparent shadow bitmaps. Low-alpha pixels in the online
-    // library are usually a baked legacy shadow and would otherwise double up.
-    private static final int UNIFORM_ICON_ART_ALPHA_CUTOFF = 128;
-    private static final float UNIFORM_ICON_VISIBLE_RATIO = 0.90f;
+    private static final String ICON_RASTER_REVISION_PREF = "icon_raster_revision";
+    private static final String ICON_RASTER_REVISION = "composer:v2|geometry:v"
+            + IconVisualMetrics.REVISION + '|' + SmartisanIconNormalizer.VERSION;
     private static Map<String, List<String>> sIconVariants;
     // Mirrors can fail temporarily. A week-long miss cache made recognized
     // system apps (notably vendor Gallery aliases) look permanently unknown.
@@ -2679,84 +2677,6 @@ public final class MaintainedLauncherSettingsHost {
      */
     public static Drawable normalizeImprovedIcon(Drawable icon) {
         return icon;
-    }
-
-    /**
-     * Normalizes icon artwork after removing a baked source shadow. The
-     * original launcher then generates its three theme-specific shadow bitmaps
-     * from this clean result; adding another shadow here would double them.
-     */
-    private static Drawable normalizeIconVisibleBounds(Drawable icon) {
-        if (icon == null) {
-            return null;
-        }
-        try {
-            Bitmap source = drawableToBitmapForBadge(icon);
-            int width = source.getWidth();
-            int height = source.getHeight();
-            if (width <= 0 || height <= 0) {
-                return icon;
-            }
-
-            Bitmap artwork = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            int left = width;
-            int top = height;
-            int right = -1;
-            int bottom = -1;
-            int[] row = new int[width];
-            int[] cleanedRow = new int[width];
-            for (int y = 0; y < height; y++) {
-                source.getPixels(row, 0, width, 0, y, width, 1);
-                for (int x = 0; x < width; x++) {
-                    int pixel = row[x];
-                    int alpha = pixel >>> 24;
-                    // Strip the existing soft exterior shadow from online/icon-pack
-                    // artwork. The original HolographicOutlineHelper derives its
-                    // three shadows from the remaining body.
-                    if (alpha < UNIFORM_ICON_ART_ALPHA_CUTOFF) {
-                        cleanedRow[x] = 0;
-                        continue;
-                    }
-                    cleanedRow[x] = pixel;
-                    if (alpha >= UNIFORM_ICON_ART_ALPHA_CUTOFF) {
-                        if (x < left) left = x;
-                        if (x > right) right = x;
-                        if (y < top) top = y;
-                        if (y > bottom) bottom = y;
-                    }
-                }
-                artwork.setPixels(cleanedRow, 0, width, 0, y, width, 1);
-            }
-            if (right < left || bottom < top) {
-                artwork.recycle();
-                source.recycle();
-                return icon;
-            }
-
-            float visible = Math.max(right - left + 1, bottom - top + 1);
-            float target = Math.min(width, height) * UNIFORM_ICON_VISIBLE_RATIO;
-            float scale = target / visible;
-            scale = Math.max(0.70f, Math.min(1.50f, scale));
-            Bitmap normalized = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(normalized);
-            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
-            float cx = (left + right + 1) * 0.5f;
-            float cy = (top + bottom + 1) * 0.5f;
-            float targetCx = width * 0.5f;
-            float targetCy = height * 0.5f;
-            canvas.save();
-            canvas.translate(targetCx, targetCy);
-            canvas.scale(scale, scale);
-            canvas.translate(-cx, -cy);
-            canvas.drawBitmap(artwork, 0f, 0f, paint);
-            canvas.restore();
-
-            artwork.recycle();
-            source.recycle();
-            return new android.graphics.drawable.BitmapDrawable(Resources.getSystem(), normalized);
-        } catch (Throwable ignored) {
-            return icon;
-        }
     }
 
     public static Drawable doppelgangerBadgeDrawable(Drawable original, PackageManager pm, Drawable systemBadged) {
@@ -10686,6 +10606,7 @@ public final class MaintainedLauncherSettingsHost {
                 applyNavigationBarIfChanged(activity);
                 maybeRefreshLauncherWallpaper(activity);
                 applyBadgeIfDirty(activity);
+                ensureIconRasterRevision(activity);
                 if (LauncherSettingBridge.dynamicWeatherCalendarEnabled(activity)) {
                     WeatherBridge.onLauncherResume(activity);
                 }
@@ -10700,6 +10621,26 @@ public final class MaintainedLauncherSettingsHost {
                         .mark("LAUNCH_DEFERRED_TASKS_END");
             }
         });
+    }
+
+    /** Rebuilds persisted iconData once when the composer contract changes. */
+    private static void ensureIconRasterRevision(Context context) {
+        if (context == null) return;
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(
+                    "com.smartisanos.launcher_prefs", Context.MODE_PRIVATE);
+            String applied = prefs.getString(ICON_RASTER_REVISION_PREF, "");
+            if (ICON_RASTER_REVISION.equals(applied)) return;
+            // Commit before dispatch so process recreation during the original
+            // reload path cannot create an update loop.
+            if (!prefs.edit().putString(ICON_RASTER_REVISION_PREF,
+                    ICON_RASTER_REVISION).commit()) return;
+            Log.i("LauncherIconRaster", "ICON_RASTER_REVISION_REFRESH old="
+                    + applied + " new=" + ICON_RASTER_REVISION);
+            applyIconChange(context);
+        } catch (Throwable error) {
+            Log.w("LauncherIconRaster", "ICON_RASTER_REVISION_REFRESH_FAILED", error);
+        }
     }
 
     public static void applyBadgeIfDirty(Activity activity) {
@@ -14043,6 +13984,9 @@ public final class MaintainedLauncherSettingsHost {
             scaleFloatField(property, "icon_size_origin", scale);
             scaleFloatField(property, "icon_size_with_shadow", scale);
             scaleFloatField(property, "icon_size_origin_resize", scale);
+            // The special desktop-settings node keeps its own renderer but shares
+            // the one externally applied user-size setting with ordinary icons.
+            scaleFloatField(property, "setting_button", scale);
             scaleIntField(property, "name_off_set_y", (1f + scale) * 0.5f);
             Class.forName("com.smartisanos.launcher.data.LayoutPropertyAdapter")
                     .getMethod("scaleFolderPreviewForIconSize", Object.class, Float.TYPE)
