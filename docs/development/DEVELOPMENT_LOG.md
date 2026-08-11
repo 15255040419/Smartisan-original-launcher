@@ -17,9 +17,66 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-08-08）
+## 当前状态总览（2026-08-11）
 
-- 2026-08-08 图标系统按冻结架构完成 Phase 1 实现收敛：普通静态 DEFAULT/IMPROVED/PACK/CUSTOM/RESOURCE 统一由 `IconVisualMetrics -> SmartisanIconNormalizer -> Static Application Composer` 处理，`icon_size_origin_resize` 不再作为第二档尺寸，固定 `0.90` 缩小语义已移除，只有真实越界才执行 fit clamp。RAW Drawable 直接一次绘制到 physical artwork，分身装饰位于 normalizer/artwork 之后、原版阴影之前；ActiveIcon 内部内容冻结，仅根节点共享外部 geometry；桌面设置保留特殊 renderer 并共享用户尺寸。Weather/Calendar 在动态关闭后的静态 fallback 共享同一 `230/295` 外部 geometry，但不再进入普通静态 Normalizer，避免静态状态额外缩小约 3%；最终纹理键升级到 `raster:v12-weather-calendar-geometry`。vivo X21A Android 9、1080、12 宫格、100% 已确认静态 Weather/Calendar 的 `normalizerScale=1.0`、`resampleCount=1`，动态开关即时切换后外轮廓基本一致。动态图标内部未修改；50/150、20 宫格、1440/2K 按冻结阶段顺序仍未执行。
+- 2026-08-11 图标统一 Optical Layer 最终收口：审计确认普通静态合成当前已经只按 RAW 的最外围 alpha bounds 等比 fit 到由 `LayoutProperty/IconVisualMetrics` 派生的固定 artwork envelope，面积、凸包、fill ratio、内部留白、形状和 source identity 均不参与最终倍率。此前残留的 `SmartisanIconNormalizer` 面积补偿类已删除；兼容字段 `icon_size_origin_resize` 在唯一 `LayoutPropertyAdapter` 入口强制等于 `icon_size_origin`，因此旧 `Aa/e.s` 静态路径不再取得较小 artwork target。DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 和桌面设置虚拟项继续只切换 RAW source；用户 50%–150% 仍只经现有 LayoutProperty 一次生效，Weather/Calendar 只对齐 root 外框，内部原版动画不变。缓存版本升级为 `raster:v14-unified-outer-envelope`，revision 变更会刷新旧缓存。`build.bat` 与 v1/v2/v3 签名通过，APK SHA256 `49BABA75B20FD0456026179D379AAF15DAFA03AAD790EA37E9C8581F5298648E`，已覆盖安装 vivo X21A。覆盖安装后首次前台启动捕获到既有 `UninstallApp.java` GLThread `V.Xo()` null 竞态；立即重启 Launcher 后稳定在 `LauncherAlias`，未复现。该竞态与图标 optical 链无调用关系，但尚未根因修复，不能把本次写成完整冷启动稳定性 PASS。50/150、20 宫格、图标包/CUSTOM、1440/2K 仍待用户可视回归。
+
+- 2026-08-11 QuickSearch FINAL FREEZE + CLEANUP：用户确认当前真机 UI/交互基本无问题后，QuickSearch 正式收口为 `QUICKSEARCH_FEATURE_FROZEN / EMULATOR_FULL_PASS / VIVO_RUNTIME_PASS`。Q1-B 改为 `REFERENCE_BENCHMARK_NOT_REQUIRED_FOR_RELEASE`，Q3 保持 non-blocking，Q8-E 改为未来独立扩展，原版 optional fields 统一为 `NON_BLOCKING_REFERENCE_GAPS`；不再把它们写为功能待完成。最终状态文档重写为当前生产架构、功能、验证、禁用链路与冻结规则，原版基线审计和完整本日志保留，15 份 Q1-Q12 阶段流水删除。清理 `build/quicksearch_final/` 1,595 个文件、294.51 MiB 的重复证据与视频分析依赖；不保留二进制截图，最终设备/结果/SHA 收口到状态文档。Production Reachability Audit 确认 Screenshot Session 类与 `launcher_original_qs_preview` 设置 Preview 跳转没有 Java/Smali/Manifest/resource/reflection/build 引用，故删除 `OriginalSearchBackgroundSession` 和该死分支；正式 `OriginalSearchTransitionHost` 的 live-surface 链、Contacts opt-in、图标 generation hydration、增量无闪和 1000ms/镜像手势门槛均保留。最终 `build.bat` 成功，APK `v1.5.5/30`、SHA256 `C64FFE3493CC36D4EBE18F6B76BF4C41467556B67C47EC05F75CBF3DEC6853E6`，v1/v2/v3=true，二进制 Manifest 含非导出 `OriginalQuickSearchActivity` 与 `READ_CONTACTS`。新版已安装 emulator-5554 与 vivo X21A；vivo 将 Launcher 前台后 800ms 上滑进入 Original，`QS_FORMAL_ENTRY_TARGET` 与 `QS_ICON_HYDRATE` 完整、无 FATAL/ANR/CME。API36 模拟器新版 Launcher 进程启动正常且无崩溃，但其不是默认桌面，ADB 注入的两方向手势均不进入搜索，故不把该次手势样本误报为 PASS；完整 API36 语义矩阵仍以此前记录为准。未提交、未推送；`MEMORY.md` 已写入长期防回归规则。
+
+- 2026-08-11 桌面搜索手势可靠性修复：`FlingUpGesture` 沿用原版 500ms 抬手时限，vivo X21A 上同一条桌面主体滑动 450ms 可进入搜索、800ms 则无 `QS_GESTURE_TRIGGER`，导致正常手速经常被静默拒绝；方向反转后还曾错误沿用原版终点四分之一屏门槛，使上滑终点越靠近顶部越容易失败。现按方向镜像位置门槛（正常上滑检查起点、反转下滑检查终点），并仅将手势完成时限放宽为 1000ms；150px、纵向角度、单指、无反向移动、编辑/切换状态保护及方向开关语义均保持不变。构建、签名、vivo X21A 覆盖安装成功；800ms 上滑首次验证及连续返回后 3/3 轮均进入 `OriginalQuickSearchActivity`，日志 `QS_FORMAL_ENTRY_TARGET target=ORIGINAL` 完整，未见 Launcher FATAL/AndroidRuntime。Dock 仍按原版归属其交互节点，不纳入桌面主体搜索手势。
+
+- 2026-08-11 QuickSearch Q12-B 真机双链闭环：vivo X21A（Android 9/API 28）已授权 `READ_CONTACTS`，覆盖安装修复版后从本项目 Launcher 上滑进入 `OriginalQuickSearchActivity` 成功。联系人源首次查询从 `contactsGeneration=0/count=0` 异步发布为 generation=1/count=414；随后使用非 PII 单字符查询得到 `contactCount=4`，证明 ContactsContract 读取、索引发布、统一 matcher 与结果提交均已实际工作。根因之一是旧 `enable()` 以对象身份比较 `ContactSearchSnapshot.EMPTY`；权限曾撤销/关闭后 `disable()` 已换成新的空快照，重新授权不会再排队重建。现以 `indexReady` 表示本授权周期是否真实完成索引。图标链首个根因是全局图标源失效只清 SearchIconBackend 缓存而不让搜索页重水合当前 Snapshot；现以 source generation 驱动一次后台水合并在完成后重绑 Top Apps/结果 Adapter。真机实际 `entries=32`、hydrate `dbLoaded=32/misses=0`、水合刷新完成；本轮窗口未见 FATAL/ANR/CME/AndroidRuntime。安装的 APK SHA256 为 `B97B058CBD3EC5E84EC9B62B0E40E1850C19577EA75FA16C87262E41788E4677`，v1/v2/v3 签名通过。未读取、输出或记录联系人姓名/号码/查询原文，未提交、未推送、未更新 MEMORY.md。
+
+- 2026-08-11 联系人无照片图标修复：用户真机截图确认 ContactSuggestion 无照片时误用 `android.R.drawable.sym_def_app_icon`（绿色 Android 机器人）。现不再使用该占位图；优先联系人缩略图，缺失时从现有 SearchSnapshot 精确复用 `com.android.contacts` 桌面项经 `SearchIconBackend` 得到的当前图标，因此会跟随当前主题/图标包/桌面重定向。构建与真机覆盖安装完成，真机上滑、图标水合 `32/32/miss=0`、无 FATAL/ANR/CME 通过。ADB 无法提交该机中文 T9 组合，故最终中文联系人行的像素级截图由用户手指操作确认；不把该项误报为自动化视觉 PASS。未新建 PackageManager 查询、未添加资源、未提交、未推送。
+
+- 2026-08-10 QuickSearch Q12 增量 query 防闪：根因是 `OriginalQuickSearchActivity.requestFilter()` 每个非空字符都在后台 match 完成前将 Application Header 设 GONE，随后又提交 rows/header，形成可见中间空帧；同时 Adapter 以 position 作 ID 且会清掉同一条目的缓存 icon。现 non-empty→non-empty 保持 QUERY State、白色结果面、ListView 和已有 Header，只对最新 generation 原子提交不可变匹配结果；Adapter 用 `entryKey` stable ID，并保留同 key 已解码 icon。`emulator-5554` 的 `phone→phon` UI dump 证明 Header、结果容器和 Phone row 连续存在。原版 `base.apk` 明确有 `READ_CONTACTS`、ContactsContract、ContactSuggestionView 与 lookup URI，结论 `PRISTINE_CONTACT_SOURCE_CONFIRMED`；但原版依赖 suggestion corpus/Smartisan producer，Launcher 的标准 ContactsContract opt-in 兼容源尚未实现，当前不会读取联系人、不会声明/申请联系人权限。未改 Q9/Q10、SearchBar/Header geometry、History、Top Apps、手势、RootView 或 SMEngine，未修改 MEMORY.md、未提交、未推送。
+
+- 2026-08-10 Q12 停用 QuickSearch Screenshot Background：用户 30fps 视频已经证明旧 Q10 的 `PixelCopy` async fallback/handoff 引发 OPEN `55→200`、EXIT `214→55` 的整屏亮度突变，并在第二次打开出现 fallback→截图替换。生产链现为透明、`windowDisablePreview=true` 的 Activity 从 live Launcher 直接进入同一条 Q9 0..300 progress；空态根 `qs_original_content_background` 与状态/导航栏 alpha 同步渐变，Query 白面不变。`OriginalSearchTransitionHost`、`OriginalQuickSearchActivity` 不再调用 capture/blur/session，日志 10 个正式手势完整 enter/exit 均为 `capture=0 blur=0 bitmap=0`，FATAL/ANR/CME/OOM/WindowLeaked/BadToken/IllegalStateException/ResourcesNotFound/InflateException=0；`phone→Phone`、IME 延迟到 transition end 后显示、非空 query Back 清空与空 query Back 退出均通过。模拟器录屏实际 6.8fps，保留逐帧 contact sheet 但不能替代用户视频要求的 30fps 门禁；因此状态为 `EMULATOR_RUNTIME_PASS / 30FPS_FRAME_CAPTURE_UNVERIFIED / REAL_DEVICE_FINAL_VISUAL_CONFIRM_PENDING`。未操作 vivo，未修改 matcher/Snapshot/History/Top Apps/手势识别/RootView/SMEngine，未提交、未推送、未更新 MEMORY.md。
+
+- 2026-08-10 修复桌面“桌面设置”入口在英文系统仍显示中文：根因是 Launcher 自有 `ThemeChooserActivity` 虚拟桌面项的 `ItemInfo.title` 在模型重建时未经过本地化资源刷新，同时 Native 设置宿主仍有两处中文硬编码。`MaintainedLauncherSettingsHost.displayNameForDesktopItem()` 现对该固定组件优先读取 `launcher_setting_name`，从而覆盖旧 locale 的持久化标题；`NativeLauncherSettingsHost` 的页面标题改用同一资源解析。未改搜索、手势或 RootView/SMEngine。
+
+- 2026-08-10 Smartisan QuickSearch Final Convergence 已在唯一自动化设备 `emulator-5554`（Android 16/API36）连续完成 Q8-C.2→Q9→Q10→Q11。Q8-C 使用 READY=19/duplicates=0 的真实 Snapshot 通过 literal/case/full-pinyin/initials/multi-token AND/stable ranking/rapid generation/zero result，保持 `PRISTINE_OPTIONAL_FIELDS_UNCONFIRMED`。Q9 恢复 pristine 0..300、350/300ms、AccelerateInterpolator、150px gate 与反向退出；Q10 定位到 PixelCopy Window 会遗漏 Launcher GL icon Surface，改为优先公开 `PixelCopy.request(SurfaceView,...)`，两个桌面页 source/blur signature 均不同，Query 白面无回归；Q11 完成 IME composing Back、result/singleTask/Dialog/HOME/portrait/locale/font 和 Bitmap 生命周期。最终状态门控 10 轮 host/capture/blur/enter/exit/destroy 均为 10，PSS 64,542→94,120KB、正常 trim 后 72,980KB，FATAL/ANR/CME/OOM/Verify/ResourcesNotFound/Inflate/WindowLeaked/BadToken/Launcher IllegalStateException=0。最终 APK v1.5.5/30、SHA256 `5BF1604B0FFC2A96EF145CAD694EC1C9247ED4426DB084AD7B0478E9B79BF830`、v1/v2/v3=true，覆盖安装到模拟器后拉回 hash 一致，正式手势/SurfaceView capture/`phone`/Back 清空与退出冒烟通过。状态 `QUICKSEARCH_CORE_COMPLETE / EMULATOR_FULL_PASS / REAL_DEVICE_FINAL_VISUAL_CONFIRM_PENDING`；未操作 vivo、未安装任何测试/独立 QuickSearch APK、未开始 Q8-E、未提交、未推送。
+- 2026-08-10 QuickSearch Q8-D 完成 Android 16 模拟器自动化 Presentation 闭环。`emulator-5554` 使用应用内 explicit preview 入口；Launcher warmup 后 Snapshot=`count=19/duplicates=0`。发现 pristine `menu_dialog` 的 public `MenuDialogTitleBar` 在现代 Framework 上被测量为整窗高度，导致按钮落到屏外；仅补回原版 `smartisan_title_bar_height=48dp` 约束。修复后 Dialog root 为底部 WRAP_CONTENT，title=48dp，Clear=48dp，18/18/24dp 间距恢复；X、Back 保留历史，Clear 清空历史，Phone 查询/打开/历史重建、white Query Surface、zero result、三轮重开均通过。最终日志 FATAL/ANR/CME/ResourcesNotFound/Inflate/Class/VerifyError=0，APK v1.5.5/30、v1/v2/v3=true、SHA256 `E19E6386BE087A52B55C18AA4E30BE85E55EF84F49705F69F6D2D14D5EA5CE07`。状态 `EMULATOR_PASS / REAL_DEVICE_VISUAL_CONFIRM_PENDING`；未操作 vivo X21A，不进入 Q8-E/Q9。
+- 2026-08-09 QuickSearch Q8-D.5 完成 pristine presentation 资源统一。真机淡蓝带旧 owner 已静态闭环：pristine `search_activity.xml/search_bar.xml` 没有独立 `secondary_bar_shadow`，移植版额外插入的 8dp shadow ImageView 才把淡蓝页面背景形成可见带；旧 wrapper 结论降级为 `PARTIAL_ROOT_CAUSE`。现删除 shadow 节点，Query/Empty 直接锚定 SearchBar；Header 直接 include pristine `header.xml`，结果 Adapter 直接 inflate pristine `application_suggestion.xml`。清空历史不再手拼 Dialog 或使用模拟 panel/button，而由 `OriginalMenuDialogCompat` 通过 external `uiContext/uiInflater` 直接 inflate pristine `menu_dialog.xml`，同名 `MenuDialogTitleBar/ShadowButton/ApplicationSuggestionView` 只提供公开 API 兼容宿主，layout/style/selector/9-patch/geometry 归原版资源所有；title shadow/divider 也按 pristine BarsHelper 几何使用原版 bitmap 恢复。History 数据、Search backend、IME、Gesture、RootView/SMEngine 均未修改。`build.bat`、resource dump、badging、diff check、v1/v2/v3 均通过，APK SHA256 `573801C1F331C5679BFFA7BEEF2B1509AD141A0769E531FEB1075785DDD0B420`；安装 0，状态 `CODE_COMPLETE / RUNTIME_PENDING`，不进入 Q8-E/Q9。
+- 2026-08-09 QuickSearch Q8-D.2 完成静态收口：pristine `BackgroundView`/`search_activity.xml`/`HeadersListView`/应用 header 与行资源审计确认空态淡蓝灰 fallback 与查询结果 surface 分层；查询容器改为 MATCH_PARENT 白色，避免单结果以下错误露出淡蓝灰。Q8-D.1 的 `Resources$NotFoundException` 根因确认是 2 处 external drawable ID 进入宿主 `setBackgroundResource()`，均改为 `uiResources.getDrawable()` + `setBackground()`；其他 Original QuickSearch 资源调用未发现同类风险。`build.bat`、签名和 diff check 已通过，APK SHA256 `6B67C42FD27F5975579DB16247233669F8852C2B15140FE49C3814A3089A4182`，versionName/versionCode=`v1.5.5/30`，v1/v2/v3=true。严格不安装，等待 Q8-D.3 明确授权。
+- 2026-08-09 QuickSearch Q8-D.3 执行唯一一次授权的 Launcher 覆盖安装，`adb install -r` 超时；设备复核仍为 `v1.5.5/30`、`lastUpdateTime=2026-08-09 22:44:07`，设备 APK SHA256 `e09a29f2ef4404eeeab123fcf48144f8f3eace24749150977bd58a8da55329d7`，与 Q8-D.2 目标 `6B67C42F...` 不一致，前台为 PackageInstallerActivity。按规则未重试、未注入手势、未执行真手验收；Q8-D.3=`INSTALL_TIMEOUT / UNVERIFIED`，Q8 不得判 PASS，不进入 Q9。
+- 2026-08-09 Q8-D 继续修复 Query 顶部几何：用户截图确认 SearchBar shadow 与 Application Header 之间出现淡蓝缝隙。审计发现 `qs_original_content` 共同父容器使 EmptyState/QueryState 不能直接锚定 shadow；现移除 wrapper，两个状态直接同级并 `layout_below=@id/qs_original_search_bar_shadow`，Top Apps 24dp 间距仅保留在 EmptyState 内部。`build.bat`、v1/v2/v3、diff check 通过，APK SHA256 `E9A27840F216E333C0467BC60931A13936156C8BFD01F6A9434DB1DE6201FC64`；本轮未安装，状态 `FIXED_CODE / RUNTIME_PENDING`，不进入 Q8-E/Q9。
+- 2026-08-09 Q8-D.4 真机回放暴露布局回归：`qs_original_search_activity.xml` 为 `<include layout="@layout/qs_original_empty_view">` 添加了显式 `android:id=qs_original_empty_content`，覆盖了被包含根节点原有的 `qs_original_empty_layout` ID；`OriginalQuickSearchActivity` 初始化时因此得到 `emptyLayout=null`，Query 首次绑定在 `requestFilter()` 的 `emptyLayout.setVisibility()` 抛出 NPE，Launcher 进程退出。ADB 日志确认 FATAL 位置为 `OriginalQuickSearchActivity.java:734`，与手势/Backend 无关。当前 Q8-D=`RUNTIME_FAIL / FIX_REQUIRED`；未重复安装，未进入 Q8-E/Q9。
+- 2026-08-09 Q8-D.4 崩溃最小修复完成：移除 `<include>` 显式 ID，恢复 `qs_original_empty_layout` 查找；Query/Empty 同级顶部几何保持不变。`build.bat`、v1/v2/v3、diff check 通过，APK SHA256 `D2619E0899444FF7AB4E78833A8568CD3F278513192001906249B61CF62FDBF3`；未安装，状态 `CRASH_FIX_BUILD_COMPLETE / RUNTIME_PENDING`。
+
+- 2026-08-09 QuickSearch Q8-A 已完成 pristine History 审计和最小恢复：原版证据确认 query/application 两类记录、`(content,type)` 去重、timestamp DESC、最多展示 20 条、应用历史优先启动、query 历史回填 SearchBar、clear 确认语义及 `FlowLayoutEx` 6dp/10dp/两行布局。新增 `SearchHistoryRepository` 后台 SharedPreferences snapshot、HistoryFlowLayoutCompat、pristine tag/clear 资源复用；Top Apps 与 History 独立。同步新增 `VerticalGestureDirectionConfig`，在 ACTION_DOWN 冻结 `vertical_gesture_direction_reversed`，保持原阈值/角度/长按/拖动/Dock/CANCEL 链，NORMAL 上滑搜索/下滑面板，REVERSED 换向；旧 `swipe_up_search_enabled`/`swipe_down_system_panels_enabled` 继续按功能语义兼容。`build.bat`、`git diff --check`、badging `v1.5.5/30`、v1/v2/v3 均通过，唯一一次 vivo X21A 覆盖安装成功，最终 APK SHA256 `15A85BEC2A6E2F4ED79DC46426FA502675239EDE6C797C21B7E741EFEEC4A90B`。用户真实操作日志证明 Original Search facade 多次进入、History count 1→4、应用结果/History 点击和重开持久；采集窗口未见 Launcher FATAL/ANR/CME/VerifyError。由于日志未出现 reverse toggle、system-panel owner/CANCEL、clear confirmation、Top Apps off 或反转方向样本，相关真机 Gate 记为 `UNVERIFIED`，不将未证明项标 PASS；不再安装、不提交、不推送。
+
+- 2026-08-09 QuickSearch Q8-B 已完成 IME 生命周期实现与设备样本：pristine 审计确认 `SearchBar` 使用公开 `InputMethodManager.showSoftInput`、主题 `adjustNothing`，无固定延迟/轮询；`OriginalQuickSearchActivity` 新增会话级 pending/generation、resume/window-focus/attach 触发和最多一次下一消息循环重试，普通 Resume 不创建新会话，`singleTask` `onNewIntent` 会重新置 pending。`build.bat`、v1/v2/v3 签名、badging、diff check 通过，唯一一次 Launcher 覆盖安装成功，APK SHA256 `2F36D60EA62D5EA51EAF8A6891FFA302E6A868B612DB44D000EE205402F8709D`。设备三次真实上滑样本均从正式入口到 IMM false→next-loop true 完成，未见 FATAL/ANR/CME/VerifyError；当前日志均为 SWIPE_UP 且 Activity 重建，REVERSED、普通 Resume 不重拉、singleTask 重入和清除后重进未完整采集，Q8-B=`UNVERIFIED`，不进入 Q8-C，不提交、不推送。
+
+- 2026-08-09 QuickSearch Original UI 最终体验收口：针对用户截图确认的视觉偏差，搜索栏不再使用灰色 `secondary_bar.9.png` 作为底色，改为白色外层并单独叠加 pristine `secondary_bar_shadow.9.png`；Top Apps 使用原版 42dp 图标、12dp 粗体文字并去除额外 drawable padding；History 继续复用原版标题/清除按钮/标签 9-patch/PNG 及 6/10dp 间距。由于 pristine `BackgroundView` 的淡蓝灰来自桌面截图加 `#e6ffffff` 白色叠层，而旁路 Activity 无法在不改 RootView/隐藏截图 API 的前提下复用截图，新增资源层 `qs_original_content_background.xml` 作为淡蓝灰 fallback。最终 `build.bat`、diff check、v1/v2/v3 签名通过，APK SHA256 `9A106EC54161DE79F30192455CE33D8B1D50C8CB1CDD9D532AA8E54556D89DDC`，覆盖安装成功；REVERSED 和最终视觉用户复核仍为 `UNVERIFIED`，不提交、不推送。
+
+- 2026-08-09 QuickSearch Q7 已完成 pristine SearchActivity/SearchActivityView/SearchBar 行为审计、Original SearchBar/Top Apps/Suggestions 正式绑定和展示层 cutover。最终 APK `856F0176A13709D6F6A39FF32BE4E0714109BF69B3F03F83A6B7B6EA0BCA1948` 只覆盖安装一次且设备拉回哈希一致；Preview 的 clear/cancel/Back/重开、Top App 2/2、`dianhua`/`dh -> 电话`、普通 suggestion 点击均通过。用户真实手指正式上滑门禁采集到 4 个有效样本（要求 3 次，按 3/3 PASS），全部进入 Original，request→bound 为 256/247/268/261ms；Maintained 正常展示=0、fallback=0，正式 `dianhua` 点击电话成功。Launcher 正式窗口批量 DB/PM/decode/UsageStats/ICU/网络/legacy loader 均为 0，FATAL/ANR/CME/Verify/ResourcesNotFound 均为 0。正式桌面上滑展示层已由 Maintained Search 切换为 `OriginalQuickSearchActivity`，Q7=`PASS`；RootView/FlingUpGesture 识别/SMEngine 未改，下一阶段为 Q8，但本轮不启动 Q8、不提交、不推送。
+
+- 2026-08-09 QuickSearch Q6.2 已修复 Original consumer 的独立 token state：Q5/Q6 共同引用进程级 `SharedSearchMatchModel`、同一 scorer 和同一 READY 边界，Q6 未 READY 时使用 weak listener 按当前 query/generation 事件驱动 replay，不再创建私有 SearchEntry 或在 Q6 matcher executor 串行运行 ICU。最终 APK `F7EA2D2434BB4CA2215E84610D7DFE3EABB6472BA611C2BCBF301452D75AC7C4` 只覆盖安装一次且设备拉回哈希一致；Snapshot=32，`dianhua -> 电话`、`dh -> 电话` 均通过，真实 `o` 查询返回 32 条并记录 `firstBefore=0 -> firstAfter=8, recycledBindCount=8`。Back/重开/再 Back 正常，FATAL/ANR/CME/Verify/ResourcesNotFound 均为 0，测试 App/第二 QuickSearch APK=0。Q6 最终 `PASS` 并冻结，下一阶段为 Q7，但本轮不启动 Q7、不提交、不推送。
+
+- 2026-08-09 QuickSearch Q6.1 已将最终修正版 `7AA87ED146A61BE5DE5C931003668A472484DA5286802A22F0322A50FE8B5027` 唯一一次覆盖安装到 vivo X21A，设备拉回 SHA 完全一致。Original Preview 首次/重开均正常，旧 `0x7f010000 -> attr/layoutManager` 命名空间碰撞及 ResourcesNotFound/Inflate/ClassNotFound/Verify/FATAL/ANR/CME/OOM 均为 0；Snapshot=32，空态 5-slot Top Apps、原版 SearchBar、真实图标、`dh -> 电话`、Back 和 Insets 均通过。实际 SearchBar=`0,84,1080,144`，Top Apps=`54,300,1026,480`，Top/Result icon=`108/90px`，row=`1080×180px`。但 `dianhua` 在 Original UI 中没有显示 Q5 已验证的“电话”结果；`dh` 又只有一个结果，滚动没有形成有效位移/recycle 样本。因此 Q6 最终为 `FAIL / UNVERIFIED`，不进入 Q7；正式入口仍为 Q5 Maintained Search，测试 App/第二 QuickSearch APK=0。
+
+- 2026-08-09 QuickSearch Q6 已完成 pristine 原版 UI 资源树审计、可见 Skeleton 迁移和同 APK Preview 接线。原版 layout/9-patch/selector/尺寸通过无代码资源 APK 内嵌，不安装第二个 package；Activity 为 non-exported/portrait，正式上滑仍保持 Q5 Maintained Search，数据/图标只读 Q5 Snapshot/Backend。唯一一次 vivo X21A 覆盖安装成功，但 Preview 首开因外部资源 Context 继承 Launcher Theme 发生 `0x7f010000` 命名空间碰撞并抛出 `Resources$NotFoundException`。最终源码已改为独立 framework Theme 和同 Context 嵌套 inflater，`build.bat`、diff check、badging v1.5.5/30、v1/v2/v3 均 PASS，APK SHA256 `7AA87ED146A61BE5DE5C931003668A472484DA5286802A22F0322A50FE8B5027`；遵守一次安装上限未重装修正版，故 Q6 真机闭环为 `UNVERIFIED`，不进入 Q7。
+
+- 2026-08-09 用户使用真实手指确认 Launcher 刚启动后的正式上滑搜索交互正常，补齐 Q5.2 Early Search 唯一缺口；此前 Cold/Warm、Snapshot、图标、拼音/首字母、点击、内存和稳定性证据继续有效。因此 Q5 最终状态由 `UNVERIFIED` 更新为 `PASS`，允许开始 Q6。该结论来自用户真机确认，不把此前未触发的 ADB 注入样本伪装成有效样本。
+
+- 2026-08-09 QuickSearch Q5.1 最终修正版已用唯一一次安装命令覆盖到 vivo X21A，设备/本地 APK SHA256 均为 `3B54D46B8635AF76F95E0C3B1FF217737F8C02E0BF052B15BAECB5C443A30C47`，测试 App=0。两次 Cold-A 均为 Snapshot=32、duplicates=0、READY legacy loader BEGIN/END=0、Top5 decoded 5/5；UI mapping 14/15ms，原 1150ms 主线程 ICU 阻塞消失。Cold-A 图标空白 median=0ms；5 次有效 Warm 图标空白 median/P95=0/0ms；拼音和首字母各 3/3，普通应用点击 3/3，PSS 218353→190967KB，Launcher 相关 FATAL/ANR/CME/OOM/VerifyError/IllegalStateException 均为 0。唯一一次 Early Search 在 model READY 前注入的 ADB 上滑没有产生 `QS_SHOW_TRIGGER`，不是有效搜索样本，不能验证 shell、Snapshot 阻塞及 READY 自动补数据三个必选条件；未重试。因此 Q5 最终仍为 `UNVERIFIED`，不开始 Q6。
+
+- 2026-08-09 QuickSearch Q5 已完成正式 Backend 接线但最终真机结论为 UNVERIFIED。`showSearchPage()` 正常 Snapshot READY 样本确认 entries=32、duplicates=0、`QS_LOAD_ENTRIES_BEGIN/END=0`，初始 Top5 decoded=5/5；但唯一安装构建的首个 Cold-A 页面首次可见为 1305ms，`QS_SHOW_COMPLETE elapsedMs=1150`。根因是 UI model 构造在主线程为 32 条逐个初始化 ICU Transliterator；同时 UsageStats 恢复当前 Top5 排序后预热命中降为 decoded 1/5、encoded/async 4/5，说明 Q4 `usageCount` 预热 identity 与 Maintained UsageStats identity 不一致。按 Q5 规则立即停止剩余矩阵，最终源码把拼音 token 延后到后台，首帧只映射 label/identity/icon；Backend hydration 在后台预计算同一份 30 天 UsageStats、按 package 去重预热 Top5，UI 直接复用，并补齐页面 detach 时取消 IME deferred callback。最终 `build.bat`、`git diff --check`、v1/v2/v3 均 PASS，APK SHA256 `3B54D46B8635AF76F95E0C3B1FF217737F8C02E0BF052B15BAECB5C443A30C47`。本阶段 Launcher 覆盖安装 1 次成功，测试 App=0；安装额度已用完，最终修正版未重装，Cold-A/Warm/Early/查询/点击/内存仍不能判 PASS，不开始 Q6。
+
+- 2026-08-09 QuickSearch Q4.3 Safe Icon Hydration 已完成并使 Q4 最终 PASS。源码审计确认 `ItemInfo.Oe()` 在 `Aa.nc()` clone 上只按保留的 id 从 `table_icons` 读取当前 dark/light/transparent PNG BLOB，普通 user 不生成 Bitmap、不写库、不发 UI/消息、不访问 PM/网络；分身 user 只在返回值上后台生成已装饰徽标 PNG，不污染 `Aa.fi`。新增独立低优先级 `QuickSearchIcon` 单线程、有界 encoded access-order cache（heap/32、2–8MiB）和按原版 36dp 目标/12 个首屏槽位计字节的 decoded cache；package 和现有 theme/source/custom/improved/online/icon-size 更新边界会失效并在新 Snapshot 后重水合。vivo X21A 唯一一次覆盖安装/冷启动：first frame 395ms、model ready 2506ms、index ready 32；hydration 1 ready + 31 DB、0 fallback、0 miss、1,252,512 bytes、76ms；Top5 108px 解码 5/5、233,280 bytes、15ms；PSS 142,893→145,201KB（+2,308KB）。工作均发生在 first frame 后后台，主线程批量 DB/PM/decode=0，网络=0，无 FATAL/ANR/CME，测试 App=0。SearchEntry/Snapshot 仍 bitmap/blob-free，正式搜索仍走旧路径，Q5 未启动。
+
+- 2026-08-09 QuickSearch Q4.2 已证明调用链实际可达。此前 `QS_INDEX_READY` 可见但 `QS_ICON_BRIDGE`/decode 消失，不是 Repository 未调用：两者同为 `Log.i`，但 vivo user build 会过滤旧 `QS_ICON_BRIDGE` TAG；shell 同级探针只有 `QS_INDEX` 可见。最小修复将 Q4 诊断统一到 `QS_INDEX` TAG，并在 Repository 调用前后增加 CALL_BEGIN/CALL_END/FAILED。最终 APK 的 `classes2.dex` 只有一个 `SearchIconBridge`，三个诊断/读取方法及 invoke 均存在。一次授权覆盖安装和一次冷启动得到 entries=32、hits=1、misses=31、invalid=0、lookup=58ms；top5/all-hit 均只解码 1 个 34832-byte PNG、3ms、成功 1。`Aa.nc()` clone 确实复制 `iconData`，低命中根因是绝大多数原 `Aa.fi` 项目在 READY 时尚未通过懒加载 `ItemInfo.Oe()` 填充该字段。Q4.2 调用诊断 PASS，但 Q4 仍 UNVERIFIED，当前读取点不足以进入 Q5；正式搜索未修改，测试 App 0，不提交不推送。
+
+- 2026-08-09 QuickSearch Q2 已建立旁路 `SearchIndexRepository`：不再在首帧后重新全量扫描 PackageManager，而是后台读取现有 `LauncherModel/Aa.nc()` 的克隆数据，生成不持有 Drawable/Bitmap 的不可变 Snapshot。warmup 同时等待 `LAUNCH_FIRST_FRAME` 与原版 `J.MESSAGE_COMPLETE/LAUNCH_MODEL_READY`，避免模型尚空时发布 READY(0)。vivo X21A 五次冷启动均得到 32 条、重复 0，build 中位数 23ms/P95 28ms；Q2 前后首帧中位数 241/253ms，索引实际在约 2.3s 模型完成后才启动，未阻塞首帧。正式搜索仍走旧 `loadSearchEntries()`，Q1-B 继续等待 Smartisan 真机，尚未进入 Q3。
+
+- 2026-08-09 QuickSearch Q4 `SearchIconBridge` 已完成代码和静态审计：当前桌面最终 GL texture 为临时产物，不能反向读取；最合适的旁路读取点是 `Aa.nc()` 当前 `ItemInfo` clone 中已存在的 `iconData` PNG 字节。新增 Bridge 只按 `packageName + componentName + userId` 匹配 Q2 `SearchEntry.iconKey`，返回短期 `IconHandle`，不复制 Bitmap、不访问磁盘、不调用 PackageManager、不联网；未命中返回 MISS。Q2 模型 READY 后增加一次汇总 `QS_ICON_BRIDGE_BEGIN/END` 旁路诊断，正式搜索仍未接入。`build.bat` 成功，最终 APK `v1.5.5/30`，SHA256 为 `31B55A7E5BA96706997CC33E71155F43F6582976804C794E97CC5D09C26E3C26`，v1/v2/v3 签名有效。当前设备允许的 Launcher 单次覆盖安装命令超时，设备仍报告 `com.smartisanos.launcher` v1.5.5/30；启动后未采集到新的 `QS_ICON_BRIDGE` 日志，因此冷启动 5 次、暖态 10 次命中率和 PSS/Java heap/Graphics 对比均保持 UNVERIFIED。未安装任何测试 App，Q3 仍为 UNVERIFIED/NON_BLOCKING，Q5 未启动。
+
+- 2026-08-09 Q4.1 已加入 `SearchIconBridge.diagnoseDecodeCost()`，只对 HIT 的 PNG bytes 做 top5/all-hit `BitmapFactory.decodeByteArray()` 汇总计时，Bitmap 每次立即 recycle，不改正式搜索、不建永久缓存。按用户重新安装授权，当前 Launcher `v1.5.5/30` 已成功覆盖安装一次（`lastUpdateTime=2026-08-09 17:07:32`）；设备无 `com.smartisanos.qstest`。一冷启动和三次暖态拉起均未出现 `QS_ICON_BRIDGE_BEGIN/END` 或 `QS_ICON_DECODE_BEGIN/END`，但 `QS_INDEX_READY generation=1 count=32 duplicates=0` 正常，未见 FATAL/ANR/ConcurrentModificationException。故图标桥命中率、lookup/decode 成本和 Q5 策略仍为 UNVERIFIED；不再安装、不补测、不启动 Q5。
+
+- 2026-08-09 桌面双指捏合进入的编辑/多选模式顶部标题已改为真实异形屏几何避让。实际标题由 SMEngine `view/Lc.smali` 创建，并非 Android `TextView`；旧逻辑仅在 `sa.ub()` 命中特定原版设备时使用固定左边距，普通移植设备始终按屏幕中心放置，所以 vivo X21A 的中心刘海会覆盖文字。当前由 `EditModeHeaderCutoutCompat` 读取运行时 `WindowInsets/DisplayCutout`、真实标题纹理宽度和 Launcher scene 宽度：默认保持原版居中，发生相交后依次尝试左、右和最大安全段；多开孔先合并阻挡区。中心宽刘海导致标题无法完整放入任一侧时，使用系统顶部 safe inset 作为圆角保护边距，不使用机型表或固定像素。vivo X21A Android 9（1080×2280，刘海 `Rect(358,0-722,79)`）已覆盖安装并由双指捏合真机确认标题左边缘约 79px，与原版截图的非贴边布局一致，Launcher 无崩溃。无刘海、左/右挖孔、药丸孔及多开孔为算法覆盖，尚未逐台真机验收。
+
+- 【已废弃】2026-08-08 图标系统的 `SmartisanIconNormalizer` 面积/凸包/fill-ratio 光学补偿方案；已由 2026-08-11 外围可见包络统一方案完全取代。
 
 - 当前几何算法不包含 package/sourceType/device 专用倍率，跨设备只由 `sceneMode + cellWidth + gridMode + surfaceWidth + iconSizeSetting` 推导 logical/physical 尺寸；因此实现层已经统一，不会因换手机自动走另一套大小算法。但目前只有 vivo X21A 的 1080/12 宫格/100% 完成真机闭环，20 宫格、50/150、1440/2K 和至少一个 720 或 1220/1260 中间分辨率仍未按冻结矩阵验收，不能承诺所有手机已经通过，也不能写入 `ICON_SYSTEM_VALIDATION_FROZEN=true`。
 
@@ -102,6 +159,96 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-08-11
+
+#### QuickSearch Q12-B 真机联系人与图标水合验证
+
+- 真机：vivo X21A（`b2a4da1c`）、Android 9/API 28、1080×2280；安装前后仅使用本项目 Launcher，不安装任何测试 APK。
+- 联系人：`READ_CONTACTS=granted`、Contacts 开关已启用、Observer 已注册。首次索引完成前快照为 generation=0/count=0，完成后为 generation=1/count=414；脱敏单字符查询提交 `contactCount=4`。日志不包含联系人、号码、lookup key 或查询文字。
+- 图标：从 Launcher 上滑进入 Original QuickSearch，Snapshot=32；`QS_ICON_HYDRATE_END` 为 `dbLoaded=32`、`misses=0`，随后 `QS_ICON_REHYDRATE_APPLIED`。未使用 PackageManager fallback 或重建 SearchIndex。
+- 修复：`ContactSearchRepository` 以 `indexReady` 而不是 `EMPTY` 的对象身份决定是否应重建；`OriginalQuickSearchActivity` 在 icon source generation 改变时使用现有 Snapshot 水合，完成后只刷新已存在的 Top Apps/Adapter。`SearchIconBackend` 提供受 generation 约束的完成回调。
+- 验收边界：真机未实际切换第三方图标包，因此“切换某一个特定图标包后每个图标的像素级外观”仍需用户视觉确认；缓存清空后的同一 Snapshot 水合、联系人结果、上滑进入和稳定性均已通过。
+
+### 2026-08-10
+
+#### QuickSearch Q8-D.6 Emulator Presentation Runtime Closure
+
+- 入口与边界：只使用 `emulator-5554`，所有 ADB 命令均指定 serial；通过 exported `ThemeChooserActivity` preview extra 由应用内启动 non-exported Original Activity，记录 `ENTRY_MODE=EXPLICIT_ACTIVITY_FOR_PRESENTATION_TEST`。未触碰 vivo X21A、未安装测试 App/独立 QuickSearch、未改 Gesture/RootView/SMEngine/Search backend/History semantics。
+- 缺陷根因：原版私有 `MenuDialogTitleBar` 的 48dp 测量行为未被 public host 继承，Android 16 把 `wrap_content` title bar 扩成整个窗口，content panel/Clear 被推到屏外。补入 pristine `smartisan_title_bar_height=48dp` 并在 `OriginalMenuDialogCompat` 对 title host 应用该约束；没有重画 Dialog。
+- 验收：EMPTY Top Apps=5 和 Phone history；`phone` 命中 Phone、Application header 直接接 SearchBar、Query Surface 全白；`zzzzz` zero result 全白。Dialog 修复后 title/Clear 均 48dp，左右 18dp、top 18dp、bottom 24dp；X/Back 保留历史，Clear 清空，点击 Phone 后 history 正常重建。三轮重开均保持 Original Activity、Top Apps=5、history=Phone、空 query。
+- 稳定性与产物：最终 log 中 FATAL/ANR/CME/ResourcesNotFound/Inflate/Class/VerifyError=0；证据为 `build/q8d_emulator_{empty,query,zero,dialog,cleared}.{png,xml}` 与 `build/q8d_emulator_final.log`。`build.bat`、badging v1.5.5/30、v1/v2/v3 签名通过，SHA256 `E19E6386BE087A52B55C18AA4E30BE85E55EF84F49705F69F6D2D14D5EA5CE07`。
+- 结论：Q8-D=`EMULATOR_PASS / REAL_DEVICE_VISUAL_CONFIRM_PENDING`。模拟器不能替代 vivo X21A 最终视觉与桌面纵向手势验收；本轮停止，不进入 Q8-E/Q9，不提交、不推送。
+
+### 2026-08-09
+
+#### QuickSearch Q7 Original QuickSearch UI Binding + Formal Presentation Cutover
+
+- 原版审计：pristine SearchBar clear 只 `setText(null)` 并保留 editor；cancel 直接 finish；非空 Back 清 query、空 Back 退出；application suggestion 启动目标后保留 SearchActivity；singleTask 的新请求清旧搜索状态后重新处理。Q7 按这些行为绑定，不照搬 Maintained 页面。
+- 实现：正式 facade 的正常目标改为 non-exported/singleTask/portrait `OriginalQuickSearchActivity`，只有同步启动异常才进入 Maintained fallback。Original 只消费当前 `SearchSnapshot`、单一 `SharedSearchMatchModel` 和 `SearchIconBackend`；Top Apps 与 suggestion 共用 Q5 component/user/profile/shortcut 启动 bridge，异步图标校验 entryKey、adapter/bind generation 和 Backend source generation。RootView、FlingUpGesture 的 150px/500ms/方向/单指判断及 SMEngine 均未修改。
+- Preview：空态与 5-slot Top Apps 正常；Top App 2/2 启动成功并可返回同一 Original Activity；`dianhua` 和 `dh` 均命中电话，suggestion 点击成功且返回保留 query；clear、0 result、cancel、非空 Back、重开空态全部 PASS。Profile/Shortcut 自然样本为 `UNAVAILABLE`，身份链静态 PASS；DEFERRED/REPLAY 为 `STATIC_VERIFIED / NOT_NATURALLY_TRIGGERED`。
+- 正式 Gate：用户完成三次真实手指上滑，日志实际得到 session 6/7/8/9 共 4 个有效样本，Original target/bound=4/4，Maintained 页面=0，fallback=0；request→bound 为 256/247/268/261ms。session 8 的 `dianhua` 结果数 1、3ms，并成功启动 `com.android.dialer/.TwelveKeyDialer`；最后一次重新进入为空态，Back 回 Launcher。
+- 硬 Gate：Launcher PID 29023 的正式窗口批量 DB/PM/decode/UsageStats/ICU/网络/legacy loader 均为 0。系统日志中 vivo Calendar/Clock 进程 PID 2598/6383 的 OEM 动态图标 `BitmapFactory` 缺文件噪声不属于 Launcher。ResourcesNotFound/FATAL/ANR/CME/VerifyError 均为 0。
+- 构建与边界：`build.bat`、`git diff --check`、badging v1.5.5/30、v1/v2/v3、Manifest/Dex 静态审计 PASS；本地与设备 APK SHA256 均为 `856F0176A13709D6F6A39FF32BE4E0714109BF69B3F03F83A6B7B6EA0BCA1948`。Launcher 覆盖安装 1 次，测试 App/独立 QuickSearch APK=0；`MEMORY.md` 未更新。
+- 结论：Q7=`PASS`。正式桌面上滑展示层已由 Maintained Search 切换为 `OriginalQuickSearchActivity`，Maintained Search 仅为同步启动失败 fallback/reference。下一阶段为 Q8 Original Search Semantics；本轮立即停止，不开始 Q8、transition、ContainerView、screenshot/blur，不提交、不推送。
+
+#### QuickSearch Q6.2 Original UI Pinyin Consumer Parity + Scroll Gate
+
+- 根因：Q6.1 只复用了 Q5 scorer，却为每个 Snapshot row 创建私有 Q5 `SearchEntry`，首个查询在 Q6 单线程串行准备 32 份 ICU token，且没有消费 Q5 token READY 或自动 replay；所以这是 consumer state/readiness 缺口，不是 Q5 拼音算法、UI、Theme、Snapshot 或 IconBackend 问题。
+- 修复：Q5/Q6 统一到进程级 `SharedSearchMatchModel` 和同一生产 scorer；后台 token 准备完成后通过 weak listener 事件驱动重放仍为当前的 query/generation。Activity destroy 移除 listener、递增 generation、取消 icon request 并关闭 executor；不使用 delay、polling、主线程 ICU/DB/PM/UsageStats/网络。
+- 构建：`build.bat`、`git diff --check`、badging `v1.5.5/30`、v1/v2/v3 和最终 Dex 静态调用链均通过；最终本地/设备拉回 APK SHA256 同为 `F7EA2D2434BB4CA2215E84610D7DFE3EABB6472BA611C2BCBF301452D75AC7C4`。
+- 真机：vivo X21A 仅覆盖安装 Launcher 一次，测试 App/独立 QuickSearch APK=0。Repository 有效 Snapshot 为 32、duplicates=0；`dianhua` 与 `dh` 均返回“电话”。真实 scorer 自动选出的 `o` 返回 32 条，实际滚动 `firstBefore=0 -> firstAfter=8`、`recycledBindCount=8`；Back、重开绑定 32 条、再次 Back 正常。
+- 稳定性：Launcher FATAL、ANR、CME、VerifyError、ResourcesNotFound 均为 0。有效 Preview 开始时 shared tokens 已 READY，因此真机未自然产生 `DEFERRED/REPLAY`；该未就绪分支完成源码/Dex 静态核查，没有通过清 token 或重复冷启造样本。正式上滑入口仍是 Q5 Maintained Search；Q6 未修改 UI/Theme/Insets/Snapshot/IconBackend/RootView/FlingUp/SMEngine。
+- 结论：Q6=`PASS`，Original UI Skeleton 冻结。下一阶段为 Q7，但本轮不开始 Q7、不提交、不推送；`MEMORY.md` 未更新。
+
+#### QuickSearch Q6.1 Original UI Final Preview Verification
+
+- 安装：本地 SHA 与指定值一致后只执行一次 Launcher 覆盖安装，返回 Success；设备拉回 APK SHA256 同为 `7AA87ED146A61BE5DE5C931003668A472484DA5286802A22F0322A50FE8B5027`，v1.5.5/30，测试 App 和独立 QuickSearch APK 均为 0。
+- Theme/lifecycle：首次和第二次 Preview 均正常，旧 `0x7f010000` Theme namespace 冲突未复现；第二次 inflate/bind 为 66/111ms，Snapshot entryCount=32，四类 Q6 生命周期日志完整；目标异常与 FATAL/ANR/CME/OOM 全部为 0。
+- UI：空态、5 个真实 Top Apps、原版 SearchBar/9-patch/icon、首字母 `dh -> 电话`、Back/重开、状态栏/cutout/手势导航均通过。实际 SearchBar=`x0/y84/w1080/h144`，Top Apps=`l54/t300/r1026/b480`，Top icon=108×108px，suggestion row=1080×180px，result icon=90×90px；无设备硬编码。
+- 未通过项：Q5 已验证拼音 `dianhua` 在 Original UI 观察窗口内没有显示“电话”；首字母结果只有一行，规定的上下滑动没有形成列表位移或 recycle 样本。不能用 Q5 matcher PASS 替代 Q6 presentation consumer PASS。
+- 边界：Q6 未改正式 RootView/FlingUp/SMEngine 入口，仍指向 Q5 Maintained Search；本次单次 ADB 桌面上滑未触发搜索，不作为新的手势样本，既有用户真实手指 Q5 PASS 保持。PM 全量扫描、网络、第二 APK=0。
+- 结论：Q6=`FAIL / UNVERIFIED`，不改代码、不重复安装、不进入 Q7、不提交、不推送。
+
+#### QuickSearch Q6 Original QuickSearch UI Skeleton
+
+- 审计：只使用 pristine `original_apks/quicksearch_phone_reference/base.apk`（SHA256 `EDF915A1CA745276F07538ABEDBBF43711B20426697E45A83A4C076ED0562D66`）及其 `decoded/`；完成 SearchActivity、私有 SearchBar、empty view、5-slot Top Apps、application suggestion、9-patch/selector/尺寸/颜色依赖清单。`quicksearch_decode/` 不作为视觉来源。
+- 实现：新增 non-exported/portrait `OriginalQuickSearchActivity` 作为并行 Preview；原版可见资源编译为 Launcher asset 中的无代码资源 APK，运行时使用独立 AssetManager/Resources/Theme。数据只读 SearchSnapshot，图标只读 SearchIconBackend，匹配调用 Q5 matcher；不改 RootView/FlingUp/SMEngine，不新增 PM 扫描、Provider、网络或第二个安装包。
+- 唯一真机样本：vivo X21A 覆盖安装一次成功，已安装构建 SHA256 `7A9153F3C9AF5187B4FFFF775F272BA7CB9A6C2677643C57FB3B3AD2FFC5A115`。Preview 首开 FATAL 定位为外部资源 `0x7f010000` 继承 Launcher 主 Theme 后被误解析成 `attr/layoutManager`；已给资源 Context 使用独立 framework theme，并让嵌套 SearchBar inflater clone 到同一 Context。
+- 验证：修复后 `build.bat`、`git diff --check`、资源表、内嵌 asset、binary Manifest、badging `v1.5.5/30`、v1/v2/v3 均 PASS；最终 SHA256 `7AA87ED146A61BE5DE5C931003668A472484DA5286802A22F0322A50FE8B5027`。因一次安装额度已用完，修正版未重装，空态/查询/滚动/Back/重开/bounds 为 `UNVERIFIED`。
+- 结论：Q6 为 `UNVERIFIED`，不进入 Q7；不再安装、不提交、不推送。
+
+#### QuickSearch Q5.1 最终修正版最小真机闭环
+
+- 真机：最终 APK 通过唯一一次覆盖安装运行于 vivo X21A；设备拉回 APK 与本地 SHA256 均为 `3B54D46B8635AF76F95E0C3B1FF217737F8C02E0BF052B15BAECB5C443A30C47`，没有安装测试 App。
+- Backend/性能：两次 Cold-A 均为 Snapshot=32、duplicates=0、READY legacy loader=0、hydration misses=0、Top5 requested/decoded=5/5。UI mapping 为 14/15ms；Cold-A 页面/第一名称/第一图标/稳定/图标空白/IME median 为 176/106.5/108/112.5/0/338ms。5 次有效 Warm 相同指标 median/P95 为 135/150、83/90、84/91、86/93、0/0、304/307ms；旧 Cold 1434/1470ms 与 Warm 399/527ms 图标空白均降为 0。
+- 正确性/资源：拼音 3/3、首字母 3/3、普通应用点击 3/3；中文输入、Profile、Shortcut 当前无可靠或自然样本，记为 UNAVAILABLE。主线程打开窗口批量 DB/PM/decode、UsageStats、ICU 和网络均为 0。PSS 218353→190967KB，Native 57680→30212KB，Dalvik 12629→14960KB，Graphics 128740→116012KB，无明显泄漏。
+- 稳定性：Launcher 相关 FATAL/ANR/CME/OOM/VerifyError/IllegalStateException 均为 0；全 buffer 的 36 条 IllegalStateException 是历史 radio `SST pid 2661 Service not connected`，不属于 Launcher/Q5。
+- 结论：Early Search 按限制只尝试一次，但在 `LAUNCH_MODEL_READY` 前注入的 ADB 上滑没有产生 `QS_SHOW_TRIGGER`，不能作为搜索样本，shell 即时显示、Snapshot 阻塞和 READY 后自动补数据均保持 UNVERIFIED。该项属于 Q5 必选门槛，因此 Q5 最终为 `UNVERIFIED`；不重试、不重新安装、不开始 Q6。
+
+#### QuickSearch Q4 SearchIconBridge
+
+- 审计：原版 QuickSearch `base.apk` 仍作为历史行为基线；Q4 明确是现代 Launcher 一体化性能优化，不恢复历史 `quicksearch_decode/LauncherIconBridge`。Launcher 当前由 `Aa` / `ItemInfo` 保存图标来源字节，经 `MaintainedLauncherSettingsHost` 的默认/改进版/图标包/自定义链和 `IconRasterDiagnostics` 合成临时最终纹理，再上传 SMEngine。
+- 实现：新增 `SearchIconBridge`，只读 `Aa.nc()` 模型 clone 的 private `iconData`；按 component/user/profile identity 匹配，返回 HIT/MISS/INVALID 和短期 `IconHandle`。不持有 Bitmap cache，不调用 `ItemInfo.Oe()`，不触发磁盘、PackageManager、网络或动态 ActiveIcon。
+- 诊断：`SearchIndexRepository` 在模型 READY 后旁路调用一次汇总命中率诊断；不改变正式搜索，仍不读取 `SearchSnapshot`。
+- 验证：`build.bat` 通过；`aapt2 dump badging` 显示 `v1.5.5/30`、minSdk 23、targetSdk 28；`apksigner verify` 的 v1/v2/v3 均为 true；Q4.1 APK SHA256 `1E27877532314627882BD5FDF3935D6F901F096F71CEFA12D267C1D4289AFB93`。覆盖安装成功一次；一冷启动、三暖态拉起未出现新的 `QS_ICON_BRIDGE`/decode 行。内存采样：TOTAL PSS 228894→228780 KB，Native Heap 64664→64296 KB，Dalvik Heap 14676→14688 KB；未建立 Graphics/Java 全量对比。
+- 结论：Q4/Q4.1 当前为 `UNVERIFIED`，不能据此选择 Q5 方案；缺口是运行时诊断日志未出现，而非继续安装测试 APK。Q3 保持 `UNVERIFIED / NON_BLOCKING`，Q5 不启动、不提交、不推送。
+
+#### QuickSearch Q2 SearchIndexRepository 基础架构
+
+- 根因：Q1-A 证明当前搜索页面首帧和顶部 View 绑定很快，主要延迟来自打开搜索后才同步准备全部应用 label/icon；原版 `ApplicationsProvider` 则在后台预建进程内索引。当前 Launcher 已有 `LauncherModel/Aa.nc()` 克隆快照和 ItemInfo 的 title/package/component/user 字段，无需另跑全量 PackageManager 扫描。
+- 实现：新增 bitmap-free `SearchEntry`、不可变 `SearchSnapshot`、进程级 `SearchIndexRepository` 与阶段 logger。Repository 使用单个后台线程，预计算 normalized label、profile serial 与字符串 iconKey；读取主 DEX Smali 模型使用后台反射桥，缺 label 时才按单组件补齐。任何异常进入 FAILED 并保留空/旧 Snapshot，不影响现有搜索。
+- 时序修正：仅依赖首帧时，真机出现模型仍为空而 READY(0) 的失败样本；最终同时等待现有首帧 deferred hook 与原版 `J.MESSAGE_COMPLETE/LAUNCH_MODEL_READY`，不使用固定延迟或轮询。Q3 包增量、Q4 图标桥和 Q5 正式接入均未提前实现。
+- 验证：`build.bat`、v1/v2/v3 签名和 vivo X21A 覆盖安装通过，设备/本地 APK SHA256 均为 `6D1B7E7E96B384C11C0749EDC1D5BE814A7F255AB9C4AE321F0FD8A5E0DCA29B`。五次进程冷启动索引 build 为 16/28/23/19/25ms，min/max/average/median/P95 为 16/28/22.2/23/28ms，5/5 均为 32 entries、duplicates=0。系统可启动 Activity 也是 32。当前搜索仍记录旧 `QS_LOAD_ENTRIES_BEGIN/END total=32`，未接 Repository。
+- 风险：Q2 前后各 5 次首帧中位数为 241/253ms、P95 为 248/265ms，差值约一个 60Hz 帧；索引在约 2.3s 的模型完成后才开始，时间线无首帧阻塞关系，但小样本跨安装波动仍需后续扩大矩阵。当前设备没有多 profile 和同包多 Activity 真机样本，且 shell 无签名数据库读取权限，逐 identity 集合差分未完成。
+
+#### 编辑模式顶部标题按刘海、挖孔和圆角安全区自适应
+
+- 根因：截图中的“已选择 [0/12] 个应用程序”来自 `com.smartisanos.launcher.view.Lc.a(g,float,int)` 创建的 SMEngine `Mc`/`status_bar_text` 节点。原版和 `clean_launcher` 都只在 `sa.ub()` 命中特定 Smartisan 设备且非大屏模式时使用 `Constants.getStatusBarTextLeftMargin()`；移植到 vivo X21A 后该分支不成立，标题固定在 `window_width/2`，与中心刘海重叠。之前检查普通 Android View 层不会命中真实显示链。
+- 修复：保留原版标题内容、字体、Y 坐标、淡入动画和 SMEngine 节点，只替换 X 中心计算。API 28+ 从 DecorView 的实时 `WindowInsets.getDisplayCutout()` 获取全部 bounding rect，按 Decor/scene 比例转换坐标并与标题真实纹理宽高检测相交；无相交保持居中，相交后按左安全段、右安全段、最大安全段选择。多开孔先排序合并，系统左右 Insets 参与内容边界；宽刘海使完整标题无法装入任何一侧时，使用真实 `safeInsetTop` 保护圆角边缘，避免贴屏幕 0 点。布局/Insets 变化会重新计算，并把节点更新排回 GLThread；不修改标题 Y、字号、文案或桌面其他状态栏节点。
+- 原版对照：`launcher/smali/com/smartisanos/launcher/view/Lc.smali` 与 `clean_launcher` 的原始实现一致；本次没有复制 maintained UI，也没有恢复原版机型固定边距。原版截图左侧有视觉安全留白，当前宽刘海回退用系统 safe inset 得到同类布局，但数值来自本机窗口几何。
+- 验证：`build.bat` 完整成功，最终 APK 覆盖安装到 vivo X21A Android 9，包版本 `v1.5.5/30`。ADB 读取该机 1080×2280、中心刘海边界 `Rect(358,0-722,79)`；通过 `/dev/input/event1` 注入真实双指捏合进入编辑多选界面，截图确认标题左边缘约 79px，不再位于刘海中心，也不再贴左侧圆角。安装后 Launcher PID 存活，未见本次兼容层引起的 `FATAL EXCEPTION`/`AndroidRuntime`。
+- 兼容边界：无刘海和标题未碰到左/右开孔时仍保持原版居中；中心水滴/药丸孔、左右开孔、多开孔以及不同标题计数宽度均由同一几何算法处理。当前仅 vivo 中心宽刘海完成真机可见验收，其他异形屏属于实现与场景矩阵覆盖，不能写成全部机型真机通过。
+
 ### 2026-08-08
 
 #### 图标系统文档冻结与旧专项审计清理
@@ -112,25 +259,11 @@
 - 验证：`build.bat` 完整成功；最终 APK 为 `v1.5.5/30`，v1/v2/v3 签名验证通过。vivo X21A 保留数据覆盖安装返回 `Success`，HOME 冷启动 `Status: ok`，Launcher PID 存活，启动日志未见 `AndroidRuntime` fatal。本次未清 Launcher 数据、未移动桌面 Item。
 - 验收边界：vivo X21A 1080/12 宫格/当前 100% 是已完成真机基线；50/150、1080 20 宫格、1440/2K 12/20 宫格、720 或 1220/1260 中间分辨率、完整来源切换、冷启动和设备重启保持仍未全部完成。当前只能写“架构与算法统一”，不能写“所有手机均已验证”或 `ICON_SYSTEM_VALIDATION_FROZEN=true`。
 
-#### 当前 1080 与原版截图的图标尺度复核
+#### 【已废弃】当前 1080 与原版截图的图标尺度复核（基于面积补偿方案）
 
-- 对比：两张原始截图均为 1080 宽，三列主宫格单格宽度均为 360px。按整幅横向宫格线测量，当前连续行高约 `448px`，原版约 `452px`，差不到 1%；留白无需再调。相同视频素材的绿色主体约 `164px` 对原版 `168px`，差约 2.4%，不存在所有图标统一小一档的证据。
-- 解释：所有普通静态来源共享同一个 `230/295` artwork/texture 外框与一次用户倍率，但 `SmartisanIconNormalizer` 会按 alpha 轮廓、面积和 fill ratio 为不同形状计算连续 optical scale，因此“外部几何与缩放流程统一”不等于每张图的 `normalizerScale` 数值完全相同，也不等于所有图标的可见宽高必须相同。视频当前诊断为 `normalizerScale=0.96914375`、`finalDrawDst=222.90305px`、`visibleAfter` 长边 217px、`resampleCount=1`；它没有命中额外 package/source/device 缩小。
-- 决策：保持冻结的 `230/295` 与统一 Composer，不改 Cell 行高，不增加全局、来源、包名或设备倍率。原版蓝色高对比背景、较强阴影和粗白标签会增加视觉重量，不应通过破坏 geometry 来补偿。
+#### 【已废弃】Weather/Calendar 静态 fallback 与动态外轮廓统一（基于面积补偿方案）
 
-#### Weather/Calendar 静态 fallback 与动态外轮廓统一
-
-- 根因：动态开关关闭后，vivo 天气与日历会回到普通静态 Composer，但仍被 `SmartisanIconNormalizer` 分别计算出 `0.9690595` 与 `0.97414947`；动态节点内部保持原版 `1.0`，因此静态外观比动态小约 3%，此前修改 ActiveIcon root 或缓存帧都没有命中这条静态显示链。
-- 修复：Weather/Calendar 静态 fallback 继续使用唯一的 `IconVisualMetrics` 外部 artwork/texture 和原版阴影，只跳过普通应用的 optical normalizer；没有加入 package/source/device 倍率，也没有修改 WeatherView、CalendarView、日期位置、天气内容、动画或 shadow 参数。纹理缓存版本升级为 `raster:v12-weather-calendar-geometry`，确保开关切换后不复用 v11 小纹理。
-- 验证：`build.bat` 完整成功，vivo X21A Android 9 覆盖安装成功（`lastUpdateTime=2026-08-08 21:54:20`）。1080/12 宫格/当前 100% 设置下，静态天气与日历均为 logical/physical `230/295`、`normalizerScale=1.0`、`resampleCount=1`；天气 visible width 从 217 增至 226，日历从 213 增至 219。动态开关 on/off 即时重载截图已完成，测试后恢复为关闭状态。
-- 风险：日历当前 improved RAW 为 192x192，诊断标记 `SOURCE_LIMITED=true`；这是素材清晰度上限，不应通过修改全局 geometry 补偿。20 宫格、50/150、1440/2K 和中间分辨率仍未验收，不能写入 `ICON_SYSTEM_VALIDATION_FROZEN=true`。
-
-#### 图标统一几何、静态合成与最终缓存收敛
-
-- 根因：普通静态来源存在两个入口；刷新调用尺寸不等于最终 texture 时，旧 `useManagedDesktopPipeline()` 只允许 managed 来源进入 composer，DEFAULT 会回到原始 resize/shadow 链，因此来源切换后仍出现大小不一致和旧纹理复用。
-- 修复：新增只读 `IconVisualMetrics` 和连续 alpha/hull/area `SmartisanIconNormalizer`；所有普通静态来源统一执行 RAW 解析、一次 physical artwork 绘制、分身装饰、原版阴影和 final texture。fallback 判断改为普通静态 Item 身份，不再以来源类型决定 geometry。ActiveIcon 只对根节点应用外部 scale，Weather/Calendar 内部布局、动画、阴影和内容未修改。
-- 验证：`build.bat` 完整打包、Manifest 注入、zipalign 和签名成功；vivo X21A Android 9 覆盖安装成功。1080/12 宫格/100% 的 DEFAULT 真机导出覆盖录音机、相机、邮件、aShell、微信和 Jovi 样本，logical/physical artwork/texture 均为 `230/295`、`resampleCount=1`；相机和微信 artwork 原图可见清晰。设备存在 user 999 分身微信，缓存键和分身装饰均保留 user/profile；本轮没有移动桌面 Item，因此未新增主/分身同屏截图。验收构建关闭临时 PNG 自动导出，诊断字段和导出实现保留供专项构建启用。
-- 风险：当前只完成 Phase 1；50/150、20 宫格、1440/2K、已安装图标包以及动态开关开启后的外部 geometry 仍按冻结顺序待后续阶段验证，不能据此宣称全部分辨率矩阵已经通过。
+#### 【已废弃】图标统一几何、静态合成与最终缓存收敛（面积补偿方案）
 
 ### 2026-08-03
 
@@ -2085,3 +2218,50 @@ ADB 结论：
 
 - 应用图标页当前仍由 `ThemeChooserActivity` 承载 maintained 风格兼容页，还不是完整迁移的原生 Smartisan Settings Activity。
 - 图标自动识别资源和 Smartisan 网络图标链路仍建议继续做更多应用回归，尤其是系统应用、Google 应用和第三方应用混合安装场景。
+### 2026-08-09
+
+#### QuickSearch Q8-C Original Search Semantics & Ranking
+
+审计与修复：
+
+- 以 `original_apks/quicksearch_phone_reference/base.apk`（SHA256 `EDF915A1CA745276F07538ABEDBBF43711B20426697E45A83A4C076ED0562D66`）及其 `decoded/` 为唯一 pristine 证据，确认 `applications` / `searchkey` schema、LIKE/INTERSECT 查询、HanziToPinyin 前缀 trie、profile/shortcut 边界和独立 History 关系。
+- 新增 `docs/development/QUICK_SEARCH_Q8C_SEARCH_SEMANTICS.md`，记录已确认行为与 `UNCONFIRMED_PRISTINE_BEHAVIOR` 边界。
+- 在既有 `SharedSearchMatchModel` 内补充后台完整拼音/词首 token form，并按空格分词逐 token 前缀匹配；未新增 Provider、SQLite、第二 matcher、T9 链路或 UI/IME/手势改动。
+- `last_resume_time` 写入来源、`token_index` 完整表/视图及 Top Apps 最终排序在 pristine 证据中仍未完全确认，Q8-C 不据此虚报 PASS。
+
+验证：
+
+- `build.bat` 成功，`build/launcher-signed.apk` SHA256：`BADED65C2688E537EFD0B8F829B832010B0DED7F9C15FA30D0884AFB10A18573`。
+- APK 签名：v1/v2/v3 `true`；aapt2 badging：`com.smartisanos.launcher`，versionCode `30`，versionName `v1.5.5`。
+- 按 Q8-C 限制仅覆盖安装一次 Launcher APK，未安装测试 App、未清除数据、未重新全量扫描。启动日志出现 `QS_INDEX_READY generation=1`、32 条唯一 entry、无 FATAL/ANR/ConcurrentModificationException；设备当前前台仍为 vivo 原桌面，无法完成完整手势/输入语义矩阵。
+
+结论：`Q8-C PARTIAL / UNVERIFIED`，不得启动 Q9；保留后续对 pristine 未确认字段的静态核查。
+
+#### QuickSearch Q8-C.1 Original Search Semantics Evidence Closure
+
+- 以 pristine `original_apks/quicksearch_phone_reference/base.apk`（SHA256 `EDF915A1CA745276F07538ABEDBBF43711B20426697E45A83A4C076ED0562D66`）及 `decoded/` 完成补充静态闭环：`token_index` 仅存在于未接入实际 query 的 `MIN(token_index)` 死字符串，schema 没有该列或来源；`last_resume_time` 的字段、投影和过滤读取已确认，但 QuickSearch APK 内没有写入调用，外部写入保持 `UNCONFIRMED_PRISTINE_BEHAVIOR`。
+- 确认原版 Top Apps 五槽位来自 `Settings.Global.maybe_launch_pkg_from_predict_result` 的最多五个包名，由 PackageManager 取得 label/icon；History 和 hot-word 是独立列表。预测源生成方及最终稳定排序未由 pristine APK 证明，仍为 `UNCONFIRMED_PRISTINE_BEHAVIOR`。
+- 确认 `FuzzyTonesHelper` 使用后台 HandlerThread 加载 provider-backed `fuzzytones.db`，`fuzzy_tones_enabled` 默认关闭；当前设备是否启用未确认。pristine `alias` 存在并参与 LIKE，但当前 `SearchEntry` 尚未接入 alias，保持 `UNCONFIRMED`。
+- 更新 `docs/development/QUICK_SEARCH_Q8C_SEARCH_SEMANTICS.md` 的“PRISTINE EVIDENCE CLOSURE”章节。本轮代码修改 `0`、构建 `0`、安装 `0`，没有新增测试 App，也没有重新扫描应用。
+- 已通过显式 Manifest HOME 组件 `com.smartisanos.launcher/.Launcher` 将当前已安装 APK 拉到前台，未修改默认桌面；随后清空 logcat 等待用户真实手指语义操作。当前尚无新的 `dianhua/dh` UI 证据，运行时语义和 Top Apps 五身份暂记 `UNCONFIRMED`，Q9 不启动。
+
+结论：`Q8-C.1 STATIC_EVIDENCE_CLOSED / RUNTIME_PENDING`；不得安装、构建或推送以补齐未知项。
+
+#### QuickSearch Q8-D.1 Final Runtime Visual Verification
+
+- 本轮按用户授权仅对 vivo X21A 执行一次 `adb install -r -d build/launcher-signed.apk`，本地 SHA256 已核对为 `E09A29F2EF4404EEEAB123FCF48144F8F3EACE24749150977BD58A8DA55329D7`；命令超时，未重试。
+- 超时后按规定检查设备：`lastUpdateTime=2026-08-09 22:06:16`，设备实际 APK SHA256 仍为 `BADED65C2688E537EFD0B8F829B832010B0DED7F9C15FA30D0884AFB10A18573`，前台为 `com.android.packageinstaller/.PackageInstallerActivity`，未达到目标 APK 一致性，立即停止。
+- 未进行真实手指视觉验收，未清 Launcher 数据、未安装测试 App。Q8-D.1=`UNVERIFIED / INSTALL_TIMEOUT`；Q8-D 不得改为 PASS，Q9 不启动。
+
+#### QuickSearch Q8-D.1 真机回放发现与修正
+
+- 目标 APK 后续在 vivo X21A 设备一致；真实进入 Original Search、IME、Top Apps=5、History=4 成功，`微信`/`电话` query 各命中 1 条。
+- 点击 History 清除 X 触发 Launcher `FATAL/InflateException`。根因是嵌入 QuickSearch 资源包 Drawable ID 被直接传给宿主 `View.setBackgroundResource()`，宿主资源表将 `0x7f030002` 解为 `layout/abc_action_menu_item_layout`。
+- 已将 Dialog panel/button 改为 `uiResources.getDrawable(id)` + `setBackground(Drawable)`；未再次安装。修正版构建 APK SHA256=`77DD92989E3AF1884735809D05C2921876A9C5B60C2C33449DA55BC63E6ED39C`，v1/v2/v3 通过。
+- 结果区层级截图已确认 header、白色 row、divider 与淡蓝灰区域仍需修正版重新验收；Q8-D.1=`FAIL / RUNTIME_UNVERIFIED`，Q9 不启动。
+
+#### QuickSearch Q8-D Original Search Result + Dialog Fidelity
+
+- pristine 审计确认应用结果 header 来自 `header.xml` / `StickyListHeaderStyle`，标题源为 `application_desc`（中文“应用程序”），14sp bold、12dp 左内边距、`#f5f5f5` 背景；应用 row 继续使用 60dp / 30dp icon / 16sp bold 的 `list_item_nophoto_bg`，divider 为 `list_divider_drawable` 的 `#14000000`、2px。
+- pristine `SearchActivityView.L()` 创建 `i/p/a` `MenuDialog`（普通 Dialog，底部对齐、透明 Window、dim、右上关闭、红色大按钮），不是 Android AlertDialog。当前 OriginalQuickSearch 已接入结果 header、divider、literal query `ForegroundColorSpan(#d44d44)` 和专用底部清空 Dialog；无结果时不显示 header，空态淡蓝灰背景保持不变。
+- 新增 `docs/development/QUICK_SEARCH_Q8D_RESULT_PRESENTATION.md`。本轮 `build.bat`、`git diff --check` 通过；未安装 Launcher、未安装测试 App。状态：`CODE_COMPLETE / RUNTIME_UNVERIFIED`，不得启动 Q9。

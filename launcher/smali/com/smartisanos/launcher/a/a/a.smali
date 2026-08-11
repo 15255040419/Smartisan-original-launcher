@@ -137,7 +137,7 @@
 
     long-to-float p2, p6
 
-    const/high16 p3, 0x43fa0000    # 500.0f
+    const/high16 p3, 0x447a0000    # 1000.0f
 
     cmpl-float p2, p2, p3
 
@@ -167,7 +167,11 @@
 
     if-eqz p2, :cond_5
 
-    if-eqz p9, :cond_5
+    invoke-static {p8, p9}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->isSearchDirectionStable(ZZ)Z
+
+    move-result p2
+
+    if-eqz p2, :cond_5
 
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
 
@@ -186,18 +190,26 @@
     .line 10
     sget p2, Lcom/smartisanos/launcher/data/Constants;->window_height:I
 
-    shr-int/lit8 p2, p2, 0x2
+    invoke-static {p1, p5, p2}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->passesSearchOriginGate(FFI)Z
 
-    int-to-float p2, p2
+    move-result p2
 
-    cmpg-float p2, p5, p2
-
-    if-gez p2, :cond_2
+    if-nez p2, :cond_2
 
     return-void
 
     :cond_2
     sub-float/2addr p1, p5
+
+    move v1, p1
+
+    neg-float v1, v1
+
+    invoke-static {v1}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->isSearchDirection(F)Z
+
+    move-result p2
+
+    if-eqz p2, :cond_5
 
     invoke-static {p1}, Ljava/lang/Math;->abs(F)F
 

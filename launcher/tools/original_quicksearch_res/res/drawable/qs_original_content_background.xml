@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Compatibility surface for the pristine BackgroundView screenshot tint. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="#e9f0f8"
+        android:endColor="#f5f9fd" />
+</shape>

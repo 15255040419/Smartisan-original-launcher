@@ -1067,6 +1067,18 @@
     .line 55
     :cond_17
     :goto_4
+    # PackageTask has now applied its install/remove/update mutation to Aa.fi/PageView.
+    # Accumulate each task and flush only when the original task batch becomes empty.
+    iget-object v5, v4, Lcom/smartisanos/launcher/data/z;->packageName:Ljava/lang/String;
+
+    iget v6, v4, Lcom/smartisanos/launcher/data/z;->Mk:I
+
+    iget-object v7, v4, Lcom/smartisanos/launcher/data/z;->Lq:Lcom/smartisanos/launcher/data/DatabaseUpdater$Action;
+
+    iget-object v8, v4, Lcom/smartisanos/launcher/data/z;->Yj:Ljava/util/List;
+
+    invoke-static {v5, v6, v7, v8, v9}, Lcom/smartisanos/launcher/quicksearch/SearchIndexRepository;->onLauncherModelPackageTaskComplete(Ljava/lang/String;ILjava/lang/Object;Ljava/util/List;Z)V
+
     iput-boolean v3, v4, Lcom/smartisanos/launcher/data/z;->Mq:Z
 
     .line 56

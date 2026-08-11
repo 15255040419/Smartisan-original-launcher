@@ -31,6 +31,12 @@ public final class LayoutPropertyAdapter {
             return;
         }
 
+        // The original resize tier is still read by a few legacy static-icon
+        // call sites.  It must never choose a smaller artwork canvas than the
+        // normal origin: source padding is handled later by the single outer
+        // visible-envelope compositor.
+        unifyLegacyIconResizeTarget(property);
+
         int width = staticInt("com.smartisanos.launcher.data.Constants", "window_width");
         int height = staticInt("com.smartisanos.launcher.data.Constants", "window_height");
         if (width <= 0 || height <= 0) {
@@ -168,6 +174,17 @@ public final class LayoutPropertyAdapter {
         } catch (Throwable ignored) {
         }
         return 0f;
+    }
+
+    private static void unifyLegacyIconResizeTarget(Object property) {
+        try {
+            Field origin = property.getClass().getField("icon_size_origin");
+            Field resize = property.getClass().getField("icon_size_origin_resize");
+            if (origin.getType() != Float.TYPE || resize.getType() != Float.TYPE) return;
+            float value = origin.getFloat(property);
+            if (value > 0f) resize.setFloat(property, value);
+        } catch (Throwable ignored) {
+        }
     }
 
     private static void setNumericField(Object property, String fieldName, float value)

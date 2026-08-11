@@ -857,38 +857,30 @@
 
     div-float v10, v3, v9
 
+    move v13, v2
+
     div-float/2addr v2, v9
 
     .line 20
-    invoke-static {}, Lcom/smartisanos/launcher/sa;->ub()Z
+    invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
 
-    move-result v11
+    move-result-object v11
 
-    if-eqz v11, :cond_3
+    invoke-virtual {v11}, Lcom/smartisanos/launcher/J;->getActivity()Landroid/app/Activity;
 
-    sget-boolean v11, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
+    move-result-object v11
 
-    if-nez v11, :cond_3
+    iget-object v12, v0, Lcom/smartisanos/launcher/view/Lc;->uO:Lcom/smartisanos/launcher/view/Mc;
 
-    .line 21
-    invoke-static {}, Lcom/smartisanos/launcher/data/Constants;->getStatusBarTextLeftMargin()I
+    invoke-virtual {v12}, Lcom/smartisanos/launcher/view/Mc;->getWidth()F
+
+    move-result v14
+
+    invoke-static {v11, v12, v3, v14, v13}, Lcom/smartisanos/launcher/compat/EditModeHeaderCutoutCompat;->resolveAndBind(Landroid/app/Activity;Ljava/lang/Object;FFF)F
 
     move-result v10
 
-    int-to-float v10, v10
-
-    iget-object v11, v0, Lcom/smartisanos/launcher/view/Lc;->uO:Lcom/smartisanos/launcher/view/Mc;
-
-    invoke-virtual {v11}, Lcom/smartisanos/launcher/view/Mc;->getWidth()F
-
-    move-result v11
-
-    div-float/2addr v11, v9
-
-    add-float/2addr v10, v11
-
     .line 22
-    :cond_3
     invoke-static {v10, v2, v3, v4, v7}, Lcom/smartisanos/smengine/d/a;->b(FFFFLcom/smartisanos/smengine/a/j;)Lcom/smartisanos/smengine/a/j;
 
     .line 23

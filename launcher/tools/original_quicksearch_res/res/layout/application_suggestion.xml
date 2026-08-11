@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<view xmlns:android="http://schemas.android.com/apk/res/android"
+    class="com.android.quicksearchbox.ui.ApplicationSuggestionView"
+    style="@style/Suggestion">
+    <RelativeLayout
+        android:id="@+id/icon_container"
+        android:layout_width="@dimen/suggestion_view_height"
+        android:layout_height="@dimen/suggestion_view_height">
+        <ImageView android:id="@+id/icon1" style="@style/SuggestionIcon1" />
+    </RelativeLayout>
+    <ImageView
+        android:id="@+id/icon2"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentTop="true"
+        android:scaleType="centerInside"
+        android:visibility="gone"
+        style="@style/SuggestionIcon2" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_toLeftOf="@id/icon2"
+        android:layout_toRightOf="@id/icon_container"
+        android:orientation="vertical">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView android:id="@+id/text1" android:layout_width="0.0dp" android:layout_weight="2.0" style="@style/SuggestionText1" />
+            <TextView android:id="@+id/dirpath" android:layout_width="0.0dp" android:layout_weight="1.0" android:gravity="right" android:textSize="13.5sp" style="@style/SuggestionText2" />
+        </LinearLayout>
+        <TextView android:id="@+id/text2" style="@style/SuggestionText2" />
+        <TextView android:id="@+id/date" android:textSize="13.5sp" android:visibility="gone" style="@style/SuggestionText2" />
+    </LinearLayout>
+</view>

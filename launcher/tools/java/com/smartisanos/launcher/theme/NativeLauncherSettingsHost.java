@@ -45,11 +45,12 @@ public final class NativeLauncherSettingsHost {
     }
 
     private static void showMain(final Activity activity) {
-        activity.setTitle("桌面设置");
+        String title = MaintainedLauncherSettingsHost.localizedDesktopSettingsLabel("Desktop Settings");
+        activity.setTitle(title);
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackground(new StripeDrawable(dp(activity, 7), 0xfff7f7f5, 0xffeeeeec));
-        root.addView(titleBar(activity, "桌面设置", new View.OnClickListener() {
+        root.addView(titleBar(activity, title, new View.OnClickListener() {
             public void onClick(View v) {
                 activity.finish();
             }

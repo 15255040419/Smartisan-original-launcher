@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/qs_original_content_background">
+
+    <RelativeLayout
+        android:id="@+id/qs_original_search_activity_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <com.smartisanos.launcher.quicksearch.ui.OriginalSearchBarCompat
+            android:id="@+id/qs_original_search_bar"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/qs_original_search_bar_height"
+            android:background="@android:color/white"
+            android:layout_alignParentTop="true" />
+
+        <include
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/qs_original_search_bar"
+            layout="@layout/qs_original_empty_view" />
+
+        <LinearLayout
+            android:id="@+id/qs_original_suggestions_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/qs_original_search_bar"
+            android:background="@android:color/white"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <include
+                android:id="@+id/qs_original_application_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                layout="@layout/header" />
+
+            <ListView
+                android:id="@+id/qs_original_suggestions"
+                android:layout_width="match_parent"
+                android:layout_height="0.0dp"
+                android:layout_weight="1.0"
+                android:background="@android:color/transparent"
+                android:divider="@drawable/list_divider_drawable"
+                android:dividerHeight="@dimen/list_divider_height"
+                android:listSelector="@android:color/transparent"
+                android:overScrollMode="always"
+                android:scrollbars="none" />
+        </LinearLayout>
+    </RelativeLayout>
+</FrameLayout>

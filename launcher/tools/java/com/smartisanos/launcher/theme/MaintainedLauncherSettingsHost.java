@@ -142,12 +142,28 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class MaintainedLauncherSettingsHost {
     private static final String LOG_TAG = "MaintainedSettings";
+    private static final String QS_PERF_TAG = "QS_PERF";
+    private static final String QS_INDEX_TAG = "QS_INDEX";
+    public static final String EXTRA_QS_PERF_SESSION = "launcher_qs_perf_session";
+    public static final String EXTRA_QS_FORMAL_REQUEST_UPTIME =
+            "launcher_qs_formal_request_uptime";
+    private static final AtomicLong QS_PERF_SESSION_COUNTER = new AtomicLong();
+    private static final Object QUICK_SEARCH_TOKEN_LOCK = new Object();
+    private static final HashMap<String, SharedSearchMatchModel> QUICK_SEARCH_MATCH_MODELS =
+            new HashMap<String, SharedSearchMatchModel>();
+    private static final ArrayList<SharedSearchMatchModel> QUICK_SEARCH_TOKEN_PENDING =
+            new ArrayList<SharedSearchMatchModel>();
+    private static final ArrayList<WeakReference<QuickSearchTokenReadyListener>>
+            QUICK_SEARCH_TOKEN_LISTENERS =
+            new ArrayList<WeakReference<QuickSearchTokenReadyListener>>();
+    private static Thread sQuickSearchTokenThread;
     private static android.os.Handler sThemePageHandler;
     private static Runnable sThemePageRunnable;
     private static volatile String sPendingThemeLoadingThemeId;
@@ -157,6 +173,7 @@ public final class MaintainedLauncherSettingsHost {
     private static WeakReference<SettingItemSwitch> sBadgeReminderSwitch;
     private static WeakReference<SettingItemSwitch> sBadgeSwipeCleanSwitch;
     private static WeakReference<SettingItemSwitch> sSearchCommonAppsSwitch;
+    private static WeakReference<SettingItemSwitch> sSearchContactsSwitch;
     private static boolean sBadgeNotificationAccessDialogShowing;
     private static volatile Resources sSettingsResources;
     private static boolean sSettingsResourcesWarmPending;
@@ -193,10 +210,14 @@ public final class MaintainedLauncherSettingsHost {
     public static final String KEY_SWIPE_UP_SEARCH_ENABLED = "swipe_up_search_enabled";
     private static final String KEY_SEARCH_COMMON_APPS_ENABLED =
             "launcher_search_common_apps_enabled";
+    public static final String KEY_SEARCH_CONTACTS_ENABLED = "search_contacts_enabled";
+    private static final int REQUEST_SEARCH_CONTACTS_PERMISSION = 2456;
     private static final String PREF_SEARCH_USAGE_ACCESS_PENDING =
             "search_usage_access_pending";
     public static final String KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED =
             "swipe_down_system_panels_enabled";
+    public static final String KEY_VERTICAL_GESTURE_DIRECTION_REVERSED =
+            "vertical_gesture_direction_reversed";
     private static final String KEY_DYNAMIC_WEATHER_CALENDAR =
             "launcher_dynamic_weather_calendar_enabled";
     private static final int REQUEST_DYNAMIC_WEATHER_LOCATION = 2414;
@@ -295,7 +316,7 @@ public final class MaintainedLauncherSettingsHost {
     private static final String SMARTISAN_ICON_CACHE_DIR = "online_icon_cache_v3";
     private static final String ICON_RASTER_REVISION_PREF = "icon_raster_revision";
     private static final String ICON_RASTER_REVISION = "composer:v2|geometry:v"
-            + IconVisualMetrics.REVISION + '|' + SmartisanIconNormalizer.VERSION;
+            + IconVisualMetrics.REVISION + "|unified-outer-envelope:v2|resize-equals-origin";
     private static Map<String, List<String>> sIconVariants;
     // Mirrors can fail temporarily. A week-long miss cache made recognized
     // system apps (notably vendor Gallery aliases) look permanently unknown.
@@ -482,9 +503,12 @@ public final class MaintainedLauncherSettingsHost {
                 return;
             }
             if (intent != null && intent.getBooleanExtra("launcher_show_search", false)) {
+                long searchSession = intent.getLongExtra(EXTRA_QS_PERF_SESSION, 0L);
                 intent.removeExtra("launcher_show_search");
+                intent.removeExtra(EXTRA_QS_PERF_SESSION);
+                qsPerf(searchSession, "QS_ACTIVITY_START");
                 tuneWindow(activity);
-                showSearchPage(activity);
+                showSearchPage(activity, searchSession);
                 return;
             }
             armSettingsClickGuard();
@@ -1339,7 +1363,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static void openLauncherSearch(Context context) {
-        openLauncherSearchInternal(context);
+        openLauncherSearchInternal(context, false);
     }
 
     public static boolean isSwipeUpSearchEnabled(Context context) {
@@ -1351,33 +1375,80 @@ public final class MaintainedLauncherSettingsHost {
         return readSystemBool(context, KEY_SEARCH_COMMON_APPS_ENABLED, false);
     }
 
+    /** Q7 presentation bridge: reads the existing setting without querying UsageStats. */
+    public static boolean shouldShowQuickSearchTopApps(Context context) {
+        return isSearchCommonAppsEnabled(context);
+    }
+
     public static void openLauncherSearchFromSwipeUp(Context context) {
         if (!isSwipeUpSearchEnabled(context)) {
             Log.i(LOG_TAG, "SWIPE_UP_SEARCH_DISABLED");
             return;
         }
         Log.i(LOG_TAG, "SWIPE_UP_SEARCH_GESTURE_DETECTED");
-        openLauncherSearchInternal(context);
+        openLauncherSearchInternal(context, true);
         Log.i(LOG_TAG, "SWIPE_UP_SEARCH_LAUNCHED");
     }
 
-    private static void openLauncherSearchInternal(Context context) {
+    private static void openLauncherSearchInternal(Context context, boolean gestureTriggered) {
+        long session = QS_PERF_SESSION_COUNTER.incrementAndGet();
+        String source = gestureTriggered ? "SWIPE_UP" : "DIRECT";
+        qsShow(session, "QS_SHOW_TRIGGER", gestureTriggered ? "source=gesture" : "source=direct");
+        if (gestureTriggered) {
+            qsPerf(session, "QS_GESTURE_TRIGGER");
+        }
+        qsPerf(session, "QS_OPEN_REQUEST");
+        Log.i(QS_INDEX_TAG, "QS_FORMAL_ENTRY_REQUEST source=" + source
+                + " session=" + session);
+        try {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.setClassName(context.getPackageName(),
+                    "com.smartisanos.launcher.quicksearch.ui.OriginalQuickSearchActivity");
+            intent.putExtra(EXTRA_QS_PERF_SESSION, session);
+            intent.putExtra(EXTRA_QS_FORMAL_REQUEST_UPTIME,
+                    android.os.SystemClock.elapsedRealtime());
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            if (!(context instanceof Activity)) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            if (gestureTriggered && context instanceof Activity) {
+                com.smartisanos.launcher.quicksearch.transition.OriginalSearchTransitionHost
+                        .open((Activity) context, intent);
+            } else {
+                context.startActivity(intent);
+            }
+            Log.i(QS_INDEX_TAG, "QS_FORMAL_ENTRY_TARGET target=ORIGINAL source=" + source
+                    + " session=" + session);
+        } catch (Throwable t) {
+            Log.e(QS_INDEX_TAG, "QS_FORMAL_ENTRY_FALLBACK reason="
+                    + t.getClass().getSimpleName() + " session=" + session, t);
+            openMaintainedSearchFallback(context, session);
+        }
+    }
+
+    private static void openMaintainedSearchFallback(Context context, long session) {
         try {
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.setClassName(context.getPackageName(),
                     "com.smartisanos.launcher.theme.ThemeChooserActivity");
             intent.putExtra("launcher_show_search", true);
+            intent.putExtra(EXTRA_QS_PERF_SESSION, session);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            if (!(context instanceof Activity)) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            }
+            if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);
-        } catch (Throwable t) {
+        } catch (Throwable fallbackError) {
             Toast.makeText(context, "无法打开搜索", Toast.LENGTH_SHORT).show();
         }
     }
 
     public static void showSearchPage(final Activity activity) {
+        Intent intent = activity == null ? null : activity.getIntent();
+        showSearchPage(activity, intent == null ? 0L
+                : intent.getLongExtra(EXTRA_QS_PERF_SESSION, 0L));
+    }
+
+    private static void showSearchPage(final Activity activity, final long searchSession) {
+        qsPerf(searchSession, "QS_SHOW_PAGE_BEGIN");
         logOperation(activity, "PAGE", "show_search");
         final ArrayList<SearchEntry> all = new ArrayList<SearchEntry>();
         final ArrayList<SearchEntry> visible = new ArrayList<SearchEntry>();
@@ -1521,7 +1592,11 @@ public final class MaintainedLauncherSettingsHost {
         list.setSelector(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
         resultPanel.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        final SearchAdapter adapter = new SearchAdapter(activity, context, resources, visible);
+        final ArrayList<com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest>
+                iconRequests = new ArrayList<com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest>();
+        final boolean[] searchPageActive = new boolean[]{true};
+        final SearchAdapter adapter = new SearchAdapter(activity, context, resources, visible,
+                searchSession, iconRequests, searchPageActive);
         list.setAdapter(adapter);
 
         clearButton.setOnClickListener(new View.OnClickListener() {
@@ -1535,6 +1610,39 @@ public final class MaintainedLauncherSettingsHost {
         });
 
         activity.setContentView(root);
+        final ViewTreeObserver.OnPreDrawListener firstDrawListener =
+                new ViewTreeObserver.OnPreDrawListener() {
+                    public boolean onPreDraw() {
+                        ViewTreeObserver observer = root.getViewTreeObserver();
+                        if (observer.isAlive()) {
+                            observer.removeOnPreDrawListener(this);
+                        }
+                        qsPerf(searchSession, "QS_VIEW_VISIBLE");
+                        return true;
+                    }
+                };
+        root.getViewTreeObserver().addOnPreDrawListener(firstDrawListener);
+        final boolean[] imeVisibleLogged = new boolean[]{false};
+        root.getViewTreeObserver().addOnGlobalLayoutListener(
+                new ViewTreeObserver.OnGlobalLayoutListener() {
+                    public void onGlobalLayout() {
+                        if (imeVisibleLogged[0] || root.getHeight() <= 0) {
+                            return;
+                        }
+                        Rect visibleFrame = new Rect();
+                        root.getWindowVisibleDisplayFrame(visibleFrame);
+                        if (root.getRootView().getHeight() - visibleFrame.bottom
+                                > root.getRootView().getHeight() * 0.15f) {
+                            imeVisibleLogged[0] = true;
+                            qsPerf(searchSession, "QS_IME_VISIBLE");
+                            qsShow(searchSession, "QS_SHOW_IME_VISIBLE", null);
+                            ViewTreeObserver observer = root.getViewTreeObserver();
+                            if (observer.isAlive()) {
+                                observer.removeOnGlobalLayoutListener(this);
+                            }
+                        }
+                    }
+                });
         query.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
             }
@@ -1551,43 +1659,22 @@ public final class MaintainedLauncherSettingsHost {
             }
         });
         query.requestFocus();
-        query.postDelayed(new Runnable() {
+        final Runnable imeRequest = new Runnable() {
             public void run() {
+                qsPerf(searchSession, "QS_IME_REQUEST");
                 Object service = activity.getSystemService(Context.INPUT_METHOD_SERVICE);
                 if (service instanceof InputMethodManager) {
                     ((InputMethodManager) service).showSoftInput(query, InputMethodManager.SHOW_IMPLICIT);
                 }
             }
-        }, 250);
+        };
+        query.postDelayed(imeRequest, 250);
 
-        // PackageManager label/icon loading can take several seconds on a cold start.
-        // Keep it off the UI thread so the search shell and keyboard appear immediately.
         final Context appContext = activity.getApplicationContext() == null
                 ? activity : activity.getApplicationContext();
-        new Thread(new Runnable() {
-            public void run() {
-                final ArrayList<SearchEntry> loaded = new ArrayList<SearchEntry>();
-                loadSearchEntries(appContext, loaded);
-                activity.runOnUiThread(new Runnable() {
-                    public void run() {
-                        if (activity.isFinishing()
-                                || (Build.VERSION.SDK_INT >= 17 && activity.isDestroyed())) {
-                            return;
-                        }
-                        all.clear();
-                        all.addAll(loaded);
-                        if (isSearchCommonAppsEnabled(activity)) {
-                            addSearchCommonApps(activity, commonApps, all, commonItemWidth);
-                        }
-                        chipBox.removeAllViews();
-                        addSearchHistoryChips(activity, chipBox, all);
-                        CharSequence currentQuery = query.getText();
-                        filterSearchEntries(currentQuery == null ? "" : currentQuery.toString(),
-                                all, visible, adapter);
-                    }
-                });
-            }
-        }, "launcher-search-loader").start();
+        new SearchPageBackendController(activity, appContext, root, query, commonApps, chipBox,
+                all, visible, adapter, commonItemWidth, searchSession, iconRequests,
+                searchPageActive, imeRequest).start();
     }
 
     private static Drawable roundedDrawable(int color, int strokeColor, int radius) {
@@ -1598,7 +1685,10 @@ public final class MaintainedLauncherSettingsHost {
         return drawable;
     }
 
-    private static View searchShortcut(final Activity activity, final SearchEntry entry, int itemWidth) {
+    private static View searchShortcut(final Activity activity, final SearchEntry entry, int itemWidth,
+            final long searchSession,
+            final ArrayList<com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest> requests,
+            final boolean[] pageActive) {
         LinearLayout item = new LinearLayout(activity);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setGravity(Gravity.CENTER);
@@ -1611,8 +1701,10 @@ public final class MaintainedLauncherSettingsHost {
 
         ImageView icon = new ImageView(activity);
         icon.setImageDrawable(entry.icon);
+        icon.setTag(entry.backendEntry == null ? null : entry.backendEntry.iconKey);
         icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         item.addView(icon, new LinearLayout.LayoutParams(dp(activity, 42), dp(activity, 42)));
+        requestVisibleSearchIcon(activity, icon, entry, searchSession, requests, pageActive);
 
         TextView label = new TextView(activity);
         label.setText(entry.label);
@@ -1634,10 +1726,18 @@ public final class MaintainedLauncherSettingsHost {
      * creates no additional package scan, scroll listener, or delayed work.
      */
     private static void addSearchCommonApps(final Activity activity, LinearLayout commonApps,
-                                            ArrayList<SearchEntry> entries, int itemWidth) {
+                                             ArrayList<SearchEntry> entries, int itemWidth,
+                                             final long searchSession,
+            ArrayList<com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest> requests,
+            boolean[] pageActive) {
+        qsPerf(searchSession, "QS_COMMON_APPS_BIND_BEGIN");
         commonApps.removeAllViews();
         HashMap<String, Boolean> seenPackages = new HashMap<String, Boolean>();
         int added = 0;
+        int decodedHits = 0;
+        int encodedHits = 0;
+        int asyncRequests = 0;
+        int misses = 0;
         while (added < 5) {
             SearchEntry selected = null;
             for (int i = 0; i < entries.size(); i++) {
@@ -1656,10 +1756,63 @@ public final class MaintainedLauncherSettingsHost {
                 break;
             }
             seenPackages.put(selected.packageName, Boolean.TRUE);
-            commonApps.addView(searchShortcut(activity, selected, itemWidth),
+            if (selected.icon != null) decodedHits++;
+            else if (selected.backendEntry != null
+                    && com.smartisanos.launcher.quicksearch.SearchIconBackend
+                    .getEncoded(selected.backendEntry) != null) {
+                encodedHits++;
+                asyncRequests++;
+            } else misses++;
+            commonApps.addView(searchShortcut(activity, selected, itemWidth, searchSession,
+                    requests, pageActive),
                     new LinearLayout.LayoutParams(itemWidth, -1));
             added++;
+            if (added == 1) {
+                qsPerf(searchSession, "QS_COMMON_FIRST_ICON_BOUND");
+                if (selected.icon != null) {
+                    qsShow(searchSession, "QS_SHOW_FIRST_ICON", "source=decoded_cache");
+                }
+            }
         }
+        qsPerf(searchSession, "QS_COMMON_APPS_BOUND", "count=" + added);
+        qsShow(searchSession, "QS_SHOW_ICON_CACHE", "scope=top5 visibleRequested=" + added
+                + " decodedHits=" + decodedHits + " encodedHits=" + encodedHits
+                + " asyncRequests=" + asyncRequests + " misses=" + misses);
+        if (asyncRequests == 0) {
+            qsShow(searchSession, "QS_SHOW_VISIBLE_ICONS_READY", "scope=top5");
+        }
+        commonApps.post(new Runnable() {
+            public void run() {
+                qsPerf(searchSession, "QS_COMMON_APPS_VISIBLE");
+            }
+        });
+    }
+
+    private static void requestVisibleSearchIcon(final Activity activity, final ImageView view,
+            final SearchEntry entry, final long searchSession,
+            ArrayList<com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest> requests,
+            final boolean[] pageActive) {
+        if (entry == null || entry.icon != null || entry.backendEntry == null
+                || com.smartisanos.launcher.quicksearch.SearchIconBackend
+                .getEncoded(entry.backendEntry) == null) return;
+        final String expectedKey = entry.backendEntry.iconKey;
+        final long expectedGeneration =
+                com.smartisanos.launcher.quicksearch.SearchIconBackend.getSourceGeneration();
+        com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest request =
+                com.smartisanos.launcher.quicksearch.SearchIconBackend.requestDecoded(activity,
+                entry.backendEntry,
+                new com.smartisanos.launcher.quicksearch.SearchIconBackend.IconCallback() {
+                    public void onIconReady(String iconKey, long generation, Bitmap bitmap) {
+                        if (!pageActive[0] || bitmap == null || generation != expectedGeneration
+                                || !expectedKey.equals(iconKey)
+                                || !expectedKey.equals(view.getTag())) return;
+                        Drawable drawable = new BitmapDrawable(activity.getResources(), bitmap);
+                        entry.icon = drawable;
+                        view.setImageDrawable(drawable);
+                        qsShow(searchSession, "QS_SHOW_FIRST_ICON", "iconKey=" + iconKey);
+                    }
+                });
+        if (request != null) requests.add(request);
     }
 
     private static void addSearchHistoryChips(final Activity activity, LinearLayout chipBox,
@@ -1711,7 +1864,21 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
+    /** Q7 presentation bridge: preserves component/profile/shortcut identity from Snapshot. */
+    public static boolean launchQuickSearchSnapshotEntry(Activity activity,
+            com.smartisanos.launcher.quicksearch.SearchEntry source) {
+        if (activity == null || source == null) return false;
+        UserHandle profileUser = source.userId > 0
+                ? userHandleForSerial(activity, source.profileSerial) : null;
+        return launchSearchEntry(activity, SearchEntry.snapshot(source, null, profileUser), false);
+    }
+
     private static void launchSearchEntry(Activity activity, SearchEntry entry) {
+        launchSearchEntry(activity, entry, true);
+    }
+
+    private static boolean launchSearchEntry(Activity activity, SearchEntry entry,
+            boolean finishOnSuccess) {
         try {
             recordSearchHistory(activity, entry);
             com.smartisanos.launcher.badge.BadgeBridge.onPackageLaunched(
@@ -1723,7 +1890,7 @@ public final class MaintainedLauncherSettingsHost {
             if (shouldVerifySearchLaunch(activity, entry)) {
                 openLauncherPasswordForSearchTarget(activity, entry);
                 activity.finish();
-                return;
+                return true;
             }
             if (entry.isPinnedShortcut()) {
                 LauncherApps launcherApps = (LauncherApps) activity.getSystemService(Context.LAUNCHER_APPS_SERVICE);
@@ -1742,13 +1909,16 @@ public final class MaintainedLauncherSettingsHost {
             } else {
                 activity.startActivity(intent);
             }
-            activity.finish();
+            if (finishOnSuccess) activity.finish();
+            return true;
         } catch (Throwable t) {
             Toast.makeText(activity, "无法启动应用", Toast.LENGTH_SHORT).show();
+            return false;
         }
     }
 
-    private static void loadSearchEntries(Context context, ArrayList<SearchEntry> out) {
+    private static void loadSearchEntries(Context context, ArrayList<SearchEntry> out,
+                                          long searchSession) {
         out.clear();
         try {
             PackageManager pm = context.getPackageManager();
@@ -1756,7 +1926,9 @@ public final class MaintainedLauncherSettingsHost {
             final HashMap<String, Long> usageForegroundTimes = readUsageForegroundTimes(context);
             Intent intent = new Intent(Intent.ACTION_MAIN);
             intent.addCategory(Intent.CATEGORY_LAUNCHER);
+            qsPerf(searchSession, "QS_LOAD_PM_QUERY_BEGIN");
             List<ResolveInfo> infos = pm.queryIntentActivities(intent, 0);
+            qsPerf(searchSession, "QS_LOAD_PM_QUERY_END", "count=" + infos.size());
             for (ResolveInfo info : infos) {
                 if (info == null || info.activityInfo == null) {
                     continue;
@@ -1781,6 +1953,9 @@ public final class MaintainedLauncherSettingsHost {
                 entry.usageForegroundTime = usageForegroundTime(usageForegroundTimes, pkg);
                 out.add(entry);
             }
+            qsPerf(searchSession, "QS_LOAD_BASE_APPS_END", "count=" + out.size());
+            qsPerf(searchSession, "QS_LOAD_ICON_STAGE_END", "count=" + out.size());
+            qsPerf(searchSession, "QS_LOAD_PROFILE_BEGIN");
             List<ProfileAppEntry> profileApps = discoverProfileApps(context, false);
             for (ProfileAppEntry profile : profileApps) {
                 if (profile == null || profile.componentName == null) {
@@ -1802,7 +1977,10 @@ public final class MaintainedLauncherSettingsHost {
                         profile.packageName);
                 out.add(entry);
             }
+            qsPerf(searchSession, "QS_LOAD_PROFILE_END", "count=" + profileApps.size());
+            qsPerf(searchSession, "QS_LOAD_SHORTCUT_BEGIN");
             loadPinnedShortcutSearchEntries(context, pm, history, out);
+            qsPerf(searchSession, "QS_LOAD_SHORTCUT_END", "total=" + out.size());
             Collections.sort(out, new Comparator<SearchEntry>() {
                 public int compare(SearchEntry a, SearchEntry b) {
                     if (a.historyRank != b.historyRank) {
@@ -1817,7 +1995,10 @@ public final class MaintainedLauncherSettingsHost {
                     return a.userId - b.userId;
                 }
             });
+            qsPerf(searchSession, "QS_LOAD_SORT_END", "total=" + out.size());
         } catch (Throwable ignored) {
+        } finally {
+            qsPerf(searchSession, "QS_LOAD_ENTRIES_END", "total=" + out.size());
         }
     }
 
@@ -1928,21 +2109,223 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static int scoreSearchEntry(String needle, SearchEntry entry) {
+        return entry == null ? -1 : scoreSharedSearchMatch(needle, entry.matchModel);
+    }
+
+    private static int scoreSharedSearchMatch(String needle, SharedSearchMatchModel model) {
+        if (model == null) return -1;
         if (needle == null || needle.length() == 0) {
             return 0;
         }
         boolean t9 = isDigitQuery(needle);
-        if (entry.labelLower.equals(needle)) return 0;
-        if (entry.labelLower.startsWith(needle)) return 10;
-        if (entry.pinyinCompact.startsWith(needle)) return 15;
-        if (entry.initials.startsWith(needle)) return 16;
-        if (entry.packageName.toLowerCase().contains(needle)) return 28;
-        if (entry.labelLower.contains(needle)) return 32;
-        if (entry.pinyinCompact.contains(needle)) return 36;
-        if (entry.pinyinSpaced.contains(needle)) return 38;
-        if (entry.initials.contains(needle)) return 40;
-        if (t9 && entry.t9Code.indexOf(needle) >= 0) return 45;
+        if (model.labelLower.equals(needle)) return 0;
+        if (model.labelLower.startsWith(needle)) return 10;
+        if (matchesTokenForms(needle, model.pinyinForms)) return 15;
+        if (matchesTokenForms(needle, model.initialForms)) return 16;
+        if (model.packageLower.contains(needle)) return 28;
+        if (model.labelLower.contains(needle)) return 32;
+        if (t9 && model.t9Code.indexOf(needle) >= 0) return 45;
         return -1;
+    }
+
+    /** Mirrors the pristine searchkey trie: every whitespace-delimited query token
+     * must be a prefix of at least one indexed pinyin/initial token form. */
+    private static boolean matchesTokenForms(String needle, ArrayList<String> forms) {
+        if (forms == null || forms.isEmpty() || needle == null || needle.length() == 0) {
+            return false;
+        }
+        String[] parts = needle.trim().split("\\s+");
+        for (String part : parts) {
+            if (part.length() == 0) continue;
+            boolean hit = false;
+            for (String form : forms) {
+                if (form != null && form.startsWith(part)) {
+                    hit = true;
+                    break;
+                }
+            }
+            if (!hit) return false;
+        }
+        return true;
+    }
+
+    public interface QuickSearchTokenReadyListener {
+        void onQuickSearchTokensReady();
+    }
+
+    /** Q5/Q6 presentation bridge: returns the process-shared production matcher model. */
+    public static Object getQuickSearchMatchModel(String label, String packageName) {
+        return obtainSharedSearchMatchModel(label, packageName);
+    }
+
+    /** Q6 presentation bridge: reuses the exact Q5 production scorer and token state. */
+    public static int scorePreparedQuickSearchMatch(String query, Object preparedModel) {
+        if (!(preparedModel instanceof SharedSearchMatchModel)) return -1;
+        String needle = query == null ? "" : query.trim().toLowerCase();
+        return scoreSharedSearchMatch(needle, (SharedSearchMatchModel) preparedModel);
+    }
+
+    public static boolean areQuickSearchMatchModelsReady(List<Object> models) {
+        if (models == null || models.isEmpty()) return true;
+        for (Object value : models) {
+            if (!(value instanceof SharedSearchMatchModel)
+                    || !((SharedSearchMatchModel) value).ready) return false;
+        }
+        return true;
+    }
+
+    public static void prepareQuickSearchMatchModelsAsync(List<Object> models,
+            QuickSearchTokenReadyListener listener) {
+        boolean ready;
+        synchronized (QUICK_SEARCH_TOKEN_LOCK) {
+            addQuickSearchTokenListenerLocked(listener);
+            if (models != null) {
+                for (Object value : models) {
+                    if (!(value instanceof SharedSearchMatchModel)) continue;
+                    SharedSearchMatchModel model = (SharedSearchMatchModel) value;
+                    if (!model.ready && !model.queued) {
+                        model.queued = true;
+                        QUICK_SEARCH_TOKEN_PENDING.add(model);
+                    }
+                }
+            }
+            ready = true;
+            if (models != null) {
+                for (Object value : models) {
+                    if (!(value instanceof SharedSearchMatchModel)
+                            || !((SharedSearchMatchModel) value).ready) {
+                        ready = false;
+                        break;
+                    }
+                }
+            }
+            if (!ready && sQuickSearchTokenThread == null) {
+                sQuickSearchTokenThread = new Thread(new Runnable() {
+                    public void run() {
+                        drainQuickSearchTokenQueue();
+                    }
+                }, "launcher-search-tokens");
+                sQuickSearchTokenThread.setDaemon(true);
+                sQuickSearchTokenThread.start();
+            }
+        }
+        if (ready && listener != null) listener.onQuickSearchTokensReady();
+    }
+
+    public static void removeQuickSearchTokenReadyListener(
+            QuickSearchTokenReadyListener listener) {
+        synchronized (QUICK_SEARCH_TOKEN_LOCK) {
+            for (int i = QUICK_SEARCH_TOKEN_LISTENERS.size() - 1; i >= 0; i--) {
+                QuickSearchTokenReadyListener current =
+                        QUICK_SEARCH_TOKEN_LISTENERS.get(i).get();
+                if (current == null || current == listener) {
+                    QUICK_SEARCH_TOKEN_LISTENERS.remove(i);
+                }
+            }
+        }
+    }
+
+    /** Returns "query\tcount" for the best real-data single-letter scroll sample. */
+    public static String findQuickSearchScrollSample(List<Object> models) {
+        if (!areQuickSearchMatchModelsReady(models)) return "";
+        String bestQuery = "";
+        int bestCount = 0;
+        for (char candidate = 'a'; candidate <= 'z'; candidate++) {
+            String query = String.valueOf(candidate);
+            int count = 0;
+            for (Object value : models) {
+                if (value instanceof SharedSearchMatchModel
+                        && scoreSharedSearchMatch(query,
+                                (SharedSearchMatchModel) value) >= 0) count++;
+            }
+            if (count > bestCount) {
+                bestQuery = query;
+                bestCount = count;
+            }
+        }
+        return bestQuery.length() == 0 ? "" : bestQuery + "\t" + bestCount;
+    }
+
+    private static SharedSearchMatchModel obtainSharedSearchMatchModel(String label,
+            String packageName) {
+        String safeLabel = label == null ? "" : label;
+        String safePackage = packageName == null ? "" : packageName;
+        String key = safeLabel + "\u0000" + safePackage;
+        synchronized (QUICK_SEARCH_TOKEN_LOCK) {
+            SharedSearchMatchModel model = QUICK_SEARCH_MATCH_MODELS.get(key);
+            if (model == null) {
+                model = new SharedSearchMatchModel(safeLabel, safePackage);
+                QUICK_SEARCH_MATCH_MODELS.put(key, model);
+            }
+            return model;
+        }
+    }
+
+    private static void prepareSharedSearchMatchModel(SharedSearchMatchModel model) {
+        if (model == null || model.ready) return;
+        synchronized (model) {
+            if (model.ready) return;
+            String spaced = toLatinPinyin(model.label);
+            String compact = compactLetters(spaced);
+            String initialValues = pinyinInitials(spaced);
+            model.pinyinSpaced = spaced;
+            model.pinyinCompact = compact;
+            model.initials = initialValues;
+            model.pinyinForms = buildTokenForms(spaced, false);
+            model.initialForms = buildTokenForms(spaced, true);
+            model.t9Code = toT9Code(model.label + " " + model.packageName + " "
+                    + compact + " " + initialValues);
+            model.ready = true;
+        }
+    }
+
+    private static void drainQuickSearchTokenQueue() {
+        while (true) {
+            SharedSearchMatchModel model;
+            synchronized (QUICK_SEARCH_TOKEN_LOCK) {
+                if (QUICK_SEARCH_TOKEN_PENDING.isEmpty()) {
+                    sQuickSearchTokenThread = null;
+                    break;
+                }
+                model = QUICK_SEARCH_TOKEN_PENDING.remove(0);
+            }
+            prepareSharedSearchMatchModel(model);
+            synchronized (QUICK_SEARCH_TOKEN_LOCK) {
+                model.queued = false;
+            }
+        }
+        publishQuickSearchTokenReady();
+    }
+
+    private static void addQuickSearchTokenListenerLocked(
+            QuickSearchTokenReadyListener listener) {
+        if (listener == null) return;
+        for (int i = QUICK_SEARCH_TOKEN_LISTENERS.size() - 1; i >= 0; i--) {
+            QuickSearchTokenReadyListener current = QUICK_SEARCH_TOKEN_LISTENERS.get(i).get();
+            if (current == null) QUICK_SEARCH_TOKEN_LISTENERS.remove(i);
+            else if (current == listener) return;
+        }
+        QUICK_SEARCH_TOKEN_LISTENERS.add(
+                new WeakReference<QuickSearchTokenReadyListener>(listener));
+    }
+
+    private static void publishQuickSearchTokenReady() {
+        ArrayList<QuickSearchTokenReadyListener> listeners =
+                new ArrayList<QuickSearchTokenReadyListener>();
+        synchronized (QUICK_SEARCH_TOKEN_LOCK) {
+            for (int i = QUICK_SEARCH_TOKEN_LISTENERS.size() - 1; i >= 0; i--) {
+                QuickSearchTokenReadyListener listener =
+                        QUICK_SEARCH_TOKEN_LISTENERS.get(i).get();
+                if (listener == null) QUICK_SEARCH_TOKEN_LISTENERS.remove(i);
+                else listeners.add(listener);
+            }
+        }
+        for (QuickSearchTokenReadyListener listener : listeners) {
+            try {
+                listener.onQuickSearchTokensReady();
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     private static ArrayList<String> readSearchHistory(Context context) {
@@ -3330,6 +3713,47 @@ public final class MaintainedLauncherSettingsHost {
         return null;
     }
 
+    /**
+     * Resolves only an explicit/global replacement for the launcher-owned
+     * Desktop Settings button.  DEFAULT deliberately returns null so the
+     * original setting-button artwork remains the fallback.
+     */
+    public static Drawable desktopSettingsOverrideDrawable() {
+        Context context = currentApplicationContext();
+        if (context == null) return null;
+        final String pkg = IconManager.DESKTOP_SETTINGS_PACKAGE;
+        final String component = IconManager.DESKTOP_SETTINGS_COMPONENT;
+        RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, pkg, component);
+        String mode = RedirectIconDB.modeOf(redirect);
+        try {
+            if (RedirectIconDB.MODE_CUSTOM.equals(mode) && redirect != null && redirect.iconData != null) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(redirect.iconData, 0, redirect.iconData.length);
+                return bitmap == null ? null : new BitmapDrawable(context.getResources(), bitmap);
+            }
+            Resources resources = createSettingsContext(context).getResources();
+            if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
+                return libraryIconDrawable(context, resources, RedirectIconDB.resourceNameOf(redirect));
+            }
+            String pack = RedirectIconDB.MODE_PACK.equals(mode) ? RedirectIconDB.packNameOf(redirect) : null;
+            if (TextUtils.isEmpty(pack)) {
+                IconSourceManager.Selection global = IconSourceManager.get(context);
+                if (global.type == IconSourceManager.Type.PACK) pack = global.packageName;
+                if (global.type == IconSourceManager.Type.IMPROVED) {
+                    Drawable improved = libraryIconDrawable(context, resources, "com.android.settings");
+                    return improved != null ? improved : libraryIconDrawable(context, resources, pkg);
+                }
+            }
+            if (!TextUtils.isEmpty(pack)) {
+                Drawable packed = com.smartisanos.home.settings.icons.IconPackManager
+                        .getPackedIcon(context, pack, pkg, component);
+                return packed != null ? packed : com.smartisanos.home.settings.icons.IconPackManager
+                        .getPackedIcon(context, pack, "com.android.settings", "com.android.settings.Settings");
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
     /** Stable source identity shared by previews, desktop source resolution and final cache keys. */
     public static String desktopIconSourceType(Object itemInfo) {
         Context context = currentApplicationContext();
@@ -3428,6 +3852,15 @@ public final class MaintainedLauncherSettingsHost {
 
     public static String displayNameForDesktopItem(String packageName, String componentName,
                                                     String fallback) {
+        // The desktop settings shortcut is a launcher-owned virtual item.  It
+        // has no package-manager label of its own, so always resolve its title
+        // from the maintained, locale-aware resources when the model rebuilds
+        // the ItemInfo.  This also repairs titles persisted in a previous
+        // locale instead of treating them as user rename overrides.
+        if ("com.smartisanos.launcher".equals(packageName)
+                && "com.smartisanos.launcher.theme.ThemeChooserActivity".equals(componentName)) {
+            return localizedDesktopSettingsLabel(fallback);
+        }
         try {
             Context context = currentApplicationContext();
             RedirectIconInfo info = RedirectIconDB.getRedirectIconInfo(context, packageName, componentName);
@@ -3437,6 +3870,12 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         return fallback;
+    }
+
+    public static String localizedDesktopSettingsLabel(String fallback) {
+        Context context = currentApplicationContext();
+        if (context == null) return fallback;
+        return getString(context, "launcher_setting_name", fallback);
     }
 
     private static void showThemePage(final Activity activity, final int restoreScrollY) {
@@ -5115,6 +5554,20 @@ public final class MaintainedLauncherSettingsHost {
 
     public static void onRequestPermissionsResult(Activity activity, int requestCode,
             String[] permissions, int[] grantResults) {
+        if (requestCode == REQUEST_SEARCH_CONTACTS_PERMISSION) {
+            boolean granted = activity != null && activity.checkSelfPermission(
+                    Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED;
+            SettingItemSwitch item = sSearchContactsSwitch == null ? null : sSearchContactsSwitch.get();
+            sSearchContactsSwitch = null;
+            if (activity != null) writeBoolSetting(activity, KEY_SEARCH_CONTACTS_ENABLED, granted);
+            if (item != null) item.setChecked(granted);
+            if (activity != null) {
+                if (granted) com.smartisanos.launcher.quicksearch.ContactSearchRepository.get(activity).enable();
+                else com.smartisanos.launcher.quicksearch.ContactSearchRepository.get(activity).disable();
+            }
+            Log.i(LOG_TAG, "SEARCH_CONTACTS_PERMISSION_RESULT granted=" + granted);
+            return;
+        }
         if (requestCode == REQUEST_BACKUP_STORAGE_PERMISSION) {
             int pendingPicker = sPendingStoragePicker;
             sPendingStoragePicker = STORAGE_PICKER_NONE;
@@ -10602,6 +11055,8 @@ public final class MaintainedLauncherSettingsHost {
             public void run() {
                 com.smartisanos.launcher.diagnostics.LauncherStartupDiagnostics
                         .mark("LAUNCH_DEFERRED_TASKS_BEGIN");
+                com.smartisanos.launcher.quicksearch.SearchIndexRepository.get(activity)
+                        .scheduleWarmup("first_frame");
                 applyProcessCompatOnce();
                 applyNavigationBarIfChanged(activity);
                 maybeRefreshLauncherWallpaper(activity);
@@ -10621,6 +11076,62 @@ public final class MaintainedLauncherSettingsHost {
                         .mark("LAUNCH_DEFERRED_TASKS_END");
             }
         });
+    }
+
+    public static boolean areSearchContactsEnabled(Context context) {
+        boolean enabled = readSystemBool(context, KEY_SEARCH_CONTACTS_ENABLED, false);
+        boolean granted = context.checkSelfPermission(Manifest.permission.READ_CONTACTS)
+                == PackageManager.PERMISSION_GRANTED;
+        if (enabled && !granted) {
+            writeBoolSetting(context, KEY_SEARCH_CONTACTS_ENABLED, false);
+            com.smartisanos.launcher.quicksearch.ContactSearchRepository.get(context).disable();
+        }
+        return enabled && granted;
+    }
+
+    private static void bindSearchContactsSwitch(final Activity activity, final Resources resources, View root) {
+        View view = find(resources, root, "item_id_search_contacts_enabled");
+        if (!(view instanceof SettingItemSwitch)) return;
+        final SettingItemSwitch item = (SettingItemSwitch) view;
+        item.setChecked(areSearchContactsEnabled(activity));
+        bindSwitchControlOnly(item, new View.OnClickListener() { public void onClick(View v) {
+            if (item.isChecked()) { item.setCheckedAnimated(false); writeBoolSetting(activity, KEY_SEARCH_CONTACTS_ENABLED, false); com.smartisanos.launcher.quicksearch.ContactSearchRepository.get(activity).disable(); return; }
+            if (activity.checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) { item.setCheckedAnimated(true); writeBoolSetting(activity, KEY_SEARCH_CONTACTS_ENABLED, true); com.smartisanos.launcher.quicksearch.ContactSearchRepository.get(activity).enable(); return; }
+            sSearchContactsSwitch = new WeakReference<SettingItemSwitch>(item);
+            showConfirmDialog(activity,
+                    getString(resources, "search_contacts_enabled_title", "Search Contacts"),
+                    getString(resources, "search_contacts_permission_message", "Allow Launcher to read contacts for search results."),
+                    getString(resources, "cancel", "取消"),
+                    getString(resources, "search_contacts_permission_allow", "Allow"),
+                    new View.OnClickListener(){ public void onClick(View v){
+                        try { activity.requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, REQUEST_SEARCH_CONTACTS_PERMISSION); }
+                        catch (Throwable error) { sSearchContactsSwitch = null; writeBoolSetting(activity, KEY_SEARCH_CONTACTS_ENABLED, false); item.setChecked(false); }
+                    }});
+        }});
+    }
+
+    private static void qsPerf(long session, String event) {
+        qsPerf(session, event, null);
+    }
+
+    private static void qsPerf(long session, String event, String detail) {
+        StringBuilder message = new StringBuilder(96)
+                .append("session=").append(session)
+                .append(" event=").append(event)
+                .append(" t=").append(android.os.SystemClock.elapsedRealtime());
+        if (!TextUtils.isEmpty(detail)) {
+            message.append(' ').append(detail);
+        }
+        Log.e(QS_PERF_TAG, message.toString());
+    }
+
+    private static void qsShow(long session, String event, String detail) {
+        StringBuilder message = new StringBuilder(128)
+                .append(event)
+                .append(" session=").append(session)
+                .append(" t=").append(android.os.SystemClock.elapsedRealtime());
+        if (!TextUtils.isEmpty(detail)) message.append(' ').append(detail);
+        Log.i(QS_INDEX_TAG, message.toString());
     }
 
     /** Rebuilds persisted iconData once when the composer contract changes. */
@@ -12328,8 +12839,10 @@ public final class MaintainedLauncherSettingsHost {
             bindSwitch(activity, resources, root, "item_id_search_page_enabled",
                     KEY_SWIPE_UP_SEARCH_ENABLED, true);
             bindSearchCommonAppsSwitch(activity, resources, root);
+            bindSearchContactsSwitch(activity, resources, root);
             bindSwitch(activity, resources, root, "item_id_swipe_down_system_panels",
                     KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED, true);
+            bindVerticalGestureDirectionSwitch(activity, resources, root);
             synchronizeBadgeSettingsWithNotificationAccess(activity,
                     com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity));
             tuneScrollBars(root);
@@ -14532,6 +15045,8 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void applyIconChange(Context context) {
+        com.smartisanos.launcher.quicksearch.SearchIconBackend.invalidateAll(
+                "launcher_icon_update_all");
         try {
             Intent intent = new Intent("com.smartisanos.launcher.update_icon");
             String packages = allLauncherPackages(context);
@@ -14550,6 +15065,7 @@ public final class MaintainedLauncherSettingsHost {
             applyIconChange(context);
             return;
         }
+        com.smartisanos.launcher.quicksearch.SearchIconBackend.invalidatePackage(packageName);
         try {
             Intent intent = new Intent("com.smartisanos.launcher.update_icon");
             intent.putExtra("extra_packagename", packageName);
@@ -14569,6 +15085,7 @@ public final class MaintainedLauncherSettingsHost {
             if (TextUtils.isEmpty(packageName)) {
                 continue;
             }
+            com.smartisanos.launcher.quicksearch.SearchIconBackend.invalidatePackage(packageName);
             if (names.length() > 0) {
                 names.append(',');
             }
@@ -15618,7 +16135,8 @@ public final class MaintainedLauncherSettingsHost {
                 for (int i = 0; i < resolved.size(); i++) {
                     RedirectIconInfo info = resolved.get(i);
                     ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
-                    if (shouldShowIconEntry(resolveInfo)) {
+                    if (IconManager.isDesktopSettings(info.packageName, info.componentName)
+                            || shouldShowIconEntry(resolveInfo)) {
                         result.add(info);
                     } else {
                         filtered++;
@@ -16478,6 +16996,10 @@ public final class MaintainedLauncherSettingsHost {
             if (!names.contains(baseName)) {
                 names.add(baseName);
             }
+            if (IconManager.isDesktopSettings(info.packageName, info.componentName)
+                    && !names.contains("com.android.settings")) {
+                names.add("com.android.settings");
+            }
             String alias = smartisanSystemIconAlias(activity, iconManager.getResolveInfo(info.packageName, info.componentName));
             if (alias != null && !names.contains(alias)) {
                 names.add(alias);
@@ -16801,6 +17323,9 @@ public final class MaintainedLauncherSettingsHost {
         }
 
         ActivityInfo ai = info.activityInfo;
+        if (IconManager.isDesktopSettings(ai.packageName, ai.name)) {
+            return desktopSettingsOverrideDrawable();
+        }
         RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, ai.packageName, ai.name);
         String mode = RedirectIconDB.modeOf(redirect);
         // Manual sources are always terminal. A missing manual source deliberately falls back
@@ -16860,8 +17385,14 @@ public final class MaintainedLauncherSettingsHost {
 
     private static Drawable packedIconFromPackage(Context context, String pack, ResolveInfo info) {
         ActivityInfo ai = info == null ? null : info.activityInfo;
-        return ai == null ? null : com.smartisanos.home.settings.icons.IconPackManager
+        if (ai == null) return null;
+        Drawable packed = com.smartisanos.home.settings.icons.IconPackManager
                 .getPackedIconNonBlocking(context, pack, ai.packageName, ai.name);
+        if (packed != null || !IconManager.isDesktopSettings(ai.packageName, ai.name)) {
+            return packed;
+        }
+        return com.smartisanos.home.settings.icons.IconPackManager.getPackedIconNonBlocking(
+                context, pack, "com.android.settings", "com.android.settings.Settings");
     }
 
     public static Drawable currentLauncherIconDrawable(Context context, String packageName) {
@@ -17633,19 +18164,335 @@ public final class MaintainedLauncherSettingsHost {
         return id == 0 ? null : root.findViewById(id);
     }
 
+    private static void bindVerticalGestureDirectionSwitch(final Context context,
+            final Resources resources, final View root) {
+        View candidate = find(resources, root,
+                "item_id_vertical_gesture_direction_reversed");
+        if (!(candidate instanceof SettingItemSwitch)) return;
+        final SettingItemSwitch item = (SettingItemSwitch) candidate;
+        final boolean reversed = readSystemBool(context,
+                KEY_VERTICAL_GESTURE_DIRECTION_REVERSED, false);
+        item.setChecked(reversed);
+        updateVerticalGestureDirectionText(resources, root, reversed);
+        bindSwitchControlOnly(item, new View.OnClickListener() {
+            public void onClick(View view) {
+                boolean next = !item.isChecked();
+                item.setCheckedAnimated(next);
+                writeBoolSetting(context, KEY_VERTICAL_GESTURE_DIRECTION_REVERSED, next);
+                updateVerticalGestureDirectionText(resources, root, next);
+                Log.i(LOG_TAG, "VERTICAL_GESTURE_DIRECTION_CHANGED mode="
+                        + (next ? "REVERSED" : "NORMAL")
+                        + " effective=NEXT_ACTION_DOWN");
+            }
+        });
+    }
+
+    private static void updateVerticalGestureDirectionText(Resources resources,
+            View root, boolean reversed) {
+        View search = find(resources, root, "item_id_search_page_enabled");
+        if (search instanceof SettingItemSwitch) {
+            ((SettingItemSwitch) search).setTitle(getString(resources,
+                    reversed ? "search_page_enabled_title_reversed"
+                            : "search_page_enabled_title",
+                    reversed ? "下滑打开搜索页" : "上滑打开搜索页"));
+        }
+        View panel = find(resources, root, "item_id_swipe_down_system_panels");
+        if (panel instanceof SettingItemSwitch) {
+            ((SettingItemSwitch) panel).setTitle(getString(resources,
+                    reversed ? "swipe_down_system_panels_title_reversed"
+                            : "swipe_down_system_panels_title",
+                    reversed ? "上滑打开通知栏和控制中心" : "下滑打开通知栏和控制中心"));
+        }
+        setTextResource(resources, root, "item_id_search_page_tips",
+                reversed ? "vertical_gesture_direction_reversed_tips"
+                        : "vertical_gesture_direction_normal_tips");
+        setTextResource(resources, root, "item_id_swipe_down_system_panels_tips",
+                reversed ? "swipe_up_system_panels_tips" : "swipe_down_system_panels_tips");
+        setTextResource(resources, root, "item_id_vertical_gesture_direction_reversed_tips",
+                reversed ? "vertical_gesture_direction_reversed_tips"
+                        : "vertical_gesture_direction_normal_tips");
+    }
+
+    private static void setTextResource(Resources resources, View root, String idName,
+            String stringName) {
+        View view = find(resources, root, idName);
+        if (view instanceof TextView) {
+            ((TextView) view).setText(getString(resources, stringName, ""));
+        }
+    }
+
+    private static final class SearchPageBackendController
+            implements com.smartisanos.launcher.quicksearch.SearchIndexRepository.SnapshotListener {
+        private final Activity activity;
+        private final Context appContext;
+        private final View root;
+        private final EditText query;
+        private final LinearLayout commonApps;
+        private final LinearLayout chipBox;
+        private final ArrayList<SearchEntry> all;
+        private final ArrayList<SearchEntry> visible;
+        private final SearchAdapter adapter;
+        private final int commonItemWidth;
+        private final long searchSession;
+        private final ArrayList<com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest>
+                iconRequests;
+        private final boolean[] pageActive;
+        private final Runnable imeRequest;
+        private final com.smartisanos.launcher.quicksearch.SearchIndexRepository repository;
+        private long boundGeneration;
+        private boolean fallbackStarted;
+
+        SearchPageBackendController(Activity activity, Context appContext, View root,
+                EditText query, LinearLayout commonApps, LinearLayout chipBox,
+                ArrayList<SearchEntry> all, ArrayList<SearchEntry> visible,
+                SearchAdapter adapter, int commonItemWidth, long searchSession,
+                ArrayList<com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest>
+                iconRequests, boolean[] pageActive, Runnable imeRequest) {
+            this.activity = activity;
+            this.appContext = appContext;
+            this.root = root;
+            this.query = query;
+            this.commonApps = commonApps;
+            this.chipBox = chipBox;
+            this.all = all;
+            this.visible = visible;
+            this.adapter = adapter;
+            this.commonItemWidth = commonItemWidth;
+            this.searchSession = searchSession;
+            this.iconRequests = iconRequests;
+            this.pageActive = pageActive;
+            this.imeRequest = imeRequest;
+            this.repository = com.smartisanos.launcher.quicksearch.SearchIndexRepository
+                    .get(appContext);
+        }
+
+        void start() {
+            root.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                public void onViewAttachedToWindow(View view) {
+                }
+
+                public void onViewDetachedFromWindow(View view) {
+                    pageActive[0] = false;
+                    query.removeCallbacks(imeRequest);
+                    repository.removeSnapshotListener(SearchPageBackendController.this);
+                    adapter.cancelIconRequests();
+                    for (com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest request
+                            : iconRequests) {
+                        if (request != null) request.cancel();
+                    }
+                    iconRequests.clear();
+                }
+            });
+            com.smartisanos.launcher.quicksearch.SearchSnapshot snapshot =
+                    repository.getCurrentSnapshot();
+            qsShow(searchSession, "QS_SHOW_SNAPSHOT_READ", "state=" + repository.getState()
+                    + " generation=" + snapshot.generation
+                    + " entries=" + snapshot.entries.size());
+            if (snapshot.generation > 0L && !snapshot.entries.isEmpty()) {
+                bindSnapshot(snapshot);
+            } else if (repository.getState()
+                    == com.smartisanos.launcher.quicksearch.SearchIndexRepository.State.FAILED
+                    || (repository.getState()
+                    == com.smartisanos.launcher.quicksearch.SearchIndexRepository.State.READY
+                    && snapshot.generation > 0L && snapshot.entries.isEmpty())) {
+                startFallback("repository_" + repository.getState());
+            } else {
+                qsShow(searchSession, "QS_SEARCH_BACKEND_PATH", "mode=SNAPSHOT state=WAITING");
+                qsShow(searchSession, "QS_SHOW_COMPLETE", "mode=shell_waiting");
+                repository.scheduleWarmup("search_early");
+            }
+            repository.addSnapshotListener(this);
+        }
+
+        public void onSnapshotPublished(final com.smartisanos.launcher.quicksearch.SearchSnapshot snapshot) {
+            activity.runOnUiThread(new Runnable() {
+                public void run() {
+                    if (!isActive() || snapshot == null || snapshot.generation <= boundGeneration) {
+                        return;
+                    }
+                    bindSnapshot(snapshot);
+                }
+            });
+        }
+
+        private boolean isActive() {
+            return pageActive[0] && !activity.isFinishing()
+                    && (Build.VERSION.SDK_INT < 17 || !activity.isDestroyed());
+        }
+
+        private void bindSnapshot(
+                com.smartisanos.launcher.quicksearch.SearchSnapshot snapshot) {
+            if (!isActive() || snapshot == null || snapshot.generation <= boundGeneration) return;
+            long begin = android.os.SystemClock.elapsedRealtime();
+            ArrayList<String> history = readSearchHistory(appContext);
+            ArrayList<SearchEntry> mapped = new ArrayList<SearchEntry>(snapshot.entries.size());
+            HashMap<String, Boolean> identities = new HashMap<String, Boolean>();
+            int duplicates = 0;
+            int decoded = 0;
+            int encoded = 0;
+            int misses = 0;
+            for (com.smartisanos.launcher.quicksearch.SearchEntry source : snapshot.entries) {
+                if (source == null || TextUtils.isEmpty(source.packageName)
+                        || TextUtils.isEmpty(source.className)) continue;
+                if (identities.put(source.entryKey, Boolean.TRUE) != null) {
+                    duplicates++;
+                    continue;
+                }
+                Bitmap bitmap = com.smartisanos.launcher.quicksearch.SearchIconBackend
+                        .getDecoded(source);
+                Drawable icon = bitmap == null ? null
+                        : new BitmapDrawable(activity.getResources(), bitmap);
+                if (bitmap != null) decoded++;
+                else if (com.smartisanos.launcher.quicksearch.SearchIconBackend
+                        .getEncoded(source) != null) encoded++;
+                else misses++;
+                UserHandle profile = source.userId > 0
+                        ? userHandleForSerial(appContext, source.profileSerial) : null;
+                if (profile == null && source.userId > 0) {
+                    profile = userHandleForIdentifier(source.userId);
+                }
+                SearchEntry entry = SearchEntry.snapshot(source, icon, profile);
+                entry.historyRank = history.indexOf(entry.key);
+                entry.usageForegroundTime =
+                        com.smartisanos.launcher.quicksearch.SearchIconBackend
+                        .getUsageForegroundTime(source.packageName);
+                mapped.add(entry);
+            }
+            boundGeneration = snapshot.generation;
+            all.clear();
+            all.addAll(mapped);
+            qsShow(searchSession, "QS_SEARCH_BACKEND_PATH", "mode=SNAPSHOT");
+            qsShow(searchSession, "QS_SHOW_FIRST_BIND", "generation=" + boundGeneration
+                    + " entries=" + mapped.size() + " duplicates=" + duplicates);
+            if (!mapped.isEmpty()) {
+                qsShow(searchSession, "QS_SHOW_FIRST_NAME", "label=" + mapped.get(0).label);
+            }
+            if (isSearchCommonAppsEnabled(activity)) {
+                addSearchCommonApps(activity, commonApps, all, commonItemWidth, searchSession,
+                        iconRequests, pageActive);
+            }
+            chipBox.removeAllViews();
+            addSearchHistoryChips(activity, chipBox, all);
+            CharSequence current = query.getText();
+            filterSearchEntries(current == null ? "" : current.toString(), all, visible, adapter);
+            qsShow(searchSession, "QS_SHOW_ICON_CACHE", "scope=snapshot visibleRequested=0"
+                    + " decodedHits=" + decoded + " encodedHits=" + encoded
+                    + " asyncRequests=0 misses=" + misses);
+            qsShow(searchSession, "QS_SHOW_COMPLETE", "mode=snapshot elapsedMs="
+                    + (android.os.SystemClock.elapsedRealtime() - begin));
+            enrichUsageAndShortcuts(boundGeneration, history, mapped);
+        }
+
+        private void enrichUsageAndShortcuts(final long generation,
+                final ArrayList<String> history,
+                final ArrayList<SearchEntry> snapshotEntries) {
+            new Thread(new Runnable() {
+                public void run() {
+                    for (SearchEntry entry : snapshotEntries) {
+                        entry.prepareSearchTokens();
+                    }
+                    final ArrayList<SearchEntry> shortcuts = new ArrayList<SearchEntry>();
+                    loadPinnedShortcutSearchEntries(appContext, appContext.getPackageManager(),
+                            history, shortcuts);
+                    publishQuickSearchTokenReady();
+                    activity.runOnUiThread(new Runnable() {
+                        public void run() {
+                            if (!isActive() || generation != boundGeneration) return;
+                            HashMap<String, Boolean> seen = new HashMap<String, Boolean>();
+                            for (SearchEntry entry : all) {
+                                seen.put(entry.key, Boolean.TRUE);
+                            }
+                            for (SearchEntry shortcut : shortcuts) {
+                                if (!seen.containsKey(shortcut.key)) all.add(shortcut);
+                            }
+                            sortMaintainedSearchEntries(all);
+                            if (isSearchCommonAppsEnabled(activity)) {
+                                addSearchCommonApps(activity, commonApps, all, commonItemWidth,
+                                        searchSession, iconRequests, pageActive);
+                            }
+                            chipBox.removeAllViews();
+                            addSearchHistoryChips(activity, chipBox, all);
+                            CharSequence current = query.getText();
+                            filterSearchEntries(current == null ? "" : current.toString(), all,
+                                    visible, adapter);
+                        }
+                    });
+                }
+            }, "launcher-search-shortcuts").start();
+        }
+
+        private void startFallback(final String reason) {
+            if (fallbackStarted) return;
+            fallbackStarted = true;
+            qsShow(searchSession, "QS_SEARCH_BACKEND_PATH", "mode=FALLBACK");
+            qsShow(searchSession, "QS_SEARCH_FALLBACK", "reason=" + reason);
+            new Thread(new Runnable() {
+                public void run() {
+                    final ArrayList<SearchEntry> loaded = new ArrayList<SearchEntry>();
+                    qsPerf(searchSession, "QS_LOAD_ENTRIES_BEGIN");
+                    loadSearchEntries(appContext, loaded, searchSession);
+                    activity.runOnUiThread(new Runnable() {
+                        public void run() {
+                            if (!isActive()) return;
+                            all.clear();
+                            all.addAll(loaded);
+                            if (isSearchCommonAppsEnabled(activity)) {
+                                addSearchCommonApps(activity, commonApps, all, commonItemWidth,
+                                        searchSession, iconRequests, pageActive);
+                            }
+                            chipBox.removeAllViews();
+                            addSearchHistoryChips(activity, chipBox, all);
+                            CharSequence current = query.getText();
+                            filterSearchEntries(current == null ? "" : current.toString(), all,
+                                    visible, adapter);
+                        }
+                    });
+                }
+            }, "launcher-search-fallback").start();
+        }
+    }
+
+    private static void sortMaintainedSearchEntries(ArrayList<SearchEntry> entries) {
+        Collections.sort(entries, new Comparator<SearchEntry>() {
+            public int compare(SearchEntry a, SearchEntry b) {
+                if (a.historyRank != b.historyRank) {
+                    if (a.historyRank < 0) return 1;
+                    if (b.historyRank < 0) return -1;
+                    return a.historyRank - b.historyRank;
+                }
+                int label = a.label.compareToIgnoreCase(b.label);
+                return label != 0 ? label : a.userId - b.userId;
+            }
+        });
+    }
+
     private static final class SearchAdapter extends BaseAdapter {
         private final Activity activity;
         private final SettingsResourceContext context;
         private final Resources resources;
         private final ArrayList<SearchEntry> entries;
+        private final long searchSession;
+        private final ArrayList<com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest>
+                iconRequests;
+        private final boolean[] pageActive;
+        private boolean firstResultBoundLogged;
+        private boolean firstIconBoundLogged;
+        private boolean resultsVisibleLogged;
+        private long bindGeneration;
+        private int pendingVisibleIcons;
         private String query = "";
 
         SearchAdapter(Activity activity, SettingsResourceContext context, Resources resources,
-                      ArrayList<SearchEntry> entries) {
+                      ArrayList<SearchEntry> entries, long searchSession,
+                ArrayList<com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest>
+                iconRequests, boolean[] pageActive) {
             this.activity = activity;
             this.context = context;
             this.resources = resources;
             this.entries = entries;
+            this.searchSession = searchSession;
+            this.iconRequests = iconRequests;
+            this.pageActive = pageActive;
         }
 
         public int getCount() {
@@ -17666,18 +18513,89 @@ public final class MaintainedLauncherSettingsHost {
 
         public View getView(int position, View convertView, ViewGroup parent) {
             final SearchEntry entry = entries.get(position);
-            View row = convertView == null ? createSearchResultRow(activity) : convertView;
+            View row = convertView;
+            SearchRowHolder holder;
+            if (row == null) {
+                row = createSearchResultRow(activity);
+                holder = new SearchRowHolder((ImageView) row.findViewById(0x53500101),
+                        (TextView) row.findViewById(0x53500102));
+                row.setTag(holder);
+            } else {
+                holder = (SearchRowHolder) row.getTag();
+            }
+            final SearchRowHolder boundHolder = holder;
+            final long token = ++bindGeneration;
+            boundHolder.bindToken = token;
+            boundHolder.boundIconKey = entry.backendEntry == null
+                    ? null : entry.backendEntry.iconKey;
 
-            ImageView icon = (ImageView) row.findViewById(0x53500101);
+            ImageView icon = holder.icon;
             if (icon != null) {
                 icon.setVisibility(View.VISIBLE);
                 icon.setImageDrawable(entry.icon);
+                if (entry.icon != null && !firstIconBoundLogged) {
+                    firstIconBoundLogged = true;
+                    qsPerf(searchSession, "QS_FIRST_ICON_BOUND");
+                    qsShow(searchSession, "QS_SHOW_FIRST_ICON", "source=decoded_cache");
+                } else if (entry.icon == null && entry.backendEntry != null
+                        && com.smartisanos.launcher.quicksearch.SearchIconBackend
+                        .getEncoded(entry.backendEntry) != null) {
+                    pendingVisibleIcons++;
+                    final long sourceGeneration =
+                            com.smartisanos.launcher.quicksearch.SearchIconBackend
+                            .getSourceGeneration();
+                    com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest request =
+                            com.smartisanos.launcher.quicksearch.SearchIconBackend.requestDecoded(
+                            activity, entry.backendEntry,
+                            new com.smartisanos.launcher.quicksearch.SearchIconBackend.IconCallback() {
+                                public void onIconReady(String iconKey, long generation,
+                                        Bitmap bitmap) {
+                                    pendingVisibleIcons = Math.max(0, pendingVisibleIcons - 1);
+                                    if (pageActive[0] && bitmap != null
+                                            && generation == sourceGeneration
+                                            && boundHolder.bindToken == token
+                                            && iconKey.equals(boundHolder.boundIconKey)) {
+                                        Drawable drawable = new BitmapDrawable(
+                                                activity.getResources(), bitmap);
+                                        entry.icon = drawable;
+                                        boundHolder.icon.setImageDrawable(drawable);
+                                        if (!firstIconBoundLogged) {
+                                            firstIconBoundLogged = true;
+                                            qsShow(searchSession, "QS_SHOW_FIRST_ICON",
+                                                    "source=async_encoded");
+                                        }
+                                    }
+                                    if (pendingVisibleIcons == 0) {
+                                        qsShow(searchSession,
+                                                "QS_SHOW_VISIBLE_ICONS_READY", null);
+                                    }
+                                }
+                            });
+                    if (request != null) {
+                        iconRequests.add(request);
+                    } else {
+                        pendingVisibleIcons = Math.max(0, pendingVisibleIcons - 1);
+                    }
+                }
             }
 
-            TextView label = (TextView) row.findViewById(0x53500102);
+            TextView label = holder.label;
             if (label != null) {
                 label.setText(highlightMatch(entry.label, query));
                 label.setSingleLine(true);
+                if (!firstResultBoundLogged) {
+                    firstResultBoundLogged = true;
+                    qsPerf(searchSession, "QS_FIRST_RESULT_BOUND");
+                }
+            }
+
+            if (!resultsVisibleLogged) {
+                resultsVisibleLogged = true;
+                row.post(new Runnable() {
+                    public void run() {
+                        qsPerf(searchSession, "QS_RESULTS_VISIBLE");
+                    }
+                });
             }
 
             row.setOnClickListener(new View.OnClickListener() {
@@ -17686,6 +18604,26 @@ public final class MaintainedLauncherSettingsHost {
                 }
             });
             return row;
+        }
+
+        void cancelIconRequests() {
+            for (com.smartisanos.launcher.quicksearch.SearchIconBackend.IconRequest request
+                    : iconRequests) {
+                if (request != null) request.cancel();
+            }
+            pendingVisibleIcons = 0;
+        }
+    }
+
+    private static final class SearchRowHolder {
+        final ImageView icon;
+        final TextView label;
+        String boundIconKey;
+        long bindToken;
+
+        SearchRowHolder(ImageView icon, TextView label) {
+            this.icon = icon;
+            this.label = label;
         }
     }
 
@@ -17756,11 +18694,9 @@ public final class MaintainedLauncherSettingsHost {
         final UserHandle profileUser;
         final long profileSerial;
         final String key;
-        final String pinyinSpaced;
-        final String pinyinCompact;
-        final String initials;
-        final String t9Code;
-        final Drawable icon;
+        final SharedSearchMatchModel matchModel;
+        Drawable icon;
+        final com.smartisanos.launcher.quicksearch.SearchEntry backendEntry;
         int historyRank = -1;
         long usageForegroundTime;
         int lastScore;
@@ -17776,6 +18712,14 @@ public final class MaintainedLauncherSettingsHost {
 
         private SearchEntry(String label, String packageName, String className, String shortcutId,
                             int userId, Drawable icon, UserHandle profileUser, long profileSerial) {
+            this(label, packageName, className, shortcutId, userId, icon, profileUser,
+                    profileSerial, null, false);
+        }
+
+        private SearchEntry(String label, String packageName, String className, String shortcutId,
+                int userId, Drawable icon, UserHandle profileUser, long profileSerial,
+                com.smartisanos.launcher.quicksearch.SearchEntry backendEntry,
+                boolean deferSearchTokens) {
             this.label = label;
             this.labelLower = label == null ? "" : label.toLowerCase();
             this.packageName = packageName;
@@ -17786,11 +18730,22 @@ public final class MaintainedLauncherSettingsHost {
             this.profileSerial = profileSerial;
             this.key = packageName + "\t" + (shortcutId == null ? className : "shortcut:" + shortcutId) + "\t"
                     + (profileSerial >= 0L ? profileSerial : userId);
-            this.pinyinSpaced = toLatinPinyin(label);
-            this.pinyinCompact = compactLetters(this.pinyinSpaced);
-            this.initials = pinyinInitials(this.pinyinSpaced);
-            this.t9Code = toT9Code(label + " " + packageName + " " + pinyinCompact + " " + initials);
+            this.matchModel = obtainSharedSearchMatchModel(label, packageName);
+            if (!deferSearchTokens) prepareSearchTokens();
             this.icon = icon;
+            this.backendEntry = backendEntry;
+        }
+
+        static SearchEntry snapshot(
+                com.smartisanos.launcher.quicksearch.SearchEntry source, Drawable icon,
+                UserHandle profileUser) {
+            return new SearchEntry(source.label, source.packageName, source.className,
+                    source.shortcutId, source.userId, icon, profileUser,
+                    source.profileSerial, source, true);
+        }
+
+        void prepareSearchTokens() {
+            prepareSharedSearchMatchModel(matchModel);
         }
 
         static SearchEntry pinnedShortcut(String label, String packageName, String shortcutId,
@@ -17802,6 +18757,29 @@ public final class MaintainedLauncherSettingsHost {
 
         boolean isPinnedShortcut() {
             return !TextUtils.isEmpty(shortcutId);
+        }
+    }
+
+    private static final class SharedSearchMatchModel {
+        final String label;
+        final String labelLower;
+        final String packageName;
+        final String packageLower;
+        volatile String pinyinSpaced = "";
+        volatile String pinyinCompact = "";
+        volatile String initials = "";
+        volatile ArrayList<String> pinyinForms = new ArrayList<String>();
+        volatile ArrayList<String> initialForms = new ArrayList<String>();
+        volatile String t9Code;
+        volatile boolean ready;
+        boolean queued;
+
+        SharedSearchMatchModel(String label, String packageName) {
+            this.label = label;
+            this.labelLower = label.toLowerCase();
+            this.packageName = packageName;
+            this.packageLower = packageName.toLowerCase();
+            this.t9Code = toT9Code(label + " " + packageName);
         }
     }
 
@@ -17879,6 +18857,23 @@ public final class MaintainedLauncherSettingsHost {
             }
         }
         return out.toString();
+    }
+
+    private static ArrayList<String> buildTokenForms(String spaced, boolean initialsOnly) {
+        ArrayList<String> forms = new ArrayList<String>();
+        if (spaced == null || spaced.length() == 0) return forms;
+        String[] words = spaced.trim().split("\\s+");
+        StringBuilder full = new StringBuilder();
+        StringBuilder initials = new StringBuilder();
+        for (String word : words) {
+            if (word == null || word.length() == 0) continue;
+            full.append(word);
+            initials.append(Character.toLowerCase(word.charAt(0)));
+            forms.add(initialsOnly
+                    ? String.valueOf(Character.toLowerCase(word.charAt(0))) : word);
+            forms.add((initialsOnly ? initials : full).toString());
+        }
+        return forms;
     }
 
     private static boolean isDigitQuery(String text) {

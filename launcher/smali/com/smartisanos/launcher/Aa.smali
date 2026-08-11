@@ -1973,6 +1973,8 @@
     move v3, v4
 
     :goto_1
+    goto :cond_6
+
     if-eqz p3, :cond_6
 
     .line 101

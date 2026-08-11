@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:smartisan="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <smartisan.widget.MenuDialogTitleBar
+        android:id="@+id/menu_dialog_title_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        smartisan:show_divider="true" />
+    <LinearLayout
+        android:id="@+id/contentPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#f5f5f5f5"
+        android:orientation="vertical">
+        <ListView
+            android:id="@+id/content_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="18.0dp"
+            android:listSelector="@android:color/transparent"
+            android:overScrollMode="never"
+            android:paddingBottom="24.0dp"
+            android:paddingLeft="@dimen/menu_dialog_horizontal_distance"
+            android:paddingRight="@dimen/menu_dialog_horizontal_distance"
+            android:paddingTop="24.0dp"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbars="vertical"
+            android:visibility="gone" />
+        <smartisan.widget.ShadowButton
+            android:id="@+id/btn_ok"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24.0dp"
+            android:layout_marginLeft="@dimen/menu_dialog_horizontal_distance"
+            android:layout_marginRight="@dimen/menu_dialog_horizontal_distance"
+            android:layout_marginTop="24.0dp"
+            android:singleLine="true"
+            android:visibility="gone"
+            style="@style/LongButton.Shrink.Highlight.Red" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="backgroundShadow" format="reference" />
+    <attr name="shadowButtonStyle">
+        <enum name="longButton" value="2" />
+        <enum name="shrink_longButton" value="3" />
+        <enum name="smallButton" value="1" />
+    </attr>
+    <attr name="shadowColors" format="color|reference" />
+    <attr name="show_divider" format="boolean" />
+</resources>

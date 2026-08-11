@@ -22,9 +22,12 @@ import java.io.FileOutputStream;
 public final class IconRasterDiagnostics {
     private static final String TAG = "LauncherIconRaster";
     private static final Set<String> REPORTED = new HashSet<String>();
-    private static final int OPTICAL_ALPHA_CUTOFF = SmartisanIconNormalizer.ALPHA_THRESHOLD;
-    private static final String OPTICAL_NORMALIZATION_VERSION = SmartisanIconNormalizer.VERSION;
-    private static final String RASTER_CACHE_VERSION = "raster:v12-weather-calendar-geometry";
+    private static final int OPTICAL_ALPHA_CUTOFF = 40;
+    private static final int ARTWORK_EDGE_GUARD_PX = 1;
+    private static final String OPTICAL_NORMALIZATION_VERSION =
+            "optical:v5-outer-visible-envelope";
+    private static final String RASTER_CACHE_VERSION = "raster:v14-unified-outer-envelope";
+    private static final float PRISTINE_CONTENT_RATIO = 1.0f;
     private static final String BADGE_VERSION = "badge:v1";
     private static final String SHADOW_VERSION = "shadow:original-v1";
     /** Enable only in an acceptance build; production builds do not write icon bitmaps. */
@@ -348,54 +351,26 @@ public final class IconRasterDiagnostics {
         }
         float contentInset = 0f;
         float contentSize = artwork;
-        // Weather and Calendar keep their original internal artwork in both live and
-        // static modes.  Their static fallback shares the ordinary texture geometry,
-        // but must not acquire a second optical scale when the live controller is off.
-        boolean applyOpticalNormalizer = opticalNormalize
-                && !isWeatherCalendarArtwork(itemInfo);
-        SmartisanIconNormalizer.Result normalized = opticalNormalize
-                ? SmartisanIconNormalizer.analyze(source) : null;
-        VisibleBounds visibleBefore = normalized == null ? null
-                : new VisibleBounds(normalized.left, normalized.top,
-                        normalized.right, normalized.bottom);
-        boolean normalizationApplied = applyOpticalNormalizer && normalized != null
-                && normalized.width() >= 2 && normalized.height() >= 2;
+        // The production optical layer uses only the source's outer alpha
+        // envelope. It never uses area, hull, fill ratio or source identity.
+        VisibleBounds visibleBefore = opticalNormalize ? analyzeVisibleBounds(source) : null;
+        boolean normalizationApplied = visibleBefore != null
+                && visibleBefore.width() >= 2 && visibleBefore.height() >= 2;
         float sourceScale;
         float drawWidth;
         float drawHeight;
         float drawLeftInArtwork;
         float drawTopInArtwork;
-        float normalizerScale = 1f;
+        float envelopeScale = 1f;
         float fitScale = 1f;
         float finalOpticalScale = 1f;
         boolean fitClampApplied = false;
         if (normalizationApplied) {
-            float visibleLongSide = Math.max(visibleBefore.width(), visibleBefore.height());
-            // AOSP normalization is relative to the complete RAW canvas.  The
-            // alpha hull is used for optical area and centering, not as a
-            // second crop-to-fill scale.
-            float baseScale = Math.min(contentSize / Math.max(1, source.getWidth()),
-                    contentSize / Math.max(1, source.getHeight()));
-            normalizerScale = normalized.scale;
-            float normalizedVisibleLongSide = visibleLongSide * baseScale * normalizerScale;
-            float maximumVisibleLongSide = Math.max(1f,
-                    artwork - SmartisanIconNormalizer.EDGE_GUARD_PX * 2f);
-            if (normalizedVisibleLongSide > maximumVisibleLongSide) {
-                fitScale = maximumVisibleLongSide / normalizedVisibleLongSide;
-                fitClampApplied = true;
-            }
-            finalOpticalScale = normalizerScale * fitScale;
-            sourceScale = baseScale * finalOpticalScale;
-            if (!(sourceScale > 0f) || Float.isInfinite(sourceScale) || Float.isNaN(sourceScale)
-                    || sourceScale < 0.25f || sourceScale > 4.0f) {
-                normalizationApplied = false;
-                normalizerScale = 1f;
-                fitScale = 1f;
-                finalOpticalScale = 1f;
-                fitClampApplied = false;
-                sourceScale = Math.min(contentSize / Math.max(1, source.getWidth()),
-                        contentSize / Math.max(1, source.getHeight()));
-            }
+            contentSize *= PRISTINE_CONTENT_RATIO;
+            sourceScale = Math.min(contentSize / visibleBefore.width(),
+                    contentSize / visibleBefore.height());
+            fitScale = sourceScale;
+            finalOpticalScale = sourceScale;
             drawWidth = source.getWidth() * sourceScale;
             drawHeight = source.getHeight() * sourceScale;
             drawLeftInArtwork = contentInset + contentSize * 0.5f
@@ -433,7 +408,7 @@ public final class IconRasterDiagnostics {
         VisibleBounds visibleAfter = opticalNormalize ? analyzeVisibleBounds(physicalArtwork) : null;
         if (isAcceptanceSample(itemInfo)) {
             Log.w(TAG, "OPTICAL_FINAL_SCALE package=" + itemField(itemInfo, "packageName")
-                    + " normalizerScale=" + normalizerScale
+                    + " envelopeScale=" + envelopeScale
                     + " fitScale=" + fitScale
                     + " finalScale=" + finalOpticalScale
                     + " fitClampApplied=" + fitClampApplied
@@ -464,7 +439,7 @@ public final class IconRasterDiagnostics {
         }
         debugDump(itemInfo, "TEXTURE", result);
         debugMetrics(itemInfo, source, rawDrawable, visibleBefore, visibleAfter,
-                normalizerScale, fitClampApplied, drawLeftInArtwork, drawTopInArtwork,
+                envelopeScale, fitClampApplied, drawLeftInArtwork, drawTopInArtwork,
                 drawWidth, drawHeight, logicalArtwork, logicalTexture, artwork, texture, result);
         Log.i(TAG, "ICON_PIPELINE_SELECTED pipeline="
                 + " pipeline=STATIC_APPLICATION_COMPOSER"
@@ -480,16 +455,8 @@ public final class IconRasterDiagnostics {
         }
         reportPhysicalOnce(source, artwork, texture, logicalArtwork, logicalTexture,
                 metrics, scaleX, scaleY);
-        if (applyOpticalNormalizer) {
-            reportOpticalNormalizationOnce(itemInfo, source, visibleBefore, physicalArtwork,
-                    normalizationApplied, finalOpticalScale, artwork, texture);
-        } else if (opticalNormalize && isAcceptanceSample(itemInfo)) {
-            Log.i(TAG, "OPTICAL_NORMALIZATION_BYPASS package="
-                    + itemField(itemInfo, "packageName")
-                    + " reason=weather_calendar_internal_artwork_frozen"
-                    + " externalGeometry=" + artwork + 'x' + artwork
-                    + " texture=" + texture + 'x' + texture);
-        }
+        if (opticalNormalize) reportOpticalNormalizationOnce(itemInfo, source, visibleBefore,
+                physicalArtwork, normalizationApplied, finalOpticalScale, artwork, texture);
         physicalArtwork.recycle();
         return result;
     }
@@ -558,7 +525,7 @@ public final class IconRasterDiagnostics {
     }
 
     private static void debugMetrics(Object itemInfo, Bitmap analysis, Drawable drawable,
-            VisibleBounds before, VisibleBounds after, float normalizerScale,
+            VisibleBounds before, VisibleBounds after, float envelopeScale,
             boolean fitClampApplied, float drawLeft, float drawTop, float drawWidth,
             float drawHeight, int logicalArtwork, int logicalTexture, int physicalArtwork,
             int physicalTexture, Bitmap finalTexture) {
@@ -586,7 +553,7 @@ public final class IconRasterDiagnostics {
                 + "\tlogicalArtwork=" + logicalArtwork + "\tlogicalTexture=" + logicalTexture
                 + "\tphysicalArtwork=" + physicalArtwork + "\tphysicalTexture=" + physicalTexture
                 + "\tanalysisSize=" + analysis.getWidth() + 'x' + analysis.getHeight()
-                + "\tnormalizerScale=" + normalizerScale
+                + "\tenvelopeScale=" + envelopeScale
                 + "\tfitClampApplied=" + fitClampApplied
                 + "\tvisibleBefore=" + boundsString(before)
                 + "\tvisibleAfter=" + boundsString(after)
@@ -771,7 +738,7 @@ public final class IconRasterDiagnostics {
                 + " finalVisibleHeight=" + (after == null ? 0 : after.height())
                 + " finalVisibleRatio=" + Math.max(finalX, finalY)
                 + " beforeVisibleRatio=" + Math.max(beforeX, beforeY)
-                + " fitPolicy=ARTWORK_EDGE_GUARD_" + SmartisanIconNormalizer.EDGE_GUARD_PX
+                + " fitPolicy=ARTWORK_EDGE_GUARD_" + ARTWORK_EDGE_GUARD_PX
                 + " cacheVersion=" + RASTER_CACHE_VERSION);
         Log.w(TAG, "OPTICAL_NORMALIZATION package=" + packageName
                 + " component=" + component + " sourceType=DEFAULT_APK"
@@ -838,7 +805,7 @@ public final class IconRasterDiagnostics {
                 + ':' + iconPercent + ':' + pageMode + ":grid=" + pageMode + ':' + themeMode + ':' + pipeline
                 + ":normalizationVersion=" + OPTICAL_NORMALIZATION_VERSION
                 + ":alphaCutoff=" + OPTICAL_ALPHA_CUTOFF
-                + ":fitPolicy=artwork-edge-guard-" + SmartisanIconNormalizer.EDGE_GUARD_PX
+                + ":fitPolicy=artwork-edge-guard-" + ARTWORK_EDGE_GUARD_PX
                 + ":normalizationApplied=true:badgeVersion=" + BADGE_VERSION
                 + ":shadowVersion=" + SHADOW_VERSION;
         Log.i(TAG, "ICON_CACHE_PIPELINE_KEY packageName=" + packageName
@@ -1065,6 +1032,15 @@ public final class IconRasterDiagnostics {
         // background
         drawBitmapFitFull(canvas, background, fullRect, paint);
 
+        // Desktop Settings is a launcher-owned virtual item.  If the user
+        // selected an improved/library/icon-pack/custom source, draw that
+        // source here; otherwise retain the original gear renderer below.
+        Drawable override = MaintainedLauncherSettingsHost.desktopSettingsOverrideDrawable();
+        if (override != null) {
+            drawDrawableFitFull(canvas, override, fullRect);
+            return output;
+        }
+
         if (pressed) {
             canvas.save();
             canvas.rotate(
@@ -1130,6 +1106,18 @@ public final class IconRasterDiagnostics {
                 source,
                 destination,
                 paint);
+    }
+
+    private static void drawDrawableFitFull(Canvas canvas, Drawable drawable, RectF destination) {
+        if (canvas == null || drawable == null) return;
+        int left = Math.round(destination.left);
+        int top = Math.round(destination.top);
+        int right = Math.round(destination.right);
+        int bottom = Math.round(destination.bottom);
+        android.graphics.Rect previous = drawable.getBounds();
+        drawable.setBounds(left, top, right, bottom);
+        drawable.draw(canvas);
+        drawable.setBounds(previous);
     }
 
     private static void logFallback(boolean pressed, float logicalSettingButtonSize, Bitmap background, Bitmap gear, Bitmap innerShadow) {

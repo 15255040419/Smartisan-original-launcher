@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+    <ImageView
+        android:id="@+id/qs_original_search_cancel"
+        android:layout_width="36.0dp"
+        android:layout_height="36.0dp"
+        android:layout_alignParentRight="true"
+        android:layout_centerVertical="true"
+        android:layout_marginRight="@dimen/qs_original_bar_margin_edge"
+        android:contentDescription="@string/qs_original_search_cancel"
+        android:src="@drawable/qs_original_cancel_selector" />
+
+    <RelativeLayout
+        android:id="@+id/qs_original_search_edit_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_centerVertical="true"
+        android:layout_marginLeft="@dimen/qs_original_bar_margin_edge"
+        android:layout_marginRight="@dimen/qs_original_search_bar_margin_search_view"
+        android:layout_toLeftOf="@id/qs_original_search_cancel"
+        android:background="@drawable/qs_original_search_bar_edit_bg_selector">
+
+        <TextView
+            android:id="@+id/qs_original_search_left_icon"
+            android:layout_width="24.0dp"
+            android:layout_height="30.0dp"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="@dimen/qs_original_bar_margin_edge"
+            android:background="@drawable/qs_original_search_bar_left_icon_selector"
+            android:importantForAccessibility="no" />
+
+        <ImageView
+            android:id="@+id/qs_original_search_clear"
+            android:layout_width="30.0dp"
+            android:layout_height="30.0dp"
+            android:layout_alignParentRight="true"
+            android:layout_centerVertical="true"
+            android:layout_marginRight="@dimen/qs_original_bar_margin_edge"
+            android:background="@drawable/qs_original_clear_selector"
+            android:contentDescription="@string/qs_original_search_clear"
+            android:visibility="gone" />
+
+        <com.smartisanos.launcher.quicksearch.ui.OriginalSearchEditTextCompat
+            android:id="@+id/qs_original_search_edit_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="@dimen/qs_original_bar_margin_edge"
+            android:layout_toLeftOf="@id/qs_original_search_clear"
+            android:layout_toRightOf="@id/qs_original_search_left_icon"
+            android:background="@null"
+            android:gravity="center_vertical"
+            android:hint="@string/qs_original_searchbar_hint"
+            android:imeOptions="actionDone"
+            android:includeFontPadding="true"
+            android:saveEnabled="false"
+            android:singleLine="true"
+            android:textColor="@color/qs_original_editor_text"
+            android:textColorHint="@color/qs_original_editor_hint"
+            android:textSize="@dimen/qs_original_search_text_size" />
+    </RelativeLayout>
+</merge>

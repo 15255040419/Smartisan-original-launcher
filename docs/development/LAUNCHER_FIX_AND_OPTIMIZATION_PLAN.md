@@ -970,9 +970,9 @@ rg -n "onWallpaperPicked|saveGaussianWallpaperCopy|refreshLauncherWallpaperNow|r
 
 冻结规则：
 
-- DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 统一进入 `IconVisualMetrics -> SmartisanIconNormalizer -> Static Application Composer`；来源只提供 RAW，不得分叉尺寸算法。
-- 用户图标百分比只由 `LayoutProperty` 应用一次；不得恢复 `icon_size_origin_resize` 第二档、固定 `0.90` 缩小或 package/source/device 倍率。
-- Weather/Calendar 内部 ActiveIcon 完全冻结，只共享 root 外部 geometry；静态 fallback 共享相同外框但跳过普通形状 normalizer。
+- DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 与桌面设置统一进入 `LayoutProperty -> IconVisualMetrics -> Unified Visible Envelope -> Static Application Composer`；来源只提供 RAW，不得分叉尺寸算法。Visible Envelope 只按最外围 alpha 可见边界去除外围透明 padding 后等比居中，不得按面积、凸包、fill ratio、内部留白或图标形状改变倍率。
+- 用户图标百分比只由 `LayoutProperty` 应用一次；`icon_size_origin_resize` 仅保留原版字段兼容，适配入口必须使其等于 `icon_size_origin`，不得恢复第二档、固定 `0.90` 缩小或 package/source/device 倍率。
+- Weather/Calendar 内部 ActiveIcon 完全冻结，只共享 root 外部 geometry；静态 fallback 同样进入 Unified Visible Envelope，均不得按普通形状、面积或内容补偿缩放。
 - 桌面设置保留特殊 renderer，但服从同一用户尺寸与 physical raster 原则。
 - 跨分辨率验收比较 `visualEnvelope/cellWidth`，不是比较绝对像素；高清 RAW 只允许一次最终 Raster，低分辨率源必须标记 `SOURCE_LIMITED`。
 - 当前仅完成 vivo X21A 1080/12 宫格/当前 100% 真机基线；50/150、20 宫格、1440/2K 和中间分辨率未全部完成前，不得标记 `ICON_SYSTEM_VALIDATION_FROZEN=true`。

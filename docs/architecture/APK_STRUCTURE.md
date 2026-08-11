@@ -46,6 +46,8 @@ E:\FANG\smartisan\smartisan-launcher-original-port
 
 ## 已删除的 APK / 目录
 
+说明：`quicksearch_decode/` 当前工作区仍存在一份未跟踪的历史本地副本（约 27 MB），它不参与 `build.bat`，也不是 pristine 来源。本节原有记录描述的是项目目标状态；该副本应在确认 Q0/Q8 历史证据已外部归档后删除。
+
 | APK / 目录 | 删除原因 |
 | --- | --- |
 | `original_apks/com.smartisanos.quicksearch-101.apk` | 已删除。当前项目改用 launcher 内自绘搜索页，不再依赖锤子独立搜索 APK。 |

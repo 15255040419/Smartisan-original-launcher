@@ -5040,6 +5040,8 @@
     # Activity lifecycle callback.
     invoke-static {}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->onLauncherModelReady()V
 
+    invoke-static {}, Lcom/smartisanos/launcher/quicksearch/SearchIndexRepository;->onLauncherModelReady()V
+
     new-instance v2, Landroid/content/Intent;
 
     const-string v3, "com.smartisanos.launcher.ready"

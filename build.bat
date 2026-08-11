@@ -300,6 +300,75 @@ if exist "%ROOT%launcher\tools\maintained_settings_res\res" (
 )
 
 rem ============================================================
+rem 7b. Build embedded original QuickSearch UI resources
+rem ============================================================
+
+if exist "%ROOT%launcher\tools\original_quicksearch_res\res" (
+  echo [extra] Building original QuickSearch UI resources...
+
+  if exist "%ROOT%launcher\scratch\original_quicksearch_res" (
+    rmdir /s /q "%ROOT%launcher\scratch\original_quicksearch_res"
+  )
+
+  mkdir "%ROOT%launcher\scratch\original_quicksearch_res\flat"
+  mkdir "%ROOT%launcher\scratch\original_quicksearch_res\source"
+
+  rem Q8-A reuses the four pristine History 9-patch/PNG assets without redrawing.
+  xcopy /e /i /q /y "%ROOT%launcher\tools\original_quicksearch_res\res" "%ROOT%launcher\scratch\original_quicksearch_res\source" >nul
+  if errorlevel 2 (
+    echo FAIL: staging original QuickSearch UI resources failed.
+    exit /b 1
+  )
+  if not exist "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4" (
+    mkdir "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4"
+  )
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\global_search_tag_white_normal.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\qs_original_history_tag_normal.9.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\global_search_tag_white_pressed.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\qs_original_history_tag_pressed.9.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\history_clear_btn_normal.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\qs_original_history_clear_normal.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\history_clear_btn_pressed.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\qs_original_history_clear_pressed.png" >nul
+  rem Q8-D.5 stages the pristine Header, result row and MenuDialog resource closure.
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\history_clear_btn_normal.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\history_clear_btn_normal.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\history_clear_btn_pressed.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\history_clear_btn_pressed.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\list_section_title.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\list_section_title.9.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\list_item_bgwithoutphoto.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\list_item_bgwithoutphoto.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\list_item_bgwithoutphoto_down.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\list_item_bgwithoutphoto_down.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\bottom_sheet_title_bar_bg.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\bottom_sheet_title_bar_bg.9.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\smt_title_bar_shadow.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\smt_title_bar_shadow.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\divider_bg.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\divider_bg.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\standard_icon_cancel.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\standard_icon_cancel.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\standard_icon_cancel_pressed.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\standard_icon_cancel_pressed.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\standard_icon_cancel_disabled.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\standard_icon_cancel_disabled.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\shrink_long_btn_red_normal.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\shrink_long_btn_red_normal.9.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\shrink_long_btn_red_pressed.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\shrink_long_btn_red_pressed.9.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\shrink_long_btn_red_disabled.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\shrink_long_btn_red_disabled.9.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\shrink_long_btn_shadow_normal.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\shrink_long_btn_shadow_normal.9.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\shrink_long_btn_shadow_pressed.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\shrink_long_btn_shadow_pressed.9.png" >nul
+  copy /y "%ROOT%original_apks\quicksearch_phone_reference\decoded\res\drawable-xxhdpi\shrink_long_btn_shadow_disable.9.png" "%ROOT%launcher\scratch\original_quicksearch_res\source\drawable-xxhdpi-v4\shrink_long_btn_shadow_disable.9.png" >nul
+  if errorlevel 1 (
+    echo FAIL: staging pristine QuickSearch History assets failed.
+    exit /b 1
+  )
+
+  if not exist "%ROOT%launcher\assets\quicksearch_original" (
+    mkdir "%ROOT%launcher\assets\quicksearch_original"
+  )
+
+  "%AAPT2%" compile --dir "%ROOT%launcher\scratch\original_quicksearch_res\source" -o "%ROOT%launcher\scratch\original_quicksearch_res\flat\res.zip"
+  if errorlevel 1 (
+    echo FAIL: aapt2 compile original QuickSearch UI resources failed.
+    exit /b 1
+  )
+
+  "%AAPT2%" link --manifest "%ROOT%launcher\tools\original_quicksearch_res\AndroidManifest.xml" -I "%ANDROID_JAR%" --auto-add-overlay -o "%ROOT%launcher\scratch\original_quicksearch_res\original-quicksearch-res.apk" "%ROOT%launcher\scratch\original_quicksearch_res\flat\res.zip"
+  if errorlevel 1 (
+    echo FAIL: aapt2 link original QuickSearch UI resources failed.
+    exit /b 1
+  )
+
+  copy /y "%ROOT%launcher\scratch\original_quicksearch_res\original-quicksearch-res.apk" "%ROOT%launcher\assets\quicksearch_original\original-quicksearch-res.apk" >nul
+)
+
+rem ============================================================
 rem 8. Build launcher with apktool
 rem ============================================================
 

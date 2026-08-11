@@ -29,6 +29,7 @@ import android.util.Log;
 
 import com.smartisanos.launcher.diagnostics.StartupCompatibilityLogger;
 import com.smartisanos.launcher.ShortcutCompatBridge;
+import com.smartisanos.launcher.quicksearch.SearchIndexRepository;
 import com.smartisanos.launcher.theme.MaintainedLauncherSettingsHost;
 
 import java.io.File;
@@ -187,6 +188,28 @@ public final class SmartisanInstallManager {
         Log.i(TAG, "INSTALL_MODEL_READY pending=" + pendingEventCount());
         processPendingEvents(context, "model_ready_reconcile");
         reconcilePinnedShortcuts(context);
+    }
+
+    /**
+     * Original PackageTask completion boundary. Duplicate broadcasts stay coalesced while the
+     * task is pending, but a later real update must be allowed to create a fresh event.
+     */
+    public static void onOriginalPackageModelUpdateComplete(String packageName) {
+        Context context;
+        boolean removed = false;
+        synchronized (LOCK) {
+            PendingPackageEvent event = PENDING_PACKAGE_EVENTS.get(packageName);
+            if (event != null && event.dispatched) {
+                PENDING_PACKAGE_EVENTS.remove(packageName);
+                removed = true;
+            }
+            context = sAppContext;
+        }
+        if (removed && context != null) {
+            persistPendingEvents(context);
+            Log.i(TAG, "INSTALL_MODEL_PACKAGE_COMPLETE pkg=" + packageName
+                    + " pendingCleared=true");
+        }
     }
 
     /**
@@ -885,6 +908,7 @@ public final class SmartisanInstallManager {
     private static void removeConfirmedInstalledApp(Context context, String packageName,
                                                      int userId) {
         Log.i(TAG, "REMOVE_DATABASE_BEGIN pkg=" + packageName + " user=" + userId);
+        SearchIndexRepository.noteModelPackageDispatch(packageName, userId, "removed");
         if (userId == 0) {
             notifyOriginalPackageRemoved(packageName);
             MaintainedLauncherSettingsHost.clearCachedImprovedIcon(context, packageName);
@@ -970,6 +994,11 @@ public final class SmartisanInstallManager {
                 + pendingPrefs(context).getLong(BASELINE_TIME, 0L));
         Log.i(TAG, "INSTALL_ORIGINAL_ADD_DISPATCH pkg=" + event.packageName
                 + " new=" + event.newInstall + " user=" + event.userId);
+        SearchIndexRepository.noteModelPackageDispatch(event.packageName, event.userId,
+                event.replacing || Intent.ACTION_PACKAGE_REPLACED.equals(event.action)
+                        ? "replaced"
+                        : (Intent.ACTION_PACKAGE_CHANGED.equals(event.action)
+                                ? "changed" : "added"));
         Handler main = sHandler == null ? new Handler(Looper.getMainLooper()) : sHandler;
         main.post(new Runnable() {
             @Override public void run() {

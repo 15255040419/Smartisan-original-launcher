@@ -18,6 +18,15 @@ import java.util.List;
 import java.util.Map;
 
 public class IconManager {
+    /**
+     * The dock's Desktop Settings button is a launcher-owned virtual desktop
+     * item.  It is intentionally not discovered through PackageManager, but
+     * its stable component identity is shared with the existing redirect-icon
+     * store so DEFAULT/IMPROVED/PACK/CUSTOM use the normal selection model.
+     */
+    public static final String DESKTOP_SETTINGS_PACKAGE = "com.smartisanos.launcher";
+    public static final String DESKTOP_SETTINGS_COMPONENT =
+            "com.smartisanos.launcher.theme.ThemeChooserActivity";
     private final Context mContext;
     private final Map<String, ResolveInfo> resolveInfoMap = new HashMap<String, ResolveInfo>();
 
@@ -49,6 +58,17 @@ public class IconManager {
             }
             all.add(info);
         }
+        if (!stored.containsKey(key(DESKTOP_SETTINGS_PACKAGE, DESKTOP_SETTINGS_COMPONENT))) {
+            RedirectIconInfo desktopSettings = new RedirectIconInfo();
+            desktopSettings.packageName = DESKTOP_SETTINGS_PACKAGE;
+            desktopSettings.componentName = DESKTOP_SETTINGS_COMPONENT;
+            desktopSettings.useImprovedAppIcon = true;
+            desktopSettings.drawableName = RedirectIconDB.MODE_AUTO;
+            all.add(desktopSettings);
+        } else if (!resolveInfoMap.containsKey(key(DESKTOP_SETTINGS_PACKAGE,
+                DESKTOP_SETTINGS_COMPONENT))) {
+            all.add(stored.get(key(DESKTOP_SETTINGS_PACKAGE, DESKTOP_SETTINGS_COMPONENT)));
+        }
         java.util.Collections.sort(all);
         return all;
     }
@@ -57,6 +77,9 @@ public class IconManager {
         RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(mContext, packageName, componentName);
         if (redirect != null && redirect.displayName != null && redirect.displayName.trim().length() > 0) {
             return redirect.displayName;
+        }
+        if (isDesktopSettings(packageName, componentName)) {
+            return MaintainedLauncherSettingsHost.localizedDesktopSettingsLabel("桌面设置");
         }
         ResolveInfo info = resolveInfoMap.get(key(packageName, componentName));
         if (info == null) {
@@ -92,7 +115,21 @@ public class IconManager {
     }
 
     public ResolveInfo getResolveInfo(String pkg, String cmp) {
-        return resolveInfoMap.get(key(pkg, cmp));
+        ResolveInfo resolved = resolveInfoMap.get(key(pkg, cmp));
+        if (resolved != null || !isDesktopSettings(pkg, cmp)) {
+            return resolved;
+        }
+        // This is metadata for the icon chooser, not a PackageManager result.
+        ResolveInfo virtual = new ResolveInfo();
+        virtual.activityInfo = new android.content.pm.ActivityInfo();
+        virtual.activityInfo.packageName = DESKTOP_SETTINGS_PACKAGE;
+        virtual.activityInfo.name = DESKTOP_SETTINGS_COMPONENT;
+        return virtual;
+    }
+
+    public static boolean isDesktopSettings(String packageName, String componentName) {
+        return DESKTOP_SETTINGS_PACKAGE.equals(packageName)
+                && DESKTOP_SETTINGS_COMPONENT.equals(componentName);
     }
 
     public void notifyIconUpdate(Map<String, RedirectIconInfo> infos) {

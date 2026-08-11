@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Values copied from pristine QuickSearch 3.0.0/101. -->
+    <color name="qs_original_background">#e6ffffff</color>
+    <color name="qs_original_editor_text">#cc000000</color>
+    <color name="qs_original_editor_hint">#26000000</color>
+    <color name="qs_original_recommend_application">#cc000000</color>
+    <color name="qs_original_recommend_component_title">#4d000000</color>
+    <color name="qs_original_history_text">#666666</color>
+    <color name="qs_original_section_header_text">#4c000000</color>
+    <color name="qs_original_search_highlight">#d44d44</color>
+
+    <dimen name="qs_original_search_bar_height">48.0dp</dimen>
+    <dimen name="qs_original_bar_margin_edge">6.0dp</dimen>
+    <dimen name="qs_original_search_bar_margin_each">12.0dp</dimen>
+    <dimen name="qs_original_search_bar_margin_search_view">6.0dp</dimen>
+    <dimen name="qs_original_search_text_size">15.0sp</dimen>
+    <dimen name="qs_original_recommend_space">18.0dp</dimen>
+    <dimen name="qs_original_recommend_top">24.0dp</dimen>
+    <dimen name="qs_original_top_app_width">50.399994dp</dimen>
+    <!-- pristine recommend_app_size from quicksearch reference -->
+    <dimen name="qs_original_top_icon_size">42.0dp</dimen>
+    <dimen name="qs_original_top_icon_padding">8.0dp</dimen>
+    <dimen name="qs_original_result_icon_size">30.0dp</dimen>
+    <dimen name="qs_original_suggestion_height">60.0dp</dimen>
+    <dimen name="qs_original_suggestion_text1_size">16.0sp</dimen>
+    <dimen name="qs_original_suggestion_text2_size">13.0sp</dimen>
+    <dimen name="qs_original_suggestion_text_margin_right">12.0dp</dimen>
+    <dimen name="qs_original_history_title_height">30.0dp</dimen>
+    <dimen name="qs_original_history_title_margin_top">26.0dp</dimen>
+    <dimen name="qs_original_history_title_margin_left">6.0dp</dimen>
+    <dimen name="qs_original_history_title_text_size">14.0sp</dimen>
+    <dimen name="qs_original_history_layout_margin_top">4.799988dp</dimen>
+    <dimen name="qs_original_history_child_spacing">6.0dp</dimen>
+    <dimen name="qs_original_history_row_spacing">10.0dp</dimen>
+    <dimen name="qs_original_history_text_size">13.5sp</dimen>
+    <dimen name="qs_original_history_icon_size">18.0dp</dimen>
+    <dimen name="qs_original_history_icon_padding">5.0dp</dimen>
+    <dimen name="qs_original_section_header_height">40.0dp</dimen>
+    <dimen name="qs_original_section_header_padding_left">12.0dp</dimen>
+    <dimen name="qs_original_section_header_text_size">14.0sp</dimen>
+    <dimen name="qs_original_list_divider_height">2.0px</dimen>
+
+    <string name="qs_original_searchbar_hint">Search on device and web</string>
+    <string name="qs_original_search_clear">Clear search text</string>
+    <string name="qs_original_search_cancel">Cancel</string>
+    <string name="qs_original_search_history">Search History</string>
+    <string name="qs_original_clear_history_confirm">Clear all search history?</string>
+    <string name="qs_original_clear_history_button">Clear</string>
+    <string name="qs_original_cancel_button">Cancel</string>
+    <string name="qs_original_application_header">Application</string>
+    <string name="qs_original_contacts_header">Contacts</string>
+    <string name="smt_cancel">Cancel</string>
+    <string name="accessibility_clear_history_text">Clear search history</string>
+
+    <!-- Pristine QuickSearch presentation closure. -->
+    <color name="white">#ffffff</color>
+    <color name="highlight_btn_text_color_disabled">@color/white</color>
+    <color name="smartisan_title_text_color">#99000000</color>
+    <color name="sticky_list_header_text_color">#4c000000</color>
+    <color name="list_divider_color">#14000000</color>
+    <dimen name="bar_margin_edge">6.0dp</dimen>
+    <dimen name="semi_small_text_size">13.5sp</dimen>
+    <dimen name="semi_large_text_size">17.0sp</dimen>
+    <dimen name="standard_icon_size">36.0dp</dimen>
+    <dimen name="smartisan_title_bar_height">48.0dp</dimen>
+    <dimen name="menu_dialog_btn_margin_edge">24.0dp</dimen>
+    <dimen name="menu_dialog_btn_margin_view">18.0dp</dimen>
+    <dimen name="menu_dialog_horizontal_distance">18.0dp</dimen>
+    <dimen name="title_bar_shadow_height">14.0dp</dimen>
+    <dimen name="bar_divider_height">0.670001dp</dimen>
+    <dimen name="suggestion_view_height">60.0dp</dimen>
+    <dimen name="screen_suggestion">30.0dp</dimen>
+    <dimen name="suggestion_icon_size">34.0dp</dimen>
+    <dimen name="suggestion_text1_size">16.0sp</dimen>
+    <dimen name="suggestion_text2_size">13.0sp</dimen>
+    <dimen name="list_divider_height">2.0px</dimen>
+
+    <style name="MenuDialogTheme" parent="@android:style/Theme.DeviceDefault.Dialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowFrame">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.InputMethod</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
+
+    <style name="StandardIconStyle">
+        <item name="android:layout_width">@dimen/standard_icon_size</item>
+        <item name="android:layout_height">@dimen/standard_icon_size</item>
+        <item name="android:scaleType">centerInside</item>
+    </style>
+
+    <style name="LongButton">
+        <item name="android:textSize">@dimen/semi_large_text_size</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/highlight_button_text_colors</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:gravity">center</item>
+        <item name="android:layout_height">60.0dp</item>
+        <item name="android:layout_marginLeft">12.0dp</item>
+        <item name="android:layout_marginRight">12.0dp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:shadowDx">0.0</item>
+        <item name="android:shadowDy">-2.0</item>
+        <item name="android:shadowRadius">0.1</item>
+        <item name="backgroundShadow">@drawable/shrink_long_btn_shadow_normal</item>
+        <item name="shadowButtonStyle">longButton</item>
+    </style>
+    <style name="LongButton.Shrink" parent="@style/LongButton">
+        <item name="android:layout_height">48.0dp</item>
+        <item name="backgroundShadow">@drawable/shrink_long_btn_shadow_normal</item>
+        <item name="shadowButtonStyle">shrink_longButton</item>
+    </style>
+    <style name="LongButton.Shrink.Highlight" parent="@style/LongButton.Shrink">
+        <item name="android:layout_height">48.0dp</item>
+    </style>
+    <style name="LongButton.Shrink.Highlight.Red" parent="@style/LongButton.Shrink.Highlight">
+        <item name="android:background">@drawable/shrink_long_btn_red_selector</item>
+        <item name="android:layout_height">48.0dp</item>
+    </style>
+
+    <style name="StickyListHeaderStyle">
+        <item name="android:textSize">@dimen/semi_small_text_size</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/sticky_list_header_text_color</item>
+        <item name="android:gravity">left|center</item>
+        <item name="android:background">@drawable/list_section_title</item>
+        <item name="android:paddingLeft">12.0dp</item>
+    </style>
+    <style name="Suggestion">
+        <item name="android:background">@drawable/list_item_nophoto_bg</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/suggestion_view_height</item>
+    </style>
+    <style name="SuggestionIcon1">
+        <item name="android:layout_width">@dimen/screen_suggestion</item>
+        <item name="android:layout_height">@dimen/screen_suggestion</item>
+        <item name="android:scaleType">fitXY</item>
+        <item name="android:layout_centerInParent">true</item>
+    </style>
+    <style name="SuggestionIcon2">
+        <item name="android:layout_width">@dimen/suggestion_icon_size</item>
+        <item name="android:layout_height">@dimen/suggestion_icon_size</item>
+        <item name="android:scaleType">centerInside</item>
+    </style>
+    <style name="SuggestionText1">
+        <item name="android:textSize">@dimen/suggestion_text1_size</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/list_text1_color</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginRight">12.0dp</item>
+        <item name="android:singleLine">true</item>
+    </style>
+    <style name="SuggestionText2">
+        <item name="android:textSize">@dimen/suggestion_text2_size</item>
+        <item name="android:textColor">@color/list_text2_color</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginRight">12.0dp</item>
+        <item name="android:singleLine">true</item>
+    </style>
+
+    <style name="QsOriginalRecommendApplication">
+        <item name="android:textSize">12.0dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/qs_original_recommend_application</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:layout_width">@dimen/qs_original_top_app_width</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:drawablePadding">0.0dp</item>
+        <item name="android:layout_weight">1.0</item>
+        <item name="android:singleLine">true</item>
+    </style>
+
+    <style name="QsOriginalSuggestion">
+        <item name="android:background">@drawable/list_item_nophoto_bg</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/qs_original_suggestion_height</item>
+    </style>
+
+    <style name="QsOriginalSuggestionIcon1">
+        <item name="android:layout_width">@dimen/qs_original_result_icon_size</item>
+        <item name="android:layout_height">@dimen/qs_original_result_icon_size</item>
+        <item name="android:scaleType">fitXY</item>
+        <item name="android:layout_centerInParent">true</item>
+    </style>
+
+    <style name="QsOriginalSuggestionText1">
+        <item name="android:textSize">@dimen/qs_original_suggestion_text1_size</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/qs_original_list_text1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginRight">@dimen/qs_original_suggestion_text_margin_right</item>
+        <item name="android:singleLine">true</item>
+    </style>
+
+    <style name="QsOriginalSuggestionText2">
+        <item name="android:textSize">@dimen/qs_original_suggestion_text2_size</item>
+        <item name="android:textColor">@color/qs_original_list_text2</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginRight">@dimen/qs_original_suggestion_text_margin_right</item>
+        <item name="android:singleLine">true</item>
+    </style>
+
+    <style name="QsOriginalHistoryTag">
+        <item name="android:textSize">@dimen/qs_original_history_text_size</item>
+        <item name="android:textColor">@color/qs_original_history_text</item>
+        <item name="android:gravity">center</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/qs_original_history_tag_selector</item>
+    </style>
+</resources>

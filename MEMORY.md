@@ -479,6 +479,18 @@ python tools/patch_launcher_window_animation_resources.py launcher/resources.ars
 
 ---
 
+## 编辑模式异形屏标题长期记忆
+
+桌面双指捏合后的“已选择 [n/N] 个应用程序”不是 Android `TextView`，真实入口是 `launcher/smali/com/smartisanos/launcher/view/Lc.smali` 的 `a(g,float,int)`，节点名为 `status_bar_text`。以后修该标题位置必须改这条 SMEngine 链，不能只改普通 View、设置宿主或其他同文案节点。
+
+标题 X 坐标必须由运行时 `WindowInsets/DisplayCutout`、全部 cutout bounding rect、真实标题纹理宽度和 scene/decor 坐标比例计算：未相交保持原版居中；相交时优先可容纳标题的左安全段，再尝试右侧和最大安全段；多开孔先合并。不得恢复 `sa.ub()` 机型判断、`getStatusBarTextLeftMargin()` 固定边距、vivo/设备专用偏移或按分辨率写死坐标。
+
+中心宽刘海可能让完整标题无法仅靠 X 位移同时做到完全避孔、完整显示和保留屏幕边缘留白。该回退必须保持标题完整，并以系统真实 safe inset 保护圆角边缘；不得通过缩小字号、改文案、改 Y 或移动整个 LayoutProperty 来规避。布局和 Insets 改变后要重新计算，SMEngine 节点更新必须回到 GLThread。
+
+截至 2026-08-09，vivo X21A Android 9 的 1080×2280 中心刘海 `Rect(358,0-722,79)` 已真机确认标题不再居中遮挡且不贴左边；无刘海、左右挖孔、水滴/药丸孔和多开孔为算法覆盖，不得表述成所有机型均已真机验收。
+
+---
+
 ## 动态天气和日历记忆
 
 动态天气和日历保留 Smartisan 原版 activeicon 分层和切换回调。
@@ -506,13 +518,13 @@ python tools/patch_launcher_window_animation_resources.py launcher/resources.ars
 
 在线图标仓库和主 Launcher 仓库是分开的。
 
-图标系统的冻结架构以 `IconVisualMetrics -> SmartisanIconNormalizer -> Static Application Composer` 为唯一普通静态链。DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 只能改变 RAW source，不能拥有各自的 geometry、倍率、阴影或最终纹理算法；不得恢复 DEFAULT-only、managed-only、`icon_size_origin_resize` 第二档尺寸、固定 `0.90` 缩小、package/sourceType/device 专用倍率或旧最终 Bitmap 优先路径。
+图标系统的冻结架构以 `LayoutProperty -> IconVisualMetrics -> Unified Visible Envelope -> Static Application Composer` 为唯一普通静态链。DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 和虚拟桌面设置项只能改变 RAW source，不能拥有各自的 geometry、倍率、阴影或最终纹理算法；不得恢复 DEFAULT-only、managed-only、固定 `0.90` 缩小、package/sourceType/device 专用倍率或旧最终 Bitmap 优先路径。
 
-统一的含义是：相同 `sceneMode/cellWidth/gridMode/surfaceWidth/iconSizeSetting` 得到同一个 logical/physical artwork/texture 外框，用户 50%～150% 比例只由 `LayoutProperty` 应用一次；不同形状仍由 `SmartisanIconNormalizer` 按 alpha 轮廓、面积和 fill ratio 计算连续 optical scale，因此不得要求所有图标的可见宽高或 `normalizerScale` 数值机械相同。跨分辨率比较必须看 `visualEnvelope/cellWidth`，不是要求 1080、1440 和 2K 使用相同绝对 px。
+统一的含义是：相同 `sceneMode/cellWidth/gridMode/surfaceWidth/iconSizeSetting` 得到同一个 logical/physical artwork/texture 外框，用户 50%～150% 比例只由 `LayoutProperty` 应用一次。Optical 层只用全局 alpha 阈值取得 RAW 的最外围可见 bounds、去除外围全透明 padding 后等比居中 fit 到固定 content envelope；不得依据面积、凸包、fill ratio、内部留白、图标形状或 source identity 改变倍率。跨分辨率比较必须看 `visualEnvelope/cellWidth`，不是要求 1080、1440 和 2K 使用相同绝对 px。
 
-普通静态最终顺序冻结为 `RAW -> normalizer -> physical artwork 一次绘制 -> clone/profile badge -> original shadow -> final texture`。最终缓存键必须隔离 component、user/profile、sourceType/sourceIdentity/sourceHash、scene/grid、icon size、logical/physical 尺寸、分辨率/density、normalizer、badge 和 shadow 版本。主应用与分身共用相同本体 geometry，分身只增加一次原版面具。
+普通静态最终顺序冻结为 `RAW -> outer visible bounds fit -> physical artwork 一次绘制 -> clone/profile badge -> original shadow -> final texture`。`icon_size_origin_resize` 仅保留 ABI 字段；在 LayoutProperty 适配入口必须与 `icon_size_origin` 相等，不能再成为较小的第二 artwork target。最终缓存键必须隔离 component、user/profile、sourceType/sourceIdentity/sourceHash、scene/grid、icon size、logical/physical 尺寸、分辨率/density、envelope、badge 和 shadow 版本。主应用与分身共用相同本体 geometry，分身只增加一次原版面具。
 
-Weather/Calendar 内部布局、内容、日期位置、阴影、timeline 和动画冻结；动态状态只允许通过 ActiveIcon root 外部 geometry 对齐普通静态外框。动态关闭后的 Weather/Calendar 静态 fallback 共享 `IconVisualMetrics` 与原版阴影，但跳过普通形状 normalizer，避免第二次 optical 缩小。桌面设置齿轮保留特殊 renderer，只共享同一用户尺寸与跨分辨率物理栅格原则。
+Weather/Calendar 内部布局、内容、日期位置、阴影、timeline 和动画冻结；动态状态只允许通过 ActiveIcon root 外部 geometry 对齐普通静态外框。动态关闭后的 Weather/Calendar 静态 fallback 共享 `IconVisualMetrics` 与原版阴影，并走同一外部 envelope 合同，不得额外按形状/面积缩小。桌面设置齿轮保留特殊 renderer，但只共享同一用户尺寸与跨分辨率物理栅格原则。
 
 截至 2026-08-08，vivo X21A Android 9 的 1080/12 宫格/当前 100% 已完成静态来源、Weather/Calendar 静态/动态切换和 `230/295` 外部 geometry 验证；这只证明冻结实现的当前真机基线。50/150、1080 20 宫格、1440/2K 12/20 宫格、至少一个 720 或 1220/1260 中间分辨率、完整 CUSTOM/RESOURCE/图标包、冷启动与设备重启保持尚未全部完成，不得提前写 `ICON_SYSTEM_VALIDATION_FROZEN=true`，也不得把“算法已统一”表述成“所有手机已真机验收”。
 
@@ -736,6 +748,18 @@ docs/architecture/APK_STRUCTURE.md
 ---
 
 ## 更新规则
+
+## QuickSearch 冻结规则
+
+* 正式搜索入口是同 APK 的 `OriginalQuickSearchActivity`，由桌面手势经 `OriginalSearchTransitionHost` 进入。
+* 应用搜索唯一数据源是 `SearchSnapshot` / `SharedSearchMatchModel`；不得恢复每次按键时的 Provider、PackageManager 或数据库扫描。
+* non-empty → non-empty 查询必须保持现有页面并原子提交最新 rows，不能恢复清空后再展示结果的闪动链路。
+* 联系人搜索默认关闭；仅在用户 opt-in 后申请 `READ_CONTACTS` 并建立后台 Snapshot，不能在每次按键查询联系人 Provider。
+* Screenshot、PixelCopy 和 Blur 搜索背景永久停用；正式路径必须保持 capture/blur/screenshot bitmap 为 0。
+* 图标来源 generation 改变后必须重新 hydration 并重绑搜索结果；这是已验证的生产修复。
+* 正常/反转搜索方向与 1000ms completion window 是 vivo X21A 真机可靠性修复，不要恢复为 500ms 原版拒绝门槛。
+
+---
 
 只有学到长期有效信息时才更新本文档。
 

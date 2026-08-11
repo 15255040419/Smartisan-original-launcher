@@ -54,6 +54,7 @@ public final class SystemPanelCompat {
         }
         final int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
+            VerticalGestureDirectionConfig.captureForActionDown(context);
             sStartX = event.getX();
             sStartY = event.getY();
             sStartTime = event.getDownTime();
@@ -165,17 +166,21 @@ public final class SystemPanelCompat {
             return;
         }
 
-        // Reject upward swipe only if displacement exceeds 150px and dy > dx (upwards)
-        if (deltaY < 0 && Math.abs(deltaY) > 150.0f && Math.abs(deltaY) > Math.abs(deltaX)) {
+        // The opposite action owns the search direction in either configured mode.
+        if (VerticalGestureDirectionConfig.isSearchDirection(deltaY)
+                && Math.abs(deltaY) > TRIGGER_DISTANCE_PX
+                && Math.abs(deltaY) > Math.abs(deltaX)) {
             sState = OTHER_GESTURE_OWNED;
-            sOwnerReason = "UP_SWIPE";
-            logDiagnostic("PULL_DOWN_REJECT_UPWARD", event, "deltaY=" + deltaY);
+            sOwnerReason = "SEARCH_SWIPE";
+            logDiagnostic("SYSTEM_PANEL_REJECT_SEARCH_DIRECTION", event,
+                    "deltaY=" + deltaY);
             return;
         }
 
-        // Evaluate pull-down condition:
-        if (deltaY > 0 && deltaY > Math.abs(deltaX)) {
-            if (deltaY >= TRIGGER_DISTANCE_PX) {
+        // Evaluate the configured system-panel direction without changing thresholds.
+        if (VerticalGestureDirectionConfig.isPanelDirection(deltaY)
+                && Math.abs(deltaY) > Math.abs(deltaX)) {
+            if (Math.abs(deltaY) >= TRIGGER_DISTANCE_PX) {
                 final boolean left = sStartX <= sScreenWidth / 2.0f;
                 logDiagnostic("PULL_DOWN_PANEL_REQUESTED", event, "side=" + (left ? "left" : "right"));
 

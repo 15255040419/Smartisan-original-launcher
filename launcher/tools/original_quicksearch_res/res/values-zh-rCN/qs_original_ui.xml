@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="qs_original_searchbar_hint">搜索本机和联系人</string>
+    <string name="qs_original_search_clear">清除搜索文字</string>
+    <string name="qs_original_search_cancel">取消</string>
+    <string name="qs_original_search_history">搜索历史</string>
+    <string name="qs_original_clear_history_confirm">确认要清空历史记录？</string>
+    <string name="qs_original_clear_history_button">清空</string>
+    <string name="qs_original_cancel_button">取消</string>
+    <string name="qs_original_application_header">应用程序</string>
+    <string name="qs_original_contacts_header">联系人</string>
+    <string name="smt_cancel">取消</string>
+    <string name="accessibility_clear_history_text">清空搜索历史</string>
+</resources>
