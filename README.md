@@ -17,8 +17,8 @@
 
 <p align="center">
   <img alt="Android" src="https://img.shields.io/badge/Android-6.0%2B-brightgreen?style=flat-square">
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.5.5-blue?style=flat-square">
-  <img alt="Build" src="https://img.shields.io/badge/build-30-orange?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.5.6-blue?style=flat-square">
+  <img alt="Build" src="https://img.shields.io/badge/build-31-orange?style=flat-square">
   <img alt="Status" src="https://img.shields.io/badge/status-active-success?style=flat-square">
 </p>
 
@@ -49,11 +49,34 @@
 
 ## 当前状态
 
-当前版本：**v1.5.5 / versionCode 30**
+当前版本：**v1.5.6 / versionCode 31**
 支持系统：**Android 6.0 及以上**
 测试环境：已在 **Android 12 / Android 15 / Android 16** 环境开展兼容测试。
 
 不同厂商 ROM 在应用分身、后台限制、主题行为、解锁广播和系统入口暴露方式上仍可能存在差异，本项目会持续针对真实设备反馈进行适配。
+
+### v1.5.6 更新摘要
+
+#### 图标与桌面
+
+* **新增备份与恢复功能**：支持备份及恢复桌面布局。
+* **支持下滑打开控制中心和通知栏**：默认上滑打开搜索页面，左侧下滑打开通知栏，右侧下滑打开快捷中心（同时增加反向开关，支持上滑和下滑调转方向）。
+* **统一图标外框**：优化图标显示统一。
+* **修复动态图标问题**：修复动态天气和日历大小统一，阴影统一。
+* **文件夹打开动画优化**：解决上一版本导致有些机型打开关闭动画卡顿的问题。
+
+#### 内置搜索页改进
+
+* **搜索入口稳定性提升**：桌面主体正常方向上滑、反转方向下滑均可进入内置搜索；保留原有方向开关、单指、距离、角度和编辑状态限制，并将完成手势窗口调整为更符合正常手速的 1000ms。
+* **搜索结果连续显示**：连续输入时保留已有结果面、标题和图标，最新查询完成后一次提交，减少结果区闪空和图标重绘。
+* **联系人搜索可选启用**：默认不读取联系人；用户开启后才请求联系人权限并在后台建立索引。无联系人头像时复用当前联系人应用图标，能随主题和图标包变化。
+* **过渡体验收敛**：搜索页直接承接桌面实时画面，不再使用截图/模糊回退，减少二次打开时的亮度跳变和闪烁。
+
+#### 设置与兼容性
+
+* **桌面设置项本地化**：桌面设置虚拟入口会随系统语言刷新名称，避免英文系统仍显示旧中文标题。
+* **图标源变化同步搜索**：主题、图标包或图标替换后，搜索页会重新水合当前图标，常用应用和结果列表保持一致。
+* **系统优化**：优化安卓9返回时，丢失窗口导致卡死的问题。
 
 ### v1.5.5 更新摘要
 
