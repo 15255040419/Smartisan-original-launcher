@@ -17,9 +17,10 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-08-11）
+## 当前状态总览（2026-08-12）
 
-- 2026-08-11 图标统一 Optical Layer 最终收口：审计确认普通静态合成当前已经只按 RAW 的最外围 alpha bounds 等比 fit 到由 `LayoutProperty/IconVisualMetrics` 派生的固定 artwork envelope，面积、凸包、fill ratio、内部留白、形状和 source identity 均不参与最终倍率。此前残留的 `SmartisanIconNormalizer` 面积补偿类已删除；兼容字段 `icon_size_origin_resize` 在唯一 `LayoutPropertyAdapter` 入口强制等于 `icon_size_origin`，因此旧 `Aa/e.s` 静态路径不再取得较小 artwork target。DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 和桌面设置虚拟项继续只切换 RAW source；用户 50%–150% 仍只经现有 LayoutProperty 一次生效，Weather/Calendar 只对齐 root 外框，内部原版动画不变。缓存版本升级为 `raster:v14-unified-outer-envelope`，revision 变更会刷新旧缓存。`build.bat` 与 v1/v2/v3 签名通过，APK SHA256 `49BABA75B20FD0456026179D379AAF15DAFA03AAD790EA37E9C8581F5298648E`，已覆盖安装 vivo X21A。覆盖安装后首次前台启动捕获到既有 `UninstallApp.java` GLThread `V.Xo()` null 竞态；立即重启 Launcher 后稳定在 `LauncherAlias`，未复现。该竞态与图标 optical 链无调用关系，但尚未根因修复，不能把本次写成完整冷启动稳定性 PASS。50/150、20 宫格、图标包/CUSTOM、1440/2K 仍待用户可视回归。
+- 2026-08-12 Icon & Folder Unified Geometry Final Fix（当前）：普通静态 DEFAULT/IMPROVED/PACK/CUSTOM/RESOURCE 已统一由 `IconRasterDiagnostics` 按完整 source canvas 等比 fit 到当前场景的固定 artwork/texture box，缓存为 `raster:v15-fixed-source-canvas`；alpha padding、面积、轮廓和形状不再决定额外倍率。普通桌面只在既有 `LayoutPropertyAdapter` 中扩大 icon box，保留原版 scene/dock 动画几何。打开文件夹以 `_folder` 为唯一几何入口，书架、内容图标、文字、标题和分页相对量按原始文件夹宽度同比适配；三列 X 由 `folder_bookcase_width` 与 `page_view_margin_left/right` 的 usable rect 对称计算。`FolderSceneMetrics` 保持原版，不再对 root scene 追加缩放或平移，避免干扰开合动画。桌面“桌面设置”已恢复原版独立 SettingButton：`Ec.wz()` 仍只合成 `editBtn_bg/editBtn_gear/editBtn_inShadow` 的按压态、旋转和阴影，不作为普通应用，不跟随图标包或自定义图标，也不进入图标替换页。当前 APK 已保留数据覆盖安装到 vivo V2458A（1260x2800/560dpi），版本 `v1.5.6/31`，本地/设备 SHA256 均为 `5025E686F036C9C23BB82C21C1E52154A7B87EE8873593D0B3BBE319BD5AE448`；`build.bat`、`git diff --check`、badging 和 v1/v2/v3 签名均通过。已完成该机文件夹打开、关闭及连续 3 轮开合的运行冒烟，未见 Launcher FATAL/ANR。实现不包含按机型 dp/px 规则；但 1080、1440/2K、12/20 宫格、50%/150%、DEFAULT/IMPROVED/PACK/CUSTOM、动态 Weather/Calendar 与文件夹预览的完整视觉矩阵仍未逐项真机验收，不能写为全分辨率 PASS。
+
 
 - 2026-08-11 QuickSearch FINAL FREEZE + CLEANUP：用户确认当前真机 UI/交互基本无问题后，QuickSearch 正式收口为 `QUICKSEARCH_FEATURE_FROZEN / EMULATOR_FULL_PASS / VIVO_RUNTIME_PASS`。Q1-B 改为 `REFERENCE_BENCHMARK_NOT_REQUIRED_FOR_RELEASE`，Q3 保持 non-blocking，Q8-E 改为未来独立扩展，原版 optional fields 统一为 `NON_BLOCKING_REFERENCE_GAPS`；不再把它们写为功能待完成。最终状态文档重写为当前生产架构、功能、验证、禁用链路与冻结规则，原版基线审计和完整本日志保留，15 份 Q1-Q12 阶段流水删除。清理 `build/quicksearch_final/` 1,595 个文件、294.51 MiB 的重复证据与视频分析依赖；不保留二进制截图，最终设备/结果/SHA 收口到状态文档。Production Reachability Audit 确认 Screenshot Session 类与 `launcher_original_qs_preview` 设置 Preview 跳转没有 Java/Smali/Manifest/resource/reflection/build 引用，故删除 `OriginalSearchBackgroundSession` 和该死分支；正式 `OriginalSearchTransitionHost` 的 live-surface 链、Contacts opt-in、图标 generation hydration、增量无闪和 1000ms/镜像手势门槛均保留。最终 `build.bat` 成功，APK `v1.5.5/30`、SHA256 `C64FFE3493CC36D4EBE18F6B76BF4C41467556B67C47EC05F75CBF3DEC6853E6`，v1/v2/v3=true，二进制 Manifest 含非导出 `OriginalQuickSearchActivity` 与 `READ_CONTACTS`。新版已安装 emulator-5554 与 vivo X21A；vivo 将 Launcher 前台后 800ms 上滑进入 Original，`QS_FORMAL_ENTRY_TARGET` 与 `QS_ICON_HYDRATE` 完整、无 FATAL/ANR/CME。API36 模拟器新版 Launcher 进程启动正常且无崩溃，但其不是默认桌面，ADB 注入的两方向手势均不进入搜索，故不把该次手势样本误报为 PASS；完整 API36 语义矩阵仍以此前记录为准。未提交、未推送；`MEMORY.md` 已写入长期防回归规则。
 
@@ -158,6 +159,18 @@
 4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
 
 ## 每日修复记录（倒序）
+
+### 2026-08-12
+
+#### Icon & Folder Unified Geometry Final Fix
+
+- 根因：旧静态合成会按 alpha 外包络而非完整源画布缩放，且曾固定读取 12 宫格 `LayoutProperty`，使 20 宫格和打开文件夹不能取得自己的 icon box；`LayoutPropertyAdapter` 的上限曾禁止宽于 1080 profile 的 surface 向上适配。文件夹的原始三列 X 没有按书架内容可用矩形重新居中。此前把桌面“桌面设置”虚拟化为普通应用并参与替换链，也与用户确认的原版行为冲突；尝试在 scene root 追加文件夹缩放还造成开合闪动/卡顿风险。
+- 修复：普通静态源统一按完整 source canvas 等比 fit 到场景固定 artwork/texture box，不再作 alpha/面积/轮廓 optical compensation。普通桌面只适配 `LayoutProperty` 中的 icon box，不改变原版 scene/dock 几何。打开文件夹则由 `_folder` 这一份 `LayoutProperty` 统一缩放书架、内容、文字、标题和分页相对几何，列中心仅从 `folder_bookcase_width` 与已有左右 margin 推导。`FolderSceneMetrics` 回到原版，未保留额外 root scale/translate。桌面“桌面设置”恢复独立 `Ec.wz()` SettingButton，物理纹理只来自 `editBtn_bg.png`、`editBtn_gear.png`、`editBtn_inShadow.png`，不再进入 DEFAULT/IMPROVED/PACK/CUSTOM 或图标替换页。
+- 路径：普通桌面、打开文件夹和关闭文件夹预览中的静态应用继续经 `IconRasterDiagnostics.composeStaticApplicationIconTexture()`；动态 Weather/Calendar 保留原版 ActiveIcon 内部动画，只共享外部 geometry。编辑模式 SettingButton 与桌面“桌面设置”保持原版独立控制按钮路径，不是应用图标。
+- 修改文件：`LayoutPropertyAdapter.java`、`FolderCellPositionAdapter.java`、`IconRasterDiagnostics.java`、`ActiveIconRasterSpec.java`、`Ec.smali`、`g.1.smali`、`IconManager.java`、`MaintainedLauncherSettingsHost.java`。
+- 验证：最终 `build.bat` 成功；`git diff --check` 成功；badging 为 `v1.5.6/versionCode 31`；v1/v2/v3 签名均通过。APK 已保留数据覆盖安装到 vivo V2458A，设备版本为 `v1.5.6/31`，本地/设备 SHA256 均为 `5025E686F036C9C23BB82C21C1E52154A7B87EE8873593D0B3BBE319BD5AE448`。该机实际加载 `_folder` 的 width scale `1260 / 1080 = 1.1666666`，连续 3 轮文件夹开合未见 FATAL/ANR；普通桌面截图未见本轮适配引入的崩溃。
+- 未验证：当前仅完成 vivo V2458A 1260x2800/560dpi 的运行与视觉冒烟。1080、1440/2K、不同 density、12/20 宫格、50%/150%、DEFAULT/IMPROVED/PACK/CUSTOM、动态 Weather/Calendar、文件夹关闭预览及所有主题的完整视觉矩阵尚待逐项真机验收。因此当前状态是 `IMPLEMENTATION_UNIFIED / VIVO_1260_RUNTIME_SMOKE_PASS / FULL_RESOLUTION_MATRIX_PENDING`，不是“所有分辨率均已通过”。
+- 防回归：不得恢复 alpha bounds/hull/fill ratio optical 倍率；不得把 `currentPageMode()`再次固定为 12 宫格；不得将桌面“桌面设置”重新纳入普通应用替换链；文件夹 X 只能从 `_folder` usable rect 派生；不得向文件夹 root scene 追加 scale/translate 干扰原版开合动画。
 
 ### 2026-08-11
 
@@ -1965,7 +1978,7 @@ ADB 结论：
   - 取消依赖运行时 `translationY` 硬调预览位置，避免手机外壳和主题截图错位。
 - 已纳入本轮发布记录的前序功能 / BUG：
   - 应用图标页：改进版图标开关复用首页同款控件；图标包行和图标大小行补齐箭头与点击范围；单应用默认图标、推荐图标、相册自定义图标切换后只刷新当前行并保持滚动位置。
-  - 桌面图标大小：50% - 150% 连续调节，小 / 中 / 大三档快捷选择，保存后所有 12 / 20 宫格普通应用和桌面设置虚拟入口统一生效。
+  - 桌面图标大小：50% - 150% 连续调节，小 / 中 / 大三档快捷选择；当前仅对 12 / 20 宫格普通应用统一生效，桌面“桌面设置”保持原版独立 SettingButton，不纳入该替换或缩放链。
   - 图标包兼容：支持 appfilter / component 精确匹配，图标包优先级高于锤子自动识别，单应用自定义图标优先级最高。
   - 内置搜索页：设置页提供“启用下滑搜索”开关；搜索页去掉自绘键盘，改为系统输入法；顶部常用应用横向滑动；搜索结果行固定高度并垂直居中。
   - 双开应用：通过 `LauncherApps.getProfiles()` 补齐多用户可启动 Activity，保存 `ItemInfo.userId` 并通过 `startActivityAsUser` 启动对应用户应用。

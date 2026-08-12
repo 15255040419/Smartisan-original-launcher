@@ -621,8 +621,6 @@
     .line 6
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/activeicon/m;->create()V
 
-    invoke-static {v0}, Lcom/smartisanos/launcher/theme/ActiveIconRasterSpec;->applyOuterGeometry(Ljava/lang/Object;)V
-
     .line 7
     invoke-virtual {p0, v0}, Lcom/smartisanos/smengine/SceneNode;->addChild(Lcom/smartisanos/smengine/SceneNode;)I
 
@@ -678,8 +676,6 @@
 
     .line 17
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/activeicon/H;->create()V
-
-    invoke-static {v0}, Lcom/smartisanos/launcher/theme/ActiveIconRasterSpec;->applyOuterGeometry(Ljava/lang/Object;)V
 
     .line 18
     invoke-virtual {v0, v4, v2, v4}, Lcom/smartisanos/smengine/SceneNode;->setTranslate(FFF)V

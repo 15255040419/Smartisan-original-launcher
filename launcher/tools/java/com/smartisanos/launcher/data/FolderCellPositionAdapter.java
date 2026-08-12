@@ -15,7 +15,10 @@ public final class FolderCellPositionAdapter {
     }
 
     public static float adjustX(Object page, int row, int column, float x) {
-        return x;
+        if (page == null || !isFolderPage(page) || !isFolderMode(page)) {
+            return x;
+        }
+        return columnCenterX(folderLayoutProperty(), column, x);
     }
 
     public static float adjustY(Object page, int row, int column, float y) {
@@ -64,6 +67,9 @@ public final class FolderCellPositionAdapter {
                 Object source = Array.get(positions, index);
                 Object copy = copyPoint(source);
                 if (copy != null) {
+                    float x = floatField(copy, "x", 0.0f);
+                    setFloatField(copy, "x",
+                            columnCenterX(layoutProperty, index % COLUMN_COUNT, x));
                     float y = floatField(copy, "y", 0.0f);
                     setFloatField(copy, "y",
                             adjustedY(positions, layoutProperty, index, y));
@@ -181,6 +187,22 @@ public final class FolderCellPositionAdapter {
 
     private static int clampColumn(int column) {
         return Math.max(0, Math.min(column, COLUMN_COUNT - 1));
+    }
+
+    private static float columnCenterX(Object layoutProperty, int column, float fallback) {
+        if (!FolderVisualGeometry.isFolderLayoutProperty(layoutProperty)) {
+            return fallback;
+        }
+        float frameWidth = floatField(layoutProperty, "folder_bookcase_width", 0.0f);
+        float left = floatField(layoutProperty, "page_view_margin_left", 0.0f);
+        float right = floatField(layoutProperty, "page_view_margin_right", 0.0f);
+        float usableWidth = frameWidth - left - right;
+        if (frameWidth <= 0.0f || usableWidth <= 0.0f) {
+            return fallback;
+        }
+        float cellWidth = usableWidth / COLUMN_COUNT;
+        return -frameWidth * 0.5f + left
+                + (clampColumn(column) + 0.5f) * cellWidth;
     }
 
     private static Float cellY(int index) {

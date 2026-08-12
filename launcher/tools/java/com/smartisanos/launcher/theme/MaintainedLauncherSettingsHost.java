@@ -3713,47 +3713,6 @@ public final class MaintainedLauncherSettingsHost {
         return null;
     }
 
-    /**
-     * Resolves only an explicit/global replacement for the launcher-owned
-     * Desktop Settings button.  DEFAULT deliberately returns null so the
-     * original setting-button artwork remains the fallback.
-     */
-    public static Drawable desktopSettingsOverrideDrawable() {
-        Context context = currentApplicationContext();
-        if (context == null) return null;
-        final String pkg = IconManager.DESKTOP_SETTINGS_PACKAGE;
-        final String component = IconManager.DESKTOP_SETTINGS_COMPONENT;
-        RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, pkg, component);
-        String mode = RedirectIconDB.modeOf(redirect);
-        try {
-            if (RedirectIconDB.MODE_CUSTOM.equals(mode) && redirect != null && redirect.iconData != null) {
-                Bitmap bitmap = BitmapFactory.decodeByteArray(redirect.iconData, 0, redirect.iconData.length);
-                return bitmap == null ? null : new BitmapDrawable(context.getResources(), bitmap);
-            }
-            Resources resources = createSettingsContext(context).getResources();
-            if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
-                return libraryIconDrawable(context, resources, RedirectIconDB.resourceNameOf(redirect));
-            }
-            String pack = RedirectIconDB.MODE_PACK.equals(mode) ? RedirectIconDB.packNameOf(redirect) : null;
-            if (TextUtils.isEmpty(pack)) {
-                IconSourceManager.Selection global = IconSourceManager.get(context);
-                if (global.type == IconSourceManager.Type.PACK) pack = global.packageName;
-                if (global.type == IconSourceManager.Type.IMPROVED) {
-                    Drawable improved = libraryIconDrawable(context, resources, "com.android.settings");
-                    return improved != null ? improved : libraryIconDrawable(context, resources, pkg);
-                }
-            }
-            if (!TextUtils.isEmpty(pack)) {
-                Drawable packed = com.smartisanos.home.settings.icons.IconPackManager
-                        .getPackedIcon(context, pack, pkg, component);
-                return packed != null ? packed : com.smartisanos.home.settings.icons.IconPackManager
-                        .getPackedIcon(context, pack, "com.android.settings", "com.android.settings.Settings");
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
-    }
-
     /** Stable source identity shared by previews, desktop source resolution and final cache keys. */
     public static String desktopIconSourceType(Object itemInfo) {
         Context context = currentApplicationContext();
@@ -3852,15 +3811,6 @@ public final class MaintainedLauncherSettingsHost {
 
     public static String displayNameForDesktopItem(String packageName, String componentName,
                                                     String fallback) {
-        // The desktop settings shortcut is a launcher-owned virtual item.  It
-        // has no package-manager label of its own, so always resolve its title
-        // from the maintained, locale-aware resources when the model rebuilds
-        // the ItemInfo.  This also repairs titles persisted in a previous
-        // locale instead of treating them as user rename overrides.
-        if ("com.smartisanos.launcher".equals(packageName)
-                && "com.smartisanos.launcher.theme.ThemeChooserActivity".equals(componentName)) {
-            return localizedDesktopSettingsLabel(fallback);
-        }
         try {
             Context context = currentApplicationContext();
             RedirectIconInfo info = RedirectIconDB.getRedirectIconInfo(context, packageName, componentName);
@@ -16135,8 +16085,7 @@ public final class MaintainedLauncherSettingsHost {
                 for (int i = 0; i < resolved.size(); i++) {
                     RedirectIconInfo info = resolved.get(i);
                     ResolveInfo resolveInfo = iconManager.getResolveInfo(info.packageName, info.componentName);
-                    if (IconManager.isDesktopSettings(info.packageName, info.componentName)
-                            || shouldShowIconEntry(resolveInfo)) {
+                    if (shouldShowIconEntry(resolveInfo)) {
                         result.add(info);
                     } else {
                         filtered++;
@@ -16996,10 +16945,6 @@ public final class MaintainedLauncherSettingsHost {
             if (!names.contains(baseName)) {
                 names.add(baseName);
             }
-            if (IconManager.isDesktopSettings(info.packageName, info.componentName)
-                    && !names.contains("com.android.settings")) {
-                names.add("com.android.settings");
-            }
             String alias = smartisanSystemIconAlias(activity, iconManager.getResolveInfo(info.packageName, info.componentName));
             if (alias != null && !names.contains(alias)) {
                 names.add(alias);
@@ -17323,9 +17268,6 @@ public final class MaintainedLauncherSettingsHost {
         }
 
         ActivityInfo ai = info.activityInfo;
-        if (IconManager.isDesktopSettings(ai.packageName, ai.name)) {
-            return desktopSettingsOverrideDrawable();
-        }
         RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, ai.packageName, ai.name);
         String mode = RedirectIconDB.modeOf(redirect);
         // Manual sources are always terminal. A missing manual source deliberately falls back
@@ -17386,13 +17328,8 @@ public final class MaintainedLauncherSettingsHost {
     private static Drawable packedIconFromPackage(Context context, String pack, ResolveInfo info) {
         ActivityInfo ai = info == null ? null : info.activityInfo;
         if (ai == null) return null;
-        Drawable packed = com.smartisanos.home.settings.icons.IconPackManager
+        return com.smartisanos.home.settings.icons.IconPackManager
                 .getPackedIconNonBlocking(context, pack, ai.packageName, ai.name);
-        if (packed != null || !IconManager.isDesktopSettings(ai.packageName, ai.name)) {
-            return packed;
-        }
-        return com.smartisanos.home.settings.icons.IconPackManager.getPackedIconNonBlocking(
-                context, pack, "com.android.settings", "com.android.settings.Settings");
     }
 
     public static Drawable currentLauncherIconDrawable(Context context, String packageName) {

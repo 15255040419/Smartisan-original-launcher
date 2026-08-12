@@ -31,12 +31,6 @@ public final class LayoutPropertyAdapter {
             return;
         }
 
-        // The original resize tier is still read by a few legacy static-icon
-        // call sites.  It must never choose a smaller artwork canvas than the
-        // normal origin: source padding is handled later by the single outer
-        // visible-envelope compositor.
-        unifyLegacyIconResizeTarget(property);
-
         int width = staticInt("com.smartisanos.launcher.data.Constants", "window_width");
         int height = staticInt("com.smartisanos.launcher.data.Constants", "window_height");
         if (width <= 0 || height <= 0) {
@@ -47,22 +41,16 @@ public final class LayoutPropertyAdapter {
         float resourceBaseHeight = resourceBaseWidth * (BASE_HEIGHT / BASE_WIDTH);
         float scaleX = width / resourceBaseWidth;
         float scaleY = height / resourceBaseHeight;
-        float scale = Math.min(1.0f, Math.min(scaleX, scaleY));
-        if ("_folder".equals(suffix)) {
-            // Open-folder geometry is loaded from the original _folder resource
-            // set. Keep that shared LayoutProperty untouched; any future
-            // compatibility transform belongs to the FolderPageView scene.
-            Log.i(TAG, "folder source"
-                    + " bookcase=" + numericField(property, "folder_bookcase_width")
-                    + "x" + numericField(property, "folder_bookcase_height")
-                    + " iconOrigin=" + numericField(property, "icon_size_origin")
-                    + " iconShadow=" + numericField(property, "icon_size_with_shadow")
-                    + " textSize=" + numericField(property, "text_font_size")
-                    + " nameOffsetY=" + numericField(property, "name_off_set_y")
-                    + " titleY=" + numericField(property, "folder_title_location_y")
-                    + " dotY=" + numericField(property, "folder_dot_view_location_y")
-                    + " sceneScaleOwner=FolderSceneMetrics");
-            return;
+        boolean folderLayout = "_folder".equals(suffix);
+        // Open-folder resources are one width-owned visual scene. Scale their
+        // LayoutProperty values together before any node/animation is created.
+        // Ordinary pages keep their original scene geometry and adapt only the
+        // icon boxes below when the surface is wider than the resource profile.
+        float scale = folderLayout
+                ? scaleX : Math.min(1.0f, Math.min(scaleX, scaleY));
+        float iconScale = Math.min(scaleX, scaleY);
+        if (!folderLayout) {
+            scaleIconBoxes(property, iconScale);
         }
         if (Math.abs(scale - 1.0f) < EPSILON
                 && Math.abs(scaleX - 1.0f) < EPSILON
@@ -95,6 +83,29 @@ public final class LayoutPropertyAdapter {
         } catch (Throwable t) {
             Log.w(TAG, "layout adaptation skipped", t);
         }
+    }
+
+    /**
+     * Icon boxes follow the existing LayoutProperty surface scale even when
+     * the surrounding scene must keep its original animation geometry.
+     */
+    private static void scaleIconBoxes(Object property, float factor) {
+        if (property == null || factor <= 1.0f + EPSILON) {
+            return;
+        }
+        String[] fields = {
+                "icon_size_origin",
+                "icon_size_origin_resize",
+                "icon_size_with_shadow",
+                "icon_size_with_shadow_folder"
+        };
+        for (String field : fields) {
+            try {
+                scaleNumericField(property, field, factor);
+            } catch (Throwable ignored) {
+            }
+        }
+        scaleFolderPreviewForIconSize(property, factor);
     }
 
     public static void scaleFolderPreviewForIconSize(Object property, float factor) {
@@ -174,17 +185,6 @@ public final class LayoutPropertyAdapter {
         } catch (Throwable ignored) {
         }
         return 0f;
-    }
-
-    private static void unifyLegacyIconResizeTarget(Object property) {
-        try {
-            Field origin = property.getClass().getField("icon_size_origin");
-            Field resize = property.getClass().getField("icon_size_origin_resize");
-            if (origin.getType() != Float.TYPE || resize.getType() != Float.TYPE) return;
-            float value = origin.getFloat(property);
-            if (value > 0f) resize.setFloat(property, value);
-        } catch (Throwable ignored) {
-        }
     }
 
     private static void setNumericField(Object property, String fieldName, float value)

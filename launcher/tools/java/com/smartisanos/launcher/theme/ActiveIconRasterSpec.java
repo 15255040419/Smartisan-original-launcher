@@ -27,7 +27,7 @@ import java.util.Map;
  */
 public final class ActiveIconRasterSpec {
     private static final String TAG = "ActiveIconRaster";
-    public static final int REVISION = 4;
+    public static final int REVISION = 1;
     private static final int MAX_MEMORY_KEYS = 160;
     private static final int MAX_DISK_FILES = 192;
     private static final Map<String, String> TEXTURE_PATHS =
@@ -147,32 +147,6 @@ public final class ActiveIconRasterSpec {
 
     public static float physicalScaleForActiveBackground(float logicalBackgroundSize) {
         return cachedArtworkScale("active", logicalBackgroundSize);
-    }
-
-    /** Applies only one uniform transform to the original ActiveIcon root. */
-    public static void applyOuterGeometry(Object activeIconRoot) {
-        if (activeIconRoot == null) return;
-        ActiveIconRasterSpec spec = resolve();
-        if (spec == null) return;
-        String className = activeIconRoot.getClass().getName();
-        boolean weather = className.endsWith(".H");
-        float originalOuter = layoutFloat(weather
-                ? "weather_back_size" : "calendar_back_size");
-        if (!(originalOuter > 0f)) return;
-        float scale = spec.logicalArtworkWidth / originalOuter;
-        if (!(scale > 0f) || Float.isNaN(scale) || Float.isInfinite(scale)) return;
-        try {
-            activeIconRoot.getClass().getMethod("setScale",
-                    Float.TYPE, Float.TYPE, Float.TYPE)
-                    .invoke(activeIconRoot, Float.valueOf(scale), Float.valueOf(scale),
-                            Float.valueOf(scale));
-            Log.i(TAG, "ACTIVE_ICON_OUTER_GEOMETRY logicalArtwork="
-                    + spec.logicalArtworkWidth + " type=" + (weather ? "weather" : "calendar")
-                    + " originalOuter=" + originalOuter
-                    + " outerScale=" + scale + " internalChanged=false");
-        } catch (Throwable error) {
-            Log.w(TAG, "ACTIVE_ICON_OUTER_GEOMETRY_FAILED", error);
-        }
     }
 
     public static String cacheKey(String type, String stateOrStyle,
