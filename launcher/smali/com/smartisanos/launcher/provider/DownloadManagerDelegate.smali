@@ -1186,7 +1186,7 @@
 
     .line 23
     :cond_8
-    invoke-static {p0}, Lcom/smartisanos/launcher/Aa;->D(Ljava/lang/String;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->blockLegacyDownloadRemoval(Ljava/lang/String;)V
 
     goto/16 :goto_1
 

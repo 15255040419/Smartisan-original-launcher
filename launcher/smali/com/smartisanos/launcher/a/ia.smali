@@ -257,7 +257,9 @@
 
     move-result-object v0
 
-    invoke-static {v0}, Lcom/smartisanos/launcher/Aa;->a(Lcom/smartisanos/launcher/data/ItemInfo;)V
+    const-string v1, "uninstall_dialog"
+
+    invoke-static {v0, v1}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->removeWorkspaceItem(Ljava/lang/Object;Ljava/lang/String;)Z
 
     .line 22
     :cond_7
@@ -320,7 +322,9 @@
 
     move-result-object p0
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/Aa;->a(Lcom/smartisanos/launcher/data/ItemInfo;)V
+    const-string v1, "uninstall_dialog"
+
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->removeWorkspaceItem(Ljava/lang/Object;Ljava/lang/String;)Z
 
     .line 31
     sget-object p0, Lcom/smartisanos/launcher/a/oa;->jk:Landroid/app/AlertDialog;

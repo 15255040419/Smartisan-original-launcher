@@ -31,6 +31,13 @@ import com.smartisanos.launcher.diagnostics.StartupCompatibilityLogger;
 import com.smartisanos.launcher.ShortcutCompatBridge;
 import com.smartisanos.launcher.quicksearch.SearchIndexRepository;
 import com.smartisanos.launcher.theme.MaintainedLauncherSettingsHost;
+import com.smartisanos.launcher.model.LauncherItemKey;
+import com.smartisanos.launcher.model.LauncherModelRepository;
+import com.smartisanos.launcher.model.PackageEventGateway;
+import com.smartisanos.launcher.model.PackageStateRepository;
+import com.smartisanos.launcher.model.ProfileRepository;
+import com.smartisanos.launcher.model.ProfileState;
+import com.smartisanos.launcher.model.RemovalGateway;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -99,6 +106,11 @@ public final class SmartisanInstallManager {
     private static Handler sHandler;
     private static Handler sWorkerHandler;
     private static HandlerThread sWorkerThread;
+    private static PackageEventGateway sPackageEvents;
+    private static ProfileRepository sProfiles;
+    private static PackageStateRepository sPackageStates;
+    private static RemovalGateway sRemovalGateway;
+    private static LauncherModelRepository sModelRepository;
 
     private SmartisanInstallManager() {
     }
@@ -121,6 +133,15 @@ public final class SmartisanInstallManager {
                 sWorkerThread = new HandlerThread("SmartisanInstallManager");
                 sWorkerThread.start();
                 sWorkerHandler = new Handler(sWorkerThread.getLooper());
+                sProfiles = new ProfileRepository(sAppContext);
+                sPackageStates = new PackageStateRepository(sAppContext, sProfiles);
+                sRemovalGateway = new RemovalGateway();
+                sModelRepository = new LauncherModelRepository(sAppContext);
+                sPackageEvents = new PackageEventGateway(sAppContext, new PackageEventGateway.Consumer() {
+                    @Override public void onPackageEvent(Context c, PackageEventGateway.PackageEvent event) {
+                        dispatchGatewayEvent(c, event);
+                    }
+                });
             }
         } catch (Throwable t) {
             synchronized (LOCK) {
@@ -148,27 +169,24 @@ public final class SmartisanInstallManager {
             return;
         }
         ensure(context);
-        enqueuePackageEvent(context, packageName, Intent.ACTION_PACKAGE_ADDED,
+        acceptPlatformEvent(context, packageName, Intent.ACTION_PACKAGE_ADDED,
                 false, 0, "legacy");
     }
 
     /** Called from the manifest receiver after the original theme-specific handling. */
     public static void onPackageEvent(Context context, Intent intent) {
-        if (context == null || intent == null || intent.getData() == null) {
-            return;
-        }
-        String packageName = intent.getData().getSchemeSpecificPart();
-        int eventUserId = intent.getIntExtra("android.intent.extra.user_handle", -1);
-        if (eventUserId < 0) {
-            int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
-            if (uid >= 0) {
-                eventUserId = userIdForUid(uid);
-            } else {
-                eventUserId = 0;
-            }
-        }
-        enqueuePackageEvent(context, packageName, intent.getAction(),
-                intent.getBooleanExtra(Intent.EXTRA_REPLACING, false), eventUserId, "manifest");
+        ensure(context);
+        PackageEventGateway gateway = sPackageEvents;
+        if (gateway != null) gateway.acceptBroadcast(context, intent, "manifest");
+    }
+
+    private static void dispatchGatewayEvent(Context context, PackageEventGateway.PackageEvent event) {
+        String action = event.type == PackageEventGateway.Type.REMOVED ? Intent.ACTION_PACKAGE_REMOVED
+                : event.type == PackageEventGateway.Type.REPLACED ? Intent.ACTION_PACKAGE_REPLACED
+                : event.type == PackageEventGateway.Type.CHANGED ? Intent.ACTION_PACKAGE_CHANGED : Intent.ACTION_PACKAGE_ADDED;
+        enqueuePackageEvent(context, event.packageName, action, event.replacing,
+                event.user == null ? 0 : sProfiles.userId(event.user), event.userSerial,
+                event.componentName, event.source);
     }
 
     /** J.MESSAGE_COMPLETE: the original model has accepted its initial database state. */
@@ -198,9 +216,13 @@ public final class SmartisanInstallManager {
         Context context;
         boolean removed = false;
         synchronized (LOCK) {
-            PendingPackageEvent event = PENDING_PACKAGE_EVENTS.get(packageName);
+            // The original completion callback has no UserHandle; it only acknowledges its
+            // historic main-user task and must never consume another profile's event.
+            PendingPackageEvent event = PENDING_PACKAGE_EVENTS.get(pendingKey(packageName, 0, 0L,
+                    Intent.ACTION_PACKAGE_ADDED, ""));
             if (event != null && event.dispatched) {
-                PENDING_PACKAGE_EVENTS.remove(packageName);
+                PENDING_PACKAGE_EVENTS.remove(pendingKey(packageName, 0, 0L,
+                        Intent.ACTION_PACKAGE_ADDED, ""));
                 removed = true;
             }
             context = sAppContext;
@@ -223,14 +245,15 @@ public final class SmartisanInstallManager {
     public static boolean shouldMarkNewlyInstalled(String packageName) {
         PendingPackageEvent event;
         synchronized (LOCK) {
-            event = PENDING_PACKAGE_EVENTS.get(packageName);
+            event = PENDING_PACKAGE_EVENTS.get(pendingKey(packageName, 0, 0L,
+                    Intent.ACTION_PACKAGE_ADDED, ""));
         }
         if (event == null || !event.dispatched || !event.newInstall) {
             Log.i(TAG, "INSTALL_NEW_MARK_RESERVED pkg=" + packageName
                     + " reserved=false reason=no_pending_new_event");
             return false;
         }
-        boolean existing = hasExistingLauncherPackage(packageName);
+        boolean existing = LauncherModelRepository.hasFormalApplicationItem(packageName, 0);
         Log.i(TAG, "INSTALL_NEW_MARK_RESERVED pkg=" + packageName
                 + " reserved=" + !existing + " existingDatabasePackage=" + existing
                 + " action=" + event.action + " replacing=" + event.replacing
@@ -374,7 +397,7 @@ public final class SmartisanInstallManager {
                         return;
                     }
                     if (success) {
-                        enqueuePackageEvent(context, pkg, Intent.ACTION_PACKAGE_ADDED,
+                        acceptPlatformEvent(context, pkg, Intent.ACTION_PACKAGE_ADDED,
                                 false, 0, "package_installer");
                     } else {
                         clearFailedInstallPlaceholder(context, pkg, "package_installer_failed");
@@ -403,11 +426,11 @@ public final class SmartisanInstallManager {
             }
             apps.registerCallback(new LauncherApps.Callback() {
                 @Override public void onPackageAdded(String packageName, UserHandle user) {
-                    enqueuePackageEvent(context, packageName, Intent.ACTION_PACKAGE_ADDED,
+                    acceptPlatformEvent(context, packageName, Intent.ACTION_PACKAGE_ADDED,
                             false, userId(user), "launcher_apps");
                 }
                 @Override public void onPackageChanged(String packageName, UserHandle user) {
-                    enqueuePackageEvent(context, packageName, Intent.ACTION_PACKAGE_CHANGED,
+                    acceptPlatformEvent(context, packageName, Intent.ACTION_PACKAGE_CHANGED,
                             false, userId(user), "launcher_apps");
                 }
                 @Override public void onPackageRemoved(String packageName, UserHandle user) {
@@ -418,7 +441,7 @@ public final class SmartisanInstallManager {
                                                           boolean replacing) {
                     if (packages == null) return;
                     for (String packageName : packages) {
-                        enqueuePackageEvent(context, packageName, Intent.ACTION_PACKAGE_ADDED,
+                        acceptPlatformEvent(context, packageName, Intent.ACTION_PACKAGE_ADDED,
                                 replacing, userId(user), "launcher_apps_available");
                     }
                 }
@@ -665,7 +688,7 @@ public final class SmartisanInstallManager {
             return;
         }
         if (!ENABLE_DOWNLOAD_ANIMATION) {
-            enqueuePackageEvent(context, pkg, Intent.ACTION_PACKAGE_ADDED,
+            acceptPlatformEvent(context, pkg, Intent.ACTION_PACKAGE_ADDED,
                     false, 0, "download_compat");
             return;
         }
@@ -728,8 +751,21 @@ public final class SmartisanInstallManager {
         forgetDisplay(null, pkg);
     }
 
-    private static void enqueuePackageEvent(Context context, String packageName, String action,
+    private static void acceptPlatformEvent(Context context, String packageName, String action,
                                             boolean replacing, int userId, String source) {
+        PackageEventGateway gateway = sPackageEvents;
+        if (gateway == null) return;
+        UserHandle user = sProfiles == null ? null : sProfiles.userForLegacyId(userId);
+        long serial = sProfiles == null ? -1L : sProfiles.serialFor(user);
+        PackageEventGateway.Type type = Intent.ACTION_PACKAGE_REMOVED.equals(action) ? PackageEventGateway.Type.REMOVED
+                : Intent.ACTION_PACKAGE_REPLACED.equals(action) ? PackageEventGateway.Type.REPLACED
+                : Intent.ACTION_PACKAGE_CHANGED.equals(action) ? PackageEventGateway.Type.CHANGED : PackageEventGateway.Type.ADDED;
+        gateway.accept(context, new PackageEventGateway.PackageEvent(type, packageName, user, serial, null, replacing, source));
+    }
+
+    private static void enqueuePackageEvent(Context context, String packageName, String action,
+                                            boolean replacing, int userId, long userSerial,
+                                            String componentName, String source) {
         if (context == null || TextUtils.isEmpty(packageName)
                 || context.getPackageName().equals(packageName)) {
             return;
@@ -748,7 +784,8 @@ public final class SmartisanInstallManager {
             return;
         }
         synchronized (LOCK) {
-            PendingPackageEvent existing = PENDING_PACKAGE_EVENTS.get(packageName);
+            String pendingKey = pendingKey(packageName, userId, userSerial, action, componentName);
+            PendingPackageEvent existing = PENDING_PACKAGE_EVENTS.get(pendingKey);
             if (existing != null) {
                 existing.replacing |= replacing || Intent.ACTION_PACKAGE_REPLACED.equals(action);
                 existing.source = source;
@@ -756,8 +793,9 @@ public final class SmartisanInstallManager {
                     existing.action = action;
                 }
             } else {
-                PENDING_PACKAGE_EVENTS.put(packageName, new PendingPackageEvent(packageName, action,
-                        replacing || Intent.ACTION_PACKAGE_REPLACED.equals(action), userId, source));
+                PENDING_PACKAGE_EVENTS.put(pendingKey, new PendingPackageEvent(packageName, action,
+                        replacing || Intent.ACTION_PACKAGE_REPLACED.equals(action), userId, userSerial,
+                        componentName, source));
             }
         }
         persistPendingEvents(context);
@@ -770,23 +808,46 @@ public final class SmartisanInstallManager {
         onPackageRemoved(context, packageName, 0, source);
     }
 
+    /** Legacy uninstall callbacks lack a reliable PackageManager result; retain the item. */
+    public static void onUncertainLegacyUninstall(String packageName) {
+        Log.w(TAG, "[PACKAGE][REMOVE_BLOCKED] source=oa.c reason=QUERY_UNCERTAIN pkg=" + packageName);
+    }
+
+    /** Routes old receiver paths through the same confirmation gate as modern callbacks. */
+    public static void onLegacyPackageRemovalBypass(String packageName) {
+        Context context = sAppContext;
+        if (context == null || TextUtils.isEmpty(packageName)) {
+            Log.w(TAG, "[PACKAGE][REMOVE_BLOCKED] source=legacy_receiver reason=CONTEXT_OR_PACKAGE_MISSING pkg=" + packageName);
+            return;
+        }
+        Log.i(TAG, "[PACKAGE][REMOVE_REQUEST] source=legacy_receiver pkg=" + packageName + " user=0");
+        acceptPlatformEvent(context, packageName, Intent.ACTION_PACKAGE_REMOVED, false, 0, "legacy_receiver");
+    }
+
+    public static void blockLegacyDownloadRemoval(String packageName) {
+        Log.w(TAG, "[PACKAGE][REMOVE_BLOCKED] source=download reason=NOT_CONFIRMED_PLACEHOLDER pkg=" + packageName);
+    }
+
+    public static void onScenePackageQueryUncertain(Object item) {
+        Log.w(TAG, "[PACKAGE][REMOVE_BLOCKED] source=scene reason=QUERY_UNCERTAIN item=" + item);
+    }
+
     private static void onPackageRemoved(Context context, String packageName, int userId,
                                          String source) {
         if (TextUtils.isEmpty(packageName)) {
             return;
         }
-        String key = removalKey(packageName, userId);
+        UserHandle eventUser = sProfiles == null ? null : sProfiles.userForLegacyId(userId);
+        long eventSerial = sProfiles == null ? -1L : sProfiles.serialFor(eventUser);
+        String key = removalKey(packageName, userId, eventSerial, Intent.ACTION_PACKAGE_REMOVED, "");
         synchronized (LOCK) {
             if (PENDING_REMOVALS.containsKey(key)) {
                 Log.i(TAG, "REMOVE_EVENT_DEDUPED pkg=" + packageName + " user=" + userId
                         + " source=" + source);
                 return;
             }
-            PendingPackageEvent pending = PENDING_PACKAGE_EVENTS.get(packageName);
-            if (pending != null && (userId < 0 || pending.userId == userId)) {
-                PENDING_PACKAGE_EVENTS.remove(packageName);
-            }
-            PENDING_REMOVALS.put(key, new PendingRemovalEvent(packageName, userId, source));
+            removePendingEventsForPackageUser(packageName, userId);
+            PENDING_REMOVALS.put(key, new PendingRemovalEvent(packageName, userId, eventSerial, "", source));
         }
         persistPendingEvents(context);
         Log.i(TAG, "REMOVE_EVENT_RECEIVED pkg=" + packageName + " user=" + userId
@@ -820,78 +881,31 @@ public final class SmartisanInstallManager {
         if (event == null) {
             return;
         }
-        int state = packagePresence(context, event.packageName, event.userId);
-        Log.i(TAG, "REMOVE_VERIFY_BEGIN pkg=" + event.packageName + " user=" + event.userId
-                + " attempt=" + attempt + " state=" + state);
-        if (state == 0) {
-            Log.i(TAG, "REMOVE_ABORTED_APP_STILL_INSTALLED pkg=" + event.packageName
-                    + " user=" + event.userId + " attempt=" + attempt);
-            finishPendingRemoval(context, key, false);
-            enqueuePackageEvent(context, event.packageName, Intent.ACTION_PACKAGE_CHANGED,
-                    false, event.userId, "removal_abort_refresh");
-            return;
-        }
-        if (state < 0 && attempt + 1 < REMOVAL_VERIFY_DELAYS_MS.length) {
-            Log.w(TAG, "REMOVE_VERIFY_QUERY_FAILED pkg=" + event.packageName
-                    + " user=" + event.userId + " attempt=" + attempt);
+        UserHandle user = sProfiles == null ? null : sProfiles.userForLegacyId(event.userId);
+        long serial = sProfiles == null ? -1L : sProfiles.serialFor(user);
+        LauncherItemKey itemKey = new LauncherItemKey(serial, event.packageName, "");
+        PackageStateRepository.PackageStateResult state = sPackageStates == null ? null
+                : sPackageStates.query(itemKey, user, false);
+        ProfileState profile = sProfiles == null ? ProfileState.UNKNOWN : sProfiles.stateFor(user);
+        com.smartisanos.launcher.model.PackageState packageState = state == null
+                ? com.smartisanos.launcher.model.PackageState.UNKNOWN : state.state;
+        // This is only event scheduling. Every destructive decision is made below per exact item
+        // through RemovalGateway, after the current Aa model item has been re-read.
+        if ((packageState == com.smartisanos.launcher.model.PackageState.REPLACING
+                || profile != ProfileState.AVAILABLE) && attempt + 1 < REMOVAL_VERIFY_DELAYS_MS.length) {
             scheduleRemovalVerification(context, key, attempt + 1);
             return;
         }
-        if (state < 0) {
-            Log.w(TAG, "REMOVE_ABORTED_QUERY_UNKNOWN pkg=" + event.packageName
-                    + " user=" + event.userId + " decision=retain");
+        if (packageState != com.smartisanos.launcher.model.PackageState.REMOVED_CONFIRMED
+                || profile != ProfileState.AVAILABLE) {
             finishPendingRemoval(context, key, false);
             return;
         }
-        Log.i(TAG, "REMOVE_CONFIRMED pkg=" + event.packageName + " user=" + event.userId
-                + " attempt=" + attempt);
         finishPendingRemoval(context, key, true);
-        removeConfirmedInstalledApp(context, event.packageName, event.userId);
-    }
-
-    /** Returns 1=absent, 0=present, -1=unknown. Unknown never authorizes deletion. */
-    private static int packagePresence(Context context, String packageName, int userId) {
-        if (context == null || TextUtils.isEmpty(packageName)) return -1;
-        try {
-            if (userId == 0) {
-                PackageManager pm = context.getPackageManager();
-                pm.getPackageInfo(packageName, 0);
-                Intent intent = new Intent(Intent.ACTION_MAIN);
-                intent.addCategory(Intent.CATEGORY_LAUNCHER);
-                intent.setPackage(packageName);
-                List matches = pm.queryIntentActivities(intent, 0);
-                int activityCount = matches == null ? 0 : matches.size();
-                Log.i(TAG, "REMOVE_VERIFY_PACKAGE_PRESENT pkg=" + packageName + " user=0"
-                        + " activityCount=" + activityCount + " installed=true");
-                return 0;
-            }
-            if (Build.VERSION.SDK_INT < 21) return -1;
-            LauncherApps apps = (LauncherApps) context.getSystemService(
-                    Context.LAUNCHER_APPS_SERVICE);
-            if (apps == null) return -1;
-            UserHandle profile = userHandleForId(userId);
-            if (profile == null) return -1;
-            List activities = apps.getActivityList(packageName, profile);
-            // A profile package with no visible launcher entry is not safe to delete:
-            // it may be paused, unavailable or still being updated.
-            if (activities != null && !activities.isEmpty()) {
-                Log.i(TAG, "REMOVE_VERIFY_ACTIVITY_PRESENT pkg=" + packageName + " user="
-                        + userId + " activityCount=" + activities.size());
-                return 0;
-            }
-            try {
-                context.getPackageManager().getPackageInfo(packageName, 0);
-                return -1;
-            } catch (PackageManager.NameNotFoundException missingFromDevice) {
-                return 1;
-            }
-        } catch (PackageManager.NameNotFoundException missing) {
-            return 1;
-        } catch (Throwable error) {
-            Log.w(TAG, "REMOVE_VERIFY_QUERY_FAILED pkg=" + packageName + " user=" + userId
-                    + " type=" + error.getClass().getSimpleName(), error);
-            return -1;
-        }
+        if (sModelRepository != null) sModelRepository.commitPackageRemovals(event.packageName, serial, event.userId,
+                event.source, packageState,
+                profile, sRemovalGateway == null ? new RemovalGateway() : sRemovalGateway);
+        forgetDisplay(null, event.packageName);
     }
 
     private static void finishPendingRemoval(Context context, String key, boolean confirmed) {
@@ -901,39 +915,25 @@ public final class SmartisanInstallManager {
         persistPendingEvents(context);
     }
 
-    private static String removalKey(String packageName, int userId) {
-        return packageName + "#" + userId;
+    private static String removalKey(String packageName, int userId, long userSerial,
+                                     String action, String componentName) {
+        String identity = userSerial >= 0L ? String.valueOf(userSerial) : "unknown-user-" + userId;
+        return identity + "#" + packageName + "#" + (action == null ? "" : action)
+                + "#" + (componentName == null ? "" : componentName);
     }
 
-    private static void removeConfirmedInstalledApp(Context context, String packageName,
-                                                     int userId) {
-        Log.i(TAG, "REMOVE_DATABASE_BEGIN pkg=" + packageName + " user=" + userId);
-        SearchIndexRepository.noteModelPackageDispatch(packageName, userId, "removed");
-        if (userId == 0) {
-            notifyOriginalPackageRemoved(packageName);
-            MaintainedLauncherSettingsHost.clearCachedImprovedIcon(context, packageName);
-        } else {
-            notifyOriginalUserPackageRemoved(packageName, userId);
-        }
-        forgetDisplay(null, packageName);
-        Log.i(TAG, "REMOVE_DATABASE_COMPLETE pkg=" + packageName + " user=" + userId);
+    private static String pendingKey(String packageName, int userId, long userSerial,
+                                     String action, String componentName) {
+        String identity = userSerial >= 0L ? String.valueOf(userSerial) : "unknown-user-" + userId;
+        return identity + "#" + packageName + "#" + (action == null ? "" : action)
+                + "#" + (componentName == null ? "" : componentName);
     }
 
-    private static void notifyOriginalUserPackageRemoved(String packageName, int userId) {
-        UserHandle user = userHandleForId(userId);
-        if (user == null) {
-            Log.w(TAG, "REMOVE_DATABASE_SKIPPED pkg=" + packageName + " user=" + userId
-                    + " reason=user_handle_unavailable");
-            return;
-        }
-        try {
-            Class<?> cls = Class.forName("com.smartisanos.launcher.c.a");
-            Method method = cls.getMethod("onPackageRemoved", String.class, UserHandle.class);
-            method.invoke(null, packageName, user);
-        } catch (Throwable error) {
-            // Never fall back to Aa.D here: it is a package-wide main-user delete.
-            Log.w(TAG, "REMOVE_DATABASE_FAILED pkg=" + packageName + " user=" + userId
-                    + " reason=profile_callback", error);
+    private static void removePendingEventsForPackageUser(String packageName, int userId) {
+        java.util.Iterator<Map.Entry<String, PendingPackageEvent>> iterator = PENDING_PACKAGE_EVENTS.entrySet().iterator();
+        while (iterator.hasNext()) {
+            PendingPackageEvent event = iterator.next().getValue();
+            if (packageName.equals(event.packageName) && event.userId == userId) iterator.remove();
         }
     }
 
@@ -1002,11 +1002,20 @@ public final class SmartisanInstallManager {
         Handler main = sHandler == null ? new Handler(Looper.getMainLooper()) : sHandler;
         main.post(new Runnable() {
             @Override public void run() {
-                if (Intent.ACTION_PACKAGE_ADDED.equals(event.action) && !event.replacing) {
+                boolean firstInstall = Intent.ACTION_PACKAGE_ADDED.equals(event.action)
+                        && !event.replacing && event.newInstall;
+                if (firstInstall) {
                     com.smartisanos.launcher.backup.PendingItemRestoreHandler
                             .onPackageAdded(context, event.packageName);
+                    notifyOriginalPackageAdded(context, event.packageName);
+                } else {
+                    // Aa.c inserts every launcher activity it currently resolves.  A PACKAGE_REPLACED
+                    // sequence can include a late PACKAGE_ADDED callback from PackageInstaller; sending
+                    // it through Aa.c rebuilds package entries and loses component/position continuity.
+                    Log.i(TAG, "INSTALL_RETAIN_EXISTING pkg=" + event.packageName
+                            + " action=" + event.action + " replacing=" + event.replacing
+                            + " new=" + event.newInstall + " reason=non_first_install");
                 }
-                notifyOriginalPackageAdded(context, event.packageName);
                 deletePendingIcon(context, event.packageName);
             }
         });
@@ -1034,42 +1043,55 @@ public final class SmartisanInstallManager {
     }
 
     private static boolean isTrueNewInstall(Context context, PendingPackageEvent event) {
-        if (event.replacing) {
+        if (context == null || event == null || event.replacing
+                || !Intent.ACTION_PACKAGE_ADDED.equals(event.action)) {
             return false;
         }
-        if (Intent.ACTION_PACKAGE_ADDED.equals(event.action)) {
-            return true;
-        }
-        long baseline = pendingPrefs(context).getLong(BASELINE_TIME, 0L);
         try {
+            ProfileRepository profiles = sProfiles;
+            PackageStateRepository packageStates = sPackageStates;
+            if (profiles == null || packageStates == null) {
+                Log.i(TAG, "INSTALL_NEW_GATE pkg=" + event.packageName
+                        + " allow=false reason=repository_unavailable");
+                return false;
+            }
+            UserHandle user = profiles.userForLegacyId(event.userId);
+            long currentSerial = profiles.serialFor(user);
+            if (user == null || event.userSerial < 0L || currentSerial != event.userSerial) {
+                Log.i(TAG, "INSTALL_NEW_GATE pkg=" + event.packageName
+                        + " allow=false reason=profile_identity_unconfirmed");
+                return false;
+            }
+            if (profiles.stateFor(user) != ProfileState.AVAILABLE) {
+                Log.i(TAG, "INSTALL_NEW_GATE pkg=" + event.packageName
+                        + " allow=false reason=profile_unavailable");
+                return false;
+            }
+            LauncherItemKey key = new LauncherItemKey(event.userSerial, event.packageName,
+                    event.componentName);
+            PackageStateRepository.PackageStateResult state = packageStates.query(key, user, false);
+            if (state.state != com.smartisanos.launcher.model.PackageState.PRESENT) {
+                Log.i(TAG, "INSTALL_NEW_GATE pkg=" + event.packageName
+                        + " allow=false reason=package_" + state.state);
+                return false;
+            }
+            if (LauncherModelRepository.hasFormalApplicationItem(event.packageName, event.userId)) {
+                Log.i(TAG, "INSTALL_NEW_GATE pkg=" + event.packageName
+                        + " allow=false reason=existing_formal_model_item");
+                return false;
+            }
             PackageInfo info = context.getPackageManager().getPackageInfo(event.packageName, 0);
-            return baseline > 0L && info.firstInstallTime >= baseline
-                    && info.firstInstallTime == info.lastUpdateTime;
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
-
-    /**
-     * Query the original launcher rows through its existing database helper.
-     * This is deliberately package-wide and conservative: if an app already
-     * owns any launcher item, an activity refresh can never manufacture NEW.
-     */
-    private static boolean hasExistingLauncherPackage(String packageName) {
-        if (TextUtils.isEmpty(packageName)) {
-            return true;
-        }
-        try {
-            Class<?> helper = Class.forName("com.smartisanos.launcher.data.a.l");
-            Method query = helper.getMethod("V", String.class);
-            String safePackageName = packageName.replace("'", "''");
-            Object rows = query.invoke(null, "packageName='" + safePackageName + "'");
-            return rows instanceof List && !((List) rows).isEmpty();
+            // Timestamp equality is corroborating evidence only. The event, profile, package
+            // state and Model-existence gates above remain mandatory for Aa.c().
+            boolean timestampsMatch = info.firstInstallTime == info.lastUpdateTime;
+            Log.i(TAG, "INSTALL_NEW_GATE pkg=" + event.packageName + " allow=" + timestampsMatch
+                    + " reason=timestamp_support first=" + info.firstInstallTime
+                    + " last=" + info.lastUpdateTime);
+            return timestampsMatch;
         } catch (Throwable error) {
-            // A failed database observation must not turn an uncertain package
-            // update into NEW.  The pending event remains available for retry.
-            Log.w(TAG, "INSTALL_DATABASE_EXISTING_CHECK_FAILED pkg=" + packageName, error);
-            return true;
+            Log.i(TAG, "INSTALL_NEW_GATE pkg=" + event.packageName
+                    + " allow=false reason=package_query_failed");
+            return false;
         }
     }
 
@@ -1215,20 +1237,6 @@ public final class SmartisanInstallManager {
         }
     }
 
-    private static void notifyOriginalPackageRemoved(String pkg) {
-        if (TextUtils.isEmpty(pkg)) {
-            return;
-        }
-        try {
-            Class<?> cls = Class.forName("com.smartisanos.launcher.Aa");
-            Method method = cls.getMethod("D", String.class);
-            method.invoke(null, pkg);
-        } catch (Throwable error) {
-            Log.w(TAG, "REMOVE_DATABASE_FAILED pkg=" + pkg + " user=0 reason=main_callback",
-                    error);
-        }
-    }
-
     private static String description(String pkg, String label) {
         String safeLabel = TextUtils.isEmpty(label) ? pkg : label;
         return "0" + SPLIT + pkg + SPLIT + "" + SPLIT + safeLabel
@@ -1292,7 +1300,8 @@ public final class SmartisanInstallManager {
                 for (String value : encoded) {
                     PendingPackageEvent event = PendingPackageEvent.decode(value);
                     if (event != null) {
-                        PENDING_PACKAGE_EVENTS.put(event.packageName, event);
+                        PENDING_PACKAGE_EVENTS.put(pendingKey(event.packageName, event.userId,
+                                event.userSerial, event.action, event.componentName), event);
                     }
                 }
             }
@@ -1338,26 +1347,6 @@ public final class SmartisanInstallManager {
         }
     }
 
-    /** API 23 lacks the public UserHandle.of(int) helper; keep the bridge reflective. */
-    private static UserHandle userHandleForId(int id) {
-        if (id < 0) return null;
-        try {
-            Method method = UserHandle.class.getMethod("of", Integer.TYPE);
-            Object value = method.invoke(null, Integer.valueOf(id));
-            return value instanceof UserHandle ? (UserHandle) value : null;
-        } catch (Throwable ignored) {
-            try {
-                java.lang.reflect.Constructor<?> constructor =
-                        UserHandle.class.getDeclaredConstructor(Integer.TYPE);
-                constructor.setAccessible(true);
-                Object value = constructor.newInstance(Integer.valueOf(id));
-                return value instanceof UserHandle ? (UserHandle) value : null;
-            } catch (Throwable ignoredAgain) {
-                return null;
-            }
-        }
-    }
-
     private static int userIdForUid(int uid) {
         try {
             Method method = UserHandle.class.getMethod("getUserId", Integer.TYPE);
@@ -1372,6 +1361,8 @@ public final class SmartisanInstallManager {
         final String packageName;
         final long receivedAt;
         final int userId;
+        final long userSerial;
+        final String componentName;
         boolean replacing;
         boolean dispatched;
         boolean newInstall;
@@ -1381,31 +1372,36 @@ public final class SmartisanInstallManager {
         String source;
 
         PendingPackageEvent(String packageName, String action, boolean replacing,
-                            int userId, String source) {
+                            int userId, long userSerial, String componentName, String source) {
             this.packageName = packageName;
             this.action = action;
             this.replacing = replacing;
             this.userId = userId;
+            this.userSerial = userSerial;
+            this.componentName = componentName == null ? "" : componentName;
             this.source = source;
             this.receivedAt = System.currentTimeMillis();
         }
 
         String encode() {
-            return packageName + "|" + action + "|" + replacing + "|" + userId + "|"
-                    + receivedAt + "|" + dispatched + "|" + newInstall + "|" + retryIndex;
+            return packageName + "|" + action + "|" + replacing + "|" + userId + "|" + userSerial
+                    + "|" + componentName + "|" + receivedAt + "|" + dispatched + "|" + newInstall + "|" + retryIndex;
         }
 
         static PendingPackageEvent decode(String value) {
             try {
                 String[] fields = value.split("\\|", -1);
-                if (fields.length != 8 || TextUtils.isEmpty(fields[0])) {
+                if ((fields.length != 8 && fields.length != 10) || TextUtils.isEmpty(fields[0])) {
                     return null;
                 }
+                boolean legacy = fields.length == 8;
                 PendingPackageEvent event = new PendingPackageEvent(fields[0], fields[1],
-                        Boolean.parseBoolean(fields[2]), Integer.parseInt(fields[3]), "restored");
-                event.dispatched = Boolean.parseBoolean(fields[5]);
-                event.newInstall = Boolean.parseBoolean(fields[6]);
-                event.retryIndex = Integer.parseInt(fields[7]);
+                        Boolean.parseBoolean(fields[2]), Integer.parseInt(fields[3]),
+                        legacy ? -1L : Long.parseLong(fields[4]), legacy ? "" : fields[5], "restored");
+                int offset = legacy ? 0 : 2;
+                event.dispatched = Boolean.parseBoolean(fields[5 + offset]);
+                event.newInstall = Boolean.parseBoolean(fields[6 + offset]);
+                event.retryIndex = Integer.parseInt(fields[7 + offset]);
                 return event;
             } catch (Throwable ignored) {
                 return null;
@@ -1416,12 +1412,17 @@ public final class SmartisanInstallManager {
     private static final class PendingRemovalEvent {
         final String packageName;
         final int userId;
+        final long userSerial;
+        final String componentName;
         final String source;
         final long receivedAt;
 
-        PendingRemovalEvent(String packageName, int userId, String source) {
+        PendingRemovalEvent(String packageName, int userId, long userSerial, String componentName,
+                            String source) {
             this.packageName = packageName;
             this.userId = userId;
+            this.userSerial = userSerial;
+            this.componentName = componentName == null ? "" : componentName;
             this.source = source;
             this.receivedAt = System.currentTimeMillis();
         }

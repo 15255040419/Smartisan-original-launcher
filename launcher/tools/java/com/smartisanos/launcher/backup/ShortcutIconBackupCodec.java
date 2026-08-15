@@ -6,6 +6,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.util.Log;
 
 import com.smartisanos.launcher.ShortcutCompatBridge;
 
@@ -47,6 +48,8 @@ final class ShortcutIconBackupCodec {
                 String packageName = item == null ? "" : item.optString("packageName", "");
                 String shortcutId = item == null ? "" : shortcutId(item);
                 long serial = item == null ? 0L : item.optLong("sourceProfileSerial", 0L);
+                if (serial <= 0L) serial = ShortcutCompatBridge.primaryUserSerial(context);
+                boolean providerFinal = isProviderPackage(packageName);
                 File source = ShortcutCompatBridge.portableSourceFile(context, packageName, shortcutId, serial);
                 if (source != null && source.isFile() && source.length() <= MAX_BLOB_BYTES) {
                     String name = "source_" + owner + ".png";
@@ -55,18 +58,37 @@ final class ShortcutIconBackupCodec {
                     try { BackupFileUtils.copy(input, output, MAX_BLOB_BYTES, null); }
                     finally { input.close(); output.close(); }
                     record.put("sourceFile", name);
+                    byte[] sourceBytes = BackupFileUtils.readBytes(new File(directory, name), MAX_BLOB_BYTES);
+                    Log.i("DesktopBackup", "BACKUP_SHORTCUT_SOURCE owner=" + owner
+                            + " hash=" + byteHash(sourceBytes));
                     record.put("sourcePackage", packageName);
                     record.put("shortcutId", shortcutId);
                     record.put("sourceUserSerial", serial);
                     record.put("identityKind", item == null ? "PRIMARY_SHORTCUT"
                             : item.optString("identityKind", "PRIMARY_SHORTCUT"));
                 }
+                if (providerFinal) {
+                    byte[] finalBytes = firstBlob(cursor);
+                    if (finalBytes != null && finalBytes.length <= MAX_BLOB_BYTES) {
+                        String name = "final_" + owner + ".png";
+                        BackupFileUtils.writeBytes(new File(directory, name), finalBytes);
+                        record.put("finalFile", name);
+                        record.put("iconRepresentation", "PROVIDER_DECORATED_FINAL");
+                        record.put("sourcePackage", packageName);
+                        record.put("shortcutId", shortcutId);
+                        record.put("sourceUserSerial", serial);
+                        record.put("identityKind", item == null ? "PRIMARY_SHORTCUT"
+                                : item.optString("identityKind", "PRIMARY_SHORTCUT"));
+                        Log.i("DesktopBackup", "BACKUP_SHORTCUT_FINAL owner=" + owner
+                                + " hash=" + byteHash(finalBytes));
+                    }
+                }
                 putString(cursor, record, "color_info");
                 putString(cursor, record, "md5");
                 putString(cursor, record, "data1");
                 putString(cursor, record, "data2");
                 putString(cursor, record, "data3");
-                if (!record.has("sourceFile")) for (String column : BLOB_COLUMNS) {
+                if (!record.has("sourceFile") || providerFinal) for (String column : BLOB_COLUMNS) {
                     int index = cursor.getColumnIndex(column);
                     if (index < 0 || cursor.isNull(index)) continue;
                     byte[] bytes = cursor.getBlob(index);
@@ -95,6 +117,14 @@ final class ShortcutIconBackupCodec {
                 if (!sourceName.matches("source_[0-9]+\\.png")) throw new IllegalArgumentException("Invalid shortcut source name");
                 BackupFileUtils.readBytes(new File(root, "icons/shortcuts/" + sourceName), MAX_BLOB_BYTES);
             }
+            String finalName = record.optString("finalFile", "");
+            if (finalName.length() != 0) {
+                if (!finalName.matches("final_[0-9]+\\.png")) throw new IllegalArgumentException("Invalid shortcut final name");
+                BackupFileUtils.readBytes(new File(root, "icons/shortcuts/" + finalName), MAX_BLOB_BYTES);
+                if (!"PROVIDER_DECORATED_FINAL".equals(record.optString("iconRepresentation", ""))) {
+                    throw new IllegalArgumentException("Invalid shortcut final representation");
+                }
+            }
             for (String column : BLOB_COLUMNS) {
                 String name = record.optString(column, "");
                 if (name.length() == 0) continue;
@@ -117,28 +147,70 @@ final class ShortcutIconBackupCodec {
             values.put("owner", owner);
             putValue(values, record, "color_info"); putValue(values, record, "md5");
             putValue(values, record, "data1"); putValue(values, record, "data2"); putValue(values, record, "data3");
+            JSONObject item = itemById(layout, owner);
+            String packageName = item == null ? record.optString("sourcePackage", "")
+                    : item.optString("packageName", record.optString("sourcePackage", ""));
+            String shortcutId = item == null ? record.optString("shortcutId", "") : shortcutId(item);
+            long serial = item == null ? record.optLong("sourceUserSerial", 0L)
+                    : item.optLong("targetProfileSerial", record.optLong("sourceUserSerial", 0L));
+            boolean iconWritten = false;
+            String finalName = record.optString("finalFile", "");
+            if (finalName.length() != 0) {
+                byte[] finalBytes = BackupFileUtils.readBytes(new File(root, "icons/shortcuts/" + finalName), MAX_BLOB_BYTES);
+                putBitmapColumns(values, finalBytes);
+                iconWritten = true;
+                Log.i("DesktopBackup", "RESTORE_SELECTED_ICON owner=" + owner
+                        + " representation=PROVIDER_DECORATED_FINAL hash=" + byteHash(finalBytes));
+            }
             String sourceName = record.optString("sourceFile", "");
-            if (sourceName.length() != 0) {
+            if (!iconWritten && sourceName.length() != 0) {
                 byte[] sourceBytes = BackupFileUtils.readBytes(new File(root, "icons/shortcuts/" + sourceName), MAX_BLOB_BYTES);
                 Bitmap source = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.length);
                 if (source != null) {
-                    String packageName = record.optString("sourcePackage", "");
-                    String shortcutId = record.optString("shortcutId", "");
-                    long serial = record.optLong("sourceUserSerial", 0L);
                     ShortcutCompatBridge.savePortableSource(context, packageName, shortcutId, serial, source);
-                    JSONObject item = itemById(layout, owner);
-                    int userId = item == null ? 0 : item.optInt("user", 0);
-                    Bitmap finalIcon = ShortcutCompatBridge.composePortableSource(context, source, packageName, userId);
-                    if (finalIcon != null) {
-                        byte[] encoded = encodePng(finalIcon);
-                        for (String column : BLOB_COLUMNS) values.put(column, encoded);
+                    if (isProviderPackage(packageName)) {
+                        Bitmap provider = ShortcutCompatBridge.loadCurrentShortcutSource(context,
+                                packageName, shortcutId, serial);
+                        if (provider != null) {
+                            putBitmapColumns(values, encodePng(provider));
+                            iconWritten = true;
+                            Log.i("DesktopBackup", "RESTORE_SELECTED_ICON owner=" + owner
+                                    + " representation=LAUNCHER_APPS_PROVIDER hash=" + byteHash(encodePng(provider)));
+                        }
+                    } else {
+                        int userId = item == null ? 0 : item.optInt("user", 0);
+                        Bitmap finalIcon = ShortcutCompatBridge.composePortableSource(context, source, packageName, userId);
+                        if (finalIcon != null) {
+                            putBitmapColumns(values, encodePng(finalIcon));
+                            iconWritten = true;
+                        }
                     }
                 }
             }
-            if (!values.containsKey("dark_icon")) for (String column : BLOB_COLUMNS) {
+            if (!iconWritten && isProviderPackage(packageName)) {
+                Bitmap source = ShortcutCompatBridge.loadCurrentShortcutSource(context,
+                        packageName, shortcutId, serial);
+                if (source != null) {
+                    putBitmapColumns(values, encodePng(source));
+                    iconWritten = true;
+                    Log.i("DesktopBackup", "RESTORE_SELECTED_ICON owner=" + owner
+                            + " representation=LAUNCHER_APPS_PROVIDER hash=" + byteHash(encodePng(source)));
+                }
+            }
+            if (!iconWritten && fallback != null) {
+                ContentValues saved = item == null ? null : fallback.get(RestoreMergePlanner.stableKey(item));
+                if (saved != null) {
+                    for (String column : BLOB_COLUMNS) if (saved.containsKey(column)) copyValue(values, saved, column);
+                    iconWritten = values.containsKey("dark_icon");
+                }
+            }
+            if (!iconWritten) for (String column : BLOB_COLUMNS) {
                 String name = record.optString(column, "");
                 if (name.length() != 0) values.put(column, BackupFileUtils.readBytes(new File(root, "icons/shortcuts/" + name), MAX_BLOB_BYTES));
             }
+            Log.i("DesktopBackup", "RESTORE_DB_ICON owner=" + owner
+                    + " hash=" + byteHash(values.getAsByteArray("dark_icon"))
+                    + " provider=" + isProviderPackage(packageName));
             database.insertOrThrow("table_icons", null, values);
             restoredOwners.add(Long.valueOf(owner));
         }
@@ -226,6 +298,35 @@ final class ShortcutIconBackupCodec {
         java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, output);
         return output.toByteArray();
+    }
+    private static byte[] firstBlob(Cursor cursor) {
+        for (String column : BLOB_COLUMNS) {
+            int index = cursor.getColumnIndex(column);
+            if (index < 0 || cursor.isNull(index)) continue;
+            byte[] bytes = cursor.getBlob(index);
+            if (bytes != null && bytes.length != 0) return bytes;
+        }
+        return null;
+    }
+    private static void putBitmapColumns(ContentValues values, byte[] encoded) {
+        if (encoded == null || encoded.length == 0) return;
+        for (String column : BLOB_COLUMNS) values.put(column, encoded);
+    }
+    private static void copyValue(ContentValues target, ContentValues source, String column) {
+        Object value = source.get(column);
+        if (value instanceof byte[]) target.put(column, (byte[]) value);
+        else if (value instanceof String) target.put(column, (String) value);
+        else if (value instanceof Integer) target.put(column, (Integer) value);
+        else if (value instanceof Long) target.put(column, (Long) value);
+        else if (value instanceof Boolean) target.put(column, (Boolean) value);
+        else if (value != null) target.put(column, String.valueOf(value));
+    }
+    private static String byteHash(byte[] bytes) {
+        return bytes == null ? "null" : Integer.toHexString(java.util.Arrays.hashCode(bytes));
+    }
+    private static boolean isProviderPackage(String packageName) {
+        return "com.tencent.mm".equals(packageName)
+                || "com.eg.android.AlipayGphone".equals(packageName);
     }
     private static boolean hasIconTable(SQLiteDatabase database) {
         Cursor cursor = null;

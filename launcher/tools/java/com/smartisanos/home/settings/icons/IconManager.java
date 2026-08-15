@@ -114,8 +114,8 @@ public class IconManager {
         try {
             PackageManager pm = mContext.getPackageManager();
             int flags = android.os.Build.VERSION.SDK_INT >= 23 ? 0x00020000 : 0;
-            List<ResolveInfo> infos = MaintainedLauncherSettingsHost
-                    .queryLauncherActivitiesWithProfiles(pm, intent, flags);
+            List<ResolveInfo> infos = com.smartisanos.launcher.model.ProfileRepository
+                    .queryLauncherActivities(pm, intent, flags);
             for (int i = 0; i < infos.size(); i++) {
                 appendResolveInfo(infos.get(i));
             }

@@ -100,9 +100,8 @@ public final class LayoutSnapshotImporter {
                 if (RestoreMergePlanner.isShortcut(item)
                         && !shortcutAvailable(context, item)) {
                     result.shortcutUnresolved++;
-                    Log.i("DesktopRestore", "RESTORE_ITEM_SKIPPED reason=SHORTCUT_SOURCE_UNAVAILABLE package="
+                    Log.i("DesktopRestore", "SHORTCUT_UNRESOLVED package="
                             + item.optString("packageName", "") + " shortcutId=" + shortcutId(item));
-                    continue;
                 }
                 if (RestoreMergePlanner.isRestoreCandidate(item) && !RestoreMergePlanner.isInstalled(context, item)) {
                     pending.put(pendingRecord(item));
@@ -172,6 +171,11 @@ public final class LayoutSnapshotImporter {
                 || (kind.length() == 0 && sourceUserId > 0);
         if (!doppelganger) {
             item.put("user", 0);
+            if (RestoreMergePlanner.isShortcut(item)) {
+                long targetSerial = ShortcutCompatBridge.primaryUserSerial(context);
+                item.put("targetProfileSerial", targetSerial);
+                rewriteShortcutIntent(item, context, targetSerial, true);
+            }
             return item;
         }
         DoppelgangerCompat.ResolvedProfile profile = DoppelgangerCompat.resolveDoppelganger(
@@ -187,6 +191,9 @@ public final class LayoutSnapshotImporter {
         }
         item.put("user", profile.userId);
         item.put("targetProfileSerial", profile.serial);
+        if (RestoreMergePlanner.isShortcut(item)) {
+            rewriteShortcutIntent(item, context, profile.serial, false);
+        }
         Log.i("DesktopRestore", "RESTORE_ITEM_WRITTEN identityKind=" + kind
                 + " package=" + item.optString("packageName", "") + " targetUserId="
                 + profile.userId + " targetSerial=" + profile.serial);
@@ -199,6 +206,17 @@ public final class LayoutSnapshotImporter {
         long serial = item.optLong("targetProfileSerial", item.optLong("sourceProfileSerial", 0L));
         return ShortcutCompatBridge.isPinnedAvailable(context, item.optString("packageName", ""),
                 shortcutId, serial);
+    }
+
+    private static void rewriteShortcutIntent(JSONObject item, Context context, long targetSerial,
+                                              boolean primaryFallback) throws Exception {
+        String packageName = item.optString("packageName", "");
+        String id = shortcutId(item);
+        if (packageName.length() == 0 || id.length() == 0) return;
+        item.put("intent", ShortcutCompatBridge.createLaunchIntent(context, packageName, id,
+                targetSerial, primaryFallback).toUri(0));
+        Log.i("DesktopRestore", "SHORTCUT_PROFILE_REMAP package=" + packageName
+                + " shortcutId=" + id + " targetSerial=" + targetSerial);
     }
 
     private static String shortcutId(JSONObject item) {

@@ -68,6 +68,25 @@
 
 本项目不是普通 Gradle-only Android 项目，不能按普通新建 Android App 的方式处理。
 
+## 现代 Android Launcher 生命周期正式架构（冻结）
+
+Package、Profile、安装、卸载、升级、启动 reconcile 与系统驱动删除的正式运行链固定为：
+
+```text
+Android System
+→ PackageEventGateway
+→ PackageStateRepository + ProfileRepository
+→ LauncherModelRepository
+→ RemovalGateway（仅系统永久删除许可）
+→ 原版 item-level Aa.a(ItemInfo) 执行器
+```
+
+`LauncherItemKey(userSerial, packageName, componentName)` 是正式身份键。`PackageStateRepository` 是唯一 Package 状态事实源；`ProfileRepository` 是唯一 Profile 状态事实源和 legacy user / serial 转换入口；`PackageEventGateway` 是唯一系统 Package Event 标准化入口；`LauncherModelRepository` 是唯一业务 Model 写入与系统删除执行入口；`RemovalGateway` 是唯一系统驱动永久删除许可入口。
+
+不得新增并行 Repository、Gateway、CompatBridge、Manager、状态枚举或 package-only identity。`UNKNOWN`、`TEMPORARILY_UNAVAILABLE`、Profile unavailable/locked/quiet、`REPLACING`、查询异常和 component resolve failure 均只能保留 Item；只有 `REMOVED_CONFIRMED` 可通过 RemovalGateway 进入 item-level 删除。Scene/View/ActiveIcon/Receiver/Installer 不得自行删除正式 DB Item，也不得重新调用 package-wide `Aa.D`。
+
+Component 生命周期是后续独立专项：仅处理 update 新增 Launcher Activity、update 删除 Launcher Activity、component rename/migration 与 stale component cleanup；不得混入 Package REMOVE，不得把 component 解析失败转换为 Package `REMOVED_CONFIRMED`。
+
 ---
 
 ## 当前可信文档
@@ -518,11 +537,15 @@ python tools/patch_launcher_window_animation_resources.py launcher/resources.ars
 
 在线图标仓库和主 Launcher 仓库是分开的。
 
-图标系统的冻结架构以 `LayoutProperty -> IconVisualMetrics -> Unified Visible Envelope -> Static Application Composer` 为唯一普通静态链。DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 和虚拟桌面设置项只能改变 RAW source，不能拥有各自的 geometry、倍率、阴影或最终纹理算法；不得恢复 DEFAULT-only、managed-only、固定 `0.90` 缩小、package/sourceType/device 专用倍率或旧最终 Bitmap 优先路径。
+图标系统的普通静态链必须由 Source 与 Geometry 分离：`RAW Drawable/Bitmap -> canonical source renderer -> original resize classification -> NORMAL/RESIZED content box -> clone/profile badge -> original shadow -> final texture`。DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 只决定 source type、identity 和 RAW source；同一 classification 必须使用同一 content box，禁止 DEFAULT-only、managed-only、固定 `0.90`、package/sourceType/device 专用倍率或把普通应用最终 texture 当作备份真相。
 
-统一的含义是：相同 `sceneMode/cellWidth/gridMode/surfaceWidth/iconSizeSetting` 得到同一个 logical/physical artwork/texture 外框，用户 50%～150% 比例只由 `LayoutProperty` 应用一次。Optical 层只用全局 alpha 阈值取得 RAW 的最外围可见 bounds、去除外围全透明 padding 后等比居中 fit 到固定 content envelope；不得依据面积、凸包、fill ratio、内部留白、图标形状或 source identity 改变倍率。跨分辨率比较必须看 `visualEnvelope/cellWidth`，不是要求 1080、1440 和 2K 使用相同绝对 px。
+原版 `clean_launcher_raw` 的 MODE_9 资源明确区分 `icon_size_origin` 与 `icon_size_origin_resize`（xxhdpi 192/166、sw411dp 256/222）；原版 `Aa` 和 `e/s` 都在 `IconColor.ColorInfo.resize` 为真、非小图标的条件下使用较小的第二 content box。因此不得再把 `icon_size_origin_resize == icon_size_origin` 作为冻结结论。resize classification 只能沿用原版 `IconColor.resize` 或经验证的等价判断，不能以面积、凸包、fill ratio、内部留白、图标形状、包名或 source type 取代它。跨分辨率比较仍以 `visualEnvelope/cellWidth` 为准。
 
-普通静态最终顺序冻结为 `RAW -> outer visible bounds fit -> physical artwork 一次绘制 -> clone/profile badge -> original shadow -> final texture`。`icon_size_origin_resize` 仅保留 ABI 字段；在 LayoutProperty 适配入口必须与 `icon_size_origin` 相等，不能再成为较小的第二 artwork target。最终缓存键必须隔离 component、user/profile、sourceType/sourceIdentity/sourceHash、scene/grid、icon size、logical/physical 尺寸、分辨率/density、envelope、badge 和 shadow 版本。主应用与分身共用相同本体 geometry，分身只增加一次原版面具。
+DEFAULT 普通应用保留 RAW source canvas 与原版 `IconColor.resize` 的 Content Box 语义；禁止自定义 area/package/shape/device magic compensation、alpha crop 或 transparent-padding crop。经真机验证后，允许 DEFAULT 在固定 artwork box 内使用 Android Launcher 式 `IconNormalizer` 可见 alpha 凸包统一 scale；不得拆 Adaptive mask、改变源码宽高比或影响 IMPROVED/PACK/CUSTOM/RESOURCE。
+
+AdaptiveIconDrawable 必须作为 Drawable 在 canonical canvas 上绘制，保留系统自身 mask/clipping 语义；不得拆 foreground/background，也不得因 opaque background 而把完整方形 Bitmap 铺满。最终缓存是可丢弃派生数据，键必须隔离 component、userSerial/profile、sourceType/sourceIdentity/sourceHash、scene/grid、icon size、contentBoxType、geometry revision、adaptive/legacy kind、badge 和 shadow revision。主应用与分身共享本体 geometry，分身只增加一次原版面具。
+
+QuickLaunch 使用独立合同，且必须与普通 Application 图标链完全隔离。微信/支付宝等已验证 provider-decorated Shortcut 的正式链固定为：`LauncherApps.getShortcutIconDrawable() provider-first -> normalize -> source_already_decorated -> smartisan.shortcut.final_icon=true -> QuickLaunchItem.z() direct serialize -> table_icons/iconData -> quick-launch-final-source texture`。这类 provider bitmap 已经包含逐快捷方式头像与圆环/外框，**不得再调用 `e.s.a()` 重画或“补圆环”**；`A.smali / EVENT_INSTALL_OR_UPDATE_SHORTCUT` 只保留原版数据库业务流，不承担 provider/final_icon 图标特判。其他非 provider-decorated 普通快捷方式才继续使用原版 `d.j.o() -> e.s.a()` 合成。QuickLaunch 的持久身份为 `packageName + shortcutId + userSerial`；备份/恢复和 portable source 必须保持该身份与 target profile serial，不得按 package-only 或固定 user 10 推断。普通应用备份保持 source-first，cache 永远可重建。
 
 Weather/Calendar 内部布局、内容、日期位置、阴影、timeline 和动画冻结；动态状态只允许通过 ActiveIcon root 外部 geometry 对齐普通静态外框。动态关闭后的 Weather/Calendar 静态 fallback 共享 `IconVisualMetrics` 与原版阴影，并走同一外部 envelope 合同，不得额外按形状/面积缩小。桌面设置齿轮保留特殊 renderer，但只共享同一用户尺寸与跨分辨率物理栅格原则。
 
@@ -591,6 +614,33 @@ online_icon_cache_v3 -> online_icon_cache_v4
 * **桌面设置按钮（齿轮）的高清逻辑**：桌面设置按钮使用内存合成纹理 `***settingbuttonup***` / `***settingbuttondown***`。不能仅依靠 `SceneNode.setImageName()` 的路径过滤机制来提供高清化；必须在 `Ec.wz()` 使用 `LayoutProperty.setting_button` 逻辑尺寸和 `NormalIconRasterSpec.rasterScale` 缩放合成，否则会产生缩放模糊。
 
 ---
+
+## QuickLaunch 小程序快捷方式长期冻结规则
+
+截至 2026-08-15，V2458A / Android 16 真机已经确认：重新添加微信小程序“云销盒”后，桌面能够显示该小程序自己的头像与 provider 圆环/外框，微信主应用仍保持自己的独立图标。该视觉结论是当前 QuickLaunch 图标链的长期 Golden Baseline。
+
+必须记住真正根因：此前头像/圆环丢失的最终 owner 在**桌面渲染源隔离**，不是 `ShortcutCompatBridge`、`A.smali` 或 `e.s.a()` 合成次数。`itemType=1` 的 `QuickLaunchItem` 一度误入普通 Application 的 `IconRasterDiagnostics` source resolver/cache，按 `packageName=com.tencent.mm` 重新解析成微信宿主应用图标；`ItemInfo.Oe()` 还会错误套用普通应用分身 badge。修复后必须永久保持以下边界：
+
+* `itemType=1` 必须退出普通 Application 的 `useDesktopStaticPipeline()`、`useManagedDesktopPipeline()`、`shouldUseHighResolutionDesktopRaster()`、`prepareStaticSource()`、`loadCurrentDesktopDrawable()`、普通 Application composer 与 DEFAULT / IMPROVED / PACK / CUSTOM / RESOURCE resolver。
+* `ItemInfo.Oe()` 对 QuickLaunch 直接使用自己的 `iconData/table_icons`，不得重新按 `packageName` 取得宿主 APP Drawable，也不得附加普通应用分身 badge。
+* QuickLaunch texture/source identity 必须独立为 `quick-launch-final-source`，至少隔离 `packageName + shortcutId + userId + userSerial + iconData/iconRawData hash`；两个同属 `com.tencent.mm` 的不同小程序绝不能共享微信主应用 texture。
+* 微信/支付宝等 provider-decorated Shortcut 必须 `LauncherApps.getShortcutIconDrawable()` 优先；只有 provider artwork 不可用时才允许使用已验证的 wrapper/portable/DB fallback。不得静默使用 `PackageManager.getApplicationIcon(packageName)` 冒充小程序图标。
+* provider-decorated 图标必须 `source_already_decorated -> final_icon -> direct serialize`，**`e.s.a()` 调用次数为 0**。不得再恢复“RAW -> e.s.a() -> FINAL”给微信/支付宝补圆环的错误方案。
+* `A.smali` 不得新增 provider/final_icon 特判或 QuickLaunch 图标控制流。数据库仍走原版 `DatabaseUpdater.Action.maa -> EVENT_INSTALL_OR_UPDATE_SHORTCUT`。
+* QuickLaunch 唯一持久身份为 `packageName + shortcutId + userSerial`，不得退化为 `packageName + shortcutId`，不得假设分身固定 `userId=10`。
+* 冷启动、Profile 切换或 `LauncherApps` 暂时查询不到 pinned Shortcut 时，不得把“暂时不可解析”当成永久删除；单次 query empty 不能触发破坏性 `EVENT_REMOVE_MULTI_APPS`。
+* Backup/Restore 遇到暂时不可解析的 Shortcut 也必须保留 DB 行、位置和已有图标；Profile remap 后必须把 Intent 中的 `smartisan.shortcut.user_serial`、portable source key 等一起改为 target serial，避免恢复后图标存在但点击失效。
+* 以后排查 QuickLaunch 图标，只允许按 `provider/createItem -> table_icons -> ItemInfo.Oe() -> render source/texture` 查 **first bad owner**，不得跨层一起改。先证明哪一层第一次变坏，再做最小修复。
+
+以下方案已经被真机验证为错误，禁止恢复：
+
+* 删除 `final_icon` 直通、强制微信/支付宝重新经过 `e.s.a()`。
+* 在 `A.smali` 里通过 `final_icon` 特判跳过或重写原版数据库图标链。
+* 只恢复 provider-first，但仍允许 `itemType=1` 进入普通 Application static/source/cache pipeline。
+* 只按 `packageName` 做 QuickLaunch texture/cache identity。
+* 将微信/支付宝宿主 APP 图标作为“找不到小程序 artwork”时的成功 fallback。
+
+当前已确认的是**新建微信小程序头像 + 圆环的 V2458A 真机视觉 PASS**。冷重载多轮、应用分身、支付宝、Backup/Restore、旧错误 QuickLaunchItem 迁移和点击启动完整矩阵仍需单独验证；不得把本条扩写为整条持久性链已全设备 PASS。
 
 ## 系统应用识别记忆
 

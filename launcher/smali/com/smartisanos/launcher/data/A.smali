@@ -2391,9 +2391,9 @@
     .locals 10
 
     .line 1
-    invoke-static {}, Lcom/smartisanos/launcher/e/s;->qg()Ljava/util/List;
+    invoke-static {}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->reconcileStartupFromLegacyDb()V
 
-    move-result-object v0
+    return-void
 
     .line 2
     new-instance v1, Ljava/util/HashMap;
@@ -10603,6 +10603,8 @@
     move-object/from16 v0, p0
 
     move/from16 v1, p1
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->beginStartup(Landroid/content/Context;)V
 
     .line 2
     sget-boolean v2, Lcom/smartisanos/launcher/va;->DBG:Z
@@ -19614,7 +19616,7 @@
 
     .line 19
     :cond_5
-    invoke-static {v5}, Lcom/smartisanos/launcher/data/a/l;->m(Ljava/util/List;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->reconcileStartupItems(Ljava/util/List;)V
 
     .line 20
     :cond_6

@@ -4554,7 +4554,7 @@
     const/4 v1, 0x0
 
     .line 4
-    invoke-static {p0, v0, v1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->queryLauncherActivitiesWithProfiles(Landroid/content/pm/PackageManager;Landroid/content/Intent;I)Ljava/util/List;
+    invoke-static {p0, v0, v1}, Lcom/smartisanos/launcher/model/ProfileRepository;->queryLauncherActivities(Landroid/content/pm/PackageManager;Landroid/content/Intent;I)Ljava/util/List;
 
     move-result-object p0
 

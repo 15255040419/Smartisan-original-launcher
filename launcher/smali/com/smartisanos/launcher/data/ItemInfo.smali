@@ -1276,6 +1276,17 @@
 
     .line 12
     :cond_1
+    iget-byte v1, p0, Lcom/smartisanos/launcher/data/ItemInfo;->itemType:B
+
+    const/4 v2, 0x1
+
+    if-ne v1, v2, :cond_oe_profile_badge
+
+    iget-object p0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->iconData:[B
+
+    return-object p0
+
+    :cond_oe_profile_badge
     iget v0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I
 
     iget-object p0, p0, Lcom/smartisanos/launcher/data/ItemInfo;->iconData:[B

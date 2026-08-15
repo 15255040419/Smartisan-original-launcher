@@ -20,7 +20,6 @@ public final class SystemPanelCompat {
     private static final String LOG_TAG = "SystemPanelCompat";
     public static final String KEY_SWIPE_DOWN_SYSTEM_PANELS =
             "swipe_down_system_panels_enabled";
-    private static final float TRIGGER_DISTANCE_PX = 150.0f;
     private static final float TOUCH_SLOP = 24.0f;
 
     private static final int IDLE = 0;
@@ -157,6 +156,8 @@ public final class SystemPanelCompat {
 
         final float deltaX = event.getX() - sStartX;
         final float deltaY = event.getY() - sStartY;
+        final float triggerDistance = VerticalGestureDirectionConfig.getSearchMinDistancePx(
+                context, context.getResources().getDisplayMetrics().heightPixels);
 
         // Reject horizontal scrolling only if displacement exceeds TOUCH_SLOP and dx > dy
         if (Math.abs(deltaX) > TOUCH_SLOP && Math.abs(deltaX) > Math.abs(deltaY)) {
@@ -168,7 +169,7 @@ public final class SystemPanelCompat {
 
         // The opposite action owns the search direction in either configured mode.
         if (VerticalGestureDirectionConfig.isSearchDirection(deltaY)
-                && Math.abs(deltaY) > TRIGGER_DISTANCE_PX
+                && Math.abs(deltaY) > triggerDistance
                 && Math.abs(deltaY) > Math.abs(deltaX)) {
             sState = OTHER_GESTURE_OWNED;
             sOwnerReason = "SEARCH_SWIPE";
@@ -177,10 +178,10 @@ public final class SystemPanelCompat {
             return;
         }
 
-        // Evaluate the configured system-panel direction without changing thresholds.
+        // Evaluate the configured system-panel direction with the shared distance policy.
         if (VerticalGestureDirectionConfig.isPanelDirection(deltaY)
                 && Math.abs(deltaY) > Math.abs(deltaX)) {
-            if (Math.abs(deltaY) >= TRIGGER_DISTANCE_PX) {
+            if (Math.abs(deltaY) >= triggerDistance) {
                 final boolean left = sStartX <= sScreenWidth / 2.0f;
                 logDiagnostic("PULL_DOWN_PANEL_REQUESTED", event, "side=" + (left ? "left" : "right"));
 

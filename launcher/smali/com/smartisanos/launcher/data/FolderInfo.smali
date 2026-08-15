@@ -939,6 +939,15 @@
     move-result-object v2
 
     .line 3
+    if-nez v2, :cond_child_present
+
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->noteFolderOrphan(Ljava/lang/Object;I)V
+
+    add-int/lit8 v1, v1, 0x1
+
+    goto :goto_0
+
+    :cond_child_present
     iget-object v3, v2, Lcom/smartisanos/launcher/data/ItemInfo;->packageName:Ljava/lang/String;
 
     iget v2, v2, Lcom/smartisanos/launcher/data/ItemInfo;->userId:I

@@ -137,7 +137,7 @@
 
     long-to-float p2, p6
 
-    const/high16 p3, 0x447a0000    # 1000.0f
+    const/high16 p3, 0x43fa0000    # 500.0f
 
     cmpl-float p2, p2, p3
 
@@ -190,7 +190,7 @@
     .line 10
     sget p2, Lcom/smartisanos/launcher/data/Constants;->window_height:I
 
-    invoke-static {p1, p5, p2}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->passesSearchOriginGate(FFI)Z
+    invoke-static {v0, p5, p2}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->passesSearchStartRegion(Landroid/content/Context;FI)Z
 
     move-result p2
 
@@ -215,7 +215,9 @@
 
     move-result p1
 
-    const/high16 p2, 0x43160000    # 150.0f
+    sget p2, Lcom/smartisanos/launcher/data/Constants;->window_height:I
+    invoke-static {v0, p2}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->getSearchMinDistancePx(Landroid/content/Context;I)F
+    move-result p2
 
     cmpl-float p2, p1, p2
 
@@ -263,6 +265,10 @@
     :goto_0
     if-eqz p0, :cond_5
 
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->canOpenSearchNow()Z
+    move-result p0
+    if-eqz p0, :cond_5
+
     invoke-static {}, Lcom/smartisanos/launcher/J;->getInstance()Lcom/smartisanos/launcher/J;
 
     move-result-object v0
@@ -272,6 +278,7 @@
     move-result-object v0
 
     invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->openLauncherSearchFromSwipeUp(Landroid/content/Context;)V
+    invoke-static {}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->markSearchOpened()V
 
     return-void
 
@@ -305,6 +312,17 @@
     move-result-object v0
 
     invoke-static {v0, p0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onMotionEvent(Landroid/content/Context;Landroid/view/MotionEvent;)V
+
+    invoke-virtual {p0}, Landroid/view/MotionEvent;->getActionMasked()I
+    move-result v1
+    if-eqz v1, :cond_search_down
+    invoke-static {p0}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->observeSearchMotion(Landroid/view/MotionEvent;)V
+    goto :cond_search_observed
+
+    :cond_search_down
+    invoke-static {v0, p0}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->beginSearchGesture(Landroid/content/Context;Landroid/view/MotionEvent;)V
+
+    :cond_search_observed
 
     invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isSwipeUpSearchEnabled(Landroid/content/Context;)Z
 
@@ -381,6 +399,7 @@
     move-result-object v0
 
     invoke-static {v0, p0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onMotionEvent(Landroid/content/Context;Landroid/view/MotionEvent;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->observeSearchMotion(Landroid/view/MotionEvent;)V
 
     sget-boolean v0, Lcom/smartisanos/launcher/a/a/a;->sk:Z
 
@@ -474,6 +493,7 @@
     move-result-object v0
 
     invoke-static {v0, p0}, Lcom/smartisanos/launcher/gesture/SystemPanelCompat;->onMotionEvent(Landroid/content/Context;Landroid/view/MotionEvent;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->observeSearchMotion(Landroid/view/MotionEvent;)V
 
     invoke-static {v0}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->isSwipeUpSearchEnabled(Landroid/content/Context;)Z
 
@@ -512,6 +532,10 @@
     move-result v0
 
     if-ne v0, v3, :cond_3
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/gesture/VerticalGestureDirectionConfig;->isSearchGestureFinalValid(Landroid/view/MotionEvent;)Z
+    move-result v4
+    if-eqz v4, :goto_0
 
     .line 6
     sget-boolean v0, Lcom/smartisanos/launcher/a/a/a;->rk:Z

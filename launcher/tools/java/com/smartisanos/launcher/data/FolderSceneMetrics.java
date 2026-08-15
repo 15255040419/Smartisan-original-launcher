@@ -1,7 +1,5 @@
 package com.smartisanos.launcher.data;
 
-import android.util.Log;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -13,7 +11,6 @@ import java.lang.reflect.Method;
  * screen-space clipping rectangle.</p>
  */
 public final class FolderSceneMetrics {
-    private static final String TAG = "FolderSceneMetrics";
     private static final String FOLDER_PAGE_CLASS =
             "com.smartisanos.launcher.view.b.t";
     private static final float EPSILON = 0.0001f;
@@ -85,12 +82,6 @@ public final class FolderSceneMetrics {
 
         final Result result = calculate(width, height, topInset, bottomInset,
                 visualLeft, visualTop, visualRight, visualBottom);
-        Log.i(TAG, "folder scene " + width + "x" + height
-                + " mode=" + currentMode
-                + " scale=" + result.uniformScale
-                + " translateX=" + result.translateX
-                + " translateY=" + result.translateY
-                + " clip=" + result.safeClipRect);
         return result;
     }
 

@@ -222,7 +222,6 @@ public final class MaintainedLauncherSettingsHost {
             "launcher_dynamic_weather_calendar_enabled";
     private static final int REQUEST_DYNAMIC_WEATHER_LOCATION = 2414;
     private static final int REQUEST_BACKUP_TREE = 54031;
-    private static final int REQUEST_BACKUP_CREATE_DOCUMENT = 54032;
     private static final int REQUEST_RESTORE_DOCUMENT = 54033;
     private static final int REQUEST_BACKUP_STORAGE_PERMISSION = 54034;
     private static final int STORAGE_PICKER_NONE = 0;
@@ -230,6 +229,7 @@ public final class MaintainedLauncherSettingsHost {
     private static final int STORAGE_PICKER_RESTORE_DOCUMENT = 2;
     private static Dialog sBackupProgressDialog;
     private static int sPendingStoragePicker = STORAGE_PICKER_NONE;
+    private static boolean sBackupNamePendingAfterTreeSelection;
     private static final String PREF_DYNAMIC_WEATHER_LOCATION_REQUESTED =
             "dynamic_weather_location_permission_requested";
     private static final String KEY_BADGE_HIDE = "launcher_hide_badge";
@@ -722,10 +722,12 @@ public final class MaintainedLauncherSettingsHost {
     public static List safeInstalledPackagesForDoppelganger(Context context) {
         ArrayList out = new ArrayList();
         if (context == null) {
+            com.smartisanos.launcher.model.LauncherModelRepository.noteStartupQueryIssue("context_missing");
             return out;
         }
         PackageManager pm = context.getPackageManager();
         if (pm == null) {
+            com.smartisanos.launcher.model.LauncherModelRepository.noteStartupQueryIssue("package_manager_missing");
             return out;
         }
         try {
@@ -736,6 +738,7 @@ public final class MaintainedLauncherSettingsHost {
                 addPackageInfos(out, (List) list);
             }
         } catch (Throwable ignored) {
+            com.smartisanos.launcher.model.LauncherModelRepository.noteStartupQueryIssue("installed_packages_as_user");
         }
         try {
             List list = pm.getInstalledPackages(0);
@@ -743,6 +746,7 @@ public final class MaintainedLauncherSettingsHost {
                 addPackageInfos(out, list);
             }
         } catch (Throwable ignored) {
+            com.smartisanos.launcher.model.LauncherModelRepository.noteStartupQueryIssue("installed_packages");
         }
         try {
             Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
@@ -762,10 +766,12 @@ public final class MaintainedLauncherSettingsHost {
                         PackageInfo packageInfo = pm.getPackageInfo(info.activityInfo.packageName, 0);
                         addPackageInfo(out, packageInfo);
                     } catch (Throwable ignored) {
+                        com.smartisanos.launcher.model.LauncherModelRepository.noteStartupQueryIssue("activity_package_info");
                     }
                 }
             }
         } catch (Throwable ignored) {
+            com.smartisanos.launcher.model.LauncherModelRepository.noteStartupQueryIssue("launcher_activity_scan");
         }
         return out;
     }
@@ -3241,8 +3247,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static boolean onActivityResult(Activity activity, int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQUEST_BACKUP_TREE || requestCode == REQUEST_BACKUP_CREATE_DOCUMENT
-                || requestCode == REQUEST_RESTORE_DOCUMENT) {
+        if (requestCode == REQUEST_BACKUP_TREE || requestCode == REQUEST_RESTORE_DOCUMENT) {
             return onBackupActivityResult(activity, requestCode, resultCode, data);
         }
         if (requestCode == 10) {
@@ -7303,30 +7308,24 @@ public final class MaintainedLauncherSettingsHost {
             confirmation = null;
         }
 
-        final AlertDialog dialog = new AlertDialog.Builder(activity)
-                .setTitle(settingPassword ? "设置页面密码" : "解锁页面")
-                .setView(content)
-                .setNegativeButton("取消", null)
-                .setPositiveButton(settingPassword ? "确定" : "解锁", null)
-                .create();
-        dialog.setOnCancelListener(new android.content.DialogInterface.OnCancelListener() {
-            @Override
-            public void onCancel(android.content.DialogInterface ignored) {
-                finishLauncherPasswordVerification();
-            }
+        final Dialog dialog = new Dialog(activity);
+        LinearLayout root = new LinearLayout(activity);
+        prepareSmartisanDialogRoot(activity, root);
+        root.addView(smartisanDialogTitle(activity, settingPassword ? "设置页面密码" : "解锁页面"),
+                new LinearLayout.LayoutParams(-1, dp(activity, 53)));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+        root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+        LinearLayout buttons = new LinearLayout(activity);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        TextView cancel = smartisanDialogActionButton(activity, "取消", false, -1);
+        cancel.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View ignored) { dialog.cancel(); }
         });
-        dialog.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
-            @Override
-            public void onDismiss(android.content.DialogInterface ignored) {
-                finishLauncherPasswordVerification();
-            }
-        });
-        dialog.setOnShowListener(new android.content.DialogInterface.OnShowListener() {
-            @Override
-            public void onShow(android.content.DialogInterface ignored) {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View ignored) {
+        TextView confirm = smartisanDialogActionButton(activity,
+                settingPassword ? "确定" : "解锁", true, 1);
+        confirm.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View ignored) {
                 String value = password.getText().toString();
                 if (!isValidPagePassword(value)) {
                     password.setError("密码需为6位数字");
@@ -7350,13 +7349,35 @@ public final class MaintainedLauncherSettingsHost {
                 }
                 dispatchLauncherPasswordResult(launcher, requestCode, Activity.RESULT_OK);
                 dialog.dismiss();
-                }
-            });
-            password.requestFocus();
-            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+            }
+        });
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 47), 1.0f));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 47)));
+        buttons.addView(confirm, new LinearLayout.LayoutParams(0, dp(activity, 47), 1.0f));
+        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
+        dialog.setContentView(root);
+        dialog.setOnCancelListener(new android.content.DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(android.content.DialogInterface ignored) {
+                finishLauncherPasswordVerification();
+            }
+        });
+        dialog.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+            @Override
+            public void onDismiss(android.content.DialogInterface ignored) {
+                finishLauncherPasswordVerification();
             }
         });
         dialog.show();
+        Window passwordWindow = dialog.getWindow();
+        if (passwordWindow != null) {
+            passwordWindow.setBackgroundDrawableResource(android.R.color.transparent);
+            passwordWindow.setLayout(Math.min(dp(activity, 380),
+                    activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 32)), -2);
+            passwordWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+        password.requestFocus();
     }
 
     private static String launcherPagePasswordHash(String value) {
@@ -9154,6 +9175,11 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void showConfirmDialog(final Activity activity, String title, String message, String negative, String positive, final View.OnClickListener positiveClick) {
         showConfirmDialog(activity, title, message, negative, positive, null, positiveClick, null);
+    }
+
+    static void showSharedConfirmDialog(final Activity activity, String title, String message,
+            String negative, String positive, final View.OnClickListener positiveClick) {
+        showConfirmDialog(activity, title, message, negative, positive, positiveClick);
     }
 
     private static void showConfirmDialog(final Activity activity, String title, String message,
@@ -11780,9 +11806,7 @@ public final class MaintainedLauncherSettingsHost {
                 locationName = DesktopBackupController.directoryDisplayPath(activity, Uri.parse(locationUri));
             }
             if (TextUtils.isEmpty(locationName)) {
-                locationName = prefs.getBoolean("backup_use_app_directory", false)
-                        ? getString(resources, "backup_app_directory", "应用专用目录")
-                        : getString(resources, "backup_system_directory_option", "使用手机系统目录");
+                locationName = getString(resources, "backup_not_selected", "尚未选择");
             } else if ("已选择目录".equals(locationName)) {
                 locationName = getString(resources, "backup_location_selected", "已选择目录");
             }
@@ -11806,7 +11830,7 @@ public final class MaintainedLauncherSettingsHost {
                 undoRow.setAlpha(canUndo ? 1f : 0.55f);
             }
             click(activity, resources, root, "backup_location", new View.OnClickListener() {
-                public void onClick(View v) { showBackupLocationChoice(activity); }
+                public void onClick(View v) { openBackupTree(activity, false); }
             });
             click(activity, resources, root, "backup_now", new View.OnClickListener() {
                 public void onClick(View v) { startBackupFromSavedLocation(activity); }
@@ -11843,7 +11867,8 @@ public final class MaintainedLauncherSettingsHost {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(new Date(time));
     }
 
-    private static void openBackupTree(Activity activity) {
+    private static void openBackupTree(Activity activity, boolean continueToBackupName) {
+        sBackupNamePendingAfterTreeSelection = continueToBackupName;
         if (!ensureStoragePermissionForPicker(activity, STORAGE_PICKER_BACKUP_TREE)) return;
         launchBackupTreePicker(activity);
     }
@@ -11904,26 +11929,6 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void showBackupLocationChoice(final Activity activity) {
-        Resources resources = getMaintainedResources(activity);
-        showBackupStorageChoice(activity, false,
-                getString(resources, "backup_location_title", "备份位置"));
-    }
-
-    private static void useAppBackupDirectory(Activity activity) {
-        activity.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
-                .remove(DesktopBackupController.KEY_TREE_URI)
-                .remove(DesktopBackupController.KEY_TREE_DISPLAY_NAME)
-                .remove(DesktopBackupController.KEY_LAST_BACKUP_DOCUMENT_URI)
-                .putBoolean("backup_use_app_directory", true)
-                .commit();
-        showDesktopBackupPage(activity, false);
-    }
-
-    private static void createBackupDocument(Activity activity) {
-        startBackupToAppDirectory(activity);
-    }
-
     private static void openRestoreDocument(Activity activity) {
         if (!ensureStoragePermissionForPicker(activity, STORAGE_PICKER_RESTORE_DOCUMENT)) return;
         launchRestoreDocumentPicker(activity);
@@ -11945,52 +11950,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void startRestoreFromSavedLocation(Activity activity) {
-        File[] backups = DesktopBackupController.appBackups(activity);
-        showRestoreSourceChoice(activity, backups);
-    }
-
-    private static void showRestoreSourceChoice(final Activity activity, final File[] backups) {
-        Resources resources = getMaintainedResources(activity);
-        showBackupStorageChoice(activity, true,
-                getString(resources, "restore_from_backup", "从备份恢复"),
-                backups);
-    }
-
-    /** Shared Smartisan-style storage selector for backup and restore. */
-    private static void showBackupStorageChoice(final Activity activity, final boolean restore,
-            String title) {
-        showBackupStorageChoice(activity, restore, title, null);
-    }
-
-    private static void showBackupStorageChoice(final Activity activity, final boolean restore,
-            String title, final File[] backups) {
-        final Resources resources = getMaintainedResources(activity);
-        MaintainedBackupStorageDialog.show(activity, resources, title,
-                getString(resources, "backup_system_directory_option", "使用手机系统目录"),
-                getString(resources, "backup_system_directory_description", "备份文件保存到手机系统目录，卸载桌面后仍可保留。"),
-                getString(resources, "backup_app_directory_option", "使用应用专用目录"),
-                getString(resources, "backup_app_directory_description", "备份文件保存到应用目录，卸载桌面后会一并删除。"),
-                getString(resources, "cancel", "取消"),
-                getString(resources, "activity_title_confirm", "确定"),
-                new MaintainedBackupStorageDialog.Listener() {
-                    public void onSystemDirectory() {
-                        if (restore) openRestoreDocument(activity);
-                        else openBackupTree(activity);
-                    }
-                    public void onAppDirectory() {
-                        if (restore) {
-                            if (backups != null && backups.length != 0) {
-                                showAppBackupSelection(activity, backups);
-                            } else {
-                                showInfoDialog(activity,
-                                        getString(resources, "restore_from_backup", "从备份恢复"),
-                                        getString(resources, "restore_no_app_backup", "应用专用目录中暂无备份记录。"));
-                            }
-                        } else {
-                            useAppBackupDirectory(activity);
-                        }
-                    }
-                });
+        openRestoreDocument(activity);
     }
 
     private static void startRestorePreview(Activity activity, Uri source) {
@@ -11999,95 +11959,108 @@ public final class MaintainedLauncherSettingsHost {
         DesktopRestoreController.validateSelectedFile(activity, source, restoreListener(activity));
     }
 
-    /**
-     * File selection stays in the launcher process.  It intentionally does not open
-     * DocumentsUI: several vendor file managers fail before returning a result.
-     */
-    private static void showAppBackupSelection(final Activity activity, File[] backups) {
-        final Dialog dialog = new Dialog(activity);
-        LinearLayout root = new LinearLayout(activity);
-        prepareSmartisanDialogRoot(activity, root);
-        TextView title = smartisanDialogTitle(activity, getString(getMaintainedResources(activity),
-                "restore_from_backup", "从备份恢复"));
-        root.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
-        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
-
-        ScrollView scroll = new ScrollView(activity);
-        scroll.setFillViewport(true);
-        scroll.setHorizontalScrollBarEnabled(false);
-        scroll.setHorizontalFadingEdgeEnabled(false);
-        LinearLayout items = new LinearLayout(activity);
-        items.setOrientation(LinearLayout.VERTICAL);
-        items.setGravity(Gravity.FILL_HORIZONTAL);
-        int max = Math.min(backups.length, 12);
-        for (int i = 0; i < max; i++) {
-            final File backup = backups[i];
-            TextView item = text(activity, backupDate(backup.lastModified()), 16, 0xff4d556b, false);
-            item.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
-            item.setSingleLine(true);
-            item.setEllipsize(TextUtils.TruncateAt.END);
-            item.setPadding(dp(activity, 20), 0, dp(activity, 20), 0);
-            // The full-page setting backgrounds carry edge insets intended for a
-            // 1080px-wide settings card.  Inside this dialog they shift the text.
-            // Use the existing Smartisan dialog-row selector instead.
-            item.setBackgroundDrawable(smartisanDialogListRowBackground());
-            item.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    dialog.dismiss();
-                    startRestorePreview(activity, Uri.fromFile(backup));
-                }
-            });
-            items.addView(item, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
-        }
-        scroll.addView(items, new ScrollView.LayoutParams(-1, -2));
-        root.addView(scroll, new LinearLayout.LayoutParams(-1,
-                Math.min(dp(activity, 56 * max), dp(activity, 420))));
-        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
-        TextView cancel = smartisanDialogActionButton(activity,
-                getString(getMaintainedResources(activity), "cancel", "取消"), false, 0);
-        cancel.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { dialog.dismiss(); }
-        });
-        root.addView(cancel, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
-        dialog.setContentView(root);
-        Window window = dialog.getWindow();
-        if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
-        dialog.show();
-        Window shown = dialog.getWindow();
-        if (shown != null) {
-            int width = Math.min(dp(activity, 380),
-                    activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 32));
-            shown.setLayout(width, -2);
-        }
-    }
-
     private static void startBackupFromSavedLocation(Activity activity) {
         SharedPreferences prefs = activity.getSharedPreferences(DesktopBackupController.PREFS, 0);
         String value = prefs.getString(DesktopBackupController.KEY_TREE_URI, "");
         if (TextUtils.isEmpty(value)) {
-            if (prefs.getBoolean("backup_use_app_directory", false)) {
-                startBackupToAppDirectory(activity);
-            } else {
-                showBackupLocationChoice(activity);
-            }
+            openBackupTree(activity, true);
             return;
         }
-        startBackup(activity, Uri.parse(value), false);
+        showBackupNameDialog(activity, Uri.parse(value));
     }
 
-    private static void startBackupToAppDirectory(final Activity activity) {
-        final Resources resources = getMaintainedResources(activity);
-        showBackupProgress(activity, getString(resources, "backup_progress", "正在备份桌面…"), true);
-        DesktopBackupController.startBackupToAppDirectory(activity, backupListener(activity, resources));
+    private interface SingleInputListener {
+        boolean onConfirm(EditText input, String value);
     }
 
-    private static void startBackup(final Activity activity, Uri destination, boolean direct) {
-        final Resources resources = getMaintainedResources(activity);
-        showBackupProgress(activity,
-                getString(resources, "backup_progress", "正在备份桌面…"), true);
-        DesktopBackupController.Listener listener = backupListener(activity, resources);
-        if (direct) DesktopBackupController.startBackupToDocument(activity, destination, listener);
-        else DesktopBackupController.startBackupToTree(activity, destination, listener);
+    private static final class SmartisanChoiceDot extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private boolean checked;
+
+        SmartisanChoiceDot(Context context) {
+            super(context);
+            setClickable(false);
+        }
+
+        void setChecked(boolean value) {
+            checked = value;
+            invalidate();
+        }
+
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float density = getResources().getDisplayMetrics().density;
+            float radius = 11f * density;
+            float cx = getWidth() * 0.5f;
+            float cy = getHeight() * 0.5f;
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(3f * density);
+            paint.setColor(0xffeeeeee);
+            canvas.drawCircle(cx, cy, radius, paint);
+            if (checked) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xffa98270);
+                canvas.drawCircle(cx, cy, radius * 0.52f, paint);
+            }
+        }
+    }
+
+    /** Shared by application rename and backup naming to keep their Smartisan UI identical. */
+    private static void showSingleInputDialog(final Activity activity, String title, String initialValue,
+            final SingleInputListener listener) {
+        final Dialog dialog = new Dialog(activity);
+        LinearLayout root = new LinearLayout(activity);
+        prepareSmartisanDialogRoot(activity, root);
+
+        TextView heading = smartisanDialogTitle(activity, title);
+        root.addView(heading, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(activity, 26), dp(activity, 20), dp(activity, 26), dp(activity, 20));
+        final EditText input = new EditText(activity);
+        input.setSingleLine(true);
+        input.setSelectAllOnFocus(true);
+        input.setTextSize(17);
+        input.setTextColor(0xff454545);
+        input.setText(initialValue);
+        input.setSelection(input.length());
+        input.setPadding(dp(activity, 14), 0, dp(activity, 14), 0);
+        input.setBackgroundDrawable(roundedDrawable(0xffffffff, 0xffc8c8c8, dp(activity, 4)));
+        content.addView(input, new LinearLayout.LayoutParams(-1, dp(activity, 48)));
+        root.addView(content, new LinearLayout.LayoutParams(-1, -2));
+
+        root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
+        LinearLayout buttons = new LinearLayout(activity);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        TextView cancel = smartisanDialogActionButton(activity, "取消", false, -1);
+        cancel.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { dialog.dismiss(); }
+        });
+        TextView confirm = smartisanDialogActionButton(activity, "确定", true, 1);
+        confirm.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                String value = input.getText() == null ? "" : input.getText().toString().trim();
+                if (listener != null && listener.onConfirm(input, value)) dialog.dismiss();
+            }
+        });
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 47), 1.0f));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 47)));
+        buttons.addView(confirm, new LinearLayout.LayoutParams(0, dp(activity, 47), 1.0f));
+        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
+
+        dialog.setContentView(root);
+        dialog.show();
+        Window shown = dialog.getWindow();
+        if (shown != null) {
+            shown.setBackgroundDrawableResource(android.R.color.transparent);
+            int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+            shown.setLayout(Math.min(dp(activity, 380), screenWidth - dp(activity, 32)), -2);
+            shown.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+        input.requestFocus();
     }
 
     private static DesktopBackupController.Listener backupListener(final Activity activity,
@@ -12110,16 +12083,9 @@ public final class MaintainedLauncherSettingsHost {
                     showDesktopBackupPage(activity, false);
                 } else if ("BACKUP_LOCATION_READ_ONLY".equals(result.errorCode)
                         || "BACKUP_LOCATION_PERMISSION_LOST".equals(result.errorCode)) {
-                    showChoiceDialog(activity,
+                    showInfoDialog(activity,
                             getString(resources, "backup_location_unavailable", "备份位置不可用"),
-                            backupResultMessage(resources, result),
-                            getString(resources, "backup_choose_again", "重新选择"),
-                            getString(resources, "backup_save_each_time", "每次另存"),
-                            new View.OnClickListener() {
-                                public void onClick(View v) { openBackupTree(activity); }
-                            }, new View.OnClickListener() {
-                                public void onClick(View v) { createBackupDocument(activity); }
-                            });
+                            backupResultMessage(resources, result));
                 } else showInfoDialog(activity,
                         getString(resources, "backup_dialog_title", "桌面备份"),
                         backupResultMessage(resources, result));
@@ -12129,30 +12095,23 @@ public final class MaintainedLauncherSettingsHost {
 
     private static boolean onBackupActivityResult(Activity activity, int requestCode,
             int resultCode, Intent data) {
-        if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) return true;
-        Uri uri = data.getData();
-        if (requestCode == REQUEST_BACKUP_TREE) {
-            if (!DesktopBackupController.persistTreePermission(activity, uri, data.getFlags())) {
-                Resources resources = getMaintainedResources(activity);
-                showChoiceDialog(activity,
-                        getString(resources, "backup_permission_failed_title", "目录授权失败"),
-                        getString(resources, "backup_permission_failed_message", "所选目录没有可持久使用的读写权限，可以重新选择或使用每次另存。"),
-                        getString(resources, "backup_choose_again", "重新选择"),
-                        getString(resources, "backup_save_each_time", "每次另存"),
-                        new View.OnClickListener() {
-                            public void onClick(View v) { openBackupTree(activity); }
-                        }, new View.OnClickListener() {
-                            public void onClick(View v) { createBackupDocument(activity); }
-                        });
-            } else {
-                activity.getSharedPreferences(DesktopBackupController.PREFS, 0).edit()
-                        .putBoolean("backup_use_app_directory", false).commit();
-                showDesktopBackupPage(activity, false);
-            }
+        if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
+            if (requestCode == REQUEST_BACKUP_TREE) sBackupNamePendingAfterTreeSelection = false;
             return true;
         }
-        if (requestCode == REQUEST_BACKUP_CREATE_DOCUMENT) {
-            startBackup(activity, uri, true);
+        Uri uri = data.getData();
+        if (requestCode == REQUEST_BACKUP_TREE) {
+            boolean continueToBackupName = sBackupNamePendingAfterTreeSelection;
+            sBackupNamePendingAfterTreeSelection = false;
+            if (!DesktopBackupController.persistTreePermission(activity, uri, data.getFlags())) {
+                Resources resources = getMaintainedResources(activity);
+                showInfoDialog(activity,
+                        getString(resources, "backup_permission_failed_title", "目录授权失败"),
+                        getString(resources, "backup_permission_failed_message", "所选目录没有可持久使用的读写权限，请重新选择。"));
+            } else {
+                if (continueToBackupName) showBackupNameDialog(activity, uri);
+                else showDesktopBackupPage(activity, false);
+            }
             return true;
         }
         if (requestCode == REQUEST_RESTORE_DOCUMENT) {
@@ -12163,6 +12122,53 @@ public final class MaintainedLauncherSettingsHost {
             return true;
         }
         return false;
+    }
+
+    private static void showBackupNameDialog(final Activity activity, final Uri treeUri) {
+        Resources resources = getMaintainedResources(activity);
+        showSingleInputDialog(activity,
+                getString(resources, "backup_name_title", "备份名称"),
+                new SimpleDateFormat("yyyy-MM-dd HH-mm", Locale.getDefault()).format(new Date()),
+                new SingleInputListener() {
+                    public boolean onConfirm(EditText input, String value) {
+                        String fileName = DesktopBackupController.normalizeBackupFileName(value);
+                        if (TextUtils.isEmpty(fileName)) {
+                            input.setError(getString(getMaintainedResources(activity),
+                                    "backup_name_empty", "名称不能为空"));
+                            return false;
+                        }
+                        Uri existing = DesktopBackupController.findTreeBackup(activity, treeUri, fileName);
+                        if (existing != null) {
+                            confirmBackupOverwrite(activity, treeUri, fileName);
+                        } else {
+                            startNamedBackup(activity, treeUri, fileName, false);
+                        }
+                        return true;
+                    }
+                });
+    }
+
+    private static void confirmBackupOverwrite(final Activity activity, final Uri treeUri,
+            final String fileName) {
+        Resources resources = getMaintainedResources(activity);
+        showChoiceDialog(activity,
+                getString(resources, "backup_overwrite_title", "覆盖备份"),
+                getString(resources, "backup_overwrite_message", "已存在同名备份，是否覆盖？"),
+                getString(resources, "cancel", "取消"),
+                getString(resources, "backup_overwrite_action", "覆盖"),
+                null, new View.OnClickListener() {
+                    public void onClick(View v) {
+                        startNamedBackup(activity, treeUri, fileName, true);
+                    }
+                });
+    }
+
+    private static void startNamedBackup(final Activity activity, Uri treeUri, String fileName,
+            boolean overwrite) {
+        final Resources resources = getMaintainedResources(activity);
+        showBackupProgress(activity, getString(resources, "backup_progress", "正在备份桌面…"), true);
+        DesktopBackupController.startBackupToTree(activity, treeUri, fileName, overwrite,
+                backupListener(activity, resources));
     }
 
     private static DesktopRestoreController.Listener restoreListener(final Activity activity) {
@@ -12627,16 +12633,10 @@ public final class MaintainedLauncherSettingsHost {
             final View pageRoot, final SettingItemSwitch automatic) {
         final Dialog dialog = new Dialog(activity);
         LinearLayout panel = new LinearLayout(activity);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable panelBackground = new GradientDrawable();
-        panelBackground.setColor(0xfff7f7f7);
-        panelBackground.setCornerRadius(dp(activity, 6));
-        panelBackground.setStroke(1, 0xffcfcfcf);
-        panel.setBackgroundDrawable(panelBackground);
+        prepareSmartisanDialogRoot(activity, panel);
 
-        TextView title = text(activity, "手动选择城市", 17, 0xff555b68, false);
-        title.setGravity(Gravity.CENTER);
-        panel.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 58)));
+        TextView title = smartisanDialogTitle(activity, "手动选择城市");
+        panel.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
         panel.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
 
         LinearLayout content = new LinearLayout(activity);
@@ -12664,8 +12664,8 @@ public final class MaintainedLauncherSettingsHost {
 
         LinearLayout buttons = new LinearLayout(activity);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
-        TextView cancel = dialogButton(activity, "取消", 0xff62666e);
-        final TextView search = dialogButton(activity, "搜索", 0xff527fcb);
+        TextView cancel = smartisanDialogActionButton(activity, "取消", false, -1);
+        final TextView search = smartisanDialogActionButton(activity, "搜索", true, 1);
         cancel.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { dialog.dismiss(); }
         });
@@ -12692,16 +12692,16 @@ public final class MaintainedLauncherSettingsHost {
                 });
             }
         });
-        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 50), 1f));
-        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 50)));
-        buttons.addView(search, new LinearLayout.LayoutParams(0, dp(activity, 50), 1f));
-        panel.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 50)));
+        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 47), 1f));
+        buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 47)));
+        buttons.addView(search, new LinearLayout.LayoutParams(0, dp(activity, 47), 1f));
+        panel.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
         dialog.setContentView(panel);
         Window window = dialog.getWindow();
         if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
         dialog.show();
         Window shown = dialog.getWindow();
-        if (shown != null) shown.setLayout(Math.min(dp(activity, 360),
+        if (shown != null) shown.setLayout(Math.min(dp(activity, 380),
                 activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 32)), -2);
         input.requestFocus();
         if (shown != null) shown.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
@@ -12712,15 +12712,9 @@ public final class MaintainedLauncherSettingsHost {
             final List<WeatherBridge.CityResult> cities) {
         final Dialog dialog = new Dialog(activity);
         LinearLayout panel = new LinearLayout(activity);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(0xfff7f7f7);
-        background.setCornerRadius(dp(activity, 6));
-        background.setStroke(1, 0xffcfcfcf);
-        panel.setBackgroundDrawable(background);
-        TextView title = text(activity, "选择准确地区", 17, 0xff555b68, false);
-        title.setGravity(Gravity.CENTER);
-        panel.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 58)));
+        prepareSmartisanDialogRoot(activity, panel);
+        TextView title = smartisanDialogTitle(activity, "选择准确地区");
+        panel.addView(title, new LinearLayout.LayoutParams(-1, dp(activity, 53)));
         panel.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
         LinearLayout rows = new LinearLayout(activity);
         rows.setOrientation(LinearLayout.VERTICAL);
@@ -12759,17 +12753,17 @@ public final class MaintainedLauncherSettingsHost {
         panel.addView(scroll, new LinearLayout.LayoutParams(-1,
                 Math.min(dp(activity, count * 54), dp(activity, 360))));
         panel.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
-        TextView cancel = dialogButton(activity, "取消", 0xff62666e);
+        TextView cancel = smartisanDialogActionButton(activity, "取消", false, 0);
         cancel.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { dialog.dismiss(); }
         });
-        panel.addView(cancel, new LinearLayout.LayoutParams(-1, dp(activity, 50)));
+        panel.addView(cancel, new LinearLayout.LayoutParams(-1, dp(activity, 47)));
         dialog.setContentView(panel);
         Window window = dialog.getWindow();
         if (window != null) window.setBackgroundDrawableResource(android.R.color.transparent);
         dialog.show();
         Window shown = dialog.getWindow();
-        if (shown != null) shown.setLayout(Math.min(dp(activity, 360),
+        if (shown != null) shown.setLayout(Math.min(dp(activity, 380),
                 activity.getResources().getDisplayMetrics().widthPixels - dp(activity, 32)), -2);
     }
 
@@ -13774,8 +13768,7 @@ public final class MaintainedLauncherSettingsHost {
             labelLp.rightMargin = dp(context, 52);
             row.addView(label, labelLp);
 
-            MaintainedBackupStorageDialog.SmartisanChoiceDot selectedMark =
-                    new MaintainedBackupStorageDialog.SmartisanChoiceDot(activity);
+            SmartisanChoiceDot selectedMark = new SmartisanChoiceDot(activity);
             selectedMark.setChecked(selected);
             RelativeLayout.LayoutParams markLp = new RelativeLayout.LayoutParams(dp(context, 26), dp(context, 26));
             markLp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
@@ -16654,47 +16647,13 @@ public final class MaintainedLauncherSettingsHost {
                                           final ResolveInfo resolveInfo,
                                           final TextView titleView) {
             if (info == null) return;
-            final Dialog dialog = new Dialog(activity);
-            LinearLayout root = new LinearLayout(activity);
-            prepareSmartisanDialogRoot(activity, root);
-
-            TextView heading = text(activity, "修改应用名称", 18, 0xff333333, true);
-            heading.setGravity(Gravity.CENTER);
-            root.addView(heading, new LinearLayout.LayoutParams(-1, dp(activity, 54)));
-
-            LinearLayout content = new LinearLayout(activity);
-            content.setOrientation(LinearLayout.VERTICAL);
-            content.setPadding(dp(activity, 24), dp(activity, 20), dp(activity, 24), dp(activity, 20));
-            final EditText input = new EditText(activity);
-            input.setSingleLine(true);
-            input.setSelectAllOnFocus(true);
-            input.setTextSize(17);
-            input.setTextColor(0xff454545);
-            input.setText(iconManager.getLableForPackage(info.packageName, info.componentName));
-            input.setSelection(input.length());
-            input.setPadding(dp(activity, 14), 0, dp(activity, 14), 0);
-            input.setBackgroundDrawable(roundedDrawable(0xffffffff, 0xffc8c8c8, dp(activity, 4)));
-            content.addView(input, new LinearLayout.LayoutParams(-1, dp(activity, 48)));
-            root.addView(content, new LinearLayout.LayoutParams(-1, -2));
-
-            root.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(-1, 1));
-
-            LinearLayout buttons = new LinearLayout(activity);
-            buttons.setOrientation(LinearLayout.HORIZONTAL);
-            TextView cancel = smartisanDialogActionButton(activity, "取消", false, -1);
-            cancel.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    dialog.dismiss();
-                }
-            });
-            TextView confirm = smartisanDialogActionButton(activity, "确定", true, 1);
-            confirm.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    String displayName = input.getText() == null ? ""
-                            : input.getText().toString().trim();
+            showSingleInputDialog(activity, "修改应用名称",
+                    iconManager.getLableForPackage(info.packageName, info.componentName),
+                    new SingleInputListener() {
+                public boolean onConfirm(EditText input, String displayName) {
                     if (displayName.length() == 0) {
                         input.setError("名称不能为空");
-                        return;
+                        return false;
                     }
                     String originalName = info.originalName;
                     if (TextUtils.isEmpty(originalName) && resolveInfo != null) {
@@ -16708,26 +16667,10 @@ public final class MaintainedLauncherSettingsHost {
                             info.componentName, displayName, originalName);
                     updateDesktopItemTitle(activity, info.packageName, info.componentName, displayName);
                     titleView.setText(displayName);
-                    dialog.dismiss();
                     Toast.makeText(activity, "应用名称已修改", Toast.LENGTH_SHORT).show();
+                    return true;
                 }
             });
-            buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 56), 1.0f));
-            buttons.addView(smartisanDivider(activity), new LinearLayout.LayoutParams(1, dp(activity, 56)));
-            buttons.addView(confirm, new LinearLayout.LayoutParams(0, dp(activity, 56), 1.0f));
-            root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 56)));
-
-            dialog.setContentView(root);
-            dialog.show();
-            Window shown = dialog.getWindow();
-            if (shown != null) {
-                shown.setBackgroundDrawableResource(android.R.color.transparent);
-                int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-                shown.setLayout(Math.min(dp(activity, 360), screenWidth - dp(activity, 32)), -2);
-                shown.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
-                        | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-            }
-            input.requestFocus();
         }
 
         private void addChoiceCell(final GridLayout grid, final View row, final RedirectIconInfo info,

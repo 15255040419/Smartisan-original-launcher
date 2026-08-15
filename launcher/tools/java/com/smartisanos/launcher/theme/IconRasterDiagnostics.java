@@ -23,8 +23,8 @@ public final class IconRasterDiagnostics {
     private static final String TAG = "LauncherIconRaster";
     private static final Set<String> REPORTED = new HashSet<String>();
     private static final int DIAGNOSTIC_ALPHA_CUTOFF = 40;
-    private static final String SOURCE_CANVAS_VERSION = "source-canvas:v1-full-bounds";
-    private static final String RASTER_CACHE_VERSION = "raster:v15-fixed-source-canvas";
+    private static final String SOURCE_CANVAS_VERSION = "source-canvas:v2-default-normalized";
+    private static final String RASTER_CACHE_VERSION = "raster:v16-default-icon-normalizer";
     private static final String BADGE_VERSION = "badge:v1";
     private static final String SHADOW_VERSION = "shadow:original-v1";
     private static final ThreadLocal<Integer> REQUESTED_LOGICAL_TEXTURE =
@@ -174,6 +174,7 @@ public final class IconRasterDiagnostics {
      * icon_size_origin-sized intermediate bitmap.
      */
     public static Bitmap prepareStaticSource(Object itemInfo, Bitmap cachedSource) {
+        if (isQuickLaunchItem(itemInfo)) return cachedSource;
         boolean highResolutionDesktop = shouldUseHighResolutionDesktopRaster(itemInfo);
         NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
         int logicalArtwork = currentLayoutSize("icon_size_origin");
@@ -209,7 +210,7 @@ public final class IconRasterDiagnostics {
      */
     public static boolean useDesktopStaticPipeline(Object activeIcon, Object itemInfo,
             boolean blackWhite, int width, int height) {
-        if (itemInfo == null || blackWhite || isOriginalActiveIcon(itemInfo)) {
+        if (itemInfo == null || isQuickLaunchItem(itemInfo) || blackWhite || isOriginalActiveIcon(itemInfo)) {
             return false;
         }
         if (isSpecialSettingButton(itemInfo)) return false;
@@ -228,6 +229,7 @@ public final class IconRasterDiagnostics {
     }
 
     public static boolean useManagedDesktopPipeline(Object itemInfo) {
+        if (isQuickLaunchItem(itemInfo)) return false;
         // This is the fallback entry used when a refresh call does not carry the
         // final texture dimensions.  Source ownership must not decide geometry:
         // DEFAULT, IMPROVED, PACK, CUSTOM and RESOURCE all use the same static
@@ -247,6 +249,7 @@ public final class IconRasterDiagnostics {
      */
     public static boolean shouldUseHighResolutionDesktopRaster(Object itemInfo) {
         return itemInfo != null
+                && !isQuickLaunchItem(itemInfo)
                 && !isSpecialSettingButton(itemInfo)
                 && !itemInfo.getClass().getName().endsWith(".FolderInfo")
                 && !itemField(itemInfo, "packageName").isEmpty()
@@ -301,11 +304,13 @@ public final class IconRasterDiagnostics {
 
     /** Compatibility entry; DEFAULT now follows the same full-canvas rule. */
     public static Bitmap composeDefaultOpticalIconTexture(Object itemInfo, Bitmap source) {
+        if (isQuickLaunchItem(itemInfo)) return source;
         return composeTexture(source, 0, itemInfo);
     }
 
     /** Unique final composer for every ordinary static application source. */
     public static Bitmap composeStaticApplicationIconTexture(Object itemInfo, Bitmap source) {
+        if (isQuickLaunchItem(itemInfo)) return source;
         return composeTexture(source, 0, itemInfo);
     }
 
@@ -355,9 +360,6 @@ public final class IconRasterDiagnostics {
         }
         float contentInset = 0f;
         float contentSize = artwork;
-        // Every source is treated as one immutable full canvas.  Only its
-        // complete width/height participate in the fit; alpha padding, hull,
-        // filled area, shape and source type never change scale or centering.
         VisibleBounds visibleBefore = analyzeVisibleBounds(source);
         float sourceScale = Math.min(contentSize / Math.max(1, source.getWidth()),
                 contentSize / Math.max(1, source.getHeight()));
@@ -370,6 +372,22 @@ public final class IconRasterDiagnostics {
                 artwork, artwork, Bitmap.Config.ARGB_8888);
         Canvas artworkCanvas = new Canvas(physicalArtwork);
         Drawable rawDrawable = itemInfo == null ? null : loadCurrentDesktopDrawable(itemInfo);
+        String sourceType = MaintainedLauncherSettingsHost.desktopIconSourceType(itemInfo);
+        if ("DEFAULT".equals(sourceType)) {
+            Drawable normalizationDrawable = rawDrawable;
+            if (normalizationDrawable == null) {
+                normalizationDrawable = new android.graphics.drawable.BitmapDrawable(
+                        android.content.res.Resources.getSystem(), source);
+            }
+            IconNormalizerCompat.Result normalization = IconNormalizerCompat.getScale(
+                    normalizationDrawable, Math.max(1, artwork * 2));
+            drawWidth *= normalization.scale;
+            drawHeight *= normalization.scale;
+            drawLeftInArtwork = contentInset + contentSize * 0.5f
+                    - normalization.visibleCenterX * drawWidth;
+            drawTopInArtwork = contentInset + contentSize * 0.5f
+                    - normalization.visibleCenterY * drawHeight;
+        }
         if (rawDrawable != null) {
             if (rawDrawable instanceof android.graphics.drawable.BitmapDrawable) {
                 ((android.graphics.drawable.BitmapDrawable) rawDrawable).setFilterBitmap(true);
@@ -734,6 +752,7 @@ public final class IconRasterDiagnostics {
     /** Keeps the SMEngine in-memory texture cache separate per physical raster. */
     public static String textureCacheKey(Object itemInfo, String baseKey) {
         if (baseKey == null || baseKey.contains("#" + RASTER_CACHE_VERSION + ":")) return baseKey;
+        if (isQuickLaunchItem(itemInfo)) return quickLaunchTextureCacheKey(itemInfo, baseKey);
         DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
         NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
         if (spec == null) return baseKey;
@@ -767,6 +786,7 @@ public final class IconRasterDiagnostics {
     }
 
     private static String resolvedSourceHash(Object itemInfo) {
+        if (isQuickLaunchItem(itemInfo)) return itemRawHash(itemInfo);
         Drawable drawable = loadCurrentDesktopDrawable(itemInfo);
         Bitmap bitmap = null;
         boolean owned = false;
@@ -923,6 +943,38 @@ public final class IconRasterDiagnostics {
         }
     }
 
+    private static boolean isQuickLaunchItem(Object item) {
+        if (item == null) return false;
+        try {
+            Object value = item.getClass().getField("itemType").get(item);
+            return value instanceof Number && ((Number) value).byteValue() == 1;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static String quickLaunchTextureCacheKey(Object itemInfo, String baseKey) {
+        String packageName = itemField(itemInfo, "packageName");
+        String shortcutId = itemField(itemInfo, "shortcutId");
+        String userId = itemField(itemInfo, "userId");
+        String userSerial = "unknown";
+        try {
+            Object intent = itemInfo.getClass().getField("intent").get(itemInfo);
+            if (intent instanceof android.content.Intent) {
+                userSerial = String.valueOf(((android.content.Intent) intent)
+                        .getLongExtra("smartisan.shortcut.user_serial", Long.MIN_VALUE));
+            }
+        } catch (Throwable ignored) {
+        }
+        String sourceHash = quickLaunchIconHash(itemInfo);
+        String key = baseKey + "#" + RASTER_CACHE_VERSION + ":quick-launch-final-source:"
+                + packageName + ':' + shortcutId + ':' + userId + ':' + userSerial + ':' + sourceHash;
+        Log.i(TAG, "QUICKLAUNCH_RENDER_SOURCE itemType=1 packageName=" + packageName
+                + " shortcutId=" + shortcutId + " userSerial=" + userSerial
+                + " sourceType=quick-launch-final-source textureKey=" + key);
+        return key;
+    }
+
     private static String itemRawHash(Object item) {
         if (item == null) return "0";
         try {
@@ -931,6 +983,16 @@ public final class IconRasterDiagnostics {
         } catch (Throwable ignored) {
             return "0";
         }
+    }
+
+    private static String quickLaunchIconHash(Object item) {
+        if (item == null) return "0";
+        try {
+            Object value = item.getClass().getField("iconData").get(item);
+            if (value instanceof byte[]) return Integer.toHexString(Arrays.hashCode((byte[]) value));
+        } catch (Throwable ignored) {
+        }
+        return itemRawHash(item);
     }
 
     private static int currentConstant(String fieldName, int fallback) {

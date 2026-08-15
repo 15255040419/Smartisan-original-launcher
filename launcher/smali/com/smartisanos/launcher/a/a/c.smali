@@ -58,6 +58,10 @@
     if-nez v0, :cond_0
 
     .line 2
+    const-string v2, "ACTIVITY_NOT_READY"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/gesture/GestureRegressionDiagnostics;->onFourFingerGate(Ljava/lang/String;)V
+
     sget-object v0, Lcom/smartisanos/launcher/a/a/c;->log:Lcom/smartisanos/launcher/va;
 
     const-string v2, "fingerSlide return by isActivityReady false"
@@ -75,6 +79,10 @@
     if-nez v0, :cond_1
 
     .line 4
+    const-string v2, "RECEIVER_DISABLED"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/gesture/GestureRegressionDiagnostics;->onFourFingerGate(Ljava/lang/String;)V
+
     sget-object v0, Lcom/smartisanos/launcher/a/a/c;->log:Lcom/smartisanos/launcher/va;
 
     const-string v2, "fingerSlide return by ENABLE_RECEIVER false"
@@ -100,6 +108,10 @@
     if-eqz v0, :cond_2
 
     .line 6
+    const-string v2, "MULTI_PAGE_MODE"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/gesture/GestureRegressionDiagnostics;->onFourFingerGate(Ljava/lang/String;)V
+
     sget-object v0, Lcom/smartisanos/launcher/a/a/c;->log:Lcom/smartisanos/launcher/va;
 
     const-string v2, "fingerSlide return by MULTI_PAGE_MODE true"
@@ -121,6 +133,10 @@
     if-eqz v0, :cond_3
 
     .line 8
+    const-string v2, "THEME_ANIMATING"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/gesture/GestureRegressionDiagnostics;->onFourFingerGate(Ljava/lang/String;)V
+
     sget-object v0, Lcom/smartisanos/launcher/a/a/c;->log:Lcom/smartisanos/launcher/va;
 
     const-string v2, "fingerSlide return by isRequireChangeThemeAnim true"
@@ -138,6 +154,10 @@
     if-nez v0, :cond_4
 
     .line 10
+    const-string v2, "CURRENT_THEME_NULL"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/gesture/GestureRegressionDiagnostics;->onFourFingerGate(Ljava/lang/String;)V
+
     sget-object v0, Lcom/smartisanos/launcher/a/a/c;->log:Lcom/smartisanos/launcher/va;
 
     const-string v2, "fingerSlide return by current theme is null"
@@ -178,10 +198,18 @@
     :cond_5
     const/4 v0, 0x1
 
+    const-string v2, "ALLOW"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/gesture/GestureRegressionDiagnostics;->onFourFingerGate(Ljava/lang/String;)V
+
     return v0
 
     :cond_6
     :goto_0
+    const-string v2, "STATUS_BLOCKED"
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/gesture/GestureRegressionDiagnostics;->onFourFingerGate(Ljava/lang/String;)V
+
     return v1
 .end method
 

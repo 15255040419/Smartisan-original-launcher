@@ -509,7 +509,7 @@
     invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     .line 32
-    invoke-static {v2}, Lcom/smartisanos/launcher/Aa;->D(Ljava/lang/String;)V
+    invoke-static {v2}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->onLegacyPackageRemovalBypass(Ljava/lang/String;)V
 
     goto :goto_1
 
@@ -716,7 +716,7 @@
     invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     .line 54
-    invoke-static {v2}, Lcom/smartisanos/launcher/Aa;->D(Ljava/lang/String;)V
+    invoke-static {v2}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->onLegacyPackageRemovalBypass(Ljava/lang/String;)V
 
     goto :goto_2
 

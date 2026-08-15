@@ -10056,9 +10056,13 @@
 
     move-result-object v7
 
+    invoke-static {v14}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->pageConstructBegin(Ljava/lang/Object;)V
+
     invoke-virtual {v1, v5, v7, v14}, Lcom/smartisanos/launcher/view/b/fa;->a(ILjava/lang/String;Lcom/smartisanos/launcher/data/Q;)Lcom/smartisanos/launcher/view/b/M;
 
     move-result-object v1
+
+    invoke-static {v1}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->pageConstructEnd(Ljava/lang/Object;)V
 
     .line 31
     iget v5, v14, Lcom/smartisanos/launcher/data/Q;->status:I

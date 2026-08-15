@@ -2444,11 +2444,24 @@
 
     move-result-object v0
 
+    move-object v4, v0
+
     invoke-virtual {v3, v0}, Lcom/smartisanos/launcher/data/FolderInfo;->O(Ljava/lang/String;)Lcom/smartisanos/launcher/data/ItemInfo;
 
     move-result-object v0
 
     .line 3
+    if-nez v0, :cond_weather_item_present
+
+    const-string v5, "weather"
+
+    invoke-static {v3, v4, v5}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->noteActiveIconOwnerMissing(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V
+
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/la;->clear()V
+
+    return-void
+
+    :cond_weather_item_present
     iget-object v3, p0, Lcom/smartisanos/launcher/view/a/la;->cy:Lcom/smartisanos/launcher/view/activeicon/H;
 
     invoke-virtual {v0}, Lcom/smartisanos/launcher/data/ItemInfo;->Oe()[B
@@ -2516,11 +2529,24 @@
 
     move-result-object v0
 
+    move-object v4, v0
+
     invoke-virtual {v3, v0}, Lcom/smartisanos/launcher/data/FolderInfo;->O(Ljava/lang/String;)Lcom/smartisanos/launcher/data/ItemInfo;
 
     move-result-object v0
 
     .line 14
+    if-nez v0, :cond_calendar_item_present
+
+    const-string v5, "calendar"
+
+    invoke-static {v3, v4, v5}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->noteActiveIconOwnerMissing(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V
+
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/la;->clear()V
+
+    return-void
+
+    :cond_calendar_item_present
     iget-object v3, p0, Lcom/smartisanos/launcher/view/a/la;->mCalendarView:Lcom/smartisanos/launcher/view/activeicon/m;
 
     invoke-virtual {v0}, Lcom/smartisanos/launcher/data/ItemInfo;->Oe()[B

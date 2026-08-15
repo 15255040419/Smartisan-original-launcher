@@ -475,7 +475,7 @@
     invoke-virtual {v1, p0}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     .line 20
-    invoke-static {v0}, Lcom/smartisanos/launcher/Aa;->D(Ljava/lang/String;)V
+    invoke-static {v0}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->onUncertainLegacyUninstall(Ljava/lang/String;)V
 
     .line 21
     :goto_2
@@ -559,6 +559,24 @@
 .method public static fd()V
     .locals 2
 
+    sget-object v0, Lcom/smartisanos/launcher/a/oa;->jk:Landroid/app/AlertDialog;
+
+    if-nez v0, :cond_1
+
+    sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
+
+    if-eqz v0, :cond_0
+
+    sget-object v0, Lcom/smartisanos/launcher/a/oa;->log:Lcom/smartisanos/launcher/va;
+
+    const-string v1, "cancelUninstallWithoutAnim nothing to do by mUninstallDialog is null"
+
+    invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/va;->info(Ljava/lang/String;)V
+
+    :cond_0
+    return-void
+
+    :cond_1
     const/4 v0, 0x1
 
     sput-boolean v0, Lcom/smartisanos/launcher/a/oa;->kk:Z
@@ -602,13 +620,43 @@
 
     move-result-object v0
 
+    if-nez v0, :scene_root_ready
+
+    const-string v0, "root"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->noteSceneNotReady(Ljava/lang/String;)V
+
+    return-void
+
+    :scene_root_ready
+
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/Eb;->zh()Lcom/smartisanos/launcher/view/V;
 
     move-result-object v0
 
+    if-nez v0, :scene_view_ready
+
+    const-string v0, "view"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->noteSceneNotReady(Ljava/lang/String;)V
+
+    return-void
+
+    :scene_view_ready
+
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/V;->Xo()Lcom/smartisanos/launcher/view/Sc;
 
     move-result-object v0
+
+    if-nez v0, :scene_controller_ready
+
+    const-string v0, "controller"
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->noteSceneNotReady(Ljava/lang/String;)V
+
+    return-void
+
+    :scene_controller_ready
 
     .line 3
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/Sc;->jq()Lcom/smartisanos/launcher/view/a/g;

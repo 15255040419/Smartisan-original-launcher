@@ -982,7 +982,9 @@
 
     .line 11
     :cond_1
-    invoke-static {v0}, Lcom/smartisanos/launcher/Aa;->a(Lcom/smartisanos/launcher/data/ItemInfo;)V
+    const-string p0, "scene_view"
+
+    invoke-static {v0, p0}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->removeWorkspaceItem(Ljava/lang/Object;Ljava/lang/String;)Z
 
     .line 12
     new-instance v1, Ljava/util/ArrayList;

@@ -143,65 +143,46 @@ public final class DesktopBackupController {
         }
     }
 
-    public static void startBackupToTree(Context context, Uri treeUri, Listener listener) {
-        start(context, treeUri, null, null, listener);
-    }
-
-    public static void startBackupToDocument(Context context, Uri documentUri, Listener listener) {
-        start(context, null, documentUri, null, listener);
-    }
-
-    /** App-scoped destination: works without storage permission or DocumentsUI. */
-    public static void startBackupToAppDirectory(Context context, Listener listener) {
-        File directory = appBackupDirectory(context);
-        String name = "SmartisanLauncher_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
-                .format(new Date()) + ".slauncherbackup";
-        start(context, null, null, new File(directory, name), listener);
-    }
-
-    public static File appBackupDirectory(Context context) {
-        File external = context == null ? null : context.getExternalFilesDir(null);
-        File base = external != null ? external : (context == null ? null : context.getFilesDir());
-        File directory = new File(base, "SmartisanLauncherBackup");
-        try { BackupFileUtils.ensureDirectory(directory); } catch (Throwable ignored) {}
-        return directory;
-    }
-
-    public static File latestAppBackup(Context context) {
-        File[] backups = appBackups(context);
-        return backups.length == 0 ? null : backups[0];
-    }
-
-    /** Newest first.  The settings host uses this list instead of DocumentsUI. */
-    public static File[] appBackups(Context context) {
-        File[] files = appBackupDirectory(context).listFiles();
-        if (files == null || files.length == 0) return new File[0];
-        int count = 0;
-        for (File file : files) {
-            if (file.isFile() && file.getName().endsWith(".slauncherbackup")) count++;
+    public static String normalizeBackupFileName(String value) {
+        String name = value == null ? "" : value.trim();
+        name = name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+        if (name.length() == 0) return "";
+        String extension = ".slauncherbackup";
+        if (name.toLowerCase(Locale.US).endsWith(extension)) {
+            name = name.substring(0, name.length() - extension.length()).trim();
         }
-        File[] backups = new File[count];
-        int index = 0;
-        for (File file : files) {
-            if (file.isFile() && file.getName().endsWith(".slauncherbackup")) backups[index++] = file;
-        }
-        for (int i = 1; i < backups.length; i++) {
-            File value = backups[i];
-            int j = i - 1;
-            while (j >= 0 && backups[j].lastModified() < value.lastModified()) {
-                backups[j + 1] = backups[j--];
+        if (name.length() == 0) return "";
+        if (name.length() > 96) name = name.substring(0, 96).trim();
+        return name.length() == 0 ? "" : name + extension;
+    }
+
+    public static Uri findTreeBackup(Context context, Uri treeUri, String fileName) {
+        if (context == null || treeUri == null || fileName == null) return null;
+        Cursor cursor = null;
+        try {
+            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri,
+                    DocumentsContract.getTreeDocumentId(treeUri));
+            cursor = context.getContentResolver().query(children, new String[] {
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME }, null, null, null);
+            while (cursor != null && cursor.moveToNext()) {
+                if (fileName.equals(cursor.getString(1))) {
+                    return DocumentsContract.buildDocumentUriUsingTree(treeUri, cursor.getString(0));
+                }
             }
-            backups[j + 1] = value;
-        }
-        return backups;
+        } catch (Throwable error) {
+            Log.w(TAG, "BACKUP_TREE_LIST_FAILED", error);
+        } finally { if (cursor != null) cursor.close(); }
+        return null;
     }
 
-    public static String appBackupDirectoryDisplayPath(Context context) {
-        return "Android/data/" + context.getPackageName() + "/files/SmartisanLauncherBackup";
+    public static void startBackupToTree(Context context, Uri treeUri, String fileName,
+            boolean overwrite, Listener listener) {
+        start(context, treeUri, fileName, overwrite, listener);
     }
 
-    private static synchronized void start(Context context, Uri treeUri, Uri documentUri,
-            File localFile, Listener listener) {
+    private static synchronized void start(Context context, Uri treeUri, String fileName,
+            boolean overwrite, Listener listener) {
         if (running != null || BackupOperationLock.isBusy()) {
             complete(listener, BackupRestoreResult.error("BACKUP_EXPORT_FAILED",
                     "桌面正在执行其他设置，请稍后再试。"));
@@ -216,14 +197,14 @@ public final class DesktopBackupController {
         }
         running = operation;
         final Uri targetTree = treeUri;
-        final Uri targetDocument = documentUri;
-        final File targetFile = localFile;
+        final String targetName = normalizeBackupFileName(fileName);
+        final boolean replaceExisting = overwrite;
         new Thread(new Runnable() {
-            public void run() { execute(app, targetTree, targetDocument, targetFile, operation); }
+            public void run() { execute(app, targetTree, targetName, replaceExisting, operation); }
         }, "DesktopBackup").start();
     }
 
-    private static void execute(Context context, Uri treeUri, Uri directDocument, File directFile,
+    private static void execute(Context context, Uri treeUri, String requestedName, boolean overwrite,
             RunningOperation operation) {
         long begin = System.currentTimeMillis();
         BackupOperationJournal journal = new BackupOperationJournal(context);
@@ -235,7 +216,7 @@ public final class DesktopBackupController {
         try {
             state(operation, journal, entry, BackupOperationJournal.State.VALIDATING_LOCATION,
                     "VALIDATING_LOCATION", true);
-            if (treeUri == null && directDocument == null && directFile == null)
+            if (treeUri == null)
                 throw coded("BACKUP_LOCATION_NOT_SELECTED");
             operation.cancellation.throwIfCancelled();
             BackupFileUtils.deleteRecursively(staging);
@@ -264,24 +245,17 @@ public final class DesktopBackupController {
             File archive = BackupArchiveWriter.write(staging, manifest, layout.value, settings,
                     theme, icons, shortcutIcons, operation.cancellation);
             operation.cancellation.throwIfCancelled();
-            String baseName = "SmartisanLauncher_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
-                    .format(new Date()) + ".slauncherbackup";
+            String baseName = requestedName;
+            if (baseName.length() == 0) {
+                baseName = "SmartisanLauncher_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+                        .format(new Date()) + ".slauncherbackup";
+            }
             state(operation, journal, entry, BackupOperationJournal.State.COPYING_TO_DESTINATION,
                     "COPYING_TO_DESTINATION", true);
             Uri finalUri;
-            if (directFile != null) {
-                copyToFileAndVerify(archive, directFile, operation.cancellation, staging);
-                finalUri = Uri.fromFile(directFile);
-            } else if (directDocument != null) {
-                partial = directDocument;
-                entry.partialUri = partial.toString();
-                journal.write(entry, BackupOperationJournal.State.COPYING_TO_DESTINATION, null);
-                copyToUriAndVerify(context, archive, directDocument, operation.cancellation, staging);
-                finalUri = directDocument;
-            } else {
-                finalUri = writeToTree(context, treeUri, archive, baseName, operation, journal, entry, staging);
-                partial = Uri.parse(entry.partialUri.length() == 0 ? finalUri.toString() : entry.partialUri);
-            }
+            finalUri = writeToTree(context, treeUri, archive, baseName, overwrite, operation, journal,
+                    entry, staging);
+            partial = Uri.parse(entry.partialUri.length() == 0 ? finalUri.toString() : entry.partialUri);
             SharedPreferences.Editor prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();
             prefs.putLong(KEY_LAST_BACKUP_TIME, System.currentTimeMillis());
             prefs.putString(KEY_LAST_BACKUP_FILE_NAME, baseName);
@@ -338,11 +312,16 @@ public final class DesktopBackupController {
     }
 
     private static Uri writeToTree(Context context, Uri tree, File archive, String finalName,
-            RunningOperation operation, BackupOperationJournal journal,
+            boolean overwrite, RunningOperation operation, BackupOperationJournal journal,
             BackupOperationJournal.Entry entry, File staging) throws Exception {
         ContentResolver resolver = context.getContentResolver();
         String treeId = DocumentsContract.getTreeDocumentId(tree);
         Uri parent = DocumentsContract.buildDocumentUriUsingTree(tree, treeId);
+        Uri existing = findTreeBackup(context, tree, finalName);
+        if (existing != null) {
+            if (!overwrite) throw coded("BACKUP_NAME_EXISTS");
+            if (!DocumentsContract.deleteDocument(resolver, existing)) throw coded("BACKUP_COPY_FAILED");
+        }
         String partialName = finalName + ".partial";
         Uri partial = DocumentsContract.createDocument(resolver, parent, "application/zip", partialName);
         if (partial == null) throw coded("BACKUP_LOCATION_READ_ONLY");
@@ -398,28 +377,6 @@ public final class DesktopBackupController {
         verify.delete();
     }
 
-    private static void copyToFileAndVerify(File archive, File destination,
-            CancellationToken cancellation, File staging) throws Exception {
-        File parent = destination.getParentFile();
-        if (parent == null) throw coded("BACKUP_COPY_FAILED");
-        BackupFileUtils.ensureDirectory(parent);
-        File partial = new File(parent, destination.getName() + ".partial");
-        FileInputStream input = new FileInputStream(archive);
-        FileOutputStream output = new FileOutputStream(partial);
-        try {
-            BackupFileUtils.copy(input, output, EXTERNAL_COPY_LIMIT, cancellation);
-            output.flush();
-            try { output.getFD().sync(); } catch (Throwable ignored) {}
-        } finally {
-            BackupFileUtils.closeQuietly(input);
-            BackupFileUtils.closeQuietly(output);
-        }
-        cancellation.throwIfCancelled();
-        BackupValidator.validateAndExtract(partial, new File(staging, "local_verified"));
-        BackupFileUtils.deleteRecursively(new File(staging, "local_verified"));
-        if (destination.exists() && !destination.delete()) throw coded("BACKUP_COPY_FAILED");
-        if (!partial.renameTo(destination)) throw coded("BACKUP_COPY_FAILED");
-    }
 
     public static void cleanupInterruptedBackup(Context context) {
         BackupOperationJournal journal = new BackupOperationJournal(context);

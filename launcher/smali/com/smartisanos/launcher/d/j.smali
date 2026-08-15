@@ -90,6 +90,15 @@
 
     invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
+    invoke-static {}, Lcom/smartisanos/launcher/ShortcutCompatBridge;->suppressLegacyPf()Z
+    move-result v1
+    if-eqz v1, :legacy_pf_continue
+    const-string v1, "SHORTCUT_LEGACY_PF destructiveRemovalSuppressed=true"
+    invoke-virtual {v0, v1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
+    return-void
+
+    :legacy_pf_continue
+
     .line 2
     new-instance v0, Ljava/util/ArrayList;
 

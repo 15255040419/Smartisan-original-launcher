@@ -9697,6 +9697,8 @@
     return-void
 
     :cond_0
+    invoke-static {p0}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->cellBegin(Ljava/lang/Object;)V
+
     const-string v0, "TextureModularColorMaterial"
 
     .line 2
@@ -9725,6 +9727,10 @@
     if-eqz v0, :cond_1
 
     .line 7
+    const-string v1, "CELL_CONTENT_CREATE"
+
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->stage(Ljava/lang/Object;Ljava/lang/String;)V
+
     iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->XH:Lcom/smartisanos/launcher/view/a/ga;
 
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/a/ga;->create()V
@@ -9733,12 +9739,20 @@
 
     .line 8
     :cond_1
+    const-string v1, "CELL_CONTENT_CREATE"
+
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->stage(Ljava/lang/Object;Ljava/lang/String;)V
+
     iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->WH:Lcom/smartisanos/launcher/view/a/ca;
 
     invoke-virtual {v0}, Lcom/smartisanos/launcher/view/a/ca;->create()V
 
     .line 9
     :goto_0
+    const-string v0, "CELL_POST_CONTENT"
+
+    invoke-static {p0, v0}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->stage(Ljava/lang/Object;Ljava/lang/String;)V
+
     invoke-direct {p0}, Lcom/smartisanos/launcher/view/a/g;->cy()V
 
     .line 10
@@ -9760,6 +9774,8 @@
     invoke-virtual {p0}, Lcom/smartisanos/smengine/SceneNode;->updateGeometricState()V
 
     :cond_2
+    invoke-static {p0}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->cellEnd(Ljava/lang/Object;)V
+
     return-void
 .end method
 
@@ -14643,7 +14659,7 @@
     :cond_3
     iget-object p0, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/Aa;->a(Lcom/smartisanos/launcher/data/ItemInfo;)V
+    invoke-static {p0}, Lcom/smartisanos/launcher/install/SmartisanInstallManager;->onScenePackageQueryUncertain(Ljava/lang/Object;)V
 
     goto :goto_1
 

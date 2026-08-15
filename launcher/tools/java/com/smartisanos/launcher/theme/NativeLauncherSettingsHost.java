@@ -519,57 +519,8 @@ public final class NativeLauncherSettingsHost {
     }
 
     private static void showConfirmDialog(final Activity activity, String title, String message, String negative, String positive, final View.OnClickListener positiveClick) {
-        final Dialog dialog = new Dialog(activity);
-        LinearLayout root = new LinearLayout(activity);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(0, dp(activity, 18), 0, 0);
-        root.setBackground(round(0xfffbfbfb, dp(activity, 8), 0x33000000));
-
-        TextView titleView = text(activity, title, 18, 0xff333333, true);
-        titleView.setGravity(Gravity.CENTER);
-        root.addView(titleView, new LinearLayout.LayoutParams(-1, dp(activity, 40)));
-
-        TextView messageView = text(activity, message, 14, 0xff777777, false);
-        messageView.setGravity(Gravity.CENTER);
-        messageView.setPadding(dp(activity, 30), 0, dp(activity, 30), dp(activity, 18));
-        root.addView(messageView, new LinearLayout.LayoutParams(-1, -2));
-
-        View line = new View(activity);
-        line.setBackgroundColor(0xffeeeeee);
-        root.addView(line, new LinearLayout.LayoutParams(-1, 1));
-
-        LinearLayout buttons = new LinearLayout(activity);
-        buttons.setOrientation(LinearLayout.HORIZONTAL);
-        TextView cancel = dialogButton(activity, negative, 0xff555555);
-        cancel.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                dialog.dismiss();
-            }
-        });
-        TextView ok = dialogButton(activity, positive, 0xffd8504b);
-        ok.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                dialog.dismiss();
-                positiveClick.onClick(v);
-            }
-        });
-        buttons.addView(cancel, new LinearLayout.LayoutParams(0, dp(activity, 50), 1.0f));
-        View vLine = new View(activity);
-        vLine.setBackgroundColor(0xffeeeeee);
-        buttons.addView(vLine, new LinearLayout.LayoutParams(1, dp(activity, 50)));
-        buttons.addView(ok, new LinearLayout.LayoutParams(0, dp(activity, 50), 1.0f));
-        root.addView(buttons, new LinearLayout.LayoutParams(-1, dp(activity, 50)));
-
-        dialog.setContentView(root);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawableResource(android.R.color.transparent);
-        }
-        dialog.show();
-        Window shown = dialog.getWindow();
-        if (shown != null) {
-            shown.setLayout(dp(activity, 294), -2);
-        }
+        MaintainedLauncherSettingsHost.showSharedConfirmDialog(activity, title, message,
+                negative, positive, positiveClick);
     }
 
     private static TextView dialogButton(Context context, String label, int color) {

@@ -20,6 +20,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -67,26 +68,39 @@ public final class ShortcutCompatBridge {
             Bitmap source = (Bitmap) getField(item, "icon");
             String iconSource = "shortcut";
             Bitmap normalized = null;
-            // Android's compatibility converter may already have substituted the host-app
-            // icon.  For provider-owned shortcuts, LauncherApps is the only authoritative
-            // source for the provider's per-shortcut artwork (including its own badge/frame).
+            Bitmap launcherAppsBitmap = null;
+            Drawable launcherAppsDrawable = null;
             if (isProviderDecoratedShortcut(packageName)) {
                 LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
-                Drawable drawable = apps == null ? null
+                launcherAppsDrawable = apps == null ? null
                         : apps.getShortcutIconDrawable(shortcut,
                                 context.getResources().getDisplayMetrics().densityDpi);
-                normalized = normalizeShortcutBitmap(context, drawableToBitmap(drawable));
+                launcherAppsBitmap = normalizeShortcutBitmap(context, drawableToBitmap(launcherAppsDrawable));
+                normalized = launcherAppsBitmap;
                 if (normalized != null) iconSource = "launcher_apps_provider";
             }
-            if (normalized == null) normalized = normalizeShortcutBitmap(context, source);
             if (normalized == null) {
-                iconSource = "launcher_apps_retry";
-                LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
-                Drawable drawable = apps == null ? null
-                        : apps.getShortcutIconDrawable(shortcut, context.getResources().getDisplayMetrics().densityDpi);
-                normalized = normalizeShortcutBitmap(context, drawableToBitmap(drawable));
+                normalized = normalizeShortcutBitmap(context, source);
+                if (normalized != null && isProviderDecoratedShortcut(packageName)) {
+                    iconSource = "wrapper_fallback";
+                }
+            }
+            if (isProviderDecoratedShortcut(packageName)) {
+                Log.i(TAG, "SHORTCUT_PROVIDER_SOURCE package=" + packageName
+                        + " shortcutId=" + shortcutId
+                        + " launcherAppsDrawableClass=" + (launcherAppsDrawable == null ? "null" : launcherAppsDrawable.getClass().getName())
+                        + " launcherAppsBitmapSize=" + bitmapSize(launcherAppsBitmap)
+                        + " launcherAppsHash=" + bitmapHash(launcherAppsBitmap)
+                        + " wrapperBitmapSize=" + bitmapSize(source)
+                        + " wrapperHash=" + bitmapHash(source)
+                        + " chosenSource=" + iconSource);
             }
             if (normalized == null) {
+                if (isProviderDecoratedShortcut(packageName)) {
+                    Log.w(TAG, "SHORTCUT_ARTWORK_UNRESOLVED package=" + packageName
+                            + " shortcutId=" + shortcutId + " userSerial=" + userSerial);
+                    return null;
+                }
                 iconSource = "original_default";
                 normalized = normalizeShortcutBitmap(context, originalDefaultShortcutIcon(context));
             }
@@ -185,20 +199,51 @@ public final class ShortcutCompatBridge {
     public static boolean isStored(Context context, ShortcutInfo shortcut, long userSerial) {
         if (context == null || shortcut == null) return false;
         try {
-            boolean primary = shortcut.getUserHandle() != null
-                    && Process.myUserHandle().equals(shortcut.getUserHandle());
-            Intent intent = createLaunchIntent(context, shortcut.getPackage(), shortcut.getId(), userSerial,
-                    primary && userSerial >= 0L);
-            java.util.Map<String, String> where = new java.util.HashMap<>();
-            where.put("intent", intent.toUri(0));
             List<?> rows = (List<?>) Class.forName("com.smartisanos.launcher.data.a.l")
-                    .getMethod("c", java.util.Map.class).invoke(null, where);
-            return rows != null && !rows.isEmpty();
+                    .getMethod("N", boolean.class).invoke(null, false);
+            String expected = key(shortcut.getPackage(), shortcut.getId(), userSerial);
+            if (rows != null) for (Object row : rows) {
+                if (expected.equals(rowIdentity(row))) return true;
+            }
+            Log.i(TAG, "SHORTCUT_IDENTITY pkg=" + shortcut.getPackage() + " id=" + shortcut.getId()
+                    + " userId=" + userIdentifier(shortcut.getUserHandle()) + " serial=" + userSerial
+                    + " stored=false");
+            return false;
         } catch (Throwable error) {
             Log.e(TAG, "PIN_DATABASE_ROW_QUERY_FAILED package=" + shortcut.getPackage()
                     + " shortcutId=" + shortcut.getId() + " userSerial=" + userSerial, error);
             return false;
         }
+    }
+
+    private static String rowIdentity(Object row) {
+        if (row == null) return "";
+        try {
+            String packageName = String.valueOf(getField(row, "packageName"));
+            String shortcutId = String.valueOf(getField(row, "shortcutId"));
+            Intent intent = (Intent) getField(row, "intent");
+            if (intent != null) {
+                String p = intent.getStringExtra(EXTRA_PACKAGE);
+                String id = intent.getStringExtra(EXTRA_ID);
+                if (p != null && p.length() != 0) packageName = p;
+                if (id != null && id.length() != 0) shortcutId = id;
+                long serial = intent.getLongExtra(EXTRA_USER_SERIAL, Long.MIN_VALUE);
+                if (serial != Long.MIN_VALUE) return key(packageName, shortcutId, serial);
+            }
+            Object userId = getField(row, "userId");
+            return key(packageName, shortcutId, userId instanceof Number
+                    ? ((Number) userId).longValue() : 0L);
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    public static long primaryUserSerial(Context context) {
+        return context == null ? -1L : userSerial(context, Process.myUserHandle());
+    }
+
+    public static boolean suppressLegacyPf() {
+        return android.os.Build.VERSION.SDK_INT >= 26;
     }
 
     /** Checks the target profile's real pinned shortcut before a restore creates a Cell. */
@@ -227,6 +272,36 @@ public final class ShortcutCompatBridge {
                     error);
         }
         return false;
+    }
+
+    /** Resolves a raw per-shortcut artwork from any currently exposed ShortcutInfo source. */
+    public static Bitmap loadCurrentShortcutSource(Context context, String packageName,
+                                                    String shortcutId, long userSerial) {
+        if (context == null || packageName == null || shortcutId == null) return null;
+        try {
+            UserManager users = (UserManager) context.getSystemService(Context.USER_SERVICE);
+            UserHandle user = users == null ? null : users.getUserForSerialNumber(userSerial);
+            if (user == null && userSerial == primaryUserSerial(context)) user = Process.myUserHandle();
+            LauncherApps apps = (LauncherApps) context.getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (apps == null || user == null) return null;
+            int flags = LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED
+                    | LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC
+                    | LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST;
+            LauncherApps.ShortcutQuery query = new LauncherApps.ShortcutQuery()
+                    .setPackage(packageName).setQueryFlags(flags);
+            List<ShortcutInfo> values = apps.getShortcuts(query, user);
+            if (values != null) for (ShortcutInfo value : values) {
+                if (value != null && shortcutId.equals(value.getId())) {
+                    Bitmap raw = drawableToBitmap(apps.getShortcutIconDrawable(value,
+                            context.getResources().getDisplayMetrics().densityDpi));
+                    return normalizeShortcutBitmap(context, raw);
+                }
+            }
+        } catch (Throwable error) {
+            Log.w(TAG, "SHORTCUT_SOURCE_RESOLVE_FAILED package=" + packageName
+                    + " shortcutId=" + shortcutId + " userSerial=" + userSerial, error);
+        }
+        return null;
     }
 
     public static File portableSourceFile(Context context, String packageName,
@@ -442,6 +517,32 @@ public final class ShortcutCompatBridge {
         drawable.setBounds(0, 0, width, height);
         drawable.draw(canvas);
         return bitmap;
+    }
+
+    private static String bitmapSize(Bitmap bitmap) {
+        return bitmap == null ? "null" : bitmap.getWidth() + "x" + bitmap.getHeight();
+    }
+
+    private static String bitmapHash(Bitmap bitmap) {
+        if (bitmap == null) return "null";
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            int[] pixels = new int[bitmap.getWidth() * bitmap.getHeight()];
+            bitmap.getPixels(pixels, 0, bitmap.getWidth(), 0, 0,
+                    bitmap.getWidth(), bitmap.getHeight());
+            for (int pixel : pixels) {
+                digest.update((byte) (pixel >>> 24));
+                digest.update((byte) (pixel >>> 16));
+                digest.update((byte) (pixel >>> 8));
+                digest.update((byte) pixel);
+            }
+            byte[] bytes = digest.digest();
+            StringBuilder value = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) value.append(String.format("%02x", b & 0xff));
+            return value.toString();
+        } catch (Throwable error) {
+            return "error";
+        }
     }
 
     private static int targetIconSize(Context context, Bitmap bitmap) {

@@ -25,16 +25,18 @@
 
 # virtual methods
 .method public b(Z)V
-    .locals 0
+    .locals 2
 
     .line 1
-    sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
+    sget-boolean v0, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
 
-    if-nez p0, :cond_0
+    sget-boolean v1, Lcom/smartisanos/launcher/data/Constants;->ENABLE_FOUR_FINGER_HORIZONTALLY_SLIDE:Z
 
-    sget-boolean p0, Lcom/smartisanos/launcher/data/Constants;->ENABLE_FOUR_FINGER_HORIZONTALLY_SLIDE:Z
+    invoke-static {p1, v1, v0}, Lcom/smartisanos/launcher/gesture/GestureRegressionDiagnostics;->onFourFingerCallback(ZZZ)V
 
-    if-eqz p0, :cond_0
+    if-nez v0, :cond_0
+
+    if-eqz v1, :cond_0
 
     .line 2
     invoke-static {}, Lcom/smartisanos/launcher/Da;->getInstance()Lcom/smartisanos/launcher/Da;

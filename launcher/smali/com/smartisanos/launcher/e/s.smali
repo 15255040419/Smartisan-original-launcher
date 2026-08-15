@@ -2642,6 +2642,10 @@
     move-result-object v1
 
     .line 61
+    const-string v3, "ICON_CACHE_LOOKUP"
+
+    invoke-static {p0, v3}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->stage(Ljava/lang/Object;Ljava/lang/String;)V
+
     invoke-virtual {v1, p1}, Lcom/smartisanos/smengine/Ea;->bb(Ljava/lang/String;)Lcom/smartisanos/smengine/Da;
 
     move-result-object v2
@@ -2657,9 +2661,25 @@
     move-object v0, v2
 
     :goto_0
+    if-eqz v0, :cond_startup_texture_miss
+
+    const/4 v3, 0x1
+
+    goto :goto_startup_texture_result
+
+    :cond_startup_texture_miss
+    const/4 v3, 0x0
+
+    :goto_startup_texture_result
+    invoke-static {p0, v3}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->textureCacheResult(Ljava/lang/Object;Z)V
+
     if-nez v0, :cond_a
 
     .line 63
+    const-string v3, "ICON_SOURCE_RESOLVE"
+
+    invoke-static {p0, v3}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->stage(Ljava/lang/Object;Ljava/lang/String;)V
+
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->iconRawSource(Ljava/lang/Object;)Landroid/graphics/Bitmap;
 
     move-result-object p2
@@ -2776,6 +2796,8 @@
     move-result-object v3
 
     .line 71
+    invoke-static {p0}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->bitmapCompose(Ljava/lang/Object;)V
+
     :cond_5
     invoke-static {p0, v3}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->prepareStaticSource(Ljava/lang/Object;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
 
@@ -2926,6 +2948,8 @@
 
     .line 87
     :goto_3
+    invoke-static {v10}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->shadowCompose(Ljava/lang/Object;)V
+
     if-eqz v9, :cond_codex_original_texture
 
     invoke-static {v10, p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->composeStaticApplicationIconTexture(Ljava/lang/Object;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
@@ -2942,6 +2966,8 @@
     :goto_codex_texture_ready
 
     .line 88
+    invoke-static {v10}, Lcom/smartisanos/launcher/diagnostics/StartupPageSceneDiagnostics;->textureCreate(Ljava/lang/Object;)V
+
     new-instance v0, Lcom/smartisanos/smengine/Da;
 
     invoke-direct {v0, p0}, Lcom/smartisanos/smengine/Da;-><init>(Landroid/graphics/Bitmap;)V
@@ -5986,7 +6012,7 @@
     const/4 v1, 0x0
 
     .line 5
-    invoke-static {v8, p1, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->queryProfileLauncherActivities(Landroid/content/Context;Ljava/lang/String;I)Ljava/util/List;
+    invoke-static {v8, p1, p2}, Lcom/smartisanos/launcher/model/ProfileRepository;->queryPackageActivities(Landroid/content/Context;Ljava/lang/String;I)Ljava/util/List;
 
     move-result-object v2
 
@@ -6146,7 +6172,7 @@
     invoke-virtual {v2, v4}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     .line 15
-    invoke-static {v8, p1, p2}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->queryProfileLauncherActivities(Landroid/content/Context;Ljava/lang/String;I)Ljava/util/List;
+    invoke-static {v8, p1, p2}, Lcom/smartisanos/launcher/model/ProfileRepository;->queryPackageActivities(Landroid/content/Context;Ljava/lang/String;I)Ljava/util/List;
 
     move-result-object v2
 
@@ -10191,7 +10217,7 @@
     const/4 p1, 0x0
 
     .line 5
-    invoke-static {p0, v0, p1}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->queryLauncherActivitiesWithProfiles(Landroid/content/pm/PackageManager;Landroid/content/Intent;I)Ljava/util/List;
+    invoke-static {p0, v0, p1}, Lcom/smartisanos/launcher/model/ProfileRepository;->queryLauncherActivities(Landroid/content/pm/PackageManager;Landroid/content/Intent;I)Ljava/util/List;
 
     move-result-object p0
 
