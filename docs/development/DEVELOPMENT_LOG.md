@@ -1,5 +1,11 @@
 # 开发与修复记录
 
+- 2026-08-16 ACTIVEICON_FOLLOW_CURRENT_STATIC_GEOMETRY_FINAL：STATIC Weather/Calendar 当前视觉尺寸冻结为基准。删除运行时历史 ratio、`166/192`、`0.831325` 和绝对 `160/192` owner；LIVE 不再改写 STATIC 或重新计算固定倍率。兼容层在同一 Cell/g 中读取 STATIC cached node 与 LIVE background 的当前 world bounds，以 `staticWorld/liveWorld` 调整 LIVE root，公共父节点比例在同一坐标空间中只抵消一次，并记录 `commonParentAppliedOnce=true`。H/m 内部 192 reference space、Timeline、shadow、foreground 保持不变。
+- 2026-08-16 ACTIVEICON_ICON_SIZE_PERCENT_PROPAGATION_ROOT_CAUSE_FINAL：`Constants.applyIconSizeToProperty()` 会按 `launcher_icon_size` 放大 STATIC 的 `icon_size_origin/icon_size_with_shadow`，但不改变 `active_icon_scale` 或 `Constants.icon_scale`；因此 H/m 原始 root scale 不消费 50/100/150% 用户设置。新增唯一 outer 输入 `LauncherSettingBridge.readIconSizeFactor()`，在 H/m root 的原版 `icon_scale × active_icon_scale` 结果上只乘一次用户百分比；保留 Cell world-bounds 校正作为当前 STATIC 基准，不改 CJ、foreground、shadow、Timeline 或 192 reference space。新增 `ACTIVEICON_GEOMETRY_VERIFY` 中的 iconSizePercent/rootScale 前后诊断。
+- 2026-08-18 ACTIVEICON_ICON_SIZE_FACTOR_FINAL_SCALE_OWNER_TRACE：构建并覆盖安装了诊断 APK；本地与 V2458A 设备 APK SHA256 均为 `642c9bb433d4307606f0d1159034bdd4717f5cad0429c5cf19b7bf147b88da9c`，versionCode=31/versionName=v1.5.6。新增 H/m create 前后及 world-bounds enter/exit 的 `ACTIVE_ICON_SIZE_TRACE`，尚未触发 Weather/Calendar 刷新取得 100%/150% 的 FIRST_FACTOR_LOSS_STAGE，因此暂不删除 world-bounds 写操作或继续修改 geometry。
+- 2026-08-18 ACTIVEICON_ICON_SIZE_FACTOR_OWNER_BRANCH_FIX：V2458A 日志未出现 H/m create trace；代码审计确认当前 `pageMode=1` 时 `Constants.useSmallActiveIcon(1)` 返回 false，原先放在该条件分支内的用户 factor 永远不执行，FIRST_FACTOR_LOSS_STAGE 为 H/m create 的 mode branch。现将用户 factor owner 移到 H/m create 条件分支之后，覆盖所有 mode；world-bounds correction 暂未删除，等待新包 trace 确认是否仍覆盖 root。
+- 2026-08-18 ACTIVEICON_ICON_SIZE_FACTOR_OWNER_RUNTIME_CONFIRM：新包覆盖安装成功，V2458A 启动日志确认当前设备设置为 `iconSizePercent=180` 时，Calendar/Weather 均从 `rootScale=(1.0,1.0)` 进入 create，随后变为 `rootScale=(1.8,1.8)`；说明 mode branch 之后的唯一 user factor owner 已执行。该次启动未出现 `GEOMETRY_ENTER/EXIT`，world-bounds correction 未参与这两个 create 样本；尚未完成用户切换后的视觉验收。
+
 ## 本文档职责
 
 本文档负责记录 BUG 根因、修复方式、验证过程、回归注意和历史决策。每次修 BUG、改行为、推翻旧方案、做 ADB / 真机验证后，都要在这里新增倒序日期记录，并同步维护顶部“当前状态总览”。
@@ -18,6 +24,36 @@
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
 ## 当前状态总览（2026-08-15）
+
+- 2026-08-16 【REAL_DEVICE_FAIL / VISUAL_NOT_IMPLEMENTED】SETTINGS_NAVIGATION_STATE_AND_VISUAL_SYSTEM：此前仅完成页面状态代码和 Dialog chrome 审计，未完成真机视觉统一；不得据此宣称视觉系统完成。页面状态实现继续由后续 `SETTINGS_VISUAL_REAL_IMPLEMENTATION_AND_NAV_STATE_FINAL` 修正。
+
+- 2026-08-16 SETTINGS_DEDUPLICATION_AND_VISUAL_BASELINE_FINAL：删除主页专用 `sMainSettingsScrollY`、`sRestoreMainSettingsScroll` 及其保存/恢复 helper，主页与其他页面统一使用 `sSettingsPageScrollStates`；备份恢复与后台运行 Row 共用 `SmartisanSettingsRowTitle/Value/Arrow` XML styles。`MaintainedLauncherSettingsHost.java` 当前 19,185 行，较本轮前减少 35 行；`build.bat` 通过。V2458A bounds、返回位置矩阵和 Dialog 截图矩阵尚未完成，因此不得记录任何 ALIGNMENT_PASS、NAVIGATION_PASS 或 DIALOG_PASS。
+
+- 2026-08-16 【REAL_DEVICE_FAIL】BACKGROUND_RUNTIME_ROW_VERTICAL_CENTER_FOLLOWUP：V2458A 截图仍未证明后台运行设置标题、状态和箭头达到同一行中心；该实验只改变了 XML 行高/高度属性，不能作为通过结论。后续应先完成真实 bounds 审计，再决定是否删除或抽取 Row。
+
+- 2026-08-16 MAIN_SETTINGS_GLOBAL_SCROLL_POSITION_RESTORE：桌面设置主页所有二级入口统一在切换前保存唯一内存态主页 ScrollView `scrollY`，返回主页后通过布局完成后的 `post` 恢复；覆盖强迫症选项、搜索与上下滑手势、后台运行、默认桌面、备份恢复、关于我们及其他主页入口。未写入 Preference、数据库或备份，也不在普通 onResume 无条件恢复。
+- 2026-08-16 SEARCH_GESTURE_COPY_RENAME：仅更新二级页显示名称为“开启搜索栏功能”，并按反向开关更新为 DOCK 上滑/状态栏顶部下滑说明；Preference key 和搜索手势实现未改。
+- 2026-08-16 【REAL_DEVICE_FAIL】BACKGROUND_RUNTIME_TITLE_ALIGNMENT_FIX：静态布局曾标记标题左对齐，但 V2458A 截图仍显示标题水平错位；本结论废弃，后续必须以真机截图为准。
+
+- 2026-08-16 MAIN_SETTINGS_SEARCH_ENTRY_REORDER：将“搜索与上下滑手势”入口从强迫症选项移到桌面设置主页，主页顺序调整为强迫症选项 → 搜索与上下滑手势 → 透明主题 → 动态天气和日历；入口继续打开同一现有二级页面，返回目标改为桌面设置主页，未修改五项 preference 或业务逻辑。
+- 2026-08-16 BACKGROUND_RUNTIME_ROW_SINGLELINE_FIX：后台运行设置两行标题改为单行、垂直居中并使用省略号保护；状态和箭头仍保持右侧固定结构。`build.bat`、`git diff --check` 和 v1/v2/v3 签名验证通过，未更新 `MEMORY.md`、未提交、未推送。
+
+- 2026-08-16 BACKGROUND_RUNTIME_RIGHT_VALUE_ALIGNMENT：后台运行设置两行右侧布局已按 `setting_backup_restore.xml` 的备份位置/立即备份结构对齐：标题占用状态左侧空间，状态使用相同的 180dp、右对齐、6dp 间距，箭头直接贴卡片右侧并垂直居中；未修改状态逻辑、入口跳转或备份恢复页。`build.bat` 和 `git diff --check` 已通过，V2458A 双页面截图对比待手动确认，未更新 `MEMORY.md`、未提交、未推送。
+
+- 2026-08-16 SEARCH_AND_VERTICAL_GESTURE_SETTINGS_GROUP：强迫症选项中的搜索页、常用应用、联系人、系统面板和上下滑反向五项已整理到“搜索与上下滑手势”二级页；一级页仅保留箭头入口和说明。二级页继续直接绑定原有 preference key、权限链和状态逻辑，固定标题改为功能名称，方向差异只更新搜索页/系统面板 Tips。未修改 RootView、TouchEvent、搜索/系统面板/方向算法、ContactSearchRepository、常用应用逻辑或备份格式。`git diff --check`、`build.bat`、v1/v2/v3 签名验证通过；真机覆盖安装因 ADB 流式安装在设备端无响应未完成，真机点按矩阵待执行。未更新 `MEMORY.md`、未提交、未推送。
+- 2026-08-16 SEARCH_AND_VERTICAL_GESTURE_SETTINGS_GROUP：修正二级页左上角返回动画方向；进入二级页使用正向滑入，返回强迫症选项使用反向滑入，其他页面导航不变。修正后 `build.bat` 和 `git diff --check` 通过，未更新 `MEMORY.md`、未提交、未推送。
+
+- 2026-08-16 BACKGROUND_RUNTIME_SETTINGS_MERGE_AND_STATUS_FIX：后台运行设置页已合并为“自启动”和“后台运行与省电设置”两行，第二行复用 V2458A 已验证的系统省电限制入口；删除旧的后台耗电管理独立入口。两行状态改为本地设备引导状态“未检查/已检查”，仅在外部系统 Activity 成功启动并返回设置页后置为已检查，不读取或伪造 OEM 省电状态，也未把 Doze 状态写入备份。自启动继续复用既有 iQOO/vivo Component 链路。`git diff --check`、`build.bat`、v1/v2/v3 签名、V2458A 覆盖安装和启动冒烟已通过，未见 Launcher `FATAL`/`VerifyError`/`NoClassDefFoundError`；两行实际点按及返回状态矩阵仍待手动执行。未更新 `MEMORY.md`、未提交、未推送。
+
+- 2026-08-16 DOCK_ORIGINAL_SLIDE_DIRECTION_SWITCH：确认当前 `V.smali` 四处直接读取原版 `Constants.SLIDE_DOCK_ACTION_TYPE`，`O.smali` 从 `launcher_switching_orientation` 加载，未新增 Dock 手势算法。已在强迫症选项暴露 `dock_slide_reverse_enabled`（默认 false），启动时以原版 0/1 值为 baseline，仅在用户 preference 存在且为 true 时取反，并即时写回原版 Constant；PreferenceBackupCodec 同步加入该 boolean。未修改 DockView、阈值、velocity、动画、几何或多页面逻辑。`git diff --check`、`build.bat`、签名与 badging 待本轮完成后确认，V2458A 方向矩阵待手动执行。未更新 `MEMORY.md`、未提交、未推送。
+
+- 2026-08-16 【已废弃 / SEMANTIC_MIXED】BATTERY_SETTINGS_VENDOR_DIRECT_FINAL：上一版把 vivo/iQOO 的自启动页面误归类为电池管理页面；OEM Component 支持保留，但入口职责已拆分到后台运行设置中心。
+
+- 2026-08-16 【REAL_DEVICE_FAIL / TARGET_ROUTING_REOPENED】BACKGROUND_RUNTIME_SETTINGS_CENTER：V2458A 已证实页面可进入，但三行高度过大；自启动点击后 Launcher 重启且未打开自启动页；后台耗电管理和系统省电限制均错误落到锤子桌面应用信息。本次仅保留原页面语义作为修复基线，不将其标为 PASS/FINAL。
+
+- 2026-08-16 BACKGROUND_RUNTIME_SETTINGS_REAL_DEVICE_FIX：后台运行二级页改为复用“更多”区域同款单行高度、字号、边距和上下/中间背景，说明统一移到卡片下方。自启动继续使用已真机确认的 `AddWhiteListActivity`，并补充 `AUTO_START_OPEN` 命中日志；后台耗电管理不再把应用详情当成功（仅最后回退并明确记录）；页面入口补充 `BACKGROUND_RUNTIME_PAGE` 生命周期诊断。V2458A 真实后台耗电 Component 尚未取得，未新增猜测的 OEM battery Activity。尚未完成三项真机点击矩阵，未标 PASS。未更新 `MEMORY.md`、未提交、未推送。
+
+- 2026-08-16 SETTINGS_SMALL_FIXES_NAV_CONTACTS_BATTERY_DIRECT：设置页三处小修复。`launcher_hide_navigation_bar` 的所有设置绑定和 Launcher 桌面读取缺省统一为 `true`，已有 key 仍按用户值保留；联系人开关删除 Launcher 自定义前置说明弹窗，首次/可再次询问时直接请求 `READ_CONTACTS`，永久拒绝时直接打开应用详情；“关闭电池优化”移除 `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 请求，改为按可解析的应用电池页、应用详情页、系统电池优化列表和系统设置回退。未修改解锁动画、搜索 Backend、QuickLaunch、备份恢复、数据库或桌面手势。`git diff --check` 与 `build.bat` 已通过；V2458A 真机逐项设置点击矩阵待执行。未更新 `MEMORY.md`、未提交、未推送。
 
 - 2026-08-16 QUICKLAUNCH_BACKUP_RESTORE_PROVIDER_FINAL_FIX：【FAIL / ROOT_CAUSE_REOPENED】V2458A 证明恢复前 provider FINAL（头像+圆环+微信角标）会在恢复后变成黄色 RAW 方图。根因是旧备份编码优先保存 `source_*.png`，恢复时又将 portable RAW 直接写入 `table_icons/iconData`；provider-decorated Shortcut 不能按 RAW 重新生成 FINAL。已将微信/支付宝备份优先写入 `final_<owner>.png`，标记 `iconRepresentation=PROVIDER_DECORATED_FINAL`，恢复时 FINAL 原样写入；旧 RAW 备份依次尝试当前 LauncherApps provider artwork、恢复事务开始前暂存的 table_icons FINAL、历史 BLOB，无法确认 FINAL 时不把 RAW 冒充成功。新增低频 `BACKUP_SHORTCUT_FINAL/SOURCE`、`RESTORE_SELECTED_ICON/DB_ICON` hash 日志。已完成构建、签名、V2458A 覆盖安装启动冒烟；尚未完成“云销盒”新备份→删除→恢复的真机闭环，故不得标记 PASS。未更新 `MEMORY.md`、未提交、未推送。
 

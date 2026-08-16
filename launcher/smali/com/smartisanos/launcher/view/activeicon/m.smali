@@ -3080,6 +3080,7 @@
     invoke-virtual {p0, v2, v0, v1}, Lcom/smartisanos/smengine/SceneNode;->setScale(FFF)V
 
     :cond_0
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconUserSize(Ljava/lang/Object;)V
 
     return-void
 .end method

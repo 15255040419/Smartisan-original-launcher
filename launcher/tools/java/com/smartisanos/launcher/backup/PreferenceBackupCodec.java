@@ -22,6 +22,7 @@ public final class PreferenceBackupCodec {
             "automatic_location", "manual_city", "manual_station_id",
             "launcher_hide_badge", "launcher_badge_swipe_clean", "launcher_hide_lable",
             "launcher_hide_navigation_bar", "launcher_unlock_animation_enabled",
+            "dock_slide_reverse_enabled",
             "swipe_down_system_panels_enabled", "swipe_up_search_enabled",
             "vertical_gesture_direction_reversed",
             "launcher_search_page_enabled", "launcher_global_icon_source_v2",

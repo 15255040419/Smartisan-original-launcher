@@ -15,38 +15,22 @@
             <RelativeLayout android:id="@+id/backup_location"
                 android:layout_width="match_parent" android:layout_height="72dp"
                 android:layout_marginTop="12dp" android:background="@drawable/selector_setting_sub_item_bg_top">
-                <TextView android:id="@+id/backup_location_title" android:layout_width="match_parent" android:layout_height="match_parent"
+                <TextView style="@style/SmartisanSettingsRowTitle" android:id="@+id/backup_location_title"
                     android:layout_toLeftOf="@id/backup_location_value"
-                    android:paddingLeft="@dimen/setting_item_text_left" android:gravity="center_vertical"
-                    android:text="@string/backup_location" android:textSize="@dimen/setting_item_text_size"
-                    android:textColor="@drawable/more_item_color_bg" />
-                <ImageView android:id="@+id/backup_location_arrow" android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" android:layout_alignParentRight="true"
-                    android:layout_centerVertical="true" android:src="@drawable/setting_next" />
-                <TextView android:id="@+id/backup_location_value" android:layout_width="180dp"
-                    android:layout_height="wrap_content" android:layout_toLeftOf="@id/backup_location_arrow"
-                    android:layout_centerVertical="true" android:layout_marginRight="6dp"
-                    android:maxLines="2" android:gravity="right|center_vertical" android:ellipsize="end"
-                    android:textSize="@dimen/more_text_size_15"
-                    android:textColor="@drawable/more_item_right_color_bg" />
+                    android:text="@string/backup_location" />
+                <ImageView style="@style/SmartisanSettingsRowArrow" android:id="@+id/backup_location_arrow" />
+                <TextView style="@style/SmartisanSettingsRowValue" android:id="@+id/backup_location_value"
+                    android:layout_toLeftOf="@id/backup_location_arrow" />
             </RelativeLayout>
             <RelativeLayout android:id="@+id/backup_now"
                 android:layout_width="match_parent" android:layout_height="82dp"
                 android:background="@drawable/selector_setting_sub_item_bg_bottom">
-                <TextView android:id="@+id/backup_now_title" android:layout_width="match_parent" android:layout_height="match_parent"
+                <TextView style="@style/SmartisanSettingsRowTitle" android:id="@+id/backup_now_title"
                     android:layout_toLeftOf="@id/backup_now_value"
-                    android:paddingLeft="@dimen/setting_item_text_left" android:gravity="center_vertical"
-                    android:text="@string/backup_now" android:textSize="@dimen/setting_item_text_size"
-                    android:textColor="@drawable/more_item_color_bg" />
-                <ImageView android:id="@+id/backup_now_arrow" android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" android:layout_alignParentRight="true"
-                    android:layout_centerVertical="true" android:src="@drawable/setting_next" />
-                <TextView android:id="@+id/backup_now_value" android:layout_width="180dp"
-                    android:layout_height="wrap_content" android:layout_toLeftOf="@id/backup_now_arrow"
-                    android:layout_centerVertical="true" android:layout_marginRight="6dp"
-                    android:maxLines="2" android:gravity="right|center_vertical" android:ellipsize="end"
-                    android:textSize="@dimen/more_text_size_15"
-                    android:textColor="@drawable/more_item_right_color_bg" />
+                    android:text="@string/backup_now" />
+                <ImageView style="@style/SmartisanSettingsRowArrow" android:id="@+id/backup_now_arrow" />
+                <TextView style="@style/SmartisanSettingsRowValue" android:id="@+id/backup_now_value"
+                    android:layout_toLeftOf="@id/backup_now_arrow" />
             </RelativeLayout>
             <RelativeLayout android:id="@+id/restore_from_backup"
                 android:layout_width="match_parent" android:layout_height="72dp"

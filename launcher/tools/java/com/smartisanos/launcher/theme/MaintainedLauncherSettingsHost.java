@@ -17,6 +17,7 @@ import android.app.usage.UsageStatsManager;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.ComponentName;
+import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
 import android.content.BroadcastReceiver;
 import android.content.DialogInterface;
@@ -211,9 +212,20 @@ public final class MaintainedLauncherSettingsHost {
     private static final String KEY_SEARCH_COMMON_APPS_ENABLED =
             "launcher_search_common_apps_enabled";
     public static final String KEY_SEARCH_CONTACTS_ENABLED = "search_contacts_enabled";
+    public static final String KEY_DOCK_SLIDE_REVERSE_ENABLED = "dock_slide_reverse_enabled";
     private static final int REQUEST_SEARCH_CONTACTS_PERMISSION = 2456;
+    private static final String PREF_SEARCH_CONTACTS_REQUESTED =
+            "search_contacts_permission_requested";
     private static final String PREF_SEARCH_USAGE_ACCESS_PENDING =
             "search_usage_access_pending";
+    private static final String PREF_BACKGROUND_RUNTIME_AUTOSTART_CHECKED =
+            "background_runtime_autostart_checked";
+    private static final String PREF_BACKGROUND_RUNTIME_POWER_CHECKED =
+            "background_runtime_power_checked";
+    private static final String PREF_BACKGROUND_RUNTIME_AUTOSTART_PENDING =
+            "background_runtime_autostart_pending";
+    private static final String PREF_BACKGROUND_RUNTIME_POWER_PENDING =
+            "background_runtime_power_pending";
     public static final String KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED =
             "swipe_down_system_panels_enabled";
     public static final String KEY_VERTICAL_GESTURE_DIRECTION_REVERSED =
@@ -273,7 +285,6 @@ public final class MaintainedLauncherSettingsHost {
     private static java.lang.ref.WeakReference<AppIconAdapter> sActiveAppIconAdapter;
     private static long sImprovedIconGeneration;
     private static final long ICON_PAGE_CACHE_FRESH_MS = 5L * 60L * 1000L;
-    private static int sMainSettingsScrollY = -1;
     private static int sThemePageScrollY = -1;
     private static final Map<String, Bitmap> sThemePreviewCache = new HashMap<String, Bitmap>();
     private static final Map<String, Bitmap> sThemeLargePreviewCache = new HashMap<String, Bitmap>();
@@ -305,12 +316,16 @@ public final class MaintainedLauncherSettingsHost {
     private static Boolean sLastBadgeHidden;
     private static WeakReference<Activity> sDeferredLauncherActivity;
     private static WeakReference<Activity> sPendingReloadSettingsActivity;
+    private static WeakReference<View> sBackgroundRuntimePageRoot;
+    private static WeakReference<Resources> sBackgroundRuntimePageResources;
     private static boolean sLauncherFirstFrameReady;
     private static boolean sDeferredLauncherTasksPosted;
     private static final Map<Activity, PasswordPageExit> sPasswordPageExits =
             new WeakHashMap<Activity, PasswordPageExit>();
     private static final Object SETTINGS_BACK_LOCK = new Object();
     private static SettingsBackEntry sSettingsBackEntry;
+    private static final Map<String, Integer> sSettingsPageScrollStates =
+            new HashMap<String, Integer>();
     public static volatile boolean sLauncherFrameReportPending;
     private static final String SMARTISAN_ICON_CACHE_PREFS = "online_icon_cache_v3";
     private static final String SMARTISAN_ICON_CACHE_DIR = "online_icon_cache_v3";
@@ -465,6 +480,9 @@ public final class MaintainedLauncherSettingsHost {
                 sSettingsBackEntry = null;
             }
         }
+        synchronized (sSettingsPageScrollStates) {
+            sSettingsPageScrollStates.clear();
+        }
         Log.i("SettingsNavigation", "SETTINGS_BACK_DESTROY_CLEAR activity="
                 + activity.getClass().getSimpleName());
     }
@@ -516,6 +534,7 @@ public final class MaintainedLauncherSettingsHost {
             SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
             View root = inflate(activity, context, "setting_main");
+            root.setTag("MAIN");
             bindPage(activity, resources, root);
             tuneScrollBars(root);
             setSettingsContentView(activity, context, resources, root, !animateBack, animateBack);
@@ -1154,7 +1173,7 @@ public final class MaintainedLauncherSettingsHost {
 
         bindGrid(activity, resources, root);
         bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
-        bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
+        bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", true);
         bindBadgeVisibilitySwitch(activity, resources, root);
         bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", false);
         bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
@@ -1204,49 +1223,47 @@ public final class MaintainedLauncherSettingsHost {
 
         click(activity, resources, root, "item_id_themes", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showThemePage(activity);
             }
         });
         click(activity, resources, root, "item_id_launcher_wallpaper", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showWallpaperPage(activity);
             }
         });
         click(activity, resources, root, "item_page_flip_anims", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showPageFlipPage(activity);
             }
         });
         click(activity, resources, root, "item_id_icons", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showIconPage(activity);
             }
         });
         click(activity, resources, root, "item_id_profile_apps", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showProfileAppsPage(activity);
             }
         });
         click(activity, resources, root, "item_id_privacy_password", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showSettingsPagePasswordEntry(activity);
             }
         });
         click(activity, resources, root, "setting_ocd_options", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showOcdOptionsPage(activity);
             }
         });
+        click(activity, resources, root, "item_id_search_vertical_gestures",
+                new View.OnClickListener() {
+                    public void onClick(View v) {
+                        showSearchVerticalGesturesPage(activity);
+                    }
+                });
         click(activity, resources, root, "setting_dynamic_weather", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showDynamicWeatherPage(activity);
             }
         });
@@ -1257,7 +1274,6 @@ public final class MaintainedLauncherSettingsHost {
         });
         click(activity, resources, root, "item_id_desktop_backup", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showDesktopBackupPage(activity, true);
             }
         });
@@ -1276,12 +1292,11 @@ public final class MaintainedLauncherSettingsHost {
         clickToast(activity, resources, root, "setting_user_experience", "用户体验计划后续接入");
         click(activity, resources, root, "setting_battery_optimization", new View.OnClickListener() {
             public void onClick(View v) {
-                openBatteryOptimizationSettings(activity);
+                showBackgroundRuntimePage(activity);
             }
         });
         click(activity, resources, root, "setting_about_us", new View.OnClickListener() {
             public void onClick(View v) {
-                sMainSettingsScrollY = currentScrollY(activity);
                 showAboutPage(activity);
             }
         });
@@ -1305,7 +1320,7 @@ public final class MaintainedLauncherSettingsHost {
             visibility |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
             visibility |= View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
             boolean hideNavigation = LauncherSettingBridge.readBool(
-                    activity, "launcher_hide_navigation_bar", false);
+                    activity, "launcher_hide_navigation_bar", true);
             if (hideNavigation) {
                 visibility |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
                 visibility |= View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
@@ -3845,7 +3860,7 @@ public final class MaintainedLauncherSettingsHost {
             final Resources resources = context.getResources();
             final View root = inflate(activity, context, "theme_preview_gridview");
             bindBackTitle(activity, resources, root, "view_title", getString(resources, "launcher_theme_text", "桌面主题"),
-                    "THEME_LIST", new Runnable() { public void run() { stopThemePagePolling(); show(activity, sMainSettingsScrollY, true); } });
+                    "THEME_LIST", new Runnable() { public void run() { stopThemePagePolling(); show(activity, settingsPageScroll("MAIN"), true); } });
             final GridView installed = asGrid(find(resources, root, "installed_list"));
             if (installed != null) {
                 installed.setSelector(android.R.color.transparent);
@@ -4446,7 +4461,15 @@ public final class MaintainedLauncherSettingsHost {
         return new Runnable() {
             public void run() {
                 cancelCurrentIconPageSession(activity);
-                show(activity, sMainSettingsScrollY, true);
+                show(activity, settingsPageScroll("MAIN"), true);
+            }
+        };
+    }
+
+    private static Runnable backToOcdOptionsAction(final Activity activity) {
+        return new Runnable() {
+            public void run() {
+                showOcdOptionsPage(activity, false);
             }
         };
     }
@@ -4462,6 +4485,7 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void bindBackTitle(final Activity activity, Resources resources, View root, String idName,
                                       String titleText, String page, Runnable backAction) {
+        markSettingsPage(root, page);
         registerSettingsBackActionPublic(activity, page, backAction);
         TextView btnBack = (TextView) find(resources, root, "btn_back");
         if (btnBack != null) {
@@ -4542,6 +4566,10 @@ public final class MaintainedLauncherSettingsHost {
             host.removeViewAt(0);
         }
         final View previous = host.getChildAt(host.getChildCount() - 1);
+        saveSettingsPageScrollState(previous);
+        Log.i("SettingsNavigation", "SETTINGS_NAV_SHOW from=" + settingsPageId(previous)
+                + " to=" + settingsPageId(root) + " activity="
+                + Integer.toHexString(System.identityHashCode(activity)));
         try {
             if (root.getParent() instanceof ViewGroup) {
                 ((ViewGroup) root.getParent()).removeView(root);
@@ -4571,6 +4599,7 @@ public final class MaintainedLauncherSettingsHost {
         }
         host.addView(root, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        restoreSettingsPageScrollState(root);
 
         final DecelerateInterpolator interpolator = new DecelerateInterpolator(1.35f);
         final boolean[] transitionStarted = new boolean[]{false};
@@ -5115,6 +5144,9 @@ public final class MaintainedLauncherSettingsHost {
         item.setCheckedAnimated(next);
         writeBoolSetting(context, key, next);
         applyLauncherSettingChange(context, key);
+        if (KEY_DOCK_SLIDE_REVERSE_ENABLED.equals(key)) {
+            applyDockSlideDirectionPreference(context);
+        }
         if ("launcher_unlock_animation_enabled".equals(key)) {
             applyUnlockAnimationEnabled(next);
         }
@@ -6245,6 +6277,29 @@ public final class MaintainedLauncherSettingsHost {
         }
         SharedPreferences settings = activity.getSharedPreferences("launcher_settings",
                 Context.MODE_PRIVATE);
+        boolean runtimeReturned = false;
+        if (settings.getBoolean(PREF_BACKGROUND_RUNTIME_AUTOSTART_PENDING, false)) {
+            settings.edit().remove(PREF_BACKGROUND_RUNTIME_AUTOSTART_PENDING)
+                    .putBoolean(PREF_BACKGROUND_RUNTIME_AUTOSTART_CHECKED, true).apply();
+            runtimeReturned = true;
+            Log.i(LOG_TAG, "BACKGROUND_RUNTIME_PAGE autoStartChecked=true");
+        }
+        if (settings.getBoolean(PREF_BACKGROUND_RUNTIME_POWER_PENDING, false)) {
+            settings.edit().remove(PREF_BACKGROUND_RUNTIME_POWER_PENDING)
+                    .putBoolean(PREF_BACKGROUND_RUNTIME_POWER_CHECKED, true).apply();
+            runtimeReturned = true;
+            Log.i(LOG_TAG, "BACKGROUND_RUNTIME_PAGE powerChecked=true");
+        }
+        View runtimeRoot = sBackgroundRuntimePageRoot == null
+                ? null : sBackgroundRuntimePageRoot.get();
+        Resources runtimeResources = sBackgroundRuntimePageResources == null
+                ? null : sBackgroundRuntimePageResources.get();
+        if (runtimeRoot != null && runtimeResources != null) {
+            updateBackgroundRuntimeStatus(activity, runtimeResources, runtimeRoot);
+            if (runtimeReturned) {
+                Log.i(LOG_TAG, "BACKGROUND_RUNTIME_PAGE event=RETURN");
+            }
+        }
         if (settings.getBoolean(PREF_SEARCH_USAGE_ACCESS_PENDING, false)) {
             settings.edit().remove(PREF_SEARCH_USAGE_ACCESS_PENDING).apply();
             boolean access = hasUsageStatsAccess(activity);
@@ -7049,7 +7104,7 @@ public final class MaintainedLauncherSettingsHost {
             t.printStackTrace();
             Toast.makeText(activity, getString(activity, "profile_apps_load_failed",
                     "应用分身页面加载失败"), Toast.LENGTH_SHORT).show();
-            show(activity, sMainSettingsScrollY);
+            show(activity, settingsPageScroll("MAIN"));
         }
     }
 
@@ -7110,7 +7165,7 @@ public final class MaintainedLauncherSettingsHost {
                     Toast.makeText(activity, getString(resources,
                             "privacy_password_disabled", "隐私密码已关闭"),
                             Toast.LENGTH_SHORT).show();
-                    show(activity, sMainSettingsScrollY);
+                    show(activity, settingsPageScroll("MAIN"));
                 }
             });
             LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(-1, dp(activity, 64));
@@ -7123,7 +7178,7 @@ public final class MaintainedLauncherSettingsHost {
             t.printStackTrace();
             Toast.makeText(activity, getString(activity, "privacy_password_page_failed",
                     "隐私密码页面加载失败"), Toast.LENGTH_SHORT).show();
-            show(activity, sMainSettingsScrollY);
+            show(activity, settingsPageScroll("MAIN"));
         }
     }
 
@@ -7172,6 +7227,7 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void bindTitleBar(final Activity activity, Resources resources, View root,
             String titleText, String page, Runnable backAction) {
+        markSettingsPage(root, page);
         registerSettingsBackActionPublic(activity, page, backAction);
         TextView btnBack = (TextView) find(resources, root, "btn_back");
         if (btnBack != null) {
@@ -7445,7 +7501,7 @@ public final class MaintainedLauncherSettingsHost {
                     if (backToPrivacyPage) {
                         showPrivacyPasswordPage(activity, false);
                     } else {
-                        show(activity, sMainSettingsScrollY, true);
+                        show(activity, settingsPageScroll("MAIN"), true);
                     }
                 }
             });
@@ -7492,7 +7548,7 @@ public final class MaintainedLauncherSettingsHost {
             setSettingsContentView(activity, context, resources, page, true, animate);
         } catch (Throwable t) {
             t.printStackTrace();
-            show(activity, sMainSettingsScrollY);
+            show(activity, settingsPageScroll("MAIN"));
         }
     }
 
@@ -11074,15 +11130,18 @@ public final class MaintainedLauncherSettingsHost {
             if (item.isChecked()) { item.setCheckedAnimated(false); writeBoolSetting(activity, KEY_SEARCH_CONTACTS_ENABLED, false); com.smartisanos.launcher.quicksearch.ContactSearchRepository.get(activity).disable(); return; }
             if (activity.checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) { item.setCheckedAnimated(true); writeBoolSetting(activity, KEY_SEARCH_CONTACTS_ENABLED, true); com.smartisanos.launcher.quicksearch.ContactSearchRepository.get(activity).enable(); return; }
             sSearchContactsSwitch = new WeakReference<SettingItemSwitch>(item);
-            showConfirmDialog(activity,
-                    getString(resources, "search_contacts_enabled_title", "Search Contacts"),
-                    getString(resources, "search_contacts_permission_message", "Allow Launcher to read contacts for search results."),
-                    getString(resources, "cancel", "取消"),
-                    getString(resources, "search_contacts_permission_allow", "Allow"),
-                    new View.OnClickListener(){ public void onClick(View v){
-                        try { activity.requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, REQUEST_SEARCH_CONTACTS_PERMISSION); }
-                        catch (Throwable error) { sSearchContactsSwitch = null; writeBoolSetting(activity, KEY_SEARCH_CONTACTS_ENABLED, false); item.setChecked(false); }
-                    }});
+            SharedPreferences permissionPrefs = activity.getSharedPreferences(
+                    "launcher_settings", Context.MODE_PRIVATE);
+            boolean requested = permissionPrefs.getBoolean(PREF_SEARCH_CONTACTS_REQUESTED, false);
+            if (requested && !activity.shouldShowRequestPermissionRationale(
+                    Manifest.permission.READ_CONTACTS)) {
+                sSearchContactsSwitch = null;
+                openApplicationDetailsSettings(activity);
+                return;
+            }
+            permissionPrefs.edit().putBoolean(PREF_SEARCH_CONTACTS_REQUESTED, true).commit();
+            try { activity.requestPermissions(new String[]{Manifest.permission.READ_CONTACTS}, REQUEST_SEARCH_CONTACTS_PERMISSION); }
+            catch (Throwable error) { sSearchContactsSwitch = null; writeBoolSetting(activity, KEY_SEARCH_CONTACTS_ENABLED, false); item.setChecked(false); }
         }});
     }
 
@@ -11552,40 +11611,243 @@ public final class MaintainedLauncherSettingsHost {
         }
     }
 
-    private static void openBatteryOptimizationSettings(Activity activity) {
-        String packageName = activity.getPackageName();
-        Uri packageUri = Uri.parse("package:" + packageName);
-        if (Build.VERSION.SDK_INT >= 23) {
-            try {
-                PowerManager powerManager = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
-                if (powerManager == null || !powerManager.isIgnoringBatteryOptimizations(packageName)) {
-                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                    intent.setData(packageUri);
-                    activity.startActivity(intent);
-                    return;
-                }
-            } catch (Throwable ignored) {
+    private static void openApplicationDetailsSettings(Activity activity) {
+        if (activity == null) return;
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        intent.setData(Uri.parse("package:" + activity.getPackageName()));
+        if (intent.resolveActivity(activity.getPackageManager()) == null) return;
+        try {
+            activity.startActivity(intent);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void markSettingsPage(View root, String page) {
+        if (root != null && !TextUtils.isEmpty(page)) {
+            root.setTag(page);
+        }
+    }
+
+    private static void saveSettingsPageScrollState(View root) {
+        String page = settingsPageId(root);
+        if (TextUtils.isEmpty(page)) return;
+        ScrollView scrollView = firstScrollView(root);
+        if (scrollView == null) return;
+        synchronized (sSettingsPageScrollStates) {
+            sSettingsPageScrollStates.put(page, scrollView.getScrollY());
+        }
+        Log.i("SettingsNavigation", "SETTINGS_NAV_SAVE page=" + page + " scrollY="
+                + scrollView.getScrollY());
+    }
+
+    private static int settingsPageScroll(String page) {
+        synchronized (sSettingsPageScrollStates) {
+            Integer saved = sSettingsPageScrollStates.get(page);
+            return saved == null ? -1 : saved;
+        }
+    }
+
+    private static void restoreSettingsPageScrollState(final View root) {
+        final String page = settingsPageId(root);
+        if (TextUtils.isEmpty(page)) return;
+        final Integer saved;
+        synchronized (sSettingsPageScrollStates) {
+            saved = sSettingsPageScrollStates.get(page);
+        }
+        if (saved == null || saved.intValue() <= 0) return;
+        Log.i("SettingsNavigation", "SETTINGS_NAV_RESTORE_REQUEST page=" + page
+                + " savedY=" + saved.intValue());
+        root.post(new Runnable() {
+            public void run() {
+                final ScrollView scrollView = firstScrollView(root);
+                if (scrollView == null) return;
+                scrollView.post(new Runnable() {
+                    public void run() {
+                        int before = scrollView.getScrollY();
+                        scrollView.scrollTo(0, saved.intValue());
+                        Log.i("SettingsNavigation", "SETTINGS_NAV_RESTORE_APPLIED page="
+                                + page + " beforeY=" + before + " afterY="
+                                + scrollView.getScrollY() + " range=" + scrollView.getChildCount());
+                    }
+                });
+            }
+        });
+    }
+
+    private static String settingsPageId(View root) {
+        if (root == null) return null;
+        Object tag = root.getTag();
+        if (tag instanceof String && !TextUtils.isEmpty((String) tag)) {
+            return (String) tag;
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                String childPage = settingsPageId(group.getChildAt(i));
+                if (!TextUtils.isEmpty(childPage)) return childPage;
             }
         }
+        return null;
+    }
+
+    public static void applyDockSlideDirectionPreference(Context context) {
+        if (context == null) return;
         try {
-            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-            activity.startActivity(intent);
-            return;
+            int originalType = Settings.Global.getInt(context.getContentResolver(),
+                    "launcher_switching_orientation", 0);
+            if (originalType != 0 && originalType != 1) {
+                return;
+            }
+            SharedPreferences prefs = context.getSharedPreferences(
+                    "launcher_settings", Context.MODE_PRIVATE);
+            int effectiveType = originalType;
+            if (prefs.contains(KEY_DOCK_SLIDE_REVERSE_ENABLED)
+                    && prefs.getBoolean(KEY_DOCK_SLIDE_REVERSE_ENABLED, false)) {
+                effectiveType = originalType == 0 ? 1 : 0;
+            }
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            constants.getField("SLIDE_DOCK_ACTION_TYPE").setInt(null, effectiveType);
+            Log.i(LOG_TAG, "DOCK_SLIDE_DIRECTION originalType=" + originalType
+                    + " reverse=" + prefs.getBoolean(KEY_DOCK_SLIDE_REVERSE_ENABLED, false)
+                    + " effectiveType=" + effectiveType);
+        } catch (Throwable error) {
+            Log.w(LOG_TAG, "DOCK_SLIDE_DIRECTION_APPLY_FAILED", error);
+        }
+    }
+
+    private static void showBackgroundRuntimePage(final Activity activity) {
+        try {
+            Log.i(LOG_TAG, "BACKGROUND_RUNTIME_PAGE event=RESUME");
+            final SettingsResourceContext context = createSettingsContext(activity);
+            final Resources resources = context.getResources();
+            View root = inflate(activity, context, "setting_background_runtime");
+            sBackgroundRuntimePageRoot = new WeakReference<View>(root);
+            sBackgroundRuntimePageResources = new WeakReference<Resources>(resources);
+            bindBackTitle(activity, resources, root, "view_title",
+                    getString(resources, "background_runtime_title", "后台运行设置"),
+                    "BACKGROUND_RUNTIME", backToMainAction(activity));
+            updateBackgroundRuntimeStatus(activity, resources, root);
+            click(activity, resources, root, "background_runtime_autostart",
+                    new View.OnClickListener() {
+                        public void onClick(View v) {
+                            if (openAutoStartSettings(activity)) {
+                                activity.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                                        .edit().putBoolean(PREF_BACKGROUND_RUNTIME_AUTOSTART_PENDING, true)
+                                        .apply();
+                            }
+                        }
+                    });
+            click(activity, resources, root, "background_runtime_power",
+                    new View.OnClickListener() {
+                        public void onClick(View v) {
+                            if (openSystemBatteryRestriction(activity)) {
+                                activity.getSharedPreferences("launcher_settings", Context.MODE_PRIVATE)
+                                        .edit().putBoolean(PREF_BACKGROUND_RUNTIME_POWER_PENDING, true)
+                                        .apply();
+                            }
+                        }
+                    });
+            tuneScrollBars(root);
+            setSettingsContentView(activity, context, resources, root, true);
+        } catch (Throwable error) {
+            Log.w(LOG_TAG, "BACKGROUND_RUNTIME_PAGE event=DESTROY error", error);
+            showInfoDialog(activity, "后台运行设置", "无法打开后台运行设置");
+        }
+    }
+
+    private static void updateBackgroundRuntimeStatus(Activity activity, Resources resources,
+            View root) {
+        if (activity == null || resources == null || root == null) return;
+        SharedPreferences settings = activity.getSharedPreferences("launcher_settings",
+                Context.MODE_PRIVATE);
+        View autostart = find(resources, root, "background_runtime_autostart_status");
+        View power = find(resources, root, "background_runtime_power_status");
+        if (autostart instanceof TextView) {
+            ((TextView) autostart).setText(settings.getBoolean(
+                    PREF_BACKGROUND_RUNTIME_AUTOSTART_CHECKED, false) ? "已检查" : "未检查");
+        }
+        if (power instanceof TextView) {
+            ((TextView) power).setText(settings.getBoolean(
+                    PREF_BACKGROUND_RUNTIME_POWER_CHECKED, false) ? "已检查" : "未检查");
+        }
+    }
+
+    private static boolean openAutoStartSettings(Activity activity) {
+        if (activity == null) return false;
+        final PackageManager packageManager = activity.getPackageManager();
+        Intent iqoo = new Intent();
+        iqoo.setComponent(new ComponentName("com.iqoo.secure",
+                "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));
+        if (startResolvedSettingsActivity(activity, packageManager, iqoo, "iqoo_add_white_list")) return true;
+        Intent vivo = new Intent();
+        vivo.setComponent(new ComponentName("com.vivo.permissionmanager",
+                "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"));
+        if (startResolvedSettingsActivity(activity, packageManager, vivo, "vivo_bg_startup")) return true;
+        Intent purview = new Intent();
+        purview.setComponent(new ComponentName("com.vivo.permissionmanager",
+                "com.vivo.permissionmanager.activity.PurviewTabActivity"));
+        if (startResolvedSettingsActivity(activity, packageManager, purview, "vivo_purview_tab")) return true;
+        Log.i(LOG_TAG, "AUTO_START_OPEN candidate=application_details resolved=unknown startAttempt=true startSuccess=unknown exception=none");
+        openApplicationDetailsSettings(activity);
+        return false;
+    }
+    private static boolean openSystemBatteryRestriction(Activity activity) {
+        if (activity == null) return false;
+        String packageName = activity.getPackageName();
+        try {
+            PowerManager powerManager = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
+            if (powerManager != null && powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                Intent list = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                if (startResolvedSettingsActivity(activity, activity.getPackageManager(), list,
+                        "ignore_battery_optimization_list_allowed")) return true;
+                Intent saver = new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS);
+                if (startResolvedSettingsActivity(activity, activity.getPackageManager(), saver,
+                        "battery_saver_settings_allowed")) return true;
+                Intent settings = new Intent(Settings.ACTION_SETTINGS);
+                if (startResolvedSettingsActivity(activity, activity.getPackageManager(), settings,
+                        "system_settings_allowed")) return true;
+                openApplicationDetailsSettings(activity);
+                return false;
+            }
         } catch (Throwable ignored) {
         }
+        Intent request = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+        request.setData(Uri.parse("package:" + packageName));
+        if (startResolvedSettingsActivity(activity, activity.getPackageManager(), request,
+                "request_ignore_battery_optimizations")) return true;
+        Intent list = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+        if (startResolvedSettingsActivity(activity, activity.getPackageManager(), list,
+                "ignore_battery_optimization_list")) return true;
+        openApplicationDetailsSettings(activity);
+        return false;
+    }
+
+    private static boolean startResolvedSettingsActivity(Activity activity,
+            PackageManager packageManager, Intent intent, String candidate) {
+        ResolveInfo resolved = null;
+        String event = (candidate.startsWith("iqoo_") || candidate.startsWith("vivo_"))
+                ? "AUTO_START_OPEN" : "BATTERY_SETTINGS_OPEN";
         try {
-            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            intent.setData(packageUri);
+            resolved = packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY);
+            Log.i(LOG_TAG, event + " manufacturer=" + Build.MANUFACTURER
+                    + " candidate=" + candidate + " resolved=" + (resolved != null)
+                    + " startAttempt=false startSuccess=false exception=none");
+            if (resolved == null) return false;
             activity.startActivity(intent);
-            return;
+            Log.i(LOG_TAG, event + " manufacturer=" + Build.MANUFACTURER
+                    + " candidate=" + candidate + " resolved=true startAttempt=true startSuccess=true exception=none");
+            return true;
+        } catch (ActivityNotFoundException ignored) {
+            Log.i(LOG_TAG, event + " candidate=" + candidate + " resolved="
+                    + (resolved != null) + " startAttempt=true startSuccess=false exception=ActivityNotFoundException");
+        } catch (SecurityException ignored) {
+            Log.i(LOG_TAG, event + " candidate=" + candidate + " resolved="
+                    + (resolved != null) + " startAttempt=true startSuccess=false exception=SecurityException");
         } catch (Throwable ignored) {
+            Log.i(LOG_TAG, event + " candidate=" + candidate + " resolved="
+                    + (resolved != null) + " startAttempt=true startSuccess=false exception=Throwable");
         }
-        try {
-            Intent intent = new Intent(Settings.ACTION_SETTINGS);
-            activity.startActivity(intent);
-        } catch (Throwable t) {
-            Toast.makeText(activity, "无法打开系统电池优化设置：" + shortError(t), Toast.LENGTH_LONG).show();
-        }
+        return false;
     }
 
     private static void showAboutPage(final Activity activity) {
@@ -12768,6 +13030,10 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void showOcdOptionsPage(final Activity activity) {
+        showOcdOptionsPage(activity, true);
+    }
+
+    private static void showOcdOptionsPage(final Activity activity, final boolean forward) {
         try {
             final SettingsResourceContext context = createSettingsContext(activity);
             Resources resources = context.getResources();
@@ -12775,10 +13041,31 @@ public final class MaintainedLauncherSettingsHost {
             bindBackTitle(activity, resources, root, "view_title",
                     getString(resources, "obsession_header_title", "OCD Settings"), "OCD_OPTIONS", backToMainAction(activity));
             bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
-            bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
+            bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", true);
+            bindSwitch(activity, resources, root, "item_id_dock_slide_reverse",
+                    KEY_DOCK_SLIDE_REVERSE_ENABLED, false);
             bindBadgeVisibilitySwitch(activity, resources, root);
             bindBadgeSwipeCleanSwitch(activity, resources, root);
             bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
+            migrateSearchGestureSetting(activity);
+            synchronizeBadgeSettingsWithNotificationAccess(activity,
+                    com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity));
+            tuneScrollBars(root);
+            setSettingsContentView(activity, context, resources, root, forward);
+        } catch (Throwable t) {
+            showInfoDialog(activity, "OCD Settings", "Unable to open OCD settings");
+        }
+    }
+
+    private static void showSearchVerticalGesturesPage(final Activity activity) {
+        try {
+            final SettingsResourceContext context = createSettingsContext(activity);
+            final Resources resources = context.getResources();
+            View root = inflate(activity, context, "setting_search_vertical_gestures");
+            bindBackTitle(activity, resources, root, "view_title",
+                    getString(resources, "search_vertical_gestures_title",
+                            "搜索与上下滑手势"), "SEARCH_VERTICAL_GESTURES",
+                    backToMainAction(activity));
             migrateSearchGestureSetting(activity);
             bindSwitch(activity, resources, root, "item_id_search_page_enabled",
                     KEY_SWIPE_UP_SEARCH_ENABLED, true);
@@ -12787,12 +13074,12 @@ public final class MaintainedLauncherSettingsHost {
             bindSwitch(activity, resources, root, "item_id_swipe_down_system_panels",
                     KEY_SWIPE_DOWN_SYSTEM_PANELS_ENABLED, true);
             bindVerticalGestureDirectionSwitch(activity, resources, root);
-            synchronizeBadgeSettingsWithNotificationAccess(activity,
-                    com.smartisanos.launcher.badge.BadgeBridge.hasNotificationAccess(activity));
+            updateVerticalGestureDirectionText(resources, root,
+                    readSystemBool(activity, KEY_VERTICAL_GESTURE_DIRECTION_REVERSED, false));
             tuneScrollBars(root);
             setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable t) {
-            showInfoDialog(activity, "OCD Settings", "Unable to open OCD settings");
+            showInfoDialog(activity, "搜索与上下滑手势", "无法打开搜索与上下滑手势设置");
         }
     }
 
@@ -13664,7 +13951,8 @@ public final class MaintainedLauncherSettingsHost {
         final LinearLayout preview = new LinearLayout(context);
         preview.setGravity(Gravity.CENTER);
         preview.setOrientation(LinearLayout.HORIZONTAL);
-        preview.setPadding(dp(context, 18), dp(context, 12), dp(context, 18), dp(context, 12));
+        preview.setPadding(smartisanDialogContentPadding(context), dp(context, 12),
+                smartisanDialogContentPadding(context), dp(context, 12));
         root.addView(preview, new LinearLayout.LayoutParams(-1, dp(context, 104)));
 
         final LinearLayout choices = new LinearLayout(context);
@@ -14103,7 +14391,8 @@ public final class MaintainedLauncherSettingsHost {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER_HORIZONTAL);
         content.setBackgroundColor(0xfffafafa);
-        content.setPadding(dp(activity, 22), dp(activity, 20), dp(activity, 22), dp(activity, 24));
+        int dialogPadding = smartisanDialogContentPadding(activity);
+        content.setPadding(dialogPadding, dp(activity, 16), dialogPadding, dp(activity, 16));
 
         final TextView percentText = new TextView(activity);
         percentText.setGravity(Gravity.CENTER);
@@ -14271,6 +14560,10 @@ public final class MaintainedLauncherSettingsHost {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             root.setClipToOutline(true);
         }
+    }
+
+    private static int smartisanDialogContentPadding(Context context) {
+        return dp(context, 24);
     }
 
     static TextView smartisanDialogActionButton(Context context, String text, boolean primary, int side) {
@@ -18069,23 +18362,9 @@ public final class MaintainedLauncherSettingsHost {
 
     private static void updateVerticalGestureDirectionText(Resources resources,
             View root, boolean reversed) {
-        View search = find(resources, root, "item_id_search_page_enabled");
-        if (search instanceof SettingItemSwitch) {
-            ((SettingItemSwitch) search).setTitle(getString(resources,
-                    reversed ? "search_page_enabled_title_reversed"
-                            : "search_page_enabled_title",
-                    reversed ? "下滑打开搜索页" : "上滑打开搜索页"));
-        }
-        View panel = find(resources, root, "item_id_swipe_down_system_panels");
-        if (panel instanceof SettingItemSwitch) {
-            ((SettingItemSwitch) panel).setTitle(getString(resources,
-                    reversed ? "swipe_down_system_panels_title_reversed"
-                            : "swipe_down_system_panels_title",
-                    reversed ? "上滑打开通知栏和控制中心" : "下滑打开通知栏和控制中心"));
-        }
         setTextResource(resources, root, "item_id_search_page_tips",
-                reversed ? "vertical_gesture_direction_reversed_tips"
-                        : "vertical_gesture_direction_normal_tips");
+                reversed ? "search_page_gesture_tips_reversed"
+                        : "search_page_gesture_tips_normal");
         setTextResource(resources, root, "item_id_swipe_down_system_panels_tips",
                 reversed ? "swipe_up_system_panels_tips" : "swipe_down_system_panels_tips");
         setTextResource(resources, root, "item_id_vertical_gesture_direction_reversed_tips",

@@ -191,6 +191,52 @@ public final class LauncherSettingBridge {
         return effectiveIconSizePercent(normalizeIconSizePercent(readInt(context, KEY_ICON_SIZE, 100)));
     }
 
+    /** Single outer-geometry input for the original ActiveIcon scene. */
+    public static float readIconSizeFactor() {
+        Context context = applicationContext();
+        return readIconSizePercent(context) / 100.0f;
+    }
+
+    /** Low-frequency trace for the single user-size input and the LIVE root owner. */
+    public static void traceActiveIconSize(String stage, Object root, float requestedScale) {
+        try {
+            Context context = applicationContext();
+            int percent = readIconSizePercent(context);
+            String type = root != null && root.getClass().getName().endsWith(".H")
+                    ? "weather" : "calendar";
+            Object scale = root == null ? null : invoke(root, "getScale");
+            Log.i(TAG, "ACTIVE_ICON_SIZE_TRACE stage=" + stage
+                    + " type=" + type
+                    + " iconSizePercent=" + percent
+                    + " iconSizeFactor=" + (percent / 100.0f)
+                    + " Constants.icon_scale=" + constantFloat("icon_scale", 0.0f)
+                    + " rootScale=" + vector2(scale)
+                    + " requestedScale=" + requestedScale);
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_SIZE_TRACE_FAILED stage=" + stage, error);
+        }
+    }
+
+    /** Applies the user icon-size factor once, after the original mode branch. */
+    public static void applyActiveIconUserSize(Object root) {
+        if (root == null) return;
+        try {
+            Object current = invoke(root, "getScale");
+            float x = floatField(current, "x");
+            float y = floatField(current, "y");
+            float z = floatField(current, "z");
+            float factor = readIconSizeFactor();
+            traceActiveIconSize("" + root.getClass().getSimpleName() + "_CREATE_BEFORE",
+                    root, x);
+            invoke(root, "setScale", Float.valueOf(x * factor), Float.valueOf(y * factor),
+                    Float.valueOf(z));
+            traceActiveIconSize("" + root.getClass().getSimpleName() + "_CREATE_AFTER",
+                    root, x * factor);
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_USER_SIZE_APPLY_FAILED", error);
+        }
+    }
+
     /**
      * Places the original cached ActiveIcon artwork into the same physical
      * texture contract as an ordinary static icon. SceneNode geometry remains
@@ -692,11 +738,7 @@ public final class LauncherSettingBridge {
     }
 
     private static long sActiveIconGeometryGeneration;
-    /**
-     * Read-only verification at the static Cell/ActiveIcon boundary. The
-     * V1.5.3 root scale, pivot, translation and internal coordinates remain
-     * authoritative; normal operation never applies an after-the-fact scale.
-     */
+    /** Matches LIVE to the current STATIC Cell geometry without changing STATIC. */
     public static void applyActiveIconRootGeometry(Object cell, Object staticIconNode) {
         try {
             Object values = readPrivateField(cell, "sc");
@@ -718,6 +760,29 @@ public final class LauncherSettingBridge {
                     || staticRect.height <= 0.0f || activeBaseRect.width <= 0.0f
                     || activeBaseRect.height <= 0.0f) return;
 
+            float widthRatio = staticRect.width / activeBaseRect.width;
+            float heightRatio = staticRect.height / activeBaseRect.height;
+            Object rootScale = invoke(activeRoot, "getScale");
+            float rootX = floatField(rootScale, "x");
+            float rootY = floatField(rootScale, "y");
+            float rootZ = floatField(rootScale, "z");
+            String rootScaleBefore = vector2(rootScale);
+            Log.i(TAG, "ACTIVE_ICON_SIZE_TRACE stage=GEOMETRY_ENTER"
+                    + " type=" + type
+                    + " iconSizePercent=" + readIconSizePercent(applicationContext())
+                    + " rootScaleEnter=" + rootScaleBefore
+                    + " staticWorld=" + staticRect.width + "x" + staticRect.height
+                    + " liveWorldBefore=" + activeBaseRect.width + "x" + activeBaseRect.height
+                    + " correction=" + widthRatio + "x" + heightRatio);
+            invoke(activeRoot, "setScale", Float.valueOf(rootX * widthRatio),
+                    Float.valueOf(rootY * heightRatio), Float.valueOf(rootZ));
+            activeBaseRect = worldRect(activeBase);
+            if (activeBaseRect == null) return;
+            Log.i(TAG, "ACTIVE_ICON_SIZE_TRACE stage=GEOMETRY_EXIT"
+                    + " type=" + type
+                    + " rootScaleExit=" + vector2(invoke(activeRoot, "getScale"))
+                    + " liveWorldAfter=" + activeBaseRect.width + "x" + activeBaseRect.height);
+
             ActiveIconRasterSpec raster = ActiveIconRasterSpec.resolve();
             float logicalArtwork = raster == null ? activeBaseRect.width
                     : raster.logicalArtworkWidth;
@@ -727,8 +792,8 @@ public final class LauncherSettingBridge {
                     * logicalArtwork / Math.max(1.0f, logicalTexture);
             float staticArtworkHeight = staticRect.height
                     * logicalArtwork / Math.max(1.0f, logicalTexture);
-            float widthRatio = activeBaseRect.width / Math.max(1.0f, staticArtworkWidth);
-            float heightRatio = activeBaseRect.height / Math.max(1.0f, staticArtworkHeight);
+            float finalWidthRatio = activeBaseRect.width / Math.max(1.0f, staticArtworkWidth);
+            float finalHeightRatio = activeBaseRect.height / Math.max(1.0f, staticArtworkHeight);
             float centerDeltaX = activeBaseRect.centerX - staticRect.centerX;
             float centerDeltaY = activeBaseRect.centerY - staticRect.centerY;
             long generation = ++sActiveIconGeometryGeneration;
@@ -741,8 +806,10 @@ public final class LauncherSettingBridge {
                     + staticArtworkWidth + "x" + staticArtworkHeight
                     + " activeBackgroundLogicalRect="
                     + activeBaseRect.width + "x" + activeBaseRect.height
-                    + " activeToStaticWidthRatio=" + widthRatio
-                    + " activeToStaticHeightRatio=" + heightRatio
+                    + " staticToLiveWidthRatio=" + widthRatio
+                    + " staticToLiveHeightRatio=" + heightRatio
+                    + " finalActiveToStaticWidthRatio=" + finalWidthRatio
+                    + " finalActiveToStaticHeightRatio=" + finalHeightRatio
                     + " centerDeltaX=" + centerDeltaX
                     + " centerDeltaY=" + centerDeltaY
                     + " staticVisible=" + invoke(staticIconNode, "isVisible")
@@ -750,8 +817,11 @@ public final class LauncherSettingBridge {
                     + " activeBackgroundVisible=" + invoke(activeBase, "isVisible")
                     + " staticScale=" + vector2(staticScale)
                     + " activeBaseScale=" + vector2(baseScale)
+                    + " iconSizePercent=" + readIconSizePercent(applicationContext())
+                    + " rootScaleBefore=" + rootScaleBefore
+                    + " rootScaleAfter=" + vector2(invoke(activeRoot, "getScale"))
                     + " shadowWorldRect=" + shadowFinalRect
-                    + " rootScaleApplied=false"
+                    + " commonParentAppliedOnce=true"
                     + " generation=" + generation);
             logActiveIconNodeTree(type, activeRoot, activeBase, shadow);
         } catch (Throwable error) {
@@ -882,6 +952,15 @@ public final class LauncherSettingBridge {
     private static float floatField(Object target, String name) throws Exception {
         if (target == null) return 0.0f;
         return target.getClass().getField(name).getFloat(target);
+    }
+
+    private static float constantFloat(String name, float fallback) {
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            return constants.getField(name).getFloat(null);
+        } catch (Throwable ignored) {
+            return fallback;
+        }
     }
 
     private static String vector2(Object vector) {

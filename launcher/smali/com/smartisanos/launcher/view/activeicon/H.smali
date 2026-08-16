@@ -5877,6 +5877,8 @@
 
     .line 10
     :cond_1
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconUserSize(Ljava/lang/Object;)V
+
     iget-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/H;->RP:[Lcom/smartisanos/smengine/SceneNode;
 
     const/4 v1, 0x1

@@ -409,7 +409,7 @@
     :goto_2
     sget-object v0, Lcom/smartisanos/launcher/data/M;->cr:Ljava/lang/String;
 
-    invoke-static {v8, v0, v2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
+    invoke-static {v8, v0, v3}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
 
     move-result v0
 
@@ -815,6 +815,8 @@
     move-result p0
 
     sput p0, Lcom/smartisanos/launcher/data/Constants;->SLIDE_DOCK_ACTION_TYPE:I
+
+    invoke-static {v8}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->applyDockSlideDirectionPreference(Landroid/content/Context;)V
 
     const-string p0, "voice_assit_by_menu"
 

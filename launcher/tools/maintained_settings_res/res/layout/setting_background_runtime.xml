@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:setting="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@drawable/background" android:fitsSystemWindows="true">
+    <com.smartisanos.home.widget.sys.Title android:id="@+id/view_title"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_alignParentTop="true" setting:title_titlex="@string/background_runtime_title" />
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent"
+        android:layout_below="@id/view_title" android:overScrollMode="always">
+        <LinearLayout android:orientation="vertical" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:paddingTop="@dimen/setting_item_top">
+            <RelativeLayout android:id="@+id/background_runtime_autostart"
+                android:background="@drawable/setting_item_up" android:layout_width="match_parent"
+                android:layout_height="72dp">
+                <TextView style="@style/SmartisanSettingsRowTitle"
+                    android:layout_toLeftOf="@id/background_runtime_autostart_status"
+                    android:singleLine="true" android:ellipsize="end"
+                    android:text="@string/background_runtime_autostart" />
+                <TextView android:id="@+id/background_runtime_autostart_status"
+                    style="@style/SmartisanSettingsRowValue"
+                    android:layout_toLeftOf="@id/background_runtime_autostart_arrow"
+                    android:singleLine="true" />
+                <ImageView android:id="@+id/background_runtime_autostart_arrow"
+                    style="@style/SmartisanSettingsRowArrow" />
+            </RelativeLayout>
+            <RelativeLayout android:id="@+id/background_runtime_power"
+                android:background="@drawable/setting_item_down" android:layout_width="match_parent"
+                android:layout_height="72dp">
+                <TextView style="@style/SmartisanSettingsRowTitle"
+                    android:layout_toLeftOf="@id/background_runtime_power_status"
+                    android:singleLine="true" android:ellipsize="end"
+                    android:text="@string/background_runtime_power" />
+                <TextView android:id="@+id/background_runtime_power_status"
+                    style="@style/SmartisanSettingsRowValue"
+                    android:layout_toLeftOf="@id/background_runtime_power_arrow"
+                    android:singleLine="true" />
+                <ImageView android:id="@+id/background_runtime_power_arrow"
+                    style="@style/SmartisanSettingsRowArrow" />
+            </RelativeLayout>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:paddingLeft="@dimen/setting_item_text_left" android:paddingRight="@dimen/setting_item_text_left"
+                android:paddingTop="18dp" android:paddingBottom="18dp" android:textSize="14sp"
+                android:textColor="#888888" android:text="@string/background_runtime_tips" />
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>

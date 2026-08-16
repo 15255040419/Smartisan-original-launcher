@@ -3107,7 +3107,7 @@
     .line 46
     sget-object p0, Lcom/smartisanos/launcher/data/M;->cr:Ljava/lang/String;
 
-    invoke-static {v0, p0, v4}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
+    invoke-static {v0, p0, v3}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readBool(Landroid/content/Context;Ljava/lang/String;Z)Z
 
     move-result p0
 

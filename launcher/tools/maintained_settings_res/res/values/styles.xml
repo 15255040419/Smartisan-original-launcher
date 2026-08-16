@@ -1141,6 +1141,32 @@
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
     </style>
+    <style name="SmartisanSettingsRowTitle">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingLeft">@dimen/setting_item_text_left</item>
+        <item name="android:textSize">@dimen/setting_item_text_size</item>
+        <item name="android:textColor">@drawable/more_item_color_bg</item>
+    </style>
+    <style name="SmartisanSettingsRowValue">
+        <item name="android:layout_width">180dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_centerVertical">true</item>
+        <item name="android:layout_marginRight">6dp</item>
+        <item name="android:gravity">right|center_vertical</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:textSize">@dimen/more_text_size_15</item>
+        <item name="android:textColor">@drawable/more_item_right_color_bg</item>
+    </style>
+    <style name="SmartisanSettingsRowArrow">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_alignParentRight">true</item>
+        <item name="android:layout_centerVertical">true</item>
+        <item name="android:src">@drawable/setting_next</item>
+    </style>
     <style name="SettingItemHeaderStyle">
         <item name="android:textSize">@dimen/settings_item_tips_text_size</item>
         <item name="android:textColor">@color/setting_item_tips_color</item>
