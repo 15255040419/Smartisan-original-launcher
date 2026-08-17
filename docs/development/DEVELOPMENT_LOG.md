@@ -1,10 +1,13 @@
 # 开发与修复记录
 
+- 2026-08-17 BACKGROUND_RUNTIME_TITLE_WIDTH_FIX_FINAL：后台运行设置页两个状态 TextView 在保留 `SmartisanSettingsRowValue` 全局 style 的前提下局部覆盖 `android:layout_width="wrap_content"`，释放固定 180dp 状态区域占用的标题空间；未修改全局 style、字体、行高、状态逻辑或其他页面。`git diff --check`、`build.bat`、v1/v2/v3 签名验证和 V2458A 覆盖安装通过，真机截图待确认。
+
 - 2026-08-16 ACTIVEICON_FOLLOW_CURRENT_STATIC_GEOMETRY_FINAL：STATIC Weather/Calendar 当前视觉尺寸冻结为基准。删除运行时历史 ratio、`166/192`、`0.831325` 和绝对 `160/192` owner；LIVE 不再改写 STATIC 或重新计算固定倍率。兼容层在同一 Cell/g 中读取 STATIC cached node 与 LIVE background 的当前 world bounds，以 `staticWorld/liveWorld` 调整 LIVE root，公共父节点比例在同一坐标空间中只抵消一次，并记录 `commonParentAppliedOnce=true`。H/m 内部 192 reference space、Timeline、shadow、foreground 保持不变。
 - 2026-08-16 ACTIVEICON_ICON_SIZE_PERCENT_PROPAGATION_ROOT_CAUSE_FINAL：`Constants.applyIconSizeToProperty()` 会按 `launcher_icon_size` 放大 STATIC 的 `icon_size_origin/icon_size_with_shadow`，但不改变 `active_icon_scale` 或 `Constants.icon_scale`；因此 H/m 原始 root scale 不消费 50/100/150% 用户设置。新增唯一 outer 输入 `LauncherSettingBridge.readIconSizeFactor()`，在 H/m root 的原版 `icon_scale × active_icon_scale` 结果上只乘一次用户百分比；保留 Cell world-bounds 校正作为当前 STATIC 基准，不改 CJ、foreground、shadow、Timeline 或 192 reference space。新增 `ACTIVEICON_GEOMETRY_VERIFY` 中的 iconSizePercent/rootScale 前后诊断。
 - 2026-08-18 ACTIVEICON_ICON_SIZE_FACTOR_FINAL_SCALE_OWNER_TRACE：构建并覆盖安装了诊断 APK；本地与 V2458A 设备 APK SHA256 均为 `642c9bb433d4307606f0d1159034bdd4717f5cad0429c5cf19b7bf147b88da9c`，versionCode=31/versionName=v1.5.6。新增 H/m create 前后及 world-bounds enter/exit 的 `ACTIVE_ICON_SIZE_TRACE`，尚未触发 Weather/Calendar 刷新取得 100%/150% 的 FIRST_FACTOR_LOSS_STAGE，因此暂不删除 world-bounds 写操作或继续修改 geometry。
 - 2026-08-18 ACTIVEICON_ICON_SIZE_FACTOR_OWNER_BRANCH_FIX：V2458A 日志未出现 H/m create trace；代码审计确认当前 `pageMode=1` 时 `Constants.useSmallActiveIcon(1)` 返回 false，原先放在该条件分支内的用户 factor 永远不执行，FIRST_FACTOR_LOSS_STAGE 为 H/m create 的 mode branch。现将用户 factor owner 移到 H/m create 条件分支之后，覆盖所有 mode；world-bounds correction 暂未删除，等待新包 trace 确认是否仍覆盖 root。
 - 2026-08-18 ACTIVEICON_ICON_SIZE_FACTOR_OWNER_RUNTIME_CONFIRM：新包覆盖安装成功，V2458A 启动日志确认当前设备设置为 `iconSizePercent=180` 时，Calendar/Weather 均从 `rootScale=(1.0,1.0)` 进入 create，随后变为 `rootScale=(1.8,1.8)`；说明 mode branch 之后的唯一 user factor owner 已执行。该次启动未出现 `GEOMETRY_ENTER/EXIT`，world-bounds correction 未参与这两个 create 样本；尚未完成用户切换后的视觉验收。
+- 2026-08-18 ACTIVEICON_STATIC_ARTWORK_BODY_BASELINE_FINAL：修正 `applyActiveIconRootGeometry()` 的 box 语义，将 STATIC texture world box 按 `logicalArtwork/logicalTexture` 换算为 STATIC artwork body world box，再以 width/height correction 的统一值调整 LIVE root；STATIC、用户百分比、H/m factor 和内部 192 reference 均未修改。新增 `ACTIVEICON_BASELINE_ALIGN` 输出 texture/body/world 前后数据；本包已构建并完成签名验证，V2458A 覆盖安装命令在 package manager 阶段未返回完成状态，真机视觉验收待完成。
 
 ## 本文档职责
 

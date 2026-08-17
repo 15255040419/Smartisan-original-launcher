@@ -751,6 +751,8 @@ public final class LauncherSettingBridge {
             String type = activeRoot.getClass().getName().endsWith(".H") ? "weather" : "calendar";
             Object activeBase = findActiveIconBase(activeRoot, type);
             if (activeBase == null) return;
+            ActiveIconRasterSpec raster = ActiveIconRasterSpec.resolve();
+            if (raster == null || raster.rasterScale <= 0.0f) return;
 
             Object staticScale = invoke(staticIconNode, "getScale");
             Object baseScale = invoke(activeBase, "getScale");
@@ -760,40 +762,61 @@ public final class LauncherSettingBridge {
                     || staticRect.height <= 0.0f || activeBaseRect.width <= 0.0f
                     || activeBaseRect.height <= 0.0f) return;
 
-            float widthRatio = staticRect.width / activeBaseRect.width;
-            float heightRatio = staticRect.height / activeBaseRect.height;
+            float logicalArtwork = Math.max(1.0f, raster.logicalArtworkWidth);
+            float logicalArtworkHeight = Math.max(1.0f, raster.logicalArtworkHeight);
+            float logicalTexture = Math.max(1.0f, raster.physicalTextureWidth / raster.rasterScale);
+            float logicalTextureHeight = Math.max(1.0f,
+                    raster.physicalTextureHeight / raster.rasterScale);
+            float staticArtworkWorldWidth = staticRect.width
+                    * logicalArtwork / logicalTexture;
+            float staticArtworkWorldHeight = staticRect.height
+                    * logicalArtworkHeight / logicalTextureHeight;
+            float widthCorrection = staticArtworkWorldWidth / activeBaseRect.width;
+            float heightCorrection = staticArtworkWorldHeight / activeBaseRect.height;
+            float uniformCorrection = widthCorrection;
+            float liveBodyWorldBeforeWidth = activeBaseRect.width;
+            float liveBodyWorldBeforeHeight = activeBaseRect.height;
             Object rootScale = invoke(activeRoot, "getScale");
             float rootX = floatField(rootScale, "x");
             float rootY = floatField(rootScale, "y");
             float rootZ = floatField(rootScale, "z");
             String rootScaleBefore = vector2(rootScale);
-            Log.i(TAG, "ACTIVE_ICON_SIZE_TRACE stage=GEOMETRY_ENTER"
+            Log.i(TAG, "ACTIVEICON_BASELINE_ALIGN"
                     + " type=" + type
                     + " iconSizePercent=" + readIconSizePercent(applicationContext())
-                    + " rootScaleEnter=" + rootScaleBefore
-                    + " staticWorld=" + staticRect.width + "x" + staticRect.height
-                    + " liveWorldBefore=" + activeBaseRect.width + "x" + activeBaseRect.height
-                    + " correction=" + widthRatio + "x" + heightRatio);
-            invoke(activeRoot, "setScale", Float.valueOf(rootX * widthRatio),
-                    Float.valueOf(rootY * heightRatio), Float.valueOf(rootZ));
+                    + " staticTextureWorld=" + staticRect.width + "x" + staticRect.height
+                    + " logicalArtwork=" + logicalArtwork + "x" + logicalArtworkHeight
+                    + " logicalTexture=" + logicalTexture + "x" + logicalTextureHeight
+                    + " staticArtworkWorld=" + staticArtworkWorldWidth + "x"
+                    + staticArtworkWorldHeight
+                    + " liveBodyWorldBefore=" + liveBodyWorldBeforeWidth + "x"
+                    + liveBodyWorldBeforeHeight
+                    + " rootScaleBefore=" + rootScaleBefore
+                    + " widthCorrection=" + widthCorrection
+                    + " heightCorrection=" + heightCorrection
+                    + " uniformCorrection=" + uniformCorrection);
+            invoke(activeRoot, "setScale", Float.valueOf(rootX * uniformCorrection),
+                    Float.valueOf(rootY * uniformCorrection), Float.valueOf(rootZ));
             activeBaseRect = worldRect(activeBase);
             if (activeBaseRect == null) return;
-            Log.i(TAG, "ACTIVE_ICON_SIZE_TRACE stage=GEOMETRY_EXIT"
-                    + " type=" + type
-                    + " rootScaleExit=" + vector2(invoke(activeRoot, "getScale"))
-                    + " liveWorldAfter=" + activeBaseRect.width + "x" + activeBaseRect.height);
-
-            ActiveIconRasterSpec raster = ActiveIconRasterSpec.resolve();
-            float logicalArtwork = raster == null ? activeBaseRect.width
-                    : raster.logicalArtworkWidth;
-            float logicalTexture = raster == null ? staticRect.width
-                    : Math.max(1.0f, raster.physicalTextureWidth / raster.rasterScale);
-            float staticArtworkWidth = staticRect.width
-                    * logicalArtwork / Math.max(1.0f, logicalTexture);
-            float staticArtworkHeight = staticRect.height
-                    * logicalArtwork / Math.max(1.0f, logicalTexture);
-            float finalWidthRatio = activeBaseRect.width / Math.max(1.0f, staticArtworkWidth);
-            float finalHeightRatio = activeBaseRect.height / Math.max(1.0f, staticArtworkHeight);
+            Log.i(TAG, "ACTIVEICON_BASELINE_ALIGN type=" + type
+                    + " iconSizePercent=" + readIconSizePercent(applicationContext())
+                    + " staticTextureWorld=" + staticRect.width + "x" + staticRect.height
+                    + " staticArtworkWorld=" + staticArtworkWorldWidth + "x"
+                    + staticArtworkWorldHeight
+                    + " liveBodyWorldBefore=" + liveBodyWorldBeforeWidth + "x"
+                    + liveBodyWorldBeforeHeight
+                    + " rootScaleBefore=" + rootScaleBefore
+                    + " widthCorrection=" + widthCorrection
+                    + " heightCorrection=" + heightCorrection
+                    + " uniformCorrection=" + uniformCorrection
+                    + " rootScaleAfter=" + vector2(invoke(activeRoot, "getScale"))
+                    + " liveBodyWorldAfter=" + activeBaseRect.width + "x"
+                    + activeBaseRect.height);
+            float finalWidthRatio = activeBaseRect.width
+                    / Math.max(1.0f, staticArtworkWorldWidth);
+            float finalHeightRatio = activeBaseRect.height
+                    / Math.max(1.0f, staticArtworkWorldHeight);
             float centerDeltaX = activeBaseRect.centerX - staticRect.centerX;
             float centerDeltaY = activeBaseRect.centerY - staticRect.centerY;
             long generation = ++sActiveIconGeometryGeneration;
@@ -803,11 +826,11 @@ public final class LauncherSettingBridge {
                     + " mode=" + activeIconMode(cell)
                     + " staticTextureWorldRect=" + staticRect
                     + " staticArtworkLogicalRect="
-                    + staticArtworkWidth + "x" + staticArtworkHeight
+                    + staticArtworkWorldWidth + "x" + staticArtworkWorldHeight
                     + " activeBackgroundLogicalRect="
                     + activeBaseRect.width + "x" + activeBaseRect.height
-                    + " staticToLiveWidthRatio=" + widthRatio
-                    + " staticToLiveHeightRatio=" + heightRatio
+                    + " staticToLiveWidthRatio=" + widthCorrection
+                    + " staticToLiveHeightRatio=" + heightCorrection
                     + " finalActiveToStaticWidthRatio=" + finalWidthRatio
                     + " finalActiveToStaticHeightRatio=" + finalHeightRatio
                     + " centerDeltaX=" + centerDeltaX

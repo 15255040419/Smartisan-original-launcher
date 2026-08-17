@@ -19,6 +19,7 @@
                     android:text="@string/background_runtime_autostart" />
                 <TextView android:id="@+id/background_runtime_autostart_status"
                     style="@style/SmartisanSettingsRowValue"
+                    android:layout_width="wrap_content"
                     android:layout_toLeftOf="@id/background_runtime_autostart_arrow"
                     android:singleLine="true" />
                 <ImageView android:id="@+id/background_runtime_autostart_arrow"
@@ -33,6 +34,7 @@
                     android:text="@string/background_runtime_power" />
                 <TextView android:id="@+id/background_runtime_power_status"
                     style="@style/SmartisanSettingsRowValue"
+                    android:layout_width="wrap_content"
                     android:layout_toLeftOf="@id/background_runtime_power_arrow"
                     android:singleLine="true" />
                 <ImageView android:id="@+id/background_runtime_power_arrow"
