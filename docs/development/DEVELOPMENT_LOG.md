@@ -1,5 +1,7 @@
 # 开发与修复记录
 
+- 2026-08-20 SMS_NOTIFICATION_BADGE_RESOLUTION_FIX_FINAL：修复系统短信 / Messages 接收新短信无桌面数字角标问题。两个根因：1. `SmartisanBadgeListenerService.countVisible()` 中原先硬编码了 `NotificationChannel.canShowBadge()` 检查，在部分厂商 ROM 或原生系统关闭 Channel 角标选项时会丢弃短信通知；现已移除该硬过滤，仅保留 `FLAG_ONGOING_EVENT`、Group Summary 去重与 Sweep 消除；2. 厂商 ROM（如 vivo OriginOS）系统短信服务通过 `com.android.mms.service` 后台 Service 包发通知，而桌面图标属于 `com.android.mms`。现新增 `BadgeBridge.resolveLauncherPackage()`，利用 `PackageManager.getLaunchIntentForPackage()` 与 `Notification.contentIntent`（`getCreatorPackage()` / `getTargetPackage()`）动态将服务包名解析归集至桌面应用包名，不使用任何包名硬编码白名单；同时 `BadgeBridge.replay()` 也对旧缓存包名自动做后缀兼容解析。桌面设置将“角标提醒”缺省开关（`KEY_BADGE_HIDE`）更正为默认开启 (`false`)。真机（vivo V2458A）验证：短信通知送达后桌面短信图标角标恢复显示，`build.bat` 成功打包签名，无需重启桌面或等待新消息即可重放恢复。
+
 - 2026-08-17 UNLOCK_ANIMATION_SESSION_GATE_FINAL：普通 Android 解锁动画触发已改为单次 Keyguard 会话门控。根因是 `e.s.ia(Context)` 曾对任意非空 Context 直接返回 true，`SCREEN_OFF` 无条件进入原版 prepare，而 maintained 生命周期 fallback 又在 `onResume` 后用延时伪造 `action_keyguard_on + USER_PRESENT`，因此从应用、设置、电话、相机或最近任务返回桌面也可能误播，并留下已 prepare 的 GL 状态等待后续补播。当前仅当锁屏前 Launcher 是可见默认 HOME、`SCREEN_OFF` 后 Keyguard 确实锁定时建会话并沿用原版 prepare；真实 `USER_PRESENT/action_keyguard_to_dismiss` 只置 pending，播放只在 `resumed + windowFocus + keyguard unlocked + default HOME + runtime/page state ready` 同时成立时同步提交一次。1500ms 仅用于取消未完成交接，不用于延时播放；取消、关闭开关、非直达 HOME、prepare/play 失败均走原版 force-finish。原版 `q(0)` prepare 与真实 `q(1)` play 共用 listener；兼容层已区分 prepare/cleanup 过渡和真实播放，并覆盖 GL 将在途 prepare 直接重定向到 play、不会再发第二次 start callback 的合并路径。已移除 `ActivityManagerNative/getRunningTasks` 和 120/250ms 伪广播 fallback，保留原版 prepare/play/force 动画实现。Android 16 `emulator-5554` PIN 锁屏验证：正常直达解锁 20 轮均为 `ARMED/COMMIT/ORIGINAL_PLAY/START/FINISH=20/20/20/20/20`，冷启动后立即锁屏的合并路径也为 `1/1/1/1/1`，无 FATAL/VerifyError；设置、电话、相机前台锁解锁后回 HOME，以及 Back/Home/最近任务返回均 `COMMIT=0`；解锁后立即进入其他应用会取消，后续回桌面无原版 play dispatch；重复 dismiss 信号每会话仍只提交一次；关闭开关时不建会话。`build.bat`、`aapt2 dump badging`、v1/v2/v3 签名和覆盖安装通过。Android 8/9/12、OriginOS/ColorOS/HyperOS/One UI 及锁屏相机从 Keyguard 快捷入口仍需对应真机复测；不得把模拟器矩阵扩写为全 ROM 真机 PASS。未更新 `MEMORY.md`、未提交、未推送。
 
 - 2026-08-17 BACKGROUND_RUNTIME_TITLE_WIDTH_FIX_FINAL：后台运行设置页两个状态 TextView 在保留 `SmartisanSettingsRowValue` 全局 style 的前提下局部覆盖 `android:layout_width="wrap_content"`，释放固定 180dp 状态区域占用的标题空间；未修改全局 style、字体、行高、状态逻辑或其他页面。`git diff --check`、`build.bat`、v1/v2/v3 签名验证和 V2458A 覆盖安装通过，真机截图待确认。
@@ -28,7 +30,9 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-08-15）
+## 当前状态总览（2026-08-20）
+
+- 2026-08-20 SMS_NOTIFICATION_BADGE_RESOLUTION_FIX_FINAL：Smartisan 数字角标以 NotificationListenerService 有效通知为数据源；不使用 NotificationChannel.canShowBadge() 硬过滤；通知包与桌面包不一致时使用 BadgeBridge.resolveLauncherPackage() 动态解析；禁止 OEM 短信包名白名单；KEY_BADGE_HIDE 默认 false；vivo V2458A / OriginOS 已真机验证短信角标 PASS；其他 ROM 属于通用实现覆盖，但尚未逐台真机验证，不得写成全 ROM PASS。
 
 - 2026-08-16 【REAL_DEVICE_FAIL / VISUAL_NOT_IMPLEMENTED】SETTINGS_NAVIGATION_STATE_AND_VISUAL_SYSTEM：此前仅完成页面状态代码和 Dialog chrome 审计，未完成真机视觉统一；不得据此宣称视觉系统完成。页面状态实现继续由后续 `SETTINGS_VISUAL_REAL_IMPLEMENTATION_AND_NAV_STATE_FINAL` 修正。
 

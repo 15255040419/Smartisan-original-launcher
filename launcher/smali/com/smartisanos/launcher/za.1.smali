@@ -167,6 +167,10 @@
 
     if-eqz v3, :cond_0
 
+    iget-object v2, p0, Lcom/smartisanos/launcher/za;->val$pkg:Ljava/lang/String;
+
+    invoke-static {v2, v1}, Lcom/smartisanos/launcher/badge/BadgeBridge;->logItemMatch(Ljava/lang/String;Ljava/lang/Object;)V
+
     .line 9
     iget v1, v1, Lcom/smartisanos/launcher/data/ItemInfo;->messagesNumber:I
 

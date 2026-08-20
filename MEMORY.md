@@ -743,6 +743,11 @@ Launcher 会先确认目标是系统应用或更新后的系统应用，再按�
 
 通知监听服务会按包名和 UID 统计有效活动通知，并转换为原版 `com.smartisanos.launcher.new_message` 协议，继续使用原版数字纹理、文件夹汇总和横扫动画。
 
+通知角标通用兼容规则：
+* 不得使用 `NotificationChannel.canShowBadge()` 作为 Smartisan 角标的硬过滤条件。
+* 针对厂商 ROM（如 vivo/OriginOS）将短信等服务通知挂在后台服务包名（如 `com.android.mms.service`）发送的情况，统一使用 `BadgeBridge.resolveLauncherPackage()` 动态解析为其桌面图标包名（如 `com.android.mms`），禁止硬编码 OEM 包名白名单。
+* 默认允许通知角标（`KEY_BADGE_HIDE` 默认值为 `false`），用户在桌面设置开启“角标提醒”并授予系统“通知使用权”后即可正常工作。
+
 ---
 
 ## 文件夹长期记忆

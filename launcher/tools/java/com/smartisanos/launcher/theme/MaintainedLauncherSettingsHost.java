@@ -6299,7 +6299,7 @@ public final class MaintainedLauncherSettingsHost {
             updateBadgeSwitchUi(activity);
             return;
         }
-        boolean reminderEnabled = !readSystemBool(activity, KEY_BADGE_HIDE, true);
+        boolean reminderEnabled = !readSystemBool(activity, KEY_BADGE_HIDE, false);
         boolean swipeCleanEnabled = readSystemBool(activity, KEY_BADGE_SWIPE_CLEAN, false);
         if (reminderEnabled || swipeCleanEnabled) {
             Log.i(LOG_TAG, "BADGE_NOTIFICATION_ACCESS_REVOKED notificationAccess=false"

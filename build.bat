@@ -408,22 +408,22 @@ rem ============================================================
 if exist "%ROOT%launcher\tools\java" (
   echo [extra] Compiling migrated settings host...
 
-  if exist "%ROOT%launcher\scratch\classes" rmdir /s /q "%ROOT%launcher\scratch\classes"
-  if exist "%ROOT%launcher\scratch\dex" rmdir /s /q "%ROOT%launcher\scratch\dex"
+  set "BUILD_SCRATCH=%OUT_DIR%\scratch"
+  if exist "%BUILD_SCRATCH%" rmdir /s /q "%BUILD_SCRATCH%"
 
-  mkdir "%ROOT%launcher\scratch\classes"
-  mkdir "%ROOT%launcher\scratch\dex"
+  mkdir "%BUILD_SCRATCH%\classes"
+  mkdir "%BUILD_SCRATCH%\dex"
 
-  dir /s /b "%ROOT%launcher\tools\java\*.java" > "%ROOT%launcher\scratch\java_sources.txt"
+  dir /s /b "%ROOT%launcher\tools\java\*.java" > "%BUILD_SCRATCH%\java_sources.txt"
 
-  javac -encoding UTF-8 -source 1.8 -target 1.8 -bootclasspath "%ANDROID_JAR%" -classpath "%ANDROID_JAR%;%OUT_DIR%\launcher-unsigned.apk" -d "%ROOT%launcher\scratch\classes" @"%ROOT%launcher\scratch\java_sources.txt"
+  javac -encoding UTF-8 -source 1.8 -target 1.8 -bootclasspath "%ANDROID_JAR%" -classpath "%ANDROID_JAR%;%OUT_DIR%\launcher-unsigned.apk" -d "%BUILD_SCRATCH%\classes" @"%BUILD_SCRATCH%\java_sources.txt"
   if errorlevel 1 (
     echo FAIL: javac migrated settings host failed.
     exit /b 1
   )
 
-  pushd "%ROOT%launcher\scratch\classes"
-  jar cf "%ROOT%launcher\scratch\helpers.jar" .
+  pushd "%BUILD_SCRATCH%\classes"
+  jar cf "%BUILD_SCRATCH%\helpers.jar" .
   if errorlevel 1 (
     popd
     echo FAIL: helper jar create failed.
@@ -431,20 +431,20 @@ if exist "%ROOT%launcher\tools\java" (
   )
   popd
 
-  call "%D8%" --min-api 23 --classpath "%ANDROID_JAR%" --output "%ROOT%launcher\scratch\dex" "%ROOT%launcher\scratch\helpers.jar"
+  call "%D8%" --min-api 23 --classpath "%ANDROID_JAR%" --output "%BUILD_SCRATCH%\dex" "%BUILD_SCRATCH%\helpers.jar"
   if errorlevel 1 (
     echo FAIL: d8 migrated settings host failed.
     exit /b 1
   )
 
-  if not exist "%ROOT%launcher\scratch\dex\classes.dex" (
+  if not exist "%BUILD_SCRATCH%\dex\classes.dex" (
     echo FAIL: d8 output classes.dex not found.
     exit /b 1
   )
 
-  copy /y "%ROOT%launcher\scratch\dex\classes.dex" "%ROOT%launcher\scratch\dex\classes2.dex" >nul
+  copy /y "%BUILD_SCRATCH%\dex\classes.dex" "%BUILD_SCRATCH%\dex\classes2.dex" >nul
 
-  pushd "%ROOT%launcher\scratch\dex"
+  pushd "%BUILD_SCRATCH%\dex"
   jar uf "%OUT_DIR%\launcher-unsigned.apk" classes2.dex
   if errorlevel 1 (
     popd

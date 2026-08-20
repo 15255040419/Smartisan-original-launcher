@@ -1,5 +1,6 @@
 package com.smartisanos.launcher.badge;
 
+import android.app.Notification;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -7,6 +8,7 @@ import android.content.SharedPreferences;
 import android.provider.Settings;
 import android.os.Build;
 import android.service.notification.NotificationListenerService;
+import android.service.notification.StatusBarNotification;
 import android.text.TextUtils;
 
 import java.util.Collection;
@@ -77,9 +79,21 @@ public final class BadgeBridge {
                 continue;
             }
             try {
-                dispatch(context, row.substring(0, pipe),
-                        Integer.parseInt(row.substring(pipe + 1, equals)),
-                        Integer.parseInt(row.substring(equals + 1)));
+                String pkg = row.substring(0, pipe);
+                int uid = Integer.parseInt(row.substring(pipe + 1, equals));
+                int count = Integer.parseInt(row.substring(equals + 1));
+                if (pkg.endsWith(".service") || pkg.endsWith(".provider")) {
+                    String candidate = pkg.endsWith(".service")
+                            ? pkg.substring(0, pkg.length() - ".service".length())
+                            : pkg.substring(0, pkg.length() - ".provider".length());
+                    try {
+                        if (context.getPackageManager().getLaunchIntentForPackage(candidate) != null) {
+                            pkg = candidate;
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+                dispatch(context, pkg, uid, count);
             } catch (RuntimeException ignored) {
             }
         }
@@ -201,6 +215,7 @@ public final class BadgeBridge {
     }
 
     static void dispatch(Context context, String pkg, int uid, int count) {
+        android.util.Log.d("SmartisanBadge", "BADGE_DISPATCH pkg=" + pkg + " uid=" + uid + " count=" + count);
         Intent intent = new Intent("com.smartisanos.launcher.new_message");
         intent.setPackage(context.getPackageName());
         intent.putExtra("extra_packagename", pkg);
@@ -208,5 +223,88 @@ public final class BadgeBridge {
         intent.putExtra("extra_uid", uid);
         intent.putExtra("extra_message_count", Math.max(0, count));
         context.sendBroadcast(intent);
+    }
+
+    public static String resolveLauncherPackage(Context context, StatusBarNotification sbn) {
+        if (context == null || sbn == null) {
+            return null;
+        }
+        String pkg = sbn.getPackageName();
+        if (TextUtils.isEmpty(pkg)) {
+            return pkg;
+        }
+        android.content.pm.PackageManager pm = context.getPackageManager();
+        if (pm == null) {
+            return pkg;
+        }
+        try {
+            if (pm.getLaunchIntentForPackage(pkg) != null) {
+                return pkg;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        Notification n = sbn.getNotification();
+        if (n != null && n.contentIntent != null) {
+            try {
+                String creator = n.contentIntent.getCreatorPackage();
+                if (!TextUtils.isEmpty(creator) && pm.getLaunchIntentForPackage(creator) != null) {
+                    return creator;
+                }
+            } catch (Throwable ignored) {
+            }
+            if (Build.VERSION.SDK_INT >= 17) {
+                try {
+                    String target = n.contentIntent.getTargetPackage();
+                    if (!TextUtils.isEmpty(target) && pm.getLaunchIntentForPackage(target) != null) {
+                        return target;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+
+        if (pkg.endsWith(".service")) {
+            String candidate = pkg.substring(0, pkg.length() - ".service".length());
+            try {
+                if (pm.getLaunchIntentForPackage(candidate) != null) {
+                    return candidate;
+                }
+            } catch (Throwable ignored) {
+            }
+        } else if (pkg.endsWith(".provider")) {
+            String candidate = pkg.substring(0, pkg.length() - ".provider".length());
+            try {
+                if (pm.getLaunchIntentForPackage(candidate) != null) {
+                    return candidate;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        return pkg;
+    }
+
+    public static void logItemMatch(String notificationPkg, Object itemObj) {
+        if (itemObj == null) {
+            return;
+        }
+        try {
+            Class<?> clazz = itemObj.getClass();
+            if ("com.smartisanos.launcher.data.ItemInfo".equals(clazz.getName())) {
+                Object pkg = clazz.getField("packageName").get(itemObj);
+                Object cmp = clazz.getField("componentName").get(itemObj);
+                Object userId = clazz.getField("userId").get(itemObj);
+                Object msgs = clazz.getField("messagesNumber").get(itemObj);
+                Object itemType = clazz.getField("itemType").get(itemObj);
+                android.util.Log.d("SmartisanBadge", "BADGE_ITEM_MATCH notificationPkg=" + notificationPkg +
+                        " item.packageName=" + pkg +
+                        " item.componentName=" + cmp +
+                        " item.userId=" + userId +
+                        " item.messagesNumber=" + msgs +
+                        " itemType=" + itemType);
+            }
+        } catch (Throwable ignored) {
+        }
     }
 }

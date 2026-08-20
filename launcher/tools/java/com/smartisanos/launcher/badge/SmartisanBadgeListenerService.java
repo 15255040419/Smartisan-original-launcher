@@ -66,7 +66,29 @@ public final class SmartisanBadgeListenerService extends NotificationListenerSer
             if (sbn == null || getPackageName().equals(sbn.getPackageName())) {
                 continue;
             }
-            String id = id(sbn.getPackageName(), sbn.getUid());
+            Notification n = sbn.getNotification();
+            String pkg = sbn.getPackageName();
+            int uid = sbn.getUid();
+            String key = sbn.getKey();
+            String channelId = (n != null && Build.VERSION.SDK_INT >= 26) ? n.getChannelId() : "N/A";
+            int notificationNumber = n != null ? n.number : 0;
+            int flags = n != null ? n.flags : 0;
+            boolean ongoing = n != null && (n.flags & Notification.FLAG_ONGOING_EVENT) != 0;
+            boolean groupSummary = n != null && (n.flags & Notification.FLAG_GROUP_SUMMARY) != 0;
+            boolean canShowBadge = channelAllowsBadge(sbn);
+            String targetPkg = BadgeBridge.resolveLauncherPackage(this, sbn);
+            android.util.Log.d("SmartisanBadge", "BADGE_NOTIFICATION pkg=" + pkg +
+                    " targetPkg=" + targetPkg +
+                    " uid=" + uid +
+                    " key=" + key +
+                    " channelId=" + channelId +
+                    " notificationNumber=" + notificationNumber +
+                    " flags=" + flags +
+                    " ongoing=" + ongoing +
+                    " groupSummary=" + groupSummary +
+                    " canShowBadge=" + canShowBadge);
+
+            String id = id(targetPkg, sbn.getUid());
             List<StatusBarNotification> list = grouped.get(id);
             if (list == null) {
                 list = new ArrayList<StatusBarNotification>();
@@ -118,6 +140,7 @@ public final class SmartisanBadgeListenerService extends NotificationListenerSer
             } catch (NumberFormatException ignored) {
                 continue;
             }
+            android.util.Log.d("SmartisanBadge", "BADGE_COUNT_RESULT pkg=" + pkg + " uid=" + uid + " count=" + count);
 
             editor.putStringSet(BadgeBridge.ACTIVE_PREFIX + badgeId, activeKeys);
             editor.putStringSet(suppressedKey, suppressed);
@@ -158,22 +181,26 @@ public final class SmartisanBadgeListenerService extends NotificationListenerSer
 
         int count = 0;
         for (StatusBarNotification sbn : list) {
-            if (suppressed.contains(notificationToken(sbn))) {
+            String token = notificationToken(sbn);
+            String pkg = sbn.getPackageName();
+            if (suppressed.contains(token)) {
+                android.util.Log.d("SmartisanBadge", "BADGE_FILTER_SUPPRESSED pkg=" + pkg + " key=" + token);
                 continue;
             }
             Notification n = sbn.getNotification();
             if (n == null || (n.flags & Notification.FLAG_ONGOING_EVENT) != 0) {
+                android.util.Log.d("SmartisanBadge", "BADGE_FILTER_ONGOING pkg=" + pkg + " key=" + token);
                 continue;
             }
             if (isGroupSummary(n) && groupsWithChildren.contains(sbn.getGroupKey())) {
+                android.util.Log.d("SmartisanBadge", "BADGE_FILTER_GROUP_SUMMARY pkg=" + pkg + " key=" + token);
                 continue;
             }
-            if (!channelAllowsBadge(sbn)) {
-                continue;
-            }
+            android.util.Log.d("SmartisanBadge", "BADGE_COUNT_ACCEPTED pkg=" + pkg + " key=" + token);
             count += n.number > 0 ? n.number : 1;
             if (count >= 999) {
-                return 999;
+                count = 999;
+                break;
             }
         }
         return count;
