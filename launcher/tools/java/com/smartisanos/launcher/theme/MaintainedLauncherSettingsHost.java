@@ -304,9 +304,6 @@ public final class MaintainedLauncherSettingsHost {
     private static boolean sSmartisanIconRefreshScheduled;
     private static boolean sDoppelgangerBootstrapScheduled;
     private static boolean sDoppelgangerIconRefreshRunning;
-    private static boolean sLauncherPausedForScreenOff;
-    private static long sLastLifecycleUnlockUptime;
-    private static long sLastOriginalUnlockUptime;
     private static long sThemeChangeGuardUntilUptime;
     private static boolean sProcessCompatApplied;
     private static Object sLastNavigationWindowToken;
@@ -2682,64 +2679,17 @@ public final class MaintainedLauncherSettingsHost {
         return fields;
     }
 
-    /**
-     * ColorOS/OriginOS may skip USER_PRESENT for the selected HOME process.
-     * Record a pause only after the display is really non-interactive, so an
-     * app launch, back gesture, settings screen, or theme reload cannot be
-     * mistaken for a device unlock.
-     */
-    public static void onLauncherPausedForUnlock(final Activity activity) {
-        if (activity == null) {
-            return;
-        }
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    PowerManager power = (PowerManager) activity.getSystemService(Context.POWER_SERVICE);
-                    if (power != null && !power.isInteractive()) {
-                        sLauncherPausedForScreenOff = true;
-                        android.util.Log.i(LOG_TAG, "launcher pause confirmed as screen-off");
-                    }
-                } catch (Throwable error) {
-                    android.util.Log.w(LOG_TAG, "unable to inspect screen-off pause", error);
-                }
-            }
-        }, 250L);
+    public static void onLauncherPausedForUnlock(Activity activity) {
+        LauncherBelowKeyguardCompat.onLauncherPaused(activity);
     }
 
-    public static void onLauncherResumedForUnlock(final Activity activity) {
-        if (activity == null || !sLauncherPausedForScreenOff) return;
-        sLauncherPausedForScreenOff = false;
-        final long now = android.os.SystemClock.uptimeMillis();
-        if (now - sLastLifecycleUnlockUptime < 1500L) return;
-        sLastLifecycleUnlockUptime = now;
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (android.os.SystemClock.uptimeMillis() - sLastOriginalUnlockUptime < 1200L) {
-                    android.util.Log.i(LOG_TAG, "lifecycle unlock fallback skipped: original receiver handled unlock");
-                    return;
-                }
-                if (shouldSkipUnlockAnimation()) {
-                    android.util.Log.i(LOG_TAG, "lifecycle unlock fallback skipped: transient launcher UI state");
-                    return;
-                }
-                android.util.Log.i(LOG_TAG, "dispatching lifecycle unlock fallback");
-                dispatchOriginalLockAction(activity, "action_keyguard_on");
-                dispatchOriginalLockAction(activity, Intent.ACTION_USER_PRESENT);
-            }
-        }, 120L);
+    public static void onLauncherResumedForUnlock(Activity activity) {
+        LauncherBelowKeyguardCompat.onLauncherResumed(activity);
     }
 
     public static void noteOriginalUnlockBroadcast() {
-        sLastOriginalUnlockUptime = android.os.SystemClock.uptimeMillis();
-        // USER_PRESENT/action_keyguard_to_dismiss can arrive while the
-        // Launcher Activity is covered by a settings Activity.  That original
-        // event has already consumed the actual screen-off cycle; retaining
-        // the flag would make a later Back-to-Home resume look like another
-        // unlock and replay the original animation.
-        sLauncherPausedForScreenOff = false;
+        // Kept for binary compatibility. The receiver now records dismiss
+        // candidates directly in LauncherBelowKeyguardCompat.
     }
 
     public static boolean shouldSkipUnlockAnimation() {
@@ -2772,25 +2722,6 @@ public final class MaintainedLauncherSettingsHost {
         } catch (Throwable ignored) {
         }
         return false;
-    }
-
-    private static void dispatchOriginalLockAction(Context context, String action) {
-        try {
-            Class<?> proxyClass = Class.forName("com.smartisanos.launcher.ja");
-            Object proxy = proxyClass.getMethod("getInstance").invoke(null);
-            if (proxy == null) {
-                android.util.Log.w(LOG_TAG, "unlock fallback ignored: ApplicationProxy is not ready");
-                return;
-            }
-            Class<?> receiverClass = Class.forName("com.smartisanos.launcher.ia");
-            java.lang.reflect.Constructor<?> constructor = receiverClass.getDeclaredConstructor(proxyClass);
-            constructor.setAccessible(true);
-            Object receiver = constructor.newInstance(proxy);
-            receiverClass.getMethod("onReceive", Context.class, Intent.class)
-                    .invoke(receiver, context, new Intent(action));
-        } catch (Throwable error) {
-            android.util.Log.e(LOG_TAG, "unable to dispatch original lock action " + action, error);
-        }
     }
 
     /** Load first-frame icons through the same component-aware path as refreshes. */
@@ -7264,6 +7195,7 @@ public final class MaintainedLauncherSettingsHost {
             constants.getField("ENABLE_UNLOCK_ANIMATION").setBoolean(null, enabled);
         } catch (Throwable ignored) {
         }
+        LauncherBelowKeyguardCompat.onUnlockSettingChanged(enabled);
     }
 
     private static LinearLayout privacyCard(Context context) {

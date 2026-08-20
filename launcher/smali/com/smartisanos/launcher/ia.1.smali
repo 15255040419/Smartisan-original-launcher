@@ -22,12 +22,16 @@
 
 # virtual methods
 .method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
-    .locals 6
+    .locals 8
+
+    move-object v7, p1
 
     .line 1
     invoke-virtual {p2}, Landroid/content/Intent;->getAction()Ljava/lang/String;
 
     move-result-object p1
+
+    move-object v6, p1
 
     if-nez p1, :cond_0
 
@@ -35,6 +39,53 @@
 
     .line 2
     :cond_0
+    sget-object p2, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->ACTION_INTERNAL_FORCE_FINISH:Ljava/lang/String;
+
+    invoke-virtual {p2, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result p2
+
+    if-eqz p2, :cond_codex_not_force_finish
+
+    iget-object p0, p0, Lcom/smartisanos/launcher/ia;->this$0:Lcom/smartisanos/launcher/ja;
+
+    invoke-static {p0}, Lcom/smartisanos/launcher/ja;->b(Lcom/smartisanos/launcher/ja;)Lcom/smartisanos/smengine/n;
+
+    move-result-object p0
+
+    const/4 p1, 0x0
+
+    invoke-virtual {p0, p1}, Lcom/smartisanos/smengine/n;->q(F)V
+
+    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onForceFinishComplete()V
+
+    return-void
+
+    :cond_codex_not_force_finish
+    sget-object p2, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->ACTION_INTERNAL_PLAY:Ljava/lang/String;
+
+    invoke-virtual {p2, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+
+    move-result p2
+
+    if-eqz p2, :cond_codex_not_internal_play
+
+    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->takeInternalPlayPermit(Landroid/content/Context;)Z
+
+    move-result p2
+
+    if-nez p2, :cond_codex_internal_play_allowed
+
+    return-void
+
+    :cond_codex_internal_play_allowed
+    const-string v0, "mLockScreenReceiver #### current is single page mode. prepare do unlock animation init."
+
+    const/4 v1, 0x0
+
+    goto/16 :cond_codex_unlock_state_ready
+
+    :cond_codex_not_internal_play
     const-string p2, "android.intent.action.SCREEN_OFF"
 
     invoke-virtual {p2, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
@@ -42,6 +93,20 @@
     move-result p2
 
     if-eqz p2, :cond_codex_unlock_action_ready
+
+    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->armFromScreenOff(Landroid/content/Context;)Z
+
+    move-result p2
+
+    if-nez p2, :cond_codex_screen_off_armed
+
+    const-string p1, "SCREEN_OFF_NOT_ARMED"
+
+    invoke-static {v7, p1}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->forceFinishOriginal(Landroid/content/Context;Ljava/lang/String;)V
+
+    return-void
+
+    :cond_codex_screen_off_armed
 
     const-string p1, "action_keyguard_on"
 
@@ -93,6 +158,10 @@
 
     invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
+    const-string p0, "RECEIVER_ACTIVITY_NOT_READY"
+
+    invoke-static {v7, p0}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->forceFinishOriginal(Landroid/content/Context;Ljava/lang/String;)V
+
     return-void
 
     .line 8
@@ -142,11 +211,22 @@
 
     .line 13
     :cond_5
+    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->canPrepare(Landroid/content/Context;)Z
+
+    move-result p1
+
+    if-nez p1, :cond_codex_prepare_session_ready
+
+    return-void
+
+    :cond_codex_prepare_session_ready
     invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->shouldSkipUnlockAnimation()Z
 
     move-result p1
 
     if-eqz p1, :cond_codex_prepare_unlock
+
+    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onPrepareFailed(Landroid/content/Context;)V
 
     return-void
 
@@ -165,6 +245,8 @@
     iget-boolean p1, p1, Lcom/smartisanos/launcher/J;->Yf:Z
 
     if-eqz p1, :cond_6
+
+    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onPrepareFailed(Landroid/content/Context;)V
 
     return-void
 
@@ -273,6 +355,8 @@
     invoke-virtual {p0, v0}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     :cond_8
+    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onPrepareFailed(Landroid/content/Context;)V
+
     return-void
 
     .line 23
@@ -284,6 +368,8 @@
     move-result-object p0
 
     invoke-virtual {p0, v1}, Lcom/smartisanos/smengine/n;->q(F)V
+
+    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onPrepareReady(Landroid/content/Context;)V
 
     goto/16 :goto_2
 
@@ -303,6 +389,8 @@
     invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     :cond_b
+    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onPrepareFailed(Landroid/content/Context;)V
+
     return-void
 
     :cond_c
@@ -326,16 +414,7 @@
 
     .line 27
     :cond_d
-    # Clear any screen-off lifecycle fallback as soon as the original unlock
-    # receiver sees the real broadcast, including while a settings Activity
-    # currently covers Launcher.
-    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->noteOriginalUnlockBroadcast()V
-
-    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->shouldSkipUnlockAnimation()Z
-
-    move-result p1
-
-    if-eqz p1, :cond_codex_unlock_state_ready
+    invoke-static {v7, v6}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onDismissSignal(Landroid/content/Context;Ljava/lang/String;)V
 
     return-void
 
@@ -369,6 +448,10 @@
     const-string p1, "mLockScreenReceiver execute error, isActivityReady false"
 
     invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
+
+    const-string p0, "PLAY_ACTIVITY_NOT_READY"
+
+    invoke-static {v7, p0}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->forceFinishOriginal(Landroid/content/Context;Ljava/lang/String;)V
 
     return-void
 
@@ -509,6 +592,10 @@
     invoke-virtual {p0, v0}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     :cond_13
+    const-string p0, "PLAY_PAGE_STATE_NOT_READY"
+
+    invoke-static {v7, p0}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->forceFinishOriginal(Landroid/content/Context;Ljava/lang/String;)V
+
     return-void
 
     .line 40
@@ -520,6 +607,8 @@
     move-result-object p0
 
     .line 41
+    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onOriginalPlayDispatched()V
+
     invoke-virtual {p0, v1}, Lcom/smartisanos/smengine/n;->q(F)V
 
     goto :goto_2
@@ -540,6 +629,10 @@
     invoke-virtual {p0, p1}, Lcom/smartisanos/launcher/va;->u(Ljava/lang/String;)V
 
     :cond_16
+    const-string p0, "PLAY_MAIN_VIEW_NOT_READY"
+
+    invoke-static {v7, p0}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->forceFinishOriginal(Landroid/content/Context;Ljava/lang/String;)V
+
     return-void
 
     .line 43
@@ -551,6 +644,8 @@
     move-result-object p0
 
     invoke-virtual {p0, v1}, Lcom/smartisanos/smengine/n;->q(F)V
+
+    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onForceFinishComplete()V
 
     :cond_18
     :goto_2

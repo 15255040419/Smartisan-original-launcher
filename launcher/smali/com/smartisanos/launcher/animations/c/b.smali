@@ -74,6 +74,8 @@
 
     invoke-static {}, Lcom/smartisanos/launcher/diagnostics/AnimationTimingDiagnostics;->onUnlockAnimationFinished()V
 
+    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onUnlockAnimationFinished()V
+
     .line 1
     sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
 
@@ -776,6 +778,8 @@
     .locals 2
 
     invoke-static {}, Lcom/smartisanos/launcher/diagnostics/AnimationTimingDiagnostics;->onUnlockAnimationStarted()V
+
+    invoke-static {}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onUnlockAnimationStarted()V
 
     .line 1
     sget-boolean v0, Lcom/smartisanos/launcher/va;->DBG:Z
