@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.Set;
 
 public final class LayoutSnapshotImporter {
+    private static final String TAG = "DesktopRestore";
+
     private static final String[] PAGE_COLUMNS = {
             "_id", "pageIndex", "status", "containment", "pageTitle", "data1", "data2", "data3"
     };
@@ -43,33 +45,49 @@ public final class LayoutSnapshotImporter {
 
     public static ImportResult restore(Context context, JSONObject layout, int gridMode,
             File pendingFile, JSONObject shortcutIcons, File extractionRoot) throws Exception {
+        
+        Log.i(TAG, "===============================================");
+        Log.i(TAG, "RESTORE PHASE 0: Pre-validation");
+        Log.i(TAG, "===============================================");
         LayoutSnapshotExporter.validate(layout);
+        FolderTopologyValidator.ValidationResult preCheck = FolderTopologyValidator.validate(layout);
+        if (!preCheck.valid) {
+            throw new IllegalStateException("Source layout has broken folder topology: " + preCheck.errorMessage);
+        }
+
         SQLiteDatabase database = LayoutSnapshotExporter.database(true);
         JSONArray backupPages = layout.getJSONArray("pages");
         JSONArray backupItems = layout.getJSONArray("items");
+        
+        // Pass 1: Identify items to preserve
+        Log.i(TAG, "RESTORE PHASE 1: Capture preserved items & shortcut fallbacks");
         List<JSONObject> currentItems = readCurrentItems(database);
-        // Keep the provider-rendered bitmap for existing QuickLaunchItems before
-        // rebuilding the tables.  This is also the compatibility path for older
-        // archives that predate icons/shortcuts.json: restoring a layout must not
-        // turn a shortcut into its host app icon merely because table_icons was
-        // rebuilt or the improved-icon mode is enabled.
         Map<String, ContentValues> shortcutFallback =
                 ShortcutIconBackupCodec.captureCurrent(database, currentItems);
         Set<String> backupKeys = new HashSet<String>();
-        for (int i = 0; i < backupItems.length(); i++) backupKeys.add(RestoreMergePlanner.stableKey(backupItems.getJSONObject(i)));
+        for (int i = 0; i < backupItems.length(); i++) {
+            backupKeys.add(RestoreMergePlanner.stableKey(backupItems.getJSONObject(i)));
+        }
         ArrayList<JSONObject> preserved = new ArrayList<JSONObject>();
         for (JSONObject item : currentItems) {
             if (RestoreMergePlanner.isRestoreCandidate(item) && RestoreMergePlanner.isInstalled(context, item)
-                    && !backupKeys.contains(RestoreMergePlanner.stableKey(item))) preserved.add(item);
+                    && !backupKeys.contains(RestoreMergePlanner.stableKey(item))) {
+                preserved.add(item);
+                Log.i(TAG, "RESTORE_PRESERVE item=" + item.optString("packageName"));
+            }
         }
 
-        JSONArray pending = new JSONArray();
         ImportResult result = new ImportResult();
+        JSONArray pending = new JSONArray();
+
         database.beginTransaction();
         try {
+            Log.i(TAG, "RESTORE PHASE 2: Wipe tables");
             database.delete("table_icons", null, null);
             database.delete("table_iteminfos", null, null);
             database.delete("table_pageinfos", null, null);
+
+            Log.i(TAG, "RESTORE PHASE 3: Insert pages");
             Set<Integer> existingPageIndexes = new HashSet<Integer>();
             int maxPage = -1;
             long maxPageId = 0L;
@@ -78,15 +96,24 @@ public final class LayoutSnapshotImporter {
                 JSONObject page = backupPages.getJSONObject(i);
                 maxPageId = Math.max(maxPageId, page.optLong("_id", 0L));
                 ContentValues values = values(page, PAGE_COLUMNS, false);
-                if (database.insertOrThrow("table_pageinfos", null, values) < 0) throw new IllegalStateException("Page insert failed");
+                if (database.insertOrThrow("table_pageinfos", null, values) < 0) {
+                    throw new IllegalStateException("Page insert failed");
+                }
                 existingPageIndexes.add(Integer.valueOf(page.getInt("pageIndex")));
             }
+
+            Log.i(TAG, "RESTORE PHASE 4: Classify and Remap Items");
             long maxId = 0L;
             int maxCell = -1;
+            List<JSONObject> foldersToInsert = new ArrayList<>();
+            List<JSONObject> itemsToInsert = new ArrayList<>();
+
             for (int i = 0; i < backupItems.length(); i++) {
                 JSONObject item = remapIdentity(context, backupItems.getJSONObject(i), result);
                 if (item == null) continue;
                 maxId = Math.max(maxId, item.optLong("_id", 0L));
+                
+                // Track max layout coordinates for appending preserved items
                 int pageIndex = item.optInt("pageIndex", -1);
                 if (pageIndex >= 0 && item.optInt("folderIndex", -1) < 0
                         && item.optInt("cellIndex", -1) >= 0) {
@@ -97,26 +124,51 @@ public final class LayoutSnapshotImporter {
                         maxCell = Math.max(maxCell, item.optInt("cellIndex", -1));
                     }
                 }
-                if (RestoreMergePlanner.isShortcut(item)
-                        && !shortcutAvailable(context, item)) {
+
+                if (RestoreMergePlanner.isFolder(item)) {
+                    foldersToInsert.add(item);
+                } else {
+                    itemsToInsert.add(item);
+                }
+            }
+
+            Log.i(TAG, "RESTORE PHASE 5: Insert Folders (Structural)");
+            for (JSONObject folder : foldersToInsert) {
+                ContentValues values = values(folder, ITEM_COLUMNS, false);
+                values.remove("icon");
+                if (database.insertOrThrow("table_iteminfos", null, values) < 0) {
+                    throw new IllegalStateException("Folder insert failed for _id=" + folder.optLong("_id"));
+                }
+                Log.i(TAG, "RESTORE_FOLDER_INSERTED _id=" + folder.optLong("_id") + " title=" + folder.optString("title"));
+                result.restored++;
+            }
+
+            Log.i(TAG, "RESTORE PHASE 6: Insert Items & Children");
+            for (JSONObject item : itemsToInsert) {
+                if (RestoreMergePlanner.isShortcut(item) && !shortcutAvailable(context, item)) {
                     result.shortcutUnresolved++;
-                    Log.i("DesktopRestore", "SHORTCUT_UNRESOLVED package="
+                    Log.i(TAG, "SHORTCUT_UNRESOLVED package="
                             + item.optString("packageName", "") + " shortcutId=" + shortcutId(item));
                 }
                 if (RestoreMergePlanner.isRestoreCandidate(item) && !RestoreMergePlanner.isInstalled(context, item)) {
                     pending.put(pendingRecord(item));
                     result.missing++;
-                    continue;
+                    Log.i(TAG, "RESTORE_ITEM_PENDING pkg=" + item.optString("packageName"));
+                    continue; // Skip insertion
                 }
+
                 ContentValues values = values(item, ITEM_COLUMNS, false);
                 values.remove("icon");
-                if (database.insertOrThrow("table_iteminfos", null, values) < 0) throw new IllegalStateException("Item insert failed");
+                if (database.insertOrThrow("table_iteminfos", null, values) < 0) {
+                    throw new IllegalStateException("Item insert failed");
+                }
                 result.restored++;
+                Log.i(TAG, "RESTORE_ITEM_INSERTED pkg=" + item.optString("packageName") + " folderIndex=" + item.optLong("folderIndex", -1L));
             }
+
+            Log.i(TAG, "RESTORE PHASE 7: Append Preserved Items");
             int capacity = gridMode == 20 ? 20 : 12;
-            if (maxPage < 0) {
-                maxPage = 0;
-            }
+            if (maxPage < 0) maxPage = 0;
             for (int i = 0; i < backupPages.length(); i++) {
                 JSONObject page = backupPages.getJSONObject(i);
                 if (page.optInt("pageIndex", -1) == maxPage) {
@@ -151,11 +203,21 @@ public final class LayoutSnapshotImporter {
                 database.insertOrThrow("table_iteminfos", null, values);
                 result.preserved++;
             }
+
+            Log.i(TAG, "RESTORE PHASE 8: Shortcut Icons & Verification");
             ShortcutIconBackupCodec.restore(context, database, layout, shortcutIcons, extractionRoot,
                     shortcutFallback);
+            
             verifyDatabase(database);
+            FolderTopologyValidator.DbValidationResult dbCheck = FolderTopologyValidator.validateDatabase(database);
+            if (!dbCheck.valid) {
+                throw new IllegalStateException("Restored database has broken folder topology: " + dbCheck.errorMessage);
+            }
+
             database.setTransactionSuccessful();
+            Log.i(TAG, "RESTORE PHASE 9: Transaction Committed");
         } finally { database.endTransaction(); }
+        
         writePending(pendingFile, pending);
         return result;
     }
@@ -183,7 +245,7 @@ public final class LayoutSnapshotImporter {
                 sourceSerial, sourceUserId);
         if (profile == null) {
             result.profileUnresolved++;
-            Log.i("DesktopRestore", "RESTORE_PROFILE_UNRESOLVED package="
+            Log.i(TAG, "RESTORE_PROFILE_UNRESOLVED package="
                     + item.optString("packageName", "") + " component="
                     + item.optString("componentName", "") + " sourceUserId="
                     + sourceUserId + " sourceSerial=" + sourceSerial);
@@ -194,7 +256,7 @@ public final class LayoutSnapshotImporter {
         if (RestoreMergePlanner.isShortcut(item)) {
             rewriteShortcutIntent(item, context, profile.serial, false);
         }
-        Log.i("DesktopRestore", "RESTORE_ITEM_WRITTEN identityKind=" + kind
+        Log.i(TAG, "RESTORE_ITEM_WRITTEN identityKind=" + kind
                 + " package=" + item.optString("packageName", "") + " targetUserId="
                 + profile.userId + " targetSerial=" + profile.serial);
         return item;
@@ -215,7 +277,7 @@ public final class LayoutSnapshotImporter {
         if (packageName.length() == 0 || id.length() == 0) return;
         item.put("intent", ShortcutCompatBridge.createLaunchIntent(context, packageName, id,
                 targetSerial, primaryFallback).toUri(0));
-        Log.i("DesktopRestore", "SHORTCUT_PROFILE_REMAP package=" + packageName
+        Log.i(TAG, "SHORTCUT_PROFILE_REMAP package=" + packageName
                 + " shortcutId=" + id + " targetSerial=" + targetSerial);
     }
 

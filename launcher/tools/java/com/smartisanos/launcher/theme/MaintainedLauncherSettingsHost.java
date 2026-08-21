@@ -2795,6 +2795,24 @@ public final class MaintainedLauncherSettingsHost {
         return loadIconForComponent(context, packageName, className);
     }
 
+    /** RAW APK/profile source only; managed selection is deliberately bypassed. */
+    public static Drawable loadDefaultIconForDesktopItem(Context context, String packageName,
+                                                         String className, int userId) {
+        if (context == null || TextUtils.isEmpty(packageName)) return null;
+        try {
+            if (userId > 0) {
+                Drawable profile = profileLauncherIcon(context, packageName, className, userId);
+                if (profile != null) return profile;
+            }
+            ResolveInfo info = resolveLauncherActivity(
+                    context.getPackageManager(), packageName, className);
+            if (info != null) return info.loadIcon(context.getPackageManager());
+            return context.getPackageManager().getApplicationIcon(packageName);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     private static ResolveInfo firstProfileResolveInfo(Context context, String packageName,
                                                        String className, int userId) {
         List list = queryProfileLauncherActivities(context, packageName, userId);
@@ -3001,8 +3019,6 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     public static Drawable normalizeLauncherIcon(Drawable icon) {
-        // Desktop geometry is owned by the original static-icon pipeline.
-        // Do not infer a second scale from source alpha bounds.
         return icon;
     }
 
@@ -3672,18 +3688,32 @@ public final class MaintainedLauncherSettingsHost {
         String component = itemFieldValue(itemInfo, "componentName");
         RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, pkg, component);
         String mode = RedirectIconDB.modeOf(redirect);
-        if (RedirectIconDB.MODE_CUSTOM.equals(mode)) return "CUSTOM";
-        if (RedirectIconDB.MODE_RESOURCE.equals(mode)) return "RESOURCE";
-        if (RedirectIconDB.MODE_PACK.equals(mode)) return "PACK";
+        if (RedirectIconDB.MODE_ORIGINAL.equals(mode)) return "DEFAULT";
+        if (RedirectIconDB.MODE_CUSTOM.equals(mode)) {
+            return redirect != null && redirect.iconData != null ? "CUSTOM" : "DEFAULT";
+        }
+        if (RedirectIconDB.MODE_RESOURCE.equals(mode)) {
+            return hasEffectiveManagedDesktopSource(context, pkg, component) ? "RESOURCE" : "DEFAULT";
+        }
+        if (RedirectIconDB.MODE_PACK.equals(mode)) {
+            return hasEffectiveManagedDesktopSource(context, pkg, component) ? "PACK" : "DEFAULT";
+        }
         IconSourceManager.Selection global = IconSourceManager.get(context);
-        if (global.type == IconSourceManager.Type.IMPROVED) return "IMPROVED";
-        if (global.type == IconSourceManager.Type.PACK) return "PACK";
+        if (global.type == IconSourceManager.Type.IMPROVED) {
+            return hasEffectiveManagedDesktopSource(context, pkg, component)
+                    ? "IMPROVED" : "DEFAULT";
+        }
+        if (global.type == IconSourceManager.Type.PACK) {
+            return hasEffectiveManagedDesktopSource(context, pkg, component) ? "PACK" : "DEFAULT";
+        }
         return "DEFAULT";
     }
 
     public static String desktopIconSourceIdentity(Object itemInfo) {
         Context context = currentApplicationContext();
         if (context == null || itemInfo == null) return "default";
+        String effectiveType = desktopIconSourceType(itemInfo);
+        if ("DEFAULT".equals(effectiveType)) return "default";
         String pkg = itemFieldValue(itemInfo, "packageName");
         String component = itemFieldValue(itemInfo, "componentName");
         RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(context, pkg, component);
@@ -3702,6 +3732,20 @@ public final class MaintainedLauncherSettingsHost {
         return global.type == IconSourceManager.Type.PACK
                 ? "pack:" + String.valueOf(global.packageName)
                 : global.type == IconSourceManager.Type.IMPROVED ? "improved" : "default";
+    }
+
+    private static boolean hasEffectiveManagedDesktopSource(
+            Context context, String packageName, String componentName) {
+        if (context == null || TextUtils.isEmpty(packageName)) return false;
+        try {
+            ResolveInfo resolved = resolveLauncherActivity(
+                    context.getPackageManager(), packageName, componentName);
+            if (resolved == null) return false;
+            SettingsResourceContext settings = createSettingsContext(context);
+            return resolveManagedIcon(context, resolved, settings.getResources(), null) != null;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private static String itemFieldValue(Object itemInfo, String fieldName) {
@@ -12429,7 +12473,7 @@ public final class MaintainedLauncherSettingsHost {
             setBackupValue(resources, root, "preview_missing_app_count", String.valueOf(plan.missingAppCount));
             setBackupValue(resources, root, "preview_missing_icon_pack_count", String.valueOf(plan.missingIconPackCount));
             setBackupValue(resources, root, "preview_missing_theme_count", String.valueOf(plan.missingThemePackageCount));
-            setBackupValue(resources, root, "preview_permission_count", String.valueOf(plan.permissionCount));
+
             setSettingsContentView(activity, context, resources, root, true);
         } catch (Throwable error) {
             Log.w(LOG_TAG, "Unable to show restore preview", error);
@@ -14168,6 +14212,12 @@ public final class MaintainedLauncherSettingsHost {
         return false;
     }
 
+    public enum ApplyReason {
+        USER_SELECTION,
+        RESTORE,
+        NETWORK_RECOVERED
+    }
+
     private static void applyGlobalIconSource(final Context context, final IconSourceManager.Selection selection) {
         if (context == null) return;
         final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
@@ -14176,8 +14226,27 @@ public final class MaintainedLauncherSettingsHost {
                 ? IconSourceManager.Selection.defaultIcon() : selection;
         final boolean sourceChanged = previousSelection.type != targetSelection.type
                 || !TextUtils.equals(previousSelection.packageName, targetSelection.packageName);
+
+        persistGlobalIconSelection(context, targetSelection);
+        reconcileCurrentGlobalIconSource(context, ApplyReason.USER_SELECTION, sourceChanged);
+    }
+
+    public static void persistGlobalIconSelection(final Context context, final IconSourceManager.Selection selection) {
+        if (context == null) return;
+        final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        final IconSourceManager.Selection targetSelection = selection == null
+                ? IconSourceManager.Selection.defaultIcon() : selection;
         IconSourceManager.set(app, targetSelection);
         invalidateActiveIconAdapter(true);
+    }
+
+    public static void reconcileCurrentGlobalIconSource(final Context context, final ApplyReason reason, final boolean sourceChanged) {
+        if (context == null) return;
+        IconRasterDiagnostics.markIconLifecycle(
+                reason == ApplyReason.RESTORE ? "RESTORE" : "HOT");
+        final Context app = context.getApplicationContext() == null ? context : context.getApplicationContext();
+        final IconSourceManager.Selection targetSelection = IconSourceManager.get(app);
+
         new Thread(new Runnable() {
             public void run() {
                 try {
@@ -14193,29 +14262,31 @@ public final class MaintainedLauncherSettingsHost {
                             ? settingsResources(app) : null;
                     SharedPreferences iconOverridePrefs = app.getSharedPreferences(
                             ICON_OVERRIDE_PREFS, Context.MODE_PRIVATE);
-                    // Older builds wrote a concrete resource choice while choosing what was
-                    // intended to be the global default.  Apply the requested default once:
-                    // every library-backed row follows its component's first candidate again.
-                    // Custom artwork and icon-pack choices deliberately remain per-app overrides.
                     boolean resetLibraryDefaults = targetSelection.type == IconSourceManager.Type.IMPROVED
                             && !iconOverridePrefs.getBoolean(
                             PREF_IMPROVED_ICON_DEFAULTS_USE_FIRST_CANDIDATE, false);
+                    int applicationCount = 0;
                     for (int i = 0; apps != null && i < apps.size(); i++) {
                         ResolveInfo info = apps.get(i);
                         ActivityInfo ai = info == null ? null : info.activityInfo;
                         if (ai == null || !shouldShowIconEntry(info)) continue;
+                        applicationCount++;
                         RedirectIconInfo redirect = RedirectIconDB.getRedirectIconInfo(app,
                                 ai.packageName, ai.name);
                         String mode = RedirectIconDB.modeOf(redirect);
-                        // A global source switch must not inherit a previous library/pack
-                        // selection. Auto delegates solely to the newly selected source and
-                        // falls back to the APK icon when that source has no coverage.
-                        if (sourceChanged && !RedirectIconDB.MODE_CUSTOM.equals(mode)
+
+                        if (reason == ApplyReason.USER_SELECTION && sourceChanged
+                                && !RedirectIconDB.MODE_CUSTOM.equals(mode)
                                 && !RedirectIconDB.MODE_AUTO.equals(mode)) {
                             RedirectIconDB.updateAutoIcon(app, ai.packageName, ai.name);
                             mode = RedirectIconDB.MODE_AUTO;
                             changed.add(ai.packageName);
                         }
+
+                        if (reason == ApplyReason.RESTORE && !RedirectIconDB.MODE_AUTO.equals(mode)) {
+                            continue;
+                        }
+
                         if (targetSelection.type == IconSourceManager.Type.IMPROVED) {
                             com.smartisanos.home.settings.icons.IconPreviewRepository.ImprovedCandidate
                                     candidate = com.smartisanos.home.settings.icons.IconPreviewRepository
@@ -14226,8 +14297,6 @@ public final class MaintainedLauncherSettingsHost {
                                 RedirectIconDB.updateAutoIcon(app, ai.packageName, ai.name);
                                 changed.add(ai.packageName);
                             }
-                            // This schedules only the existing raw-PNG cache path.  It never
-                            // asks the 52dp settings-preview repository to provide desktop art.
                             scheduleSmartisanIconFetch(app, ai.packageName);
                             if (candidate.exists && !TextUtils.isEmpty(candidate.sourceId)
                                     && !candidate.sourceId.equals(ai.packageName)) {
@@ -14244,20 +14313,23 @@ public final class MaintainedLauncherSettingsHost {
                         iconOverridePrefs.edit().putBoolean(
                                 PREF_IMPROVED_ICON_DEFAULTS_USE_FIRST_CANDIDATE, true).apply();
                     }
+                    Log.i(LOG_TAG, "RESTORE_ICON_SOURCE_RECONCILE source=" + targetSelection.type
+                            + " reason=" + reason + " applicationCount=" + applicationCount + " changedCount=" + changed.size());
+                    final java.util.ArrayList<String> finalChanged = new java.util.ArrayList<String>(changed);
                     new Handler(Looper.getMainLooper()).post(new Runnable() {
                         public void run() {
                             if (context instanceof Activity) {
                                 refreshIconPackSubtitle((Activity) context);
                             }
-                            applyIconChanges(app, changed);
+                            applyIconChanges(app, finalChanged);
                             invalidateActiveIconAdapter(true);
                         }
                     });
                 } catch (Throwable error) {
-                    Log.w(LOG_TAG, "GLOBAL_ICON_SOURCE_APPLY_FAILED", error);
+                    Log.e(LOG_TAG, "Global icon background task failed", error);
                 }
             }
-        }, "global-icon-source-apply").start();
+        }).start();
     }
 
     private static String iconSizeSubtitle(Context context) {
@@ -15416,6 +15488,7 @@ public final class MaintainedLauncherSettingsHost {
     }
 
     private static void forceUpdateIcon(Context context, RedirectIconInfo info) {
+        IconRasterDiagnostics.markIconLifecycle("HOT");
         if (info != null && !TextUtils.isEmpty(info.packageName)) {
             applyIconChanges(context, Collections.singleton(info.packageName));
         }
@@ -17456,19 +17529,22 @@ public final class MaintainedLauncherSettingsHost {
         }
         if (RedirectIconDB.MODE_PACK.equals(mode)) {
             String pack = RedirectIconDB.packNameOf(redirect);
-            return pack == null ? null : com.smartisanos.home.settings.icons.IconPackManager
+            Drawable custom = pack == null ? null : com.smartisanos.home.settings.icons.IconPackManager
                     .getPackedIcon(context, pack, ai.packageName, ai.name);
+            return custom;
         }
         IconSourceManager.Selection global = temporaryGlobal == null
                 ? IconSourceManager.get(context) : temporaryGlobal;
         if (global.type == IconSourceManager.Type.PACK) {
-            return packedIconFromPackage(context, global.packageName, info);
+            Drawable custom = packedIconFromPackage(context, global.packageName, info);
+            return custom;
         }
         if (global.type == IconSourceManager.Type.IMPROVED) {
             // Desktop artwork must be resolved from the original resource or
             // cached PNG.  IconPreviewRepository owns only 52dp settings UI
             // previews and must not introduce an intermediate desktop raster.
-            return smartisanIconDrawableCachedOnly(context, info, resources);
+            Drawable custom = smartisanIconDrawableCachedOnly(context, info, resources);
+            return custom;
         }
         return null;
     }
@@ -17507,7 +17583,7 @@ public final class MaintainedLauncherSettingsHost {
         try {
             Drawable cachedImproved = smartisanNetworkIconDrawable(context, packageName);
             if (cachedImproved != null) {
-                return cachedImproved;
+                return normalizeLauncherIcon(cachedImproved);
             }
             PackageManager pm = context.getPackageManager();
             Intent intent = new Intent(Intent.ACTION_MAIN);
@@ -18114,6 +18190,9 @@ public final class MaintainedLauncherSettingsHost {
     private static void scheduleSmartisanIconRefresh(Context context,
                                                       java.util.Collection<String> packages) {
         if (context == null || packages == null || packages.isEmpty()) {
+            return;
+        }
+        if (com.smartisanos.launcher.backup.RestoreIconSourceReconciler.queueIfPending(context, packages)) {
             return;
         }
         synchronized (MaintainedLauncherSettingsHost.class) {

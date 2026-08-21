@@ -86,13 +86,9 @@ public final class PendingItemRestoreHandler {
                 values.put("cellIndex", cell);
                 values.put("folderIndex", -1);
                 values.put("title", label(context, item));
-                values.put("lastActivateTime", 0);
-                values.put("messagesNumber", 0);
-                values.put("newlyInstalled", 0);
                 values.put("packageName", item.optString("packageName", ""));
                 values.put("componentName", item.optString("componentName", ""));
                 values.put("user", item.optInt("user", 0));
-                values.put("usage_count", 0);
                 database.insertOrThrow("table_iteminfos", null, values);
                 restored++;
             }

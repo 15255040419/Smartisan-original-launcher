@@ -108,8 +108,13 @@ public final class BackupValidator {
         checkedJson(new File(output, "pending_items.json"), MAX_ENTRY_BYTES);
         validateCustomIcons(output, icons);
         ShortcutIconBackupCodec.validate(layout, shortcutIcons, output);
+        JSONObject portableSources = new JSONObject();
+        if (new File(output, "icons/sources.json").exists()) {
+            portableSources = checkedJson(new File(output, "icons/sources.json"), MAX_ENTRY_BYTES);
+            validatePortableSources(output, portableSources);
+        }
         return new BackupArchiveReader.ValidatedBackup(archive, output, manifest, layout,
-                settings, theme, icons, shortcutIcons);
+                settings, theme, icons, shortcutIcons, portableSources);
     }
 
     private static void assertZipCentralDirectory(File archive) throws Exception {
@@ -151,6 +156,36 @@ public final class BackupValidator {
                 throw invalid("Custom icon is not PNG");
             }
             if (BitmapFactory.decodeByteArray(data, 0, data.length) == null) throw invalid("Invalid PNG");
+        }
+    }
+
+    private static void validatePortableSources(File root, JSONObject sources) throws Exception {
+        JSONArray records = sources.optJSONArray("records");
+        if (records == null) return;
+        if (records.length() > 4096) throw invalid("Too many portable icon sources");
+        java.util.HashSet<String> names = new java.util.HashSet<String>();
+        for (int i = 0; i < records.length(); i++) {
+            String name = records.getJSONObject(i).optString("portableFile", "");
+            if (!name.matches("[0-9a-f]{1,8}\\.png") || !names.add(name)) {
+                throw invalid("Invalid portable source name");
+            }
+            String normalized = normalizeEntryName("icons/sources/" + name);
+            File icon = safeChild(root, normalized);
+            byte[] data = BackupFileUtils.readBytes(icon, 512L * 1024L);
+            if (data.length < 8 || data[0] != (byte) 0x89 || data[1] != 0x50
+                    || data[2] != 0x4e || data[3] != 0x47 || data[4] != 0x0d
+                    || data[5] != 0x0a || data[6] != 0x1a || data[7] != 0x0a) {
+                throw invalid("Portable source is not PNG");
+            }
+            android.graphics.Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+            if (bitmap == null || bitmap.getWidth() < 48 || bitmap.getHeight() < 48
+                    || bitmap.getWidth() > 1024 || bitmap.getHeight() > 1024) {
+                throw invalid("Invalid portable source dimensions");
+            }
+            String sha256 = BackupFileUtils.hex(java.security.MessageDigest.getInstance("SHA-256").digest(data));
+            if (!sha256.equalsIgnoreCase(records.getJSONObject(i).optString("sha256", ""))) {
+                throw invalid("Portable source SHA256 mismatch");
+            }
         }
     }
 

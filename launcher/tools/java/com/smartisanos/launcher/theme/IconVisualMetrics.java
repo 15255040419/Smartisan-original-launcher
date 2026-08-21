@@ -11,7 +11,11 @@ import android.util.Log;
  * therefore reads the selected scene values but never applies that setting again.
  */
 public final class IconVisualMetrics {
-    public static final int REVISION = 4;
+    public static final int REVISION = 5;
+    // Frozen original-port golden: the UI's 100% maps to the artwork box that
+    // was visually accepted before size controls were added. This calibration
+    // belongs only to the geometry owner; the persisted/user value stays 100.
+    private static final float ORIGINAL_GOLDEN_ARTWORK_SCALE = 1.20f;
 
     public final int sceneMode;
     public final int gridMode;
@@ -82,7 +86,8 @@ public final class IconVisualMetrics {
 
             DisplayMetrics display = android.content.res.Resources.getSystem().getDisplayMetrics();
             int logicalWidth = Math.max(1, intField(constants, "window_width", display.widthPixels));
-            float scale = display.widthPixels / (float) logicalWidth;
+            int surfaceWidth = launcherSurfaceWidth(display.widthPixels);
+            float scale = surfaceWidth / (float) logicalWidth;
             if (!(scale > 0f) || Float.isNaN(scale) || Float.isInfinite(scale)) scale = 1f;
             int physicalArtwork = Math.max(1, (int) Math.ceil(artwork * scale));
             int physicalTexture = Math.max(1, (int) Math.ceil(texture * scale));
@@ -90,7 +95,7 @@ public final class IconVisualMetrics {
             int setting = context == null ? 100 : LauncherSettingBridge.readIconSizePercent(context);
             IconVisualMetrics result = new IconVisualMetrics(sceneMode, sceneMode, setting, cell,
                     artwork, texture, physicalArtwork, physicalTexture, scale,
-                    display.widthPixels, logicalWidth);
+                    surfaceWidth, logicalWidth);
             Log.i("LauncherIconRaster", "ICON_VISUAL_METRICS sceneMode=" + sceneMode
                     + " gridMode=" + sceneMode + " iconSizeSetting=" + setting
                     + " cellWidth=" + cell + " logicalArtwork=" + artwork
@@ -101,11 +106,32 @@ public final class IconVisualMetrics {
                     + " weatherOuter=" + floatField(property, "weather_back_size", 0f)
                     + " calendarOuter=" + floatField(property, "calendar_back_size", 0f)
                     + " settingButton=" + floatField(property, "setting_button", 0f)
-                    + " physicalScale=" + scale + " surfaceWidth=" + display.widthPixels);
+                    + " physicalScale=" + scale + " surfaceWidth=" + surfaceWidth
+                    + " surfaceOwner=" + (surfaceWidth == display.widthPixels
+                    ? "DISPLAY_FALLBACK" : "LAUNCHER_GL_SURFACE"));
             return result;
         } catch (Throwable ignored) {
             return null;
         }
+    }
+
+    public static int geometryPercentForUser(int userPercent) {
+        return Math.max(1, Math.round(userPercent * ORIGINAL_GOLDEN_ARTWORK_SCALE));
+    }
+
+    /** Prefer the actual Launcher GL surface; DisplayMetrics is startup fallback only. */
+    private static int launcherSurfaceWidth(int fallback) {
+        try {
+            Class<?> launcher = Class.forName("com.smartisanos.launcher.J");
+            Object instance = launcher.getMethod("getInstance").invoke(null);
+            Object surface = launcher.getMethod("Oa").invoke(instance);
+            if (surface instanceof android.view.View) {
+                int width = ((android.view.View) surface).getWidth();
+                if (width > 0) return width;
+            }
+        } catch (Throwable ignored) {
+        }
+        return Math.max(1, fallback);
     }
 
     private static float floatField(Object object, String name, float fallback) {

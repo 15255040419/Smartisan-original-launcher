@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -23,7 +24,6 @@ public final class RestoreMergePlanner {
         public int shortcutCount;
         public int missingIconPackCount;
         public int missingThemePackageCount;
-        public int permissionCount;
     }
 
     private RestoreMergePlanner() {}
@@ -35,7 +35,10 @@ public final class RestoreMergePlanner {
         for (int i = 0; i < items.length(); i++) {
             JSONObject item = items.getJSONObject(i);
             backupKeys.add(stableKey(item));
-            if (item.optInt("itemType", -1) == 2) plan.folderCount++;
+            if (isFolder(item)) {
+                plan.folderCount++;
+                continue; // FolderInfo is always restored; never counted as missing app
+            }
             if (isShortcut(item)) plan.shortcutCount++;
             if (isRestoreCandidate(item) && !isInstalled(context, item)) plan.missingAppCount++;
         }
@@ -64,8 +67,6 @@ public final class RestoreMergePlanner {
         plan.missingIconPackCount = missingPacks.size();
         String themePackage = backup.theme.optString("themePackage", "");
         plan.missingThemePackageCount = ThemeBackupCodec.isThemePackageAvailable(context, themePackage) ? 0 : 1;
-        if (preferenceEnabled(backup.settings, "launcher_hide_badge")
-                && !notificationAccessGranted(context)) plan.permissionCount++;
         return plan;
     }
 
@@ -105,7 +106,25 @@ public final class RestoreMergePlanner {
                 && item.optString("componentName", "").length() != 0;
     }
 
+    /**
+     * Returns true if this item is a Smartisan Launcher FolderInfo (itemType == 2).
+     *
+     * FolderInfo is a Launcher-internal structure object, NOT an installed Android app.
+     * It MUST never go through PackageManager.isInstalled() or pending_items.json.
+     * It is always restored unconditionally as a structural row in table_iteminfos.
+     */
+    static boolean isFolder(JSONObject item) {
+        return item.optInt("itemType", -1) == 2;
+    }
+
+    /**
+     * Returns true only for items whose presence depends on an installed Android package.
+     *
+     * FolderInfo is explicitly excluded: it is a Launcher-internal object, not an app.
+     * Only items that pass this check are eligible for isInstalled() or pending_items.
+     */
     static boolean isRestoreCandidate(JSONObject item) {
+        if (isFolder(item)) return false;
         // Original QuickLaunch rows may intentionally omit componentName; their
         // package/shortcut/profile identity is still sufficient to merge safely.
         return hasComponent(item) || isShortcut(item);
@@ -161,25 +180,5 @@ public final class RestoreMergePlanner {
     private static boolean packageInstalled(Context context, String pkg) {
         try { context.getPackageManager().getPackageInfo(pkg, 0); return true; }
         catch (Throwable ignored) { return false; }
-    }
-
-    private static boolean preferenceEnabled(JSONObject settings, String key) {
-        JSONObject files = settings.optJSONObject("files");
-        if (files == null) return false;
-        java.util.Iterator<String> names = files.keys();
-        while (names.hasNext()) {
-            JSONObject values = files.optJSONObject(names.next());
-            JSONObject typed = values == null ? null : values.optJSONObject(key);
-            if (typed != null && "boolean".equals(typed.optString("type"))) return typed.optBoolean("value");
-        }
-        return false;
-    }
-
-    private static boolean notificationAccessGranted(Context context) {
-        try {
-            String flat = android.provider.Settings.Secure.getString(context.getContentResolver(),
-                    "enabled_notification_listeners");
-            return flat != null && flat.contains(context.getPackageName());
-        } catch (Throwable ignored) { return false; }
     }
 }

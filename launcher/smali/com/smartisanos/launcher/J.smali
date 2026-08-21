@@ -5042,6 +5042,12 @@
 
     invoke-static {}, Lcom/smartisanos/launcher/quicksearch/SearchIndexRepository;->onLauncherModelReady()V
 
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/J;->getContext()Landroid/content/Context;
+
+    move-result-object v2
+
+    invoke-static {v2}, Lcom/smartisanos/launcher/backup/RestoreIconSourceReconciler;->onLauncherModelReady(Landroid/content/Context;)V
+
     new-instance v2, Landroid/content/Intent;
 
     const-string v3, "com.smartisanos.launcher.ready"

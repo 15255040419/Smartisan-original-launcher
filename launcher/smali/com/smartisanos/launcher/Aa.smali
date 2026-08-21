@@ -1973,6 +1973,9 @@
     move v3, v4
 
     :goto_1
+    # iconRawData is source persistence only. Ordinary application artwork is
+    # composed exactly once by Static Application Composer when the final
+    # texture is requested; never pre-compose a DB bitmap here.
     goto :cond_6
 
     if-eqz p3, :cond_6

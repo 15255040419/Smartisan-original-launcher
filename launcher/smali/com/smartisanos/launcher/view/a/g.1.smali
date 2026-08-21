@@ -746,7 +746,7 @@
     :cond_5
     const/4 v1, 0x0
 
-    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconRootGeometry(Ljava/lang/Object;Ljava/lang/Object;)V
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->syncActiveIconToStaticArtwork(Ljava/lang/Object;Ljava/lang/Object;)V
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconShadowOwnership(Ljava/lang/Object;)V
 
@@ -3176,7 +3176,7 @@
     :active_raster_diag_run
     const/4 v1, 0x0
 
-    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconRootGeometry(Ljava/lang/Object;Ljava/lang/Object;)V
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->syncActiveIconToStaticArtwork(Ljava/lang/Object;Ljava/lang/Object;)V
 
     invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconShadowOwnership(Ljava/lang/Object;)V
 
@@ -8753,7 +8753,7 @@
 
     .line 15
     :cond_2
-    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconRootGeometry(Ljava/lang/Object;Ljava/lang/Object;)V
+    invoke-static {p0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->syncActiveIconToStaticArtwork(Ljava/lang/Object;Ljava/lang/Object;)V
 
     invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/g;->rl()V
 

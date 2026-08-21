@@ -239,11 +239,13 @@ public final class DesktopBackupController {
             org.json.JSONObject icons = IconBackupCodec.encode(context, new File(staging, "icons/custom"));
             org.json.JSONObject shortcutIcons = ShortcutIconBackupCodec.encode(context, layout.value,
                     new File(staging, "icons/shortcuts"));
+            org.json.JSONObject portableSources = RestoreIconSourceReconciler.encodePortableSources(
+                    context, new File(staging, "icons/sources"));
 
             state(operation, journal, entry, BackupOperationJournal.State.BUILDING_ARCHIVE,
-                    "BUILDING_ARCHIVE", true);
+                    "正在构建压缩包", true);
             File archive = BackupArchiveWriter.write(staging, manifest, layout.value, settings,
-                    theme, icons, shortcutIcons, operation.cancellation);
+                    theme, icons, shortcutIcons, portableSources, operation.cancellation);
             operation.cancellation.throwIfCancelled();
             String baseName = requestedName;
             if (baseName.length() == 0) {

@@ -67,6 +67,11 @@ public final class LayoutSnapshotExporter {
             item.put("sourceUserId", sourceUserId);
             item.put("sourceProfileSerial", sourceSerial);
             item.put("diagnosticOnly", true);
+            
+            // Wipe volatile runtime states that shouldn't be restored across devices
+            if (item.has("messagesNumber")) item.put("messagesNumber", 0);
+            if (item.has("lastActivateTime")) item.put("lastActivateTime", 0);
+            if (item.has("usage_count")) item.put("usage_count", 0);
         }
     }
 

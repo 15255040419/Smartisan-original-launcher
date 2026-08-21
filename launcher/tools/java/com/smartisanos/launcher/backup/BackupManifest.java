@@ -22,7 +22,7 @@ public final class BackupManifest {
     public int screenWidth;
     public int screenHeight;
     public int densityDpi;
-    public int iconSourceSchemaVersion = 2;
+    public int iconSourceSchemaVersion = 3;
     public int shortcutSourceSchemaVersion = 2;
     public int profileIdentitySchemaVersion = 1;
 

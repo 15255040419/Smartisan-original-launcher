@@ -182,8 +182,10 @@ public final class DesktopRestoreController {
                     new File(rollbackDirectory, "icons/custom"));
             org.json.JSONObject shortcutIcons = ShortcutIconBackupCodec.encode(context, layout.value,
                     new File(rollbackDirectory, "icons/shortcuts"));
+            org.json.JSONObject portableSources = RestoreIconSourceReconciler.encodePortableSources(
+                    context, new File(rollbackDirectory, "icons/sources"));
             File rollbackArchive = BackupArchiveWriter.write(rollbackDirectory, manifest,
-                    layout.value, settings, theme, icons, shortcutIcons, cancel);
+                    layout.value, settings, theme, icons, shortcutIcons, portableSources, cancel);
             BackupValidator.validateAndExtract(rollbackArchive, new File(rollbackDirectory, "verified"));
             BackupFileUtils.deleteRecursively(new File(rollbackDirectory, "verified"));
             entry.rollbackPath = rollbackArchive.getAbsolutePath();
@@ -300,6 +302,10 @@ public final class DesktopRestoreController {
         }
         journal.write(entry, RestoreOperationJournal.State.APPLYING_ICONS, null);
         IconBackupCodec.restore(context, backup.icons, backup.extractedRoot);
+        RestoreIconSourceReconciler.restorePortableSources(context, backup.portableSources,
+                backup.extractedRoot);
+        RestoreIconSourceReconciler.setPendingReconcile(context, entry.operationToken);
+
         Log.i(TAG, "RESTORE_CACHE_INVALIDATED oldRasterVersion=raster:v1-v7 newRasterVersion=raster:v8"
                 + " ordinaryTableIcons=cleared shortcutSource=preserved");
         journal.write(entry, RestoreOperationJournal.State.APPLYING_THEME, null);
@@ -328,7 +334,7 @@ public final class DesktopRestoreController {
         // background hydration only after this frame is visible.
         MaintainedLauncherSettingsHost.showRestoreStatusToast(context, resultCode);
         if ("RESTORE_COMPLETE".equals(resultCode)) {
-            MaintainedLauncherSettingsHost.rehydrateImprovedIconsAfterRestore(context);
+            com.smartisanos.launcher.backup.RestoreIconSourceReconciler.primeIconSourceAfterRestore(context);
         }
         journal.write(entry, RestoreOperationJournal.State.CLEANING, null);
         BackupFileUtils.deleteRecursively(new File(entry.stagingPath));

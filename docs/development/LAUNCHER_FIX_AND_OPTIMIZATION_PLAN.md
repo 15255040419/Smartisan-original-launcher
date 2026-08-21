@@ -966,16 +966,9 @@ rg -n "onWallpaperPicked|saveGaussianWallpaperCopy|refreshLauncherWallpaperNow|r
 
 # 14. 阶段 9：图标加载
 
-状态：加载性能核心实现完成；图标 geometry/raster 架构已于 2026-08-08 冻结，最终跨分辨率回归待完成。普通模式不再启动图标包扫描或 appfilter 解析；所选图标包解析、在线图标落盘均只合并更新受影响包名，不再以设置资源预热或图标缓存写入触发全量数据库刷新。
+状态：加载性能核心实现完成；图标 geometry/raster 架构于 2026-08-21 重新审计并冻结为 [`ICON_RENDERING_CONTRACT.md`](ICON_RENDERING_CONTRACT.md)。当前实现仍需按合同消除数据库预合成与最终 Composer 的双 Owner，并打通 ActiveIcon attach 后的 STATIC geometry sync，最终跨分辨率矩阵尚未完成。普通模式不再启动图标包扫描或 appfilter 解析；所选图标包解析、在线图标落盘均只合并更新受影响包名，不再以设置资源预热或图标缓存写入触发全量数据库刷新。
 
-冻结规则：
-
-- DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 与桌面设置统一进入 `LayoutProperty -> IconVisualMetrics -> Unified Visible Envelope -> Static Application Composer`；来源只提供 RAW，不得分叉尺寸算法。Visible Envelope 只按最外围 alpha 可见边界去除外围透明 padding 后等比居中，不得按面积、凸包、fill ratio、内部留白或图标形状改变倍率。
-- 用户图标百分比只由 `LayoutProperty` 应用一次；`icon_size_origin_resize` 仅保留原版字段兼容，适配入口必须使其等于 `icon_size_origin`，不得恢复第二档、固定 `0.90` 缩小或 package/source/device 倍率。
-- Weather/Calendar 内部 ActiveIcon 完全冻结，只共享 root 外部 geometry；静态 fallback 同样进入 Unified Visible Envelope，均不得按普通形状、面积或内容补偿缩放。
-- 桌面设置保留特殊 renderer，但服从同一用户尺寸与 physical raster 原则。
-- 跨分辨率验收比较 `visualEnvelope/cellWidth`，不是比较绝对像素；高清 RAW 只允许一次最终 Raster，低分辨率源必须标记 `SOURCE_LIMITED`。
-- 当前仅完成 vivo X21A 1080/12 宫格/当前 100% 真机基线；50/150、20 宫格、1440/2K 和中间分辨率未全部完成前，不得标记 `ICON_SYSTEM_VALIDATION_FROZEN=true`。
+冻结规则只在 [`ICON_RENDERING_CONTRACT.md`](ICON_RENDERING_CONTRACT.md) 维护，本计划不再复制另一套算法。核心边界：来源只解析 RAW；`IconVisualMetrics` 唯一决定 geometry/physical raster；普通 Application 每次生成只调用一次最终 Composer；DEFAULT-only optical normalization；ActiveIcon 内部原版动画冻结并在每个 geometry generation 追随 STATIC artwork world rect。完整矩阵通过前不得标记 `ICON_SYSTEM_VALIDATION_FROZEN=true`、`FINAL` 或 `PASS`。
 
 ## 原版参考
 

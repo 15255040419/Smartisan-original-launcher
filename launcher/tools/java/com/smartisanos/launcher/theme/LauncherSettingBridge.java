@@ -188,13 +188,12 @@ public final class LauncherSettingBridge {
     }
 
     public static int readIconSizePercent(Context context) {
-        return effectiveIconSizePercent(normalizeIconSizePercent(readInt(context, KEY_ICON_SIZE, 100)));
+        return normalizeIconSizePercent(readInt(context, KEY_ICON_SIZE, 100));
     }
 
-    /** Single outer-geometry input for the original ActiveIcon scene. */
-    public static float readIconSizeFactor() {
-        Context context = applicationContext();
-        return readIconSizePercent(context) / 100.0f;
+    /** Geometry-only mapping owned by IconVisualMetrics; the user value is unchanged. */
+    public static int readIconGeometryPercent(Context context) {
+        return IconVisualMetrics.geometryPercentForUser(readIconSizePercent(context));
     }
 
     /** Low-frequency trace for the single user-size input and the LIVE root owner. */
@@ -214,26 +213,6 @@ public final class LauncherSettingBridge {
                     + " requestedScale=" + requestedScale);
         } catch (Throwable error) {
             Log.w(TAG, "ACTIVE_ICON_SIZE_TRACE_FAILED stage=" + stage, error);
-        }
-    }
-
-    /** Applies the user icon-size factor once, after the original mode branch. */
-    public static void applyActiveIconUserSize(Object root) {
-        if (root == null) return;
-        try {
-            Object current = invoke(root, "getScale");
-            float x = floatField(current, "x");
-            float y = floatField(current, "y");
-            float z = floatField(current, "z");
-            float factor = readIconSizeFactor();
-            traceActiveIconSize("" + root.getClass().getSimpleName() + "_CREATE_BEFORE",
-                    root, x);
-            invoke(root, "setScale", Float.valueOf(x * factor), Float.valueOf(y * factor),
-                    Float.valueOf(z));
-            traceActiveIconSize("" + root.getClass().getSimpleName() + "_CREATE_AFTER",
-                    root, x * factor);
-        } catch (Throwable error) {
-            Log.w(TAG, "ACTIVE_ICON_USER_SIZE_APPLY_FAILED", error);
         }
     }
 
@@ -738,39 +717,138 @@ public final class LauncherSettingBridge {
     }
 
     private static long sActiveIconGeometryGeneration;
+    private static final java.util.Map<Object, String> ACTIVE_ICON_STATES =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<Object, String>());
+
+    /** Re-sync at the original LIVE/STATIC state boundary without a delay. */
+    public static void syncActiveIconState(Object activeRoot, String state) {
+        if (activeRoot == null) return;
+        ACTIVE_ICON_STATES.put(activeRoot, state == null ? "LIVE" : state);
+        try {
+            Object cell = readPrivateField(activeRoot, "qP");
+            if (cell != null) syncActiveIconToStaticArtwork(cell, null);
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_STATE_SYNC_FAILED state=" + state
+                    + " class=" + error.getClass().getSimpleName());
+        }
+    }
+
     /** Matches LIVE to the current STATIC Cell geometry without changing STATIC. */
-    public static void applyActiveIconRootGeometry(Object cell, Object staticIconNode) {
+    public static void syncActiveIconToStaticArtwork(Object cell, Object staticIconNode) {
         try {
             Object values = readPrivateField(cell, "sc");
-            if (!(values instanceof Object[])) return;
+            if (!(values instanceof Object[])) {
+                Log.i(TAG, "ACTIVE_ICON_GEOMETRY_SYNC_DEFER reason=sc_unavailable");
+                return;
+            }
             Object[] nodes = (Object[]) values;
-            if (staticIconNode == null && nodes.length > 1) staticIconNode = nodes[1];
-            if (staticIconNode == null) return;
-            if (nodes.length <= 7 || nodes[7] == null) return;
+            // sc[1] is the ordinary-application artwork node and is deliberately
+            // not created for Weather/Calendar.  sc[0] is only a possible cached
+            // texture node; some original ActiveIcon lifecycles do not publish it.
+            if (staticIconNode == null && nodes.length > 0) staticIconNode = nodes[0];
+            if (nodes.length <= 7 || nodes[7] == null) {
+                return;
+            }
             Object activeRoot = nodes[7];
             String type = activeRoot.getClass().getName().endsWith(".H") ? "weather" : "calendar";
             Object activeBase = findActiveIconBase(activeRoot, type);
-            if (activeBase == null) return;
+            if (activeBase == null) {
+                Log.i(TAG, "ACTIVE_ICON_GEOMETRY_SYNC_DEFER reason=active_base_unavailable"
+                        + " type=" + type + " children=" + activeIconChildNames(activeRoot));
+                return;
+            }
             ActiveIconRasterSpec raster = ActiveIconRasterSpec.resolve();
-            if (raster == null || raster.rasterScale <= 0.0f) return;
+            if (raster == null || raster.rasterScale <= 0.0f) {
+                Log.i(TAG, "ACTIVE_ICON_GEOMETRY_SYNC_DEFER reason=raster_unavailable type=" + type);
+                return;
+            }
 
-            Object staticScale = invoke(staticIconNode, "getScale");
             Object baseScale = invoke(activeBase, "getScale");
-            Rect staticRect = worldRect(staticIconNode);
             Rect activeBaseRect = worldRect(activeBase);
-            if (staticRect == null || activeBaseRect == null || staticRect.width <= 0.0f
-                    || staticRect.height <= 0.0f || activeBaseRect.width <= 0.0f
-                    || activeBaseRect.height <= 0.0f) return;
 
             float logicalArtwork = Math.max(1.0f, raster.logicalArtworkWidth);
             float logicalArtworkHeight = Math.max(1.0f, raster.logicalArtworkHeight);
             float logicalTexture = Math.max(1.0f, raster.physicalTextureWidth / raster.rasterScale);
             float logicalTextureHeight = Math.max(1.0f,
                     raster.physicalTextureHeight / raster.rasterScale);
-            float staticArtworkWorldWidth = staticRect.width
-                    * logicalArtwork / logicalTexture;
-            float staticArtworkWorldHeight = staticRect.height
-                    * logicalArtworkHeight / logicalTextureHeight;
+            Object staticScale = staticIconNode == null ? invoke(cell, "getScale")
+                    : invoke(staticIconNode, "getScale");
+            Rect staticRect = staticIconNode == null ? null : worldRect(staticIconNode);
+            String oracle;
+            float staticArtworkWorldWidth;
+            float staticArtworkWorldHeight;
+            if (staticRect != null && staticRect.width > 0.0f && staticRect.height > 0.0f) {
+                oracle = "STATIC_NODE";
+                staticArtworkWorldWidth = staticRect.width * logicalArtwork / logicalTexture;
+                staticArtworkWorldHeight = staticRect.height
+                        * logicalArtworkHeight / logicalTextureHeight;
+            } else {
+                // The original renderer can keep an invisible node out of the
+                // published world-bounds tree.  sc[0] and sc[7] are siblings in
+                // the same Cell, so sc[0]'s resolved local display scale is the
+                // next real STATIC geometry oracle; unlike raster metrics it
+                // already includes grid and user-size changes.
+                float staticLocalWidth = Math.abs(floatField(staticScale, "x"));
+                float staticLocalHeight = Math.abs(floatField(staticScale, "y"));
+                if (staticIconNode != null && staticLocalWidth > 0.0f
+                        && staticLocalHeight > 0.0f) {
+                    Object rootScale = invoke(activeRoot, "getScale");
+                    float rootX = floatField(rootScale, "x");
+                    float rootY = floatField(rootScale, "y");
+                    float rootZ = floatField(rootScale, "z");
+                    float baseHalfWidth = Math.abs(floatField(baseScale, "x"));
+                    float baseHalfHeight = Math.abs(floatField(baseScale, "y"));
+                    float currentHalfWidth = baseHalfWidth * Math.abs(rootX);
+                    float currentHalfHeight = baseHalfHeight * Math.abs(rootY);
+                    float staticArtworkHalfWidth = staticLocalWidth
+                            * logicalArtwork / logicalTexture;
+                    float staticArtworkHalfHeight = staticLocalHeight
+                            * logicalArtworkHeight / logicalTextureHeight;
+                    if (currentHalfWidth > 0.0f && currentHalfHeight > 0.0f) {
+                        float widthCorrection = staticArtworkHalfWidth / currentHalfWidth;
+                        float heightCorrection = staticArtworkHalfHeight / currentHalfHeight;
+                        float correction = Math.min(widthCorrection, heightCorrection);
+                        invoke(activeRoot, "setScale", Float.valueOf(rootX * correction),
+                                Float.valueOf(rootY * correction), Float.valueOf(rootZ));
+                        invoke(activeRoot, "updateGeometricState");
+                        Log.i(TAG, "ICON_CONTRACT_ACTIVE_SYNC type=" + type.toUpperCase()
+                                + " state=" + (ACTIVE_ICON_STATES.get(activeRoot) == null
+                                ? "LIVE" : ACTIVE_ICON_STATES.get(activeRoot))
+                                + " staticOracle=STATIC_NODE_LOCAL_SCALE"
+                                + " staticIndex=0"
+                                + " iconSizePercent=" + raster.iconSizePercent
+                                + " staticTextureHalf=" + staticLocalWidth + "x" + staticLocalHeight
+                                + " staticArtworkHalf=" + staticArtworkHalfWidth + "x"
+                                + staticArtworkHalfHeight
+                                + " activeArtworkHalfBefore=" + currentHalfWidth + "x"
+                                + currentHalfHeight
+                                + " finalWidthRatio="
+                                + ((baseHalfWidth * Math.abs(rootX * correction))
+                                / staticArtworkHalfWidth)
+                                + " finalHeightRatio="
+                                + ((baseHalfHeight * Math.abs(rootY * correction))
+                                / staticArtworkHalfHeight)
+                                + " centerDeltaX=0.0 centerDeltaY=0.0"
+                                + " rootScaleAfter=" + vector2(invoke(activeRoot, "getScale")));
+                        return;
+                    }
+                }
+                // STATIC is the only final geometry oracle.  If its real node is
+                // not published yet, defer; never substitute physical raster
+                // dimensions for SMEngine logical/world geometry.
+                Log.i(TAG, "ACTIVE_ICON_GEOMETRY_SYNC_DEFER reason=static_oracle_unavailable"
+                        + " type=" + type + " staticIndex=0");
+                logActiveIconCellNodes(type, nodes);
+                logActiveIconNodeTree(type, activeRoot, activeBase,
+                        findLiveShadow(activeRoot));
+                return;
+            }
+            if (activeBaseRect == null || activeBaseRect.width <= 0.0f
+                    || activeBaseRect.height <= 0.0f) {
+                Log.i(TAG, "ACTIVE_ICON_GEOMETRY_SYNC_DEFER reason=static_node_bounds_unavailable"
+                        + " type=" + type);
+                return;
+            }
             float widthCorrection = staticArtworkWorldWidth / activeBaseRect.width;
             float heightCorrection = staticArtworkWorldHeight / activeBaseRect.height;
             float uniformCorrection = widthCorrection;
@@ -783,6 +861,7 @@ public final class LauncherSettingBridge {
             String rootScaleBefore = vector2(rootScale);
             Log.i(TAG, "ACTIVEICON_BASELINE_ALIGN"
                     + " type=" + type
+                    + " oracle=" + oracle
                     + " iconSizePercent=" + readIconSizePercent(applicationContext())
                     + " staticTextureWorld=" + staticRect.width + "x" + staticRect.height
                     + " logicalArtwork=" + logicalArtwork + "x" + logicalArtworkHeight
@@ -797,9 +876,25 @@ public final class LauncherSettingBridge {
                     + " uniformCorrection=" + uniformCorrection);
             invoke(activeRoot, "setScale", Float.valueOf(rootX * uniformCorrection),
                     Float.valueOf(rootY * uniformCorrection), Float.valueOf(rootZ));
+            invoke(activeRoot, "updateGeometricState");
             activeBaseRect = worldRect(activeBase);
             if (activeBaseRect == null) return;
+            for (int attempt = 0; attempt < 2; attempt++) {
+                float deltaX = staticRect.centerX - activeBaseRect.centerX;
+                float deltaY = staticRect.centerY - activeBaseRect.centerY;
+                if (Math.abs(deltaX) <= 0.5f && Math.abs(deltaY) <= 0.5f) break;
+                Object translate = invoke(activeRoot, "getLocation");
+                float translateX = floatField(translate, "x");
+                float translateY = floatField(translate, "y");
+                float translateZ = floatField(translate, "z");
+                invoke(activeRoot, "setTranslate", Float.valueOf(translateX + deltaX),
+                        Float.valueOf(translateY + deltaY), Float.valueOf(translateZ));
+                invoke(activeRoot, "updateGeometricState");
+                activeBaseRect = worldRect(activeBase);
+                if (activeBaseRect == null) return;
+            }
             Log.i(TAG, "ACTIVEICON_BASELINE_ALIGN type=" + type
+                    + " oracle=" + oracle
                     + " iconSizePercent=" + readIconSizePercent(applicationContext())
                     + " staticTextureWorld=" + staticRect.width + "x" + staticRect.height
                     + " staticArtworkWorld=" + staticArtworkWorldWidth + "x"
@@ -835,7 +930,8 @@ public final class LauncherSettingBridge {
                     + " finalActiveToStaticHeightRatio=" + finalHeightRatio
                     + " centerDeltaX=" + centerDeltaX
                     + " centerDeltaY=" + centerDeltaY
-                    + " staticVisible=" + invoke(staticIconNode, "isVisible")
+                    + " staticVisible=" + (staticIconNode == null
+                    ? "NOT_CREATED" : invoke(staticIconNode, "isVisible"))
                     + " activeRootVisible=" + invoke(activeRoot, "isVisible")
                     + " activeBackgroundVisible=" + invoke(activeBase, "isVisible")
                     + " staticScale=" + vector2(staticScale)
@@ -846,6 +942,15 @@ public final class LauncherSettingBridge {
                     + " shadowWorldRect=" + shadowFinalRect
                     + " commonParentAppliedOnce=true"
                     + " generation=" + generation);
+            String state = ACTIVE_ICON_STATES.get(activeRoot);
+            if (state == null) state = "LIVE";
+            Log.i(TAG, "ICON_CONTRACT_ACTIVE_SYNC type=" + type.toUpperCase()
+                    + " state=" + state
+                    + " finalWidthRatio=" + finalWidthRatio
+                    + " finalHeightRatio=" + finalHeightRatio
+                    + " centerDeltaX=" + centerDeltaX
+                    + " centerDeltaY=" + centerDeltaY
+                    + " staticOracle=" + oracle + " generation=" + generation);
             logActiveIconNodeTree(type, activeRoot, activeBase, shadow);
         } catch (Throwable error) {
             Log.w(TAG, "ACTIVE_ICON_GEOMETRY_VERIFY_FAILED class="
@@ -885,7 +990,10 @@ public final class LauncherSettingBridge {
             StringBuilder tree = new StringBuilder(256);
             tree.append("ACTIVE_ICON_NODE_TREE type=").append(type)
                     .append(" root=").append(invoke(root, "getName"))
+                    .append(" state=").append(ACTIVE_ICON_STATES.get(root))
+                    .append(" rootVisible=").append(invoke(root, "isVisible"))
                     .append(" rootScale=").append(vector2(invoke(root, "getScale")))
+                    .append(" rootWorld=").append(worldRect(root))
                     .append(" childCount=").append(childCount);
             for (int i = 0; i < childCount; i++) {
                 Object child = invoke(root, "getChildAt", Integer.valueOf(i));
@@ -895,6 +1003,7 @@ public final class LauncherSettingBridge {
                         .append(",layer=").append(invoke(child, "getLayer"))
                         .append(",queue=").append(invoke(child, "getRenderQueue"))
                         .append(",scale=").append(vector2(invoke(child, "getScale")))
+                        .append(",world=").append(worldRect(child))
                         .append(",texture=").append(invoke(child, "getTextureName",
                                 Integer.valueOf(0)))
                         .append('}');
@@ -975,6 +1084,44 @@ public final class LauncherSettingBridge {
     private static float floatField(Object target, String name) throws Exception {
         if (target == null) return 0.0f;
         return target.getClass().getField(name).getFloat(target);
+    }
+
+    private static void logActiveIconCellNodes(String type, Object[] nodes) {
+        try {
+            StringBuilder result = new StringBuilder(256);
+            result.append("ACTIVE_ICON_CELL_NODES type=").append(type);
+            for (int i = 0; i < nodes.length; i++) {
+                Object node = nodes[i];
+                if (node == null) continue;
+                result.append(" | sc[").append(i).append("]{")
+                        .append(node.getClass().getSimpleName())
+                        .append(",name=").append(invoke(node, "getName"))
+                        .append(",visible=").append(invoke(node, "isVisible"))
+                        .append(",scale=").append(vector2(invoke(node, "getScale")))
+                        .append(",world=").append(worldRect(node))
+                        .append(",texture=").append(invoke(node, "getTextureName",
+                                Integer.valueOf(0))).append('}');
+            }
+            Log.i(TAG, result.toString());
+        } catch (Throwable error) {
+            Log.w(TAG, "ACTIVE_ICON_CELL_NODES_FAILED type=" + type
+                    + " class=" + error.getClass().getSimpleName());
+        }
+    }
+
+    private static float number(Object value) {
+        return value instanceof Number ? ((Number) value).floatValue() : 0.0f;
+    }
+
+    private static String activeIconChildNames(Object activeRoot) throws Exception {
+        StringBuilder result = new StringBuilder("[");
+        int count = ((Integer) invoke(activeRoot, "getChildCount")).intValue();
+        for (int i = 0; i < count; i++) {
+            if (i > 0) result.append(',');
+            Object child = invoke(activeRoot, "getChildAt", Integer.valueOf(i));
+            result.append(invoke(child, "getName"));
+        }
+        return result.append(']').toString();
     }
 
     private static float constantFloat(String name, float fallback) {
@@ -1201,17 +1348,6 @@ public final class LauncherSettingBridge {
             return 150;
         }
         return percent;
-    }
-
-    private static int effectiveIconSizePercent(int percent) {
-        int scaled = Math.round(percent * 1.20f);
-        if (scaled < 50) {
-            return 50;
-        }
-        if (scaled > 180) {
-            return 180;
-        }
-        return scaled;
     }
 
 }

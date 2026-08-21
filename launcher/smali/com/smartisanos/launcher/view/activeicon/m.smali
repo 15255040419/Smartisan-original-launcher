@@ -2256,6 +2256,10 @@
 
     move-object/from16 v0, p0
 
+    const-string v2, "FLIP"
+
+    invoke-static {v0, v2}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->syncActiveIconState(Ljava/lang/Object;Ljava/lang/String;)V
+
     move/from16 v1, p1
 
     .line 1
@@ -2841,6 +2845,10 @@
     invoke-virtual/range {p0 .. p0}, Lcom/smartisanos/launcher/view/activeicon/m;->rq()V
 
     :cond_b
+    const-string v1, "LIVE"
+
+    invoke-static {v0, v1}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->syncActiveIconState(Ljava/lang/Object;Ljava/lang/String;)V
+
     return-void
 .end method
 
@@ -3080,8 +3088,6 @@
     invoke-virtual {p0, v2, v0, v1}, Lcom/smartisanos/smengine/SceneNode;->setScale(FFF)V
 
     :cond_0
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->applyActiveIconUserSize(Ljava/lang/Object;)V
-
     return-void
 .end method
 

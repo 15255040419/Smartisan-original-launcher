@@ -8340,7 +8340,7 @@
 .method private static applyLauncherIconSize(Landroid/content/Context;)V
     .locals 5
 
-    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readIconSizePercent(Landroid/content/Context;)I
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->readIconGeometryPercent(Landroid/content/Context;)I
 
     move-result p0
 

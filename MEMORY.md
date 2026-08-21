@@ -843,4 +843,49 @@ docs/architecture/APK_STRUCTURE.md
 * private key
 * keystore password
 
+---
+
+## 桌面备份与恢复机制 (Backup & Restore)
+
+1. **FolderInfo 身份认知**：`FolderInfo` (`itemType = 2`) 是桌面内部控制的虚拟结构件，**绝不是 Android 系统已安装的应用**。
+   * 它的 `packageName` 固定为 `com.smartisan.folder`。
+   * 绝对不允许它进入 `PackageManager.isInstalled()` 或 `pending_items.json` 进行检查。
+   * 它在数据库中必须保证 `folderIndex = 0` (早期数据可能为 -1，但不影响其作为父容器的地位)。
+   * 子应用的 `folderIndex` 必须匹配其父级 `FolderInfo` 的 `_id`。
+
+2. **6-Pass 原子恢复写入逻辑**：
+   桌面恢复的正确时序极其严格，必须保证父级文件夹实体在子应用之前写入：
+   * 前置与后置强制进行 `FolderTopologyValidator` 拓扑校验，断绝孤儿。
+   * 插入时必须先执行 `table_pageinfos` (页面建立)。
+   * 随后必须先扫描并插入所有的 `itemType == 2` (Folders)。
+   * 然后再扫描并插入所有的非 Folder Items，以确保有可供挂载的合法 `folderIndex` 实体。
+   * 最后追加未卸载且不在备份中的当前新安装 App。
+
+3. **数据库兼容与一次性状态**：
+   * 原版各个版本的 `table_iteminfos` schema 可能存在差异（例如某些旧机型不存在 `lastActivateTime` 或 `usage_count` 列）。
+   * 在向 `ContentValues` 打包或清零状态时，**必须且只能通过 `item.has("key")` 来动态判定该字段在原生 DB 中是否存在**。绝对禁止强行写入无 Schema 保证的硬编码字段，否则会导致 SQLite 异常。
+   * `messagesNumber` 等一次性角标或统计类状态在备份导出时必须安全清零，以保证快照的跨设备、跨生命周期可用性。
+
+4. **权限剥离规则**：
+   * `launcher_hide_badge`（通知监听权限）、`automatic_location`（定位权限）等必须被隔离到 `NON_PORTABLE_PERMISSION_KEYS` 中。
+   * 它们必须在导出和导入阶段被直接遗弃，不允许被记录进 `.slauncherbackup`，否则新机恢复会导致状态机以为有权限而触发致命闪退。
+
 详细修复记录继续写入 `docs/development/DEVELOPMENT_LOG.md`。
+
+---
+
+## 图标统一与 ActiveIcon 验收边界
+
+唯一规范入口为 `docs/development/ICON_RENDERING_CONTRACT.md`。本文只保留长期防回归摘要；任何旧日志、计划或实现与该合同冲突时，不得继续按旧倍率施工。
+
+1. **“统一”的稳定定义**：普通桌面应用在同一 Cell 中共享最终 physical artwork/texture、原版阴影、用户图标百分比和缓存身份；这不表示 DEFAULT、IMPROVED、PACK、CUSTOM、RESOURCE 的所有可见 alpha 边界必须完全等宽等高。有效 DEFAULT 可以使用可见面积归一化，真正命中的改进版、图标包和自定义素材必须保留其设计比例，禁止再次全局归一化把淘宝、美团等图标缩小。
+
+2. **有效来源优先**：图标来源必须按该应用最终实际解析结果分类，不能只读取全局选择。CUSTOM 仅在存在有效自定义 iconData 时成立；RESOURCE/PACK/IMPROVED 仅在 managed drawable 实际可解析时成立；否则必须归为 DEFAULT。来源变化后缓存键必须同步失效。
+
+3. **单一尺寸 owner**：普通 Application 的数据库 `iconRawData` 默认视为 `LEGACY_UNKNOWN`，不得恢复为 managed RAW；`Aa.smali` 不再预加边距，Cold Bind、Hot Update、Backup Restore 都必须重新解析正式 RAW source，并只进入一次 final physical Composer。正式 managed source 缺失时回退 APK DEFAULT，不能用已预合成 DB 位图补偿。
+
+4. **天气/日历动态验收**：H/m 禁止再次乘用户百分比；用户大小由原版 ActiveIcon/Cell 链与 STATIC geometry 共同反映。真机确认最终交接是同一 Cell 的 `sc[0]=cell_Icon_rect` 静态纹理与 `sc[7]=Weather/Calendar ActiveIconRoot` 互斥显示。同步优先读取 `sc[0]` world rect；不可见节点未发布 world bounds 时，可读取它已经解析的 local display scale，因为该值已包含当前宫格和用户尺寸。`sc[0]` 尚未创建时只能 defer，禁止用 `IconVisualMetrics.logicalArtworkBox` 或 physical raster px 臆造 world rect并写回 ActiveIconRoot scale。只有 Weather 与 Calendar 都取得基于真实 `sc[0]` 的 `ICON_CONTRACT_ACTIVE_SYNC` ratio/center 证据，并完成切换前、中、后矩阵，才允许标记静态/动态统一。
+
+5. **禁止恢复的旧倍率**：不得恢复固定 `73.32%`、`94%`、`166/192`、`0.831325`、`160/192`，也不得新增按包名或图标形状硬编码的尺寸补丁。应先定位 FIRST BAD ICON LAYER，再做最小修复。
+
+6. **100% 与 Golden 基准**：设置页的持久化/显示/cache identity 必须保持真实 100，不能伪装成 120；但不得因此把用户已确认的原版 Golden artwork 基准整体缩小。100% 到 Golden logical artwork/texture 的统一换算只能由 `IconVisualMetrics` 持有，LayoutProperty、STATIC Composer 与 ActiveIcon 共同消费，其他模块不得再拥有倍率。

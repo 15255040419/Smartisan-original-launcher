@@ -7,7 +7,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 
 /**
- * Narrow Launcher3 IconNormalizer port for DEFAULT desktop artwork only.
+ * Narrow Launcher3 IconNormalizer port for effective DEFAULT desktop artwork only.
  *
  * <p>This class intentionally calculates only the standard visible-alpha convex-hull scale. It
  * never wraps legacy icons, changes an AdaptiveIconDrawable mask, crops source pixels, or applies

@@ -358,6 +358,10 @@
 
     iput-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/a;->sP:Lcom/smartisanos/launcher/view/activeicon/ActiveIconView$IconStatus;
 
+    const-string v0, "STATIC"
+
+    invoke-static {p0, v0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->syncActiveIconState(Ljava/lang/Object;Ljava/lang/String;)V
+
     return-void
 .end method
 
@@ -368,6 +372,10 @@
     sget-object v0, Lcom/smartisanos/launcher/view/activeicon/ActiveIconView$IconStatus;->RESUME:Lcom/smartisanos/launcher/view/activeicon/ActiveIconView$IconStatus;
 
     iput-object v0, p0, Lcom/smartisanos/launcher/view/activeicon/a;->sP:Lcom/smartisanos/launcher/view/activeicon/ActiveIconView$IconStatus;
+
+    const-string v0, "LIVE"
+
+    invoke-static {p0, v0}, Lcom/smartisanos/launcher/theme/LauncherSettingBridge;->syncActiveIconState(Ljava/lang/Object;Ljava/lang/String;)V
 
     return-void
 .end method

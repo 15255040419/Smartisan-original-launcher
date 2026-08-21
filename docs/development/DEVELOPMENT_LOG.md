@@ -1,17 +1,35 @@
 # 开发与修复记录
 
+## 最新专项补录（按结论优先级，不参与倒序日期轴）
+
+- 2026-08-21 ACTIVEICON_REAL_STATIC_ORACLE_FIX：22:37 LIVE 与 22:38 STATIC 连续截图推翻 `ACTIVEICON_STATIC_LIVE_GEOMETRY_AND_GOLDEN_BASELINE_FIX` 的逻辑盒子结论。FIRST BAD OWNER 是 `syncActiveIconToStaticArtwork()` 在没有真实 STATIC geometry 时，把 `IconVisualMetrics.logicalArtwork=269` 直接写入原版 192 ActiveIconRoot scale，形成第二份最终尺寸 Owner；日志的 `269=269` 是 synthetic oracle 自证。真机节点审计确认实际交接为 `sc[0]=cell_Icon_rect` 静态合成纹理与 `sc[7]=weatherView/calendarView` 动态树互斥显示；`sc[0]` 在 create 初期可能为空，随后 STATIC 状态发布，`sc[7]` STATIC 时隐藏。现删除 `STATIC_METRICS` fallback：优先读取 `sc[0]` world rect；不可见节点没有 world bounds 时，读取同一 Cell 中 `sc[0]` 的 texture half-scale，再乘统一 `logicalArtwork/logicalTexture` 得到 STATIC artwork half-scale，与 Active background 自身 half-scale 在同单位下计算 Root correction；`sc[0]` 未发布则 defer。100% 真机采样为 `143.5 × 269/344 ÷ 96 ≈ 1.169`，该结果完全来自当前静态节点和合同字段，不是固定倍率，50/100/150 会随静态节点变化；不改 Weather/Calendar 的内部 Timeline、192 参考空间、资源 raster，也不改普通/改进版/图标包静态 Composer。静态审计、完整构建与覆盖安装通过，逐帧视觉及完整矩阵仍未 PASS。
+
+- 2026-08-21 【已废弃】ACTIVEICON_STATIC_LIVE_GEOMETRY_AND_GOLDEN_BASELINE_FIX：该方案把不存在的 `sc[1]` 当成“没有 STATIC oracle”，继而用 `IconVisualMetrics.logicalArtwork=269` 将原版 192 ActiveIconRoot 固定放大到 `1.4010416`。后续连续截图证明 LIVE/STATIC 仍明显跳变；其 `finalRatio=1.0` 日志没有读取最终静态显示节点，属于错误自证，不得恢复。
+
+- 2026-08-21 【已废弃】ICON_RENDERING_CONTRACT_IMPLEMENTED_MATRIX_PENDING
+
+- 2026-08-21 ICON_RENDERING_CONTRACT_ARCHITECTURE_FROZEN：根据多轮普通图标、备份恢复和 Weather/Calendar 尺寸回归，建立 `docs/development/ICON_RENDERING_CONTRACT.md` 作为唯一图标施工合同。永久冻结 Source Resolver、IconVisualMetrics、Static Application Composer、ActiveIcon Geometry Sync 四层 Owner；明确 DEFAULT-only optical normalization，IMPROVED/PACK/CUSTOM/RESOURCE 保留设计比例但共享同一 artwork/texture/center/shadow；RAW 只允许一次 physical resample，禁止预合成→DB→再合成；未知 DB bitmap 回退 DEFAULT；ActiveIcon 以 STATIC artwork world rect 为运行时 oracle并按 geometry generation 幂等同步；Surface 使用真实 SMEngine/Launcher 宽度推导统一 physicalScale；缓存身份覆盖 geometry/surface/grid/size/theme/source/profile。`LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md` 中“所有来源统一裁 alpha”和“强制 resize box 等于普通 box”的冲突旧规则已删除，计划改为只引用唯一合同。当前状态是 `ARCHITECTURE_FROZEN / IMPLEMENTATION_COMPLETE / RUNTIME_MATRIX_NOT_PASSED`，不得写 FINAL/PASS，也不得再按单机型或单图标调倍率。
+
+- 2026-08-21 EFFECTIVE_ICON_SOURCE_NORMALIZATION_FIX：恢复后图标大小不一致并不是改进版素材本身统一变大，而是桌面诊断/归一化链把“全局选择为 IMPROVED”误当成“该应用实际命中了改进版资源”。影视仓、NewBox 等没有有效改进版资源时实际回退 APK 原图，却仍被标记为 IMPROVED，因而跳过 DEFAULT 可见面积归一化；反过来若把所有来源统一归一化，又会把淘宝、美团等真正命中的改进版图标二次缩小。现改为按最终有效来源分类：CUSTOM 仅在有 iconData 时成立，RESOURCE/PACK/IMPROVED 仅在实际解析到 managed drawable 时成立，否则归为 DEFAULT；只有有效 DEFAULT 进入既有 IconNormalizer，改进版/图标包/自定义资源维持原尺寸。缓存版本升级为 `source-canvas:v3-effective-source-normalized` / `raster:v17-effective-source-normalizer`，避免沿用错误纹理。V2458A 冷启动日志已确认淘宝、美团为 `sourceRoute=IMPROVED`，三个实际回退应用为 `sourceRoute=DEFAULT`。仅有一段天气 120% 切换录像中未观察到最终外轮廓跳变；该样本不能扩写为天气/日历、所有比例和宫格均已统一。未经证明的 alpha-envelope 实验缩放已撤销，H/m 内部 192 坐标与 Timeline 未修改。
+
+- 2026-08-21 ICON_UNIFICATION_DOCUMENT_AND_CODE_AUDIT：只读复审当前暂存代码、历史文档、普通静态 Cell 合成链以及 Weather/Calendar ActiveIcon 链。结论：普通应用已经共享最终 physical artwork/texture、阴影、用户百分比与缓存规格，但 `Aa.smali` 对第三方来源的数据库预合成与 `e/s + IconRasterDiagnostics` 最终合成仍可能形成两个尺寸 owner；当 `prepareStaticSource()` 无法重新解析当前 managed drawable 而回退已带边距的 `iconRawData` 时，存在再次合成并使淘宝、美团等真实改进版图标缩小的路径。因此 Cold Bind、Hot Update、Backup Restore 尚不能写成视觉绝对一致。动态侧 H/m 的用户倍率调用已有真机日志，但用于匹配 STATIC artwork world bounds 的 `applyActiveIconRootGeometry()` 在现有样本中没有 `ACTIVEICON_BASELINE_ALIGN` / `ACTIVE_ICON_GEOMETRY_VERIFY` 命中证据；天气单段录像不能替代日历、跨日刷新、50/100/150%、12/20 宫格和冷启动矩阵。当前统一状态统一降级为 `ARCHITECTURE_PARTIAL / RUNTIME_UNVERIFIED`；删除普通图标“视觉绝对一致”和天气/日历“FINAL”结论。在取得完整矩阵前，不得恢复固定 `73.32%`、`94%`、`166/192`、`0.831325` 或按包名硬编码倍率，也不得对所有来源强制同一 alpha normalizer。
+
+- 2026-08-21 RESTORE_IMPROVED_ICON_SOURCE_FIRST_FIX：V2458A 的 19:28 真机日志确认备份与恢复均正确提交了 `launcher_global_icon_source_v2=improved`，但旧归档只保存全局选择、RedirectIconDB 记录和自定义图标，没有保存 `online_icon_cache_v3` 中实际生效的改进版原始 PNG；恢复又先清空普通 `table_icons`，导致第一次冷启动只能用 APK 原图建库，第一遍后台补齐源缓存后第二次恢复才正常。此前未暂存的 `icons/sources.json` / `RestoreIconSourceReconciler` 只是半实现：writer 没有写入 index，restore 没有落盘，pending reconcile 也从未设置。现将原始改进版源 PNG（不含最终纹理）写入 `icons/sources.json`，以 SHA-256、PNG 头、48–1024px 和 512KiB 上限验证，恢复时原子合并到持久缓存，并在 LauncherModel ready 后执行一次幂等全局来源重绑定；旧归档缺少 sources 时继续兼容异步补图。`build.bat`、`aapt2 dump badging`、v1/v2/v3 签名、Android 16 模拟器覆盖安装与冷启动通过。V2458A 已覆盖安装最终 APK，本地/设备 SHA-256 均为 `630854b102b9d7024547e2e9ca035e39795c00c65d2cbc5dea72fb879c79617d`；新建真机归档从旧格式约 8.5 KiB 增至 27.9 KiB，实测含 `icons/sources.json`、源 PNG、匹配 SHA-256 和 `iconSourceSchemaVersion=3`，随后仅恢复一次即完成 Launcher reload，页面、文件夹和图标纹理正常，无第二次恢复。旧归档因从未包含源 PNG，无法承诺离线逐像素还原，只能由本地图标库/网络自动补齐。
+
+- 作用域更正：上述“一次恢复”只证明 V2458A 新 schema v3 归档中的普通改进版 RAW source 可一次恢复并重绑定；不代表 QuickLaunch、全部普通来源最终 raster、旧归档离线恢复或跨 ROM 已 PASS。
+
 - 2026-08-20 SMS_NOTIFICATION_BADGE_RESOLUTION_FIX_FINAL：修复系统短信 / Messages 接收新短信无桌面数字角标问题。两个根因：1. `SmartisanBadgeListenerService.countVisible()` 中原先硬编码了 `NotificationChannel.canShowBadge()` 检查，在部分厂商 ROM 或原生系统关闭 Channel 角标选项时会丢弃短信通知；现已移除该硬过滤，仅保留 `FLAG_ONGOING_EVENT`、Group Summary 去重与 Sweep 消除；2. 厂商 ROM（如 vivo OriginOS）系统短信服务通过 `com.android.mms.service` 后台 Service 包发通知，而桌面图标属于 `com.android.mms`。现新增 `BadgeBridge.resolveLauncherPackage()`，利用 `PackageManager.getLaunchIntentForPackage()` 与 `Notification.contentIntent`（`getCreatorPackage()` / `getTargetPackage()`）动态将服务包名解析归集至桌面应用包名，不使用任何包名硬编码白名单；同时 `BadgeBridge.replay()` 也对旧缓存包名自动做后缀兼容解析。桌面设置将“角标提醒”缺省开关（`KEY_BADGE_HIDE`）更正为默认开启 (`false`)。真机（vivo V2458A）验证：短信通知送达后桌面短信图标角标恢复显示，`build.bat` 成功打包签名，无需重启桌面或等待新消息即可重放恢复。
 
 - 2026-08-17 UNLOCK_ANIMATION_SESSION_GATE_FINAL：普通 Android 解锁动画触发已改为单次 Keyguard 会话门控。根因是 `e.s.ia(Context)` 曾对任意非空 Context 直接返回 true，`SCREEN_OFF` 无条件进入原版 prepare，而 maintained 生命周期 fallback 又在 `onResume` 后用延时伪造 `action_keyguard_on + USER_PRESENT`，因此从应用、设置、电话、相机或最近任务返回桌面也可能误播，并留下已 prepare 的 GL 状态等待后续补播。当前仅当锁屏前 Launcher 是可见默认 HOME、`SCREEN_OFF` 后 Keyguard 确实锁定时建会话并沿用原版 prepare；真实 `USER_PRESENT/action_keyguard_to_dismiss` 只置 pending，播放只在 `resumed + windowFocus + keyguard unlocked + default HOME + runtime/page state ready` 同时成立时同步提交一次。1500ms 仅用于取消未完成交接，不用于延时播放；取消、关闭开关、非直达 HOME、prepare/play 失败均走原版 force-finish。原版 `q(0)` prepare 与真实 `q(1)` play 共用 listener；兼容层已区分 prepare/cleanup 过渡和真实播放，并覆盖 GL 将在途 prepare 直接重定向到 play、不会再发第二次 start callback 的合并路径。已移除 `ActivityManagerNative/getRunningTasks` 和 120/250ms 伪广播 fallback，保留原版 prepare/play/force 动画实现。Android 16 `emulator-5554` PIN 锁屏验证：正常直达解锁 20 轮均为 `ARMED/COMMIT/ORIGINAL_PLAY/START/FINISH=20/20/20/20/20`，冷启动后立即锁屏的合并路径也为 `1/1/1/1/1`，无 FATAL/VerifyError；设置、电话、相机前台锁解锁后回 HOME，以及 Back/Home/最近任务返回均 `COMMIT=0`；解锁后立即进入其他应用会取消，后续回桌面无原版 play dispatch；重复 dismiss 信号每会话仍只提交一次；关闭开关时不建会话。`build.bat`、`aapt2 dump badging`、v1/v2/v3 签名和覆盖安装通过。Android 8/9/12、OriginOS/ColorOS/HyperOS/One UI 及锁屏相机从 Keyguard 快捷入口仍需对应真机复测；不得把模拟器矩阵扩写为全 ROM 真机 PASS。未更新 `MEMORY.md`、未提交、未推送。
 
 - 2026-08-17 BACKGROUND_RUNTIME_TITLE_WIDTH_FIX_FINAL：后台运行设置页两个状态 TextView 在保留 `SmartisanSettingsRowValue` 全局 style 的前提下局部覆盖 `android:layout_width="wrap_content"`，释放固定 180dp 状态区域占用的标题空间；未修改全局 style、字体、行高、状态逻辑或其他页面。`git diff --check`、`build.bat`、v1/v2/v3 签名验证和 V2458A 覆盖安装通过，真机截图待确认。
 
-- 2026-08-16 ACTIVEICON_FOLLOW_CURRENT_STATIC_GEOMETRY_FINAL：STATIC Weather/Calendar 当前视觉尺寸冻结为基准。删除运行时历史 ratio、`166/192`、`0.831325` 和绝对 `160/192` owner；LIVE 不再改写 STATIC 或重新计算固定倍率。兼容层在同一 Cell/g 中读取 STATIC cached node 与 LIVE background 的当前 world bounds，以 `staticWorld/liveWorld` 调整 LIVE root，公共父节点比例在同一坐标空间中只抵消一次，并记录 `commonParentAppliedOnce=true`。H/m 内部 192 reference space、Timeline、shadow、foreground 保持不变。
-- 2026-08-16 ACTIVEICON_ICON_SIZE_PERCENT_PROPAGATION_ROOT_CAUSE_FINAL：`Constants.applyIconSizeToProperty()` 会按 `launcher_icon_size` 放大 STATIC 的 `icon_size_origin/icon_size_with_shadow`，但不改变 `active_icon_scale` 或 `Constants.icon_scale`；因此 H/m 原始 root scale 不消费 50/100/150% 用户设置。新增唯一 outer 输入 `LauncherSettingBridge.readIconSizeFactor()`，在 H/m root 的原版 `icon_scale × active_icon_scale` 结果上只乘一次用户百分比；保留 Cell world-bounds 校正作为当前 STATIC 基准，不改 CJ、foreground、shadow、Timeline 或 192 reference space。新增 `ACTIVEICON_GEOMETRY_VERIFY` 中的 iconSizePercent/rootScale 前后诊断。
+- 2026-08-16 ACTIVEICON_FOLLOW_CURRENT_STATIC_GEOMETRY_ATTEMPT：STATIC Weather/Calendar 被选作预期视觉基准；删除运行时历史 ratio、`166/192`、`0.831325` 和绝对 `160/192` owner。兼容层尝试在同一 Cell/g 中读取 STATIC cached node 与 LIVE background 的 world bounds，以 `staticWorld/liveWorld` 调整 LIVE root。后续审计确认现有真机样本没有该 world-bounds 校正的运行时命中证据，因此本条只记录实现意图，不代表动态与静态已验收统一。H/m 内部 192 reference space、Timeline、shadow、foreground 保持不变。
+- 2026-08-16 【已被 Icon Rendering Contract 取代】ACTIVEICON_ICON_SIZE_PERCENT_PROPAGATION_ROOT_CAUSE：该阶段曾在 H/m root 上再次乘用户百分比；2026-08-21 审计确认这会形成第二份最终大小 Owner。当前合同固定为用户大小只进入 STATIC geometry，ActiveIcon attach 后按 geometry generation 对齐 STATIC artwork world rect。本条仅保留历史根因，不得恢复该实现或标记 FINAL。
 - 2026-08-18 ACTIVEICON_ICON_SIZE_FACTOR_FINAL_SCALE_OWNER_TRACE：构建并覆盖安装了诊断 APK；本地与 V2458A 设备 APK SHA256 均为 `642c9bb433d4307606f0d1159034bdd4717f5cad0429c5cf19b7bf147b88da9c`，versionCode=31/versionName=v1.5.6。新增 H/m create 前后及 world-bounds enter/exit 的 `ACTIVE_ICON_SIZE_TRACE`，尚未触发 Weather/Calendar 刷新取得 100%/150% 的 FIRST_FACTOR_LOSS_STAGE，因此暂不删除 world-bounds 写操作或继续修改 geometry。
 - 2026-08-18 ACTIVEICON_ICON_SIZE_FACTOR_OWNER_BRANCH_FIX：V2458A 日志未出现 H/m create trace；代码审计确认当前 `pageMode=1` 时 `Constants.useSmallActiveIcon(1)` 返回 false，原先放在该条件分支内的用户 factor 永远不执行，FIRST_FACTOR_LOSS_STAGE 为 H/m create 的 mode branch。现将用户 factor owner 移到 H/m create 条件分支之后，覆盖所有 mode；world-bounds correction 暂未删除，等待新包 trace 确认是否仍覆盖 root。
 - 2026-08-18 ACTIVEICON_ICON_SIZE_FACTOR_OWNER_RUNTIME_CONFIRM：新包覆盖安装成功，V2458A 启动日志确认当前设备设置为 `iconSizePercent=180` 时，Calendar/Weather 均从 `rootScale=(1.0,1.0)` 进入 create，随后变为 `rootScale=(1.8,1.8)`；说明 mode branch 之后的唯一 user factor owner 已执行。该次启动未出现 `GEOMETRY_ENTER/EXIT`，world-bounds correction 未参与这两个 create 样本；尚未完成用户切换后的视觉验收。
-- 2026-08-18 ACTIVEICON_STATIC_ARTWORK_BODY_BASELINE_FINAL：修正 `applyActiveIconRootGeometry()` 的 box 语义，将 STATIC texture world box 按 `logicalArtwork/logicalTexture` 换算为 STATIC artwork body world box，再以 width/height correction 的统一值调整 LIVE root；STATIC、用户百分比、H/m factor 和内部 192 reference 均未修改。新增 `ACTIVEICON_BASELINE_ALIGN` 输出 texture/body/world 前后数据；本包已构建并完成签名验证，V2458A 覆盖安装命令在 package manager 阶段未返回完成状态，真机视觉验收待完成。
+- 2026-08-18 ACTIVEICON_STATIC_ARTWORK_BODY_BASELINE_ATTEMPT：修正 `applyActiveIconRootGeometry()` 的 box 语义，将 STATIC texture world box 按 `logicalArtwork/logicalTexture` 换算为 STATIC artwork body world box，再以 width/height correction 的统一值调整 LIVE root；STATIC、用户百分比、H/m factor 和内部 192 reference 均未修改。新增 `ACTIVEICON_BASELINE_ALIGN` 输出 texture/body/world 前后数据；构建与签名验证完成，但 V2458A 覆盖安装未确认完成，且后续启动样本没有校正日志，因此不得标记为 Final 或视觉通过。
 
 ## 本文档职责
 
@@ -30,7 +48,11 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-08-20）
+## 当前状态总览（2026-08-21）
+
+- 2026-08-21 ICON_RENDERING_CONTRACT_CURRENT_STATE：静态代码已收敛为 RAW Source Resolver → IconVisualMetrics → 单次 Static Application Composer，数据库预合成与 managed `LEGACY_UNKNOWN` 回灌路径已删除；ActiveIcon 第二用户倍率 owner 已删除，最终 root 改为跟随 STATIC artwork world rect。静态审计、构建、签名和验证器自测通过；真机安装因 vivo 系统确认未完成，固定运行时矩阵仍未通过。因此当前仅为 `IMPLEMENTATION_COMPLETE / RUNTIME_MATRIX_NOT_PASSED`，不得宣称所有来源、生命周期、分辨率和动态状态视觉已验收一致。
+
+- 2026-08-21 BACKUP_RESTORE_CURRENT_SCOPE：当前只保留 SAF 系统目录；新 schema v3 归档保存可移植改进版 RAW source，V2458A 一次恢复重绑定通过；FolderTopology/Schema 写入仅完成 V2458A 样本。QuickLaunch provider-decorated FINAL 恢复仍为 `ROOT_CAUSE_REOPENED`，普通 Application 最终 raster 仍受 Icon Rendering Contract 门禁，旧归档和 Android 8–16 多 ROM 矩阵未完成。
 
 - 2026-08-20 SMS_NOTIFICATION_BADGE_RESOLUTION_FIX_FINAL：Smartisan 数字角标以 NotificationListenerService 有效通知为数据源；不使用 NotificationChannel.canShowBadge() 硬过滤；通知包与桌面包不一致时使用 BadgeBridge.resolveLauncherPackage() 动态解析；禁止 OEM 短信包名白名单；KEY_BADGE_HIDE 默认 false；vivo V2458A / OriginOS 已真机验证短信角标 PASS；其他 ROM 属于通用实现覆盖，但尚未逐台真机验证，不得写成全 ROM PASS。
 
@@ -80,7 +102,7 @@
 
 - 2026-08-15 FIRST_INSTALL / COLD START Page Scene 审计：`NO_CREATE_PAGES_GATE_REGRESSION / NO_CODE_CHANGE`。V2458A / Android 16 的已有实测仍显示 `SCENE_CREATE_PAGES≈1582ms`，但逐段对照 maintained `MainView.createPages()`、当前 `Eb.oh()` 与 clean `Eb.oh()` 后确认当前没有丢失懒初始化 Gate：每个 `PageInfo` 均只创建 Page metadata/node；仅 `status==NORMAL(0)` 且已初始化普通页数 `<2` 时调用 `M.Hn()` 并显示，其余页面只隐藏。`M.Hn()` 以 `vI` 一次性标志保护内容创建；`fa.h(...)` 及 `fa.o(index,true)` 的窗口/相邻页可见路径仍会 `setVisibility(true) -> Hn()`，已初始化页面不会重复创建。当前 `Eb.oh()` 与 clean 在该 Gate 语义无差异，且本轮未发现 LayoutPropertyAdapter、Folder adaptation 或 icon compatibility 在 Page 构造阶段绕过 `Hn()` 直接创建普通 Cell；Folder 未进入提前展开初始化。新增空 Page 的 `Hn()` 仅在没有普通页时发生，不能解释保留数据多页启动。故不能基于“启动时全页 Cell 创建”的错误前提机械修改 Gate、提前 `MESSAGE_COMPLETE` 或开始 FIRST_INSTALL DEFAULT/IMPROVED；本轮未改 Smali/Java/资源/数据库/动画，未构建、未安装。下一步只能以每页 `Hn()/Cell.create()` 的真实计时和当前恢复页/相邻页取样继续定位 1.58s，完成后再决定最小修复。未更新 `MEMORY.md`、未提交、未推送。
 
-- 2026-08-15 DEFAULT_ICON_VISUAL_NORMALIZATION_FINAL：vivo X21A（1080×2280、12 宫格、100%）真机确认 `DEFAULT_VISUAL_SIZE` 的 FULL_SOURCE_CANVAS 差异来自各应用 Drawable 的可见 alpha 面积；现仅在 `sourceType=DEFAULT` 的固定 artwork box 内移植 Android Launcher3 `IconNormalizer.getScale()` 的可见 alpha（阈值 40）/行凸包/面积上限 scale，按可见中心绘制完整原 Drawable，之后仍由原 Smartisan shadow 合成。无 crop、mask/background/颜色/宽高比改变，不 wrap legacy 为 Adaptive；Adaptive 仍作为原整体 Drawable 绘制。IMPROVED、PACK、CUSTOM、RESOURCE、`IconColor.resize` Content Box、Cell、LayoutProperty、Folder、Weather/Calendar 和 SettingButton 均不进入此分支。缓存键升级为 `raster:v16-default-icon-normalizer`，保证 DEFAULT 新 texture 真实重建。`build.bat`、`git diff --check`、badging（`v1.5.6/31`）和 v1/v2/v3 签名通过；`adb install -r -d` 返回 `Success`，设备 `lastUpdateTime=2026-08-15 16:39:53`，HOME 冷启无 Launcher FATAL/AndroidRuntime。DEFAULT 当前屏可见外部 artwork 已收敛且原始样式保持；随后用户通过正式 UI 切到 IMPROVED，当前真机截图确认未受 DEFAULT 分支影响。云服务存在两个原有可选 IMPROVED 图标，用户手动选择第二个，尺寸变化为既有 per-app 选择，不记为回归。按本轮停止条件，Folder、20 宫格与 50/150% 不继续测试。未提交、未推送。
+- 2026-08-15 DEFAULT_ICON_VISUAL_NORMALIZATION_VIVO_BASELINE：vivo X21A（1080×2280、12 宫格、100%）真机确认仅 DEFAULT 在固定 artwork box 内使用 optical normalization，IMPROVED、PACK、CUSTOM、RESOURCE 不进入该分支。构建、签名、覆盖安装和当前屏样本通过；Folder、20 宫格、50/150%、其他 Surface 与生命周期矩阵未执行，因此本条只是单机基线，不是 FINAL/PASS。
 
 - 2026-08-15 Icon Visual Contract & Layout Integrity，诊断收口与 Layout Geometry Integrity Audit：一次性 `ICON_ADAPTIVE_STAGE`、`ICON_PHASE1_BASELINE`、`ICON_SOURCE_RESOLVE`、`ICON_LOG_PROBE`、`ICON_SETTING_BASELINE`、switch/refresh probe 及其 e/s、Cell、Receiver 调用均已删除；打开 Folder 的每次 `FolderSceneMetrics.resolve()` 高频场景日志也已删除，均不改变 source、raster、cache、shadow、geometry 或设置写入。`build.bat`、`git diff --check`、badging（`v1.5.6/31`）及 v1/v2/v3 签名通过。清理版已完成 vivo X21A 真机覆盖安装并由新 Launcher 进程运行；HOME 重启后清空 logcat，专项临时诊断清理已真机确认。静态审计确认：普通桌面 label 直接读取当前 `LayoutProperty.text_font_size/name_off_set_y/icon_offset_y/icon_offset_y_without_app_name`；12/20 由各自 mode property 选择，DEFAULT/IMPROVED 不参与 label 坐标；字体与图标 box 走统一 `scale`，纵向 label/offset 走 `scaleY`，横向文本长度走 `scaleX`。打开 Folder 则严格 owner-gated 到 folder mode：`LayoutPropertyAdapter` 的 `_folder` 字段、`FolderVisualGeometry` 的 label/row/title/indicator 及 `FolderCellPositionAdapter` 的 3 列 child cells 都以 `folder_bookcase_width / 1080` 的统一 scale 推导，未见桌面 icon geometry 注入 Folder child 的静态证据。该静态分流不构成明确 BUG；720/1080/1220-1260/1440、12/20、50/100/150 的数值矩阵与 vivo X21A closed/open Folder、label、分页点真机验收尚未完成。未提交、未推送。
 
@@ -102,7 +124,7 @@
 
 - Phase 2B-C/D 生命周期收口：独立 fixture 的真实多来源 ADD、REPLACE retain、component stale retain、同包 A/B item-level 真卸载和真实多来源 REMOVE 幂等均通过。`isTrueNewInstall()` 已由“时间相等即首装”收口为事件非 replacing、稳定 Profile identity、Profile=AVAILABLE、PackageState=PRESENT、Model 无既有正式 application item、时间相等仅辅助的联合 Gate；旧 InstallManager DB existence path 已删。v4-add 确认更新新增 C 不自动出现，记录为后续 component lifecycle reconcile 技术债，绝不走 Package REMOVE。既有 User 999（serial 10）profile 安装/卸载与主用户隔离，profile 卸载状态为 TEMPORARILY_UNAVAILABLE 且 REMOVE_COMMIT=0。用户将 A/B 放入测试 Folder 后，真卸载产生 A=95/B=96 两次独立 item-level commit，后续 callback removed=0，FATAL/GLThread/FolderInfo.Oe/ItemInfo.Oe/oa.hd/orphan=0；因 Launcher 重启切换桌面页，Folder 最终视觉规则与 REPLACE 精确 page/cell 不虚报 PASS。硬架构 Gate 已完成，状态 `PHASE_2_IMPLEMENTATION_COMPLETE / CROSS_DEVICE_VALIDATION_PENDING`；OnePlus/OPPO、Quiet/Locked、Folder 可见规则、REPLACE 精确保位和 Folder Weather/Calendar 为环境验证待补。未进入 Phase 3、未提交、未推送；专项全文见 `MODERN_ANDROID_LAUNCHER_MODEL_REFACTOR.md`。
 
-- 2026-08-12 Icon & Folder Unified Geometry Final Fix（当前）：普通静态 DEFAULT/IMPROVED/PACK/CUSTOM/RESOURCE 已统一由 `IconRasterDiagnostics` 按完整 source canvas 等比 fit 到当前场景的固定 artwork/texture box，缓存为 `raster:v15-fixed-source-canvas`；alpha padding、面积、轮廓和形状不再决定额外倍率。普通桌面只在既有 `LayoutPropertyAdapter` 中扩大 icon box，保留原版 scene/dock 动画几何。打开文件夹以 `_folder` 为唯一几何入口，书架、内容图标、文字、标题和分页相对量按原始文件夹宽度同比适配；三列 X 由 `folder_bookcase_width` 与 `page_view_margin_left/right` 的 usable rect 对称计算。`FolderSceneMetrics` 保持原版，不再对 root scene 追加缩放或平移，避免干扰开合动画。桌面“桌面设置”已恢复原版独立 SettingButton：`Ec.wz()` 仍只合成 `editBtn_bg/editBtn_gear/editBtn_inShadow` 的按压态、旋转和阴影，不作为普通应用，不跟随图标包或自定义图标，也不进入图标替换页。当前 APK 已保留数据覆盖安装到 vivo V2458A（1260x2800/560dpi），版本 `v1.5.6/31`，本地/设备 SHA256 均为 `5025E686F036C9C23BB82C21C1E52154A7B87EE8873593D0B3BBE319BD5AE448`；`build.bat`、`git diff --check`、badging 和 v1/v2/v3 签名均通过。已完成该机文件夹打开、关闭及连续 3 轮开合的运行冒烟，未见 Launcher FATAL/ANR。实现不包含按机型 dp/px 规则；但 1080、1440/2K、12/20 宫格、50%/150%、DEFAULT/IMPROVED/PACK/CUSTOM、动态 Weather/Calendar 与文件夹预览的完整视觉矩阵仍未逐项真机验收，不能写为全分辨率 PASS。
+- 2026-08-12 【历史实现，当前已被 Icon Rendering Contract 取代】Icon & Folder Unified Geometry：该版本曾让全部普通来源按完整 source canvas fit，并完成 V2458A 1260 分辨率文件夹开合冒烟；它没有完成完整来源/宫格/大小/分辨率矩阵，也不包含当前 DEFAULT-only optical normalization、唯一 Composer 和 ActiveIcon geometry generation 合同。文件夹 `_folder` 隔离与独立 SettingButton 结论继续有效；普通图标最终尺寸算法不得再引用本条。
 
 
 - 2026-08-11 QuickSearch FINAL FREEZE + CLEANUP：用户确认当前真机 UI/交互基本无问题后，QuickSearch 正式收口为 `QUICKSEARCH_FEATURE_FROZEN / EMULATOR_FULL_PASS / VIVO_RUNTIME_PASS`。Q1-B 改为 `REFERENCE_BENCHMARK_NOT_REQUIRED_FOR_RELEASE`，Q3 保持 non-blocking，Q8-E 改为未来独立扩展，原版 optional fields 统一为 `NON_BLOCKING_REFERENCE_GAPS`；不再把它们写为功能待完成。最终状态文档重写为当前生产架构、功能、验证、禁用链路与冻结规则，原版基线审计和完整本日志保留，15 份 Q1-Q12 阶段流水删除。清理 `build/quicksearch_final/` 1,595 个文件、294.51 MiB 的重复证据与视频分析依赖；不保留二进制截图，最终设备/结果/SHA 收口到状态文档。Production Reachability Audit 确认 Screenshot Session 类与 `launcher_original_qs_preview` 设置 Preview 跳转没有 Java/Smali/Manifest/resource/reflection/build 引用，故删除 `OriginalSearchBackgroundSession` 和该死分支；正式 `OriginalSearchTransitionHost` 的 live-surface 链、Contacts opt-in、图标 generation hydration、增量无闪和 1000ms/镜像手势门槛均保留。最终 `build.bat` 成功，APK `v1.5.5/30`、SHA256 `C64FFE3493CC36D4EBE18F6B76BF4C41467556B67C47EC05F75CBF3DEC6853E6`，v1/v2/v3=true，二进制 Manifest 含非导出 `OriginalQuickSearchActivity` 与 `READ_CONTACTS`。新版已安装 emulator-5554 与 vivo X21A；vivo 将 Launcher 前台后 800ms 上滑进入 Original，`QS_FORMAL_ENTRY_TARGET` 与 `QS_ICON_HYDRATE` 完整、无 FATAL/ANR/CME。API36 模拟器新版 Launcher 进程启动正常且无崩溃，但其不是默认桌面，ADB 注入的两方向手势均不进入搜索，故不把该次手势样本误报为 PASS；完整 API36 语义矩阵仍以此前记录为准。未提交、未推送；`MEMORY.md` 已写入长期防回归规则。
@@ -243,6 +265,26 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-08-21
+
+#### 桌面图标渲染管线尝试及统一性复审
+
+- **当时定位**：源码追踪发现冷启动（Cold Bind）和异步热更新（Hot Update）存在不同的数据源入口：
+  - Cold Bind 渲染管线 (`g.1.smali`): 在渲染时通过 `shouldUseManagedIcon` 前置拦截，直接在 Java 层取了 Drawable 画满 UI 单元格，完全绕过了数据库保存的 `iconRawData`。由于之前去除了 `InsetDrawable` 尺寸欺骗，导致直接将 256x256 生素材截断渲染而变大。
+  - Hot Update 数据更新管线 (`Aa.smali`): 在线下载完成更新数据库时，原本存在的“官方 Static Application Composer”（内边距补齐与缩放逻辑）被早期的 `cc29dbca` 提交用硬编码的 `goto :cond_6` 完全跳过，导致生素材未被裁剪缩放直接转存 DB，同样变得巨大。
+- **已暂存修改**：放弃在 Java 侧模拟 Padding 的路径，恢复原版 Smali Composer：
+  - 在 `Aa.smali` 中，移除强制跳出指令，重写了跳转逻辑（`if-nez p2`, `if-nez v1`）：确保所有的第三方应用程序和下载的 Canonical 图标，都能无条件进入 Composer 处理区；保留原有对于系统应用根据 `ColorInfo.resize` 来判定是否缩放的克制设计，避免系统应用被双重缩小。
+  - 在 `g.1.smali` 中，移除了导致数据分叉的 `shouldUseManagedIcon` 判断和对 `PackageManager.getApplicationIcon` 的依赖。现在桌面对于所有的 `itemType == 0`，都优先读取数据库的 `iconRawData`。如果 `iconRawData` 存在，则直接渲染，从而保证 Cold Bind 也能读到已被 Composer 正确处理的带内边距位图。
+- **复审结论**：本地构建曾通过，但该修改没有消除所有尺寸 owner。`e/s + IconRasterDiagnostics` 仍负责最终 physical texture 合成；如果 managed source 重解析成功，会覆盖数据库位图，如果失败则可能继续使用已经由 `Aa` 加过边距的 `iconRawData`。后一条路径存在重复留白/缩小风险，不能再写成 Cold/Hot/Restore 已统一。状态为 `AUDIT_REOPENED / FIX_REQUIRED`，不得签署 Final Pass。
+
+### 2026-08-20
+
+#### Desktop Backup & Restore：文件夹拓扑、Schema兼容与非便携权限隔离
+
+- **范围**：修复 FolderInfo 被当作安装包过滤、父文件夹未先写入导致子项散落、不同原版数据库缺少统计列时的越界写入，以及通知监听/定位等非便携权限跨设备恢复。
+- **实现**：恢复采用 `RESTORE PHASE 0..9` 有序事务；页表后先分类并写入 Folder，再写普通项和子项，最后追加保留项、恢复快捷方式图标并执行前后 FolderTopology 校验。状态清零只处理快照实际存在的字段；`NON_PORTABLE_PERMISSION_KEYS` 在导出与导入双向剥离。
+- **验证边界**：V2458A 样本完成 PHASE 0..9、54项写入和冷重载，状态仅为 `FOLDER_TOPOLOGY_AND_SCHEMA_RESTORE_V2458A_PASS`。QuickLaunch备份恢复仍为 `ROOT_CAUSE_REOPENED`；普通Application最终Raster仍受 Icon Rendering Contract门禁；Android 8–16与多ROM矩阵未完成。不得写成全部备份恢复、全部ROM或全部旧机型PASS。
+
 ### 2026-08-15
 
 #### QuickLaunch 小程序最终渲染源隔离修复（V2458A 真机视觉 PASS）
@@ -260,14 +302,14 @@
 
 ### 2026-08-12
 
-#### Icon & Folder Unified Geometry Final Fix
+#### 【历史实现，当前已被 Icon Rendering Contract 取代】Icon & Folder Unified Geometry
 
 - 根因：旧静态合成会按 alpha 外包络而非完整源画布缩放，且曾固定读取 12 宫格 `LayoutProperty`，使 20 宫格和打开文件夹不能取得自己的 icon box；`LayoutPropertyAdapter` 的上限曾禁止宽于 1080 profile 的 surface 向上适配。文件夹的原始三列 X 没有按书架内容可用矩形重新居中。此前把桌面“桌面设置”虚拟化为普通应用并参与替换链，也与用户确认的原版行为冲突；尝试在 scene root 追加文件夹缩放还造成开合闪动/卡顿风险。
 - 修复：普通静态源统一按完整 source canvas 等比 fit 到场景固定 artwork/texture box，不再作 alpha/面积/轮廓 optical compensation。普通桌面只适配 `LayoutProperty` 中的 icon box，不改变原版 scene/dock 几何。打开文件夹则由 `_folder` 这一份 `LayoutProperty` 统一缩放书架、内容、文字、标题和分页相对几何，列中心仅从 `folder_bookcase_width` 与已有左右 margin 推导。`FolderSceneMetrics` 回到原版，未保留额外 root scale/translate。桌面“桌面设置”恢复独立 `Ec.wz()` SettingButton，物理纹理只来自 `editBtn_bg.png`、`editBtn_gear.png`、`editBtn_inShadow.png`，不再进入 DEFAULT/IMPROVED/PACK/CUSTOM 或图标替换页。
 - 路径：普通桌面、打开文件夹和关闭文件夹预览中的静态应用继续经 `IconRasterDiagnostics.composeStaticApplicationIconTexture()`；动态 Weather/Calendar 保留原版 ActiveIcon 内部动画，只共享外部 geometry。编辑模式 SettingButton 与桌面“桌面设置”保持原版独立控制按钮路径，不是应用图标。
 - 修改文件：`LayoutPropertyAdapter.java`、`FolderCellPositionAdapter.java`、`IconRasterDiagnostics.java`、`ActiveIconRasterSpec.java`、`Ec.smali`、`g.1.smali`、`IconManager.java`、`MaintainedLauncherSettingsHost.java`。
 - 验证：最终 `build.bat` 成功；`git diff --check` 成功；badging 为 `v1.5.6/versionCode 31`；v1/v2/v3 签名均通过。APK 已保留数据覆盖安装到 vivo V2458A，设备版本为 `v1.5.6/31`，本地/设备 SHA256 均为 `5025E686F036C9C23BB82C21C1E52154A7B87EE8873593D0B3BBE319BD5AE448`。该机实际加载 `_folder` 的 width scale `1260 / 1080 = 1.1666666`，连续 3 轮文件夹开合未见 FATAL/ANR；普通桌面截图未见本轮适配引入的崩溃。
-- 未验证：当前仅完成 vivo V2458A 1260x2800/560dpi 的运行与视觉冒烟。1080、1440/2K、不同 density、12/20 宫格、50%/150%、DEFAULT/IMPROVED/PACK/CUSTOM、动态 Weather/Calendar、文件夹关闭预览及所有主题的完整视觉矩阵尚待逐项真机验收。因此当前状态是 `IMPLEMENTATION_UNIFIED / VIVO_1260_RUNTIME_SMOKE_PASS / FULL_RESOLUTION_MATRIX_PENDING`，不是“所有分辨率均已通过”。
+- 未验证：只完成 vivo V2458A 1260x2800/560dpi 的运行与视觉冒烟。当前状态降级为 `HISTORICAL_IMPLEMENTATION / VIVO_1260_RUNTIME_SMOKE_ONLY`；普通图标算法以 2026-08-21 Contract 为准。
 - 防回归：不得恢复 alpha bounds/hull/fill ratio optical 倍率；不得把 `currentPageMode()`再次固定为 12 宫格；不得将桌面“桌面设置”重新纳入普通应用替换链；文件夹 X 只能从 `_folder` usable rect 派生；不得向文件夹 root scene 追加 scale/translate 干扰原版开合动画。
 
 ### 2026-08-11
@@ -364,7 +406,7 @@
 
 #### 图标系统文档冻结与旧专项审计清理
 
-- 结论：当前实现层已经统一普通静态来源、ActiveIcon 外部 geometry、Weather/Calendar 静态 fallback 和桌面设置物理栅格原则；“统一”指相同 Cell 下共享外部 geometry、用户百分比只应用一次、跨分辨率保持相同 `visualEnvelope/cellWidth`，不指所有形状具有完全相同的可见宽高或 normalizer 数值，也不指不同分辨率使用相同绝对 px。
+- 2026-08-21 复审更正：本节只能保留为当时的架构目标，不能作为当前验收结论。普通静态来源仍可能在 managed 生素材与数据库预合成回退之间分叉，ActiveIcon world-bounds 校正也没有现有真机样本的运行时命中证据；当前只确认普通 Cell 的最终 physical geometry、阴影、用户百分比和缓存规格原则共享。“统一”不指所有形状具有完全相同的可见宽高，也不代表所有来源、动态状态和分辨率已经验证。
 - 防回归：冻结架构、合成顺序、缓存键字段、禁止倍率和剩余验证矩阵已同步写入项目 `MEMORY.md` 与 `LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md`。删除已被当前实现取代且包含 DEFAULT-only、旧 `raster:v8` 和“optical normalization 尚未完成”等错误状态的 `ICON_PROFILE_RASTER_AUDIT_2026-08-07.md`；`LAUNCHER_FIX_AND_OPTIMIZATION_PLAN.md`、`LAUNCHER_STARTUP_BASELINE.md`、`ORIGINAL_BEHAVIOR_REFERENCE.md` 分别承担总体计划、启动实测和原版链路职责，继续保留。
 - 生产清理：关闭 `DEBUG_RASTER_DUMP`，诊断字段和按需导出代码保留，正式构建不再持续写入 `DEBUG_ARTWORK/DEBUG_TEXTURE/metrics.tsv`；需要专项验收时才临时启用，验收后必须恢复关闭。
 - 验证：`build.bat` 完整成功；最终 APK 为 `v1.5.5/30`，v1/v2/v3 签名验证通过。vivo X21A 保留数据覆盖安装返回 `Success`，HOME 冷启动 `Status: ok`，Launcher PID 存活，启动日志未见 `AndroidRuntime` fatal。本次未清 Launcher 数据、未移动桌面 Item。
@@ -391,9 +433,9 @@
 - 修复：恢复事务删除数据库前按“来源包名 + shortcutId + userSerial”暂存当前 `QuickLaunchItem(itemType=1)` 的 `table_icons` BLOB；恢复优先使用备份中的逐快捷方式记录，旧备份或记录缺失时按稳定身份回填当前原始位图。改进版图标恢复后仅对已有本地资源主动刷新普通应用，快捷方式仍由原版最终位图链路消费。
 - 验证：`build.bat` 完整构建、重打包、对齐和签名成功；`git diff --check` 通过。当前 ADB 无在线设备，尚未完成真机备份/恢复与动态图标切换截图回归。
 
-#### 备份目录选择器与设置项默认值
+#### 【备份目录双路径已被 SAF-only 方案取代】备份目录选择器与设置项默认值
 
-- 备份位置和恢复来源现在共用锤子风格的双选项对话框：中间选择“使用手机系统目录”或“使用应用专用目录”，默认系统目录；底部固定为“取消 / 确定”。确认系统目录后才启动存储权限和 DocumentsUI，确认应用目录后分别进入应用备份记录或应用专用备份流程。
+- 历史版本曾提供“手机系统目录/应用专用目录”双选项；2026-08-15 起应用专用目录及选择弹窗已删除，当前只保留 SAF 手机系统目录。本段不得作为当前入口说明。
 - 新安装或缺少历史键时，“显示搜索页常用应用”和“解锁动画”均默认关闭；已有用户显式保存的开关值不被覆盖。中英文资源均已补齐。
 - `build.bat` 和 `git diff --check` 已通过；当前无在线 ADB 设备，未完成真机对话框截图和 Android 8–16 矩阵验证。
 - 选项行改为独立的圆点控件与文字横向布局，增加与正文一致的左侧内边距，避免圆点贴近弹窗边缘；备份行为和默认值不变。
@@ -426,7 +468,7 @@
 - **修复**：页表改为以原版 SQLite 主键 `_id` 做唯一性校验，保留原始 `pageIndex/status/containment`；恢复校验同样只验证 `_id`，新增保留应用时按实际已使用的根级页追加，并为真正新增页分配新的 `_id`。布局快照继续按原版列白名单读写 `table_pageinfos.pageTitle` 和 `table_iteminfos.title`，所以页面分组标题、文件夹标题、文件夹内容及位置会一起轮转。预览的“桌面板块数量”改为实际含根级内容的页面数，不再显示页表预分配容量。
 - **界面**：首页入口移到“设置默认桌面”下、“关于我们”上；管理页去除手工 `>`，统一使用 `setting_next`，标题和右侧值采用一级设置的字号/颜色，右侧值与箭头留出固定但紧凑的间距，标题会自动让位。已选择的 SAF 目录显示其 document-id 路径（如 `/Download/LauncherBackup`），而不是泛化的“已选择目录”；这不是假定存在可访问的真实文件系统路径。恢复预览页同步使用相同的行高、字重、颜色和卡片宽度。说明明确列出会备份的页面/文件夹/位置/设置/主题/名称/图标，以及不会备份的壁纸、应用数据、账户、权限、默认桌面、密码、天气缓存和定位信息。
 - **进度与恢复**：备份、校验和恢复均继续复用 `SmartisanProgressDialog` 显示阶段状态；恢复确认后仍走既有 `:reload` 冷重载，桌面首帧后再结束过渡，备份本身不重载桌面。
-- **恢复结果与图标**：恢复成功、撤销成功或自动回滚均在新桌面真实首帧后通过原版 `Bb` / `ToastSmt` 底部轻提示立即显示；恢复准备阶段的失败也直接使用同一提示，不再把结果暂存到下次进入“桌面备份与恢复”页面后弹出大对话框。备份会保存全局图标来源、已选图标包、单应用图标模式及自定义 PNG，但不打包可再下载的在线改进图标缓存；恢复到“改进版图标”后，首帧可见再以既有后台下载队列补齐缺失缓存，保留自定义、资源、图标包和系统原图选择，不在主线程、恢复校验或首帧中联网/解码。
+- **恢复结果与图标（schema v3 更正）**：提示与冷重载时序继续有效。旧归档不保存在线改进版 RAW，只能后台补齐；2026-08-21 起新归档通过 `icons/sources.json` 保存可移植改进版 RAW source。最终 raster 仍是可丢弃缓存，不进入普通应用备份真相。
 - **验证边界**：用户提供的 vivo X21A Android 9 截图已显示 2026-08-01 的成功备份、恢复预览和可撤销状态；本地 `build.bat` 和 Android 17 模拟器覆盖安装通过。Android 12 及 Android 8/10/11/13–16 的真实 SAF Provider、恢复、撤销、杀进程恢复仍需逐机复测，不能用单机成功代替全机型承诺。
 
 #### 移除 Shizuku 默认桌面通道
@@ -1067,7 +1109,6 @@
 #### 动态天气/日历阴影根因修复与图标设置弹窗统一
 
 - 动态阴影根因：当前 `ActiveIconView.a(base, active)` 已转到 `LauncherSettingBridge.composeActiveIconToBaseBounds()`；该方法为避免双层图标只把动态主体画进新的透明 Bitmap，却完全没有生成阴影。此前在 ActiveIcon 节点创建后补调 `g.rl()` 只影响私有 3D 阴影节点，不能进入最终缓存 Bitmap，而且该 `sc[27] + MutiTexMaterial` 链在现代 Android 上存在已验证崩溃风险，因此视觉上始终没有稳定阴影。
-- 最终修复：保持 v1.5.3 已验证的 `73.32%` 动态主体比例和纵向锚点不变；先把动态主体绘制到普通图标画布，再读取原版资源中的 `icon_shadow_radius` / `icon_shadow_color`（透明主题使用对应 transparent 数组），按照原版 `data/L` 的 `extractAlpha + BlurMaskFilter` 思路生成两层软件阴影，最后覆盖动态主体。完整静态天气/日历图标仍不参与绘制，不会重新出现双层图案。
 - 删除 ActiveIcon 创建尾部无效的 `rl()` 补丁，避免重复创建私有 GL 阴影节点和恢复已废弃崩溃链。
 - 图标包选择不再使用系统 `AlertDialog.Builder.setItems()`；改为复用 `prepareSmartisanDialogRoot()`、统一标题/分隔线/列表按压态/底部取消按钮，并标明当前选择。选择、后台预热和桌面刷新逻辑保持不变。
 - 桌面图标大小弹窗宽度统一为 `min(380dp, screenWidth - 32dp)`；移除预览区额外的渐变背景、描边和圆角框，只保留当前百分比、大小预览、滑杆与刻度，底部按钮继续复用统一组件。
@@ -1241,16 +1282,16 @@
 - 顶部“已完成”已补齐手势、多页管理、页面隐藏/锁定、文件夹、翻页动画、主题、搜索、角标、设置入口、动态图标、应用分身与多用户等现有能力；README 的核心特性同步加入四指和双指手势。
 - 删除原“未完成 / 待处理”中全部 `[x]` 已完成项目。当前没有明确缺失的核心桌面功能；剩余内容改为“已完成但需要继续回归”和“已知限制”，避免把跨机型测试、通知系统边界、用户确认安装等平台限制误写成开发未完成。
 
-#### 动态天气/日历最终对齐、兼容阴影与 Android 16 闪退修复
+#### 【部分历史结论已被取代】动态天气/日历对齐尝试、兼容阴影与 Android 16 闪退修复
 
-- 用户真机确认天气数据、动态天气显示及桌面运行已经恢复正常。实时 WeatherView / CalendarView 保留原版 `nc(vm)`；结束后的静态 Bitmap 使用原版 `sq()` 公式 `(icon_size_with_shadow - icon_size_origin) / 4` 对齐。三列布局为画布的 5.487805%，不再使用近似 5% 或固定像素，因此动画与结束帧不会残留约 1px 跳动。
+- 当时真机确认天气数据、动态显示和桌面运行恢复；该样本不能证明 Weather/Calendar LIVE/STATIC world rect 已在全部比例和宫格对齐。“不会残留约 1px 跳动”的最终结论已撤销，当前必须以 `syncActiveIconToStaticArtwork()` 的 ratio/center 自动指标和逐帧矩阵验收。
 - 原版阴影来自 Cell `sc[27]`、八张运行时阴影纹理和 `MutiTexMaterial`，依赖 Smartisan `Settings.Global`、已移除的 `android.graphics.BlurImageFilter` 以及旧 shader 的 `uShadowRadius`。普通 Android/Android 16 不得强制开启该链路；真机出现的 GLThread 闪退已通过 ADB 明确定位并完整撤销。
 - 【已废弃】早期兼容方案曾将动态底图裁为无阴影主体并生成 `_shadow.png` / `_shadow_transparent.png`。后续真机对比确认该处理会去掉原版纹理中的低 alpha 投影，透明主题下视觉过淡；当前已恢复原版底图并由动态节点直接加载。
 - 保留的原版安全路径是 `data/L.smali` 的 `extractAlpha + BlurMaskFilter` 三 Bitmap 合成；依赖 Smartisan 私有 GL/`sc[27]` 的 activeicon 运行时 shadow map 仍保持关闭，两者不能混为一条链路。
 
 ### 2026-07-02
 
-#### 动态图标真机定版、关闭动态后的标准图标映射与在线识别修复
+#### 【映射/刷新结论保留，尺寸定版已撤销】动态图标、关闭动态后的标准图标映射与在线识别修复
 
 - 实时动画使用原版 `nc(vm)` 纵向坐标；结束后的静态 Bitmap 以动画为基准，使用原版 `sq()` 几何差校正。两条路径职责不同，但最终可见外框必须重合。
 - 关闭动态后不再下载天气/日历图标。构建时直接把图标库中完整的 `com.smartisanos.weather.png` 和 `com.android.calendar.png` 编入 maintained 资源 APK，运行时分别以 `static_icon_weather` / `static_icon_calendar` 读取；所有已识别厂商天气、日历均直接命中这两个本地资源，离线和非首次进入桌面也可立即取得完整静态图标。
@@ -1260,7 +1301,6 @@
 - 拨号/电话本的组件和标题优先分流未改动；本次标准包映射只作用于关闭动态后的天气和日历。
 - 关闭动态只决定“是否走普通图标链路”，不决定普通图标来源。普通链路优先级固定为：单应用自定义/明确选择 > 图标包组件映射 > 已启用的改进版图标（天气/日历使用 APK 内置完整资源）> 应用系统原图。改进版总开关关闭时不会强制使用内置天气/日历；选中图标包时也不会被改进版别名抢占。拨号 Activity 禁止回退到联系人包级映射的保护继续保留。
 - 性能日志确认此前一次图标操作会执行数百次 PNG 压缩和网络连接。优化后：动态天气/日历开关只向数据库提交已安装天气、日历包，不再两次全量刷新全部应用；图标大小重启后只重建 LayoutProperty/SceneNode，不再重新匹配、压缩或下载图标；图标更新从“反射直调 + 本应用广播”两次执行改为直调成功即结束、广播仅作失败兜底；全量包列表按包名去重。全局改进版/整包切换仍允许更新全部实际受影响应用。
-- 动态开关的天气/日历图标已经内置且定向刷新，切换为一轮两包刷新，600ms 后重建 Launcher。静态合成画布使用 73.32%，实时根节点在原版 mode 分支基础上乘 94%；实时动画保留 `nc(vm)`，静态 Bitmap 使用精确 `sq()` 比例校正。内部天气图形、温度、日期和动画参数不动。
 - 普通 Android 的普通应用图标继续使用原版 `data/L.smali` 软件生成的 dark/light/transparent 三张 Bitmap；动态天气和日历因使用独立 activeicon 节点，直接加载原版 ActiveIcon 完整底图，依赖 Smartisan framework 的 activeicon `sc[27]` GL 阴影链路继续禁用。
 - 【已废弃】曾为 256px 动态底框引入画布裁切补偿的双层生成阴影。该方案不能等价于原版纹理阴影，且会覆盖原版半透明边缘，因此不再使用。
 - 在线改进版图标成功下载后持久保存到 `filesDir/online_icon_cache_v3`，跨进程重启和覆盖安装复用；读取顺序为内存缓存 → 持久文件 → 必要时联网。天气数据保存在 SharedPreferences，正常 TTL 为一小时，位置 TTL 为六小时；只有缓存过期、用户手动刷新或位置模式改变才联网。
@@ -1496,7 +1536,6 @@
 
 - **应用分身图标**：清理厂商 `getUserBadgedIcon`、旧微信专用角标和 Launcher 自绘面具可能重复叠加的路径。当前以主用户原始应用图标为底图，只绘制一层锤子风格面具，并调整面具轮廓、尺寸和位置；应用分身设置入口恢复使用原来的设置图标。
 - **桌面与文件夹文字**：桌面标签略微增大，文件夹内标签保持更小的层级；两处使用一致的字体绘制基线。文件夹内标签显式清除阴影，修复文字重影和模糊。
-- **图标视觉尺寸**：系统图标、主题图标、redirect、自定义图标和在线图标统一经过 alpha 可见区归一化，再应用用户的 50%–150% 尺寸比例。首帧直接读取 `PackageManager` 的路径也执行同样归一化，修复冷启动时图标先大小不一、稍后才跳成一致的问题。
 - **搜索手势**：自绘搜索页采用完整 `DOWN / MOVE / UP` 位移、方向、时长和阈值判断，缩短有效下滑的触发距离；同时停用 SMEngine 中遗留的上滑搜索入口。当前只有明确的桌面下滑手势可以打开搜索页，上滑、点击和轻微抖动不应触发。
 - **在线图标库**：取消旧锤子图标服务器依赖，按应用包名访问 `icons/drawable/<package>.png`。优先使用 Gitee 下载镜像，失败后回退 GitHub；下载在后台执行并写入应用私有缓存，包含失败缓存、文件大小与图片尺寸校验。仓库现有 2209 个图标及索引，在线资源不会增加 APK 体积。
 - **跨品牌系统图标**：新增受系统应用身份约束的类别映射。不同厂商的相机、相册、浏览器、联系人、短信、邮件、计算器、文件管理、指南针、录音、音乐、视频、天气、便签、设置、安装器和 SIM 工具包可映射到统一的锤子在线图标；日历和时钟保留动态实现，第三方同名应用不参与映射。
@@ -1504,7 +1543,6 @@
 - **在线图标自动刷新**：缓存写入采用 2 秒静默期合并刷新；刷新完成后不会永久锁死，后续下载批次仍可再次通知桌面，因此不再要求用户切换主题或重开“改进版图标”。刷新始终不阻塞首次桌面初始化。
 - **跨 ROM 主题切换**：普通主题不再只把切换消息保存在进程静态字段后提前返回，而是先将主题 ID 写入 Launcher 两套私有配置并调用原版主题栈，再发送动画消息。这样 vivo/OriginOS 即使回收旧进程，新 Launcher 也能从持久化主题恢复。正常切换不再无条件追加第二次进程重建，避免连续播放两轮加载动画；透明主题等确实需要重启的路径仍会先安排精确 HOME PendingIntent，再结束旧进程。
 - **电话本图标优先级**：厂商拨号器可能使用同一包提供拨号和电话本两个 Activity。联系人类别识别已提前到 package-wide packed icon 之前，显式自定义图标仍保持最高优先级；“电话本 / 联系人 / 通讯录”会直接使用联系人图标，不再被整包电话图标抢先覆盖。
-- **首帧与刷新图标统一**：桌面首帧不再调用 package-wide `PackageManager.getApplicationIcon()`，而是使用 `ItemInfo.packageName + componentName` 精确还原 Launcher Activity，并直接进入与后续刷新相同的改进版图标链路。拨号与电话本即使同包也保持独立，其他已缓存或本地可识别图标首次进入桌面即可生效。在线图标下载完成后会触发数据库与图标刷新，不再要求切换主题或手动重开“改进版图标”。
 - **电话/联系人最终渲染分流**：对照 maintained `97ff218`，图标包的三参数匹配禁止拨号 Activity 回退到联系人包级映射；桌面节点刷新同时传入 `ItemInfo.title`，按“桌面标题 > Activity > 包名”识别电话、拨号、电话本、联系人和通讯录，阻止异步刷新再次把电话本覆盖成电话。
 - **原版解锁动画跨 ROM 触发**：确认动画控制器、9/12/16/20 宫格颜色资源和 `USER_PRESENT` 播放链路均属于 Launcher 主 APK。动态接收器监听标准 `SCREEN_OFF` 并映射到原版 `action_keyguard_on` 完成锁定预初始化；部分 ColorOS 可能不向默认 HOME 派发该广播，因此保留生命周期兜底。旧的“握手时间取消生命周期兜底”已废弃；当前唯一可信去重规则见 2026-07-18 的 `unlockGeneration` 记录。
 - **解锁动画与临时桌面状态隔离**：修复更换主题后立即锁屏，解锁时再次执行主题切换动画的问题。主题应用原先同时通过原版主题栈和额外静态消息各派发一次 `MESSAGE_CHANGE_THEME`，第二条消息可能滞留到解锁后；现仅在原版主题栈失败时使用额外消息兜底，并在主题过渡保护期内跳过解锁场景重建。修复文件夹打开状态锁屏后解锁导致 GL 线程空上下文崩溃、Launcher 进程重启的问题；解锁前检测当前 FolderController，文件夹打开时保留现有场景，不初始化解锁动画。ADB 实测主题场景无重复 `MESSAGE_CHANGE_THEME`，文件夹场景 PID 不变且无 `FATAL EXCEPTION`，普通桌面锁屏仍正常播放解锁动画。
@@ -1803,7 +1841,7 @@
 #### Android 16 触摸、图标尺寸与文件夹动画修复
 
 - Android 16 / VIVO 上压平手指后桌面不翻页：ADB 原始输入与应用事件确认触摸坐标没有中断，根因是旧 `TVelocityAndGestureTracker` 把较大的 `MotionEvent.getSize()` 当作专用 sweep 手势。Android 15+ 将旧 `sweep_threshold` 提升到 1.0，避免抢占普通翻页；下滑搜索改为先把完整 MotionEvent 交给 RootView / SMEngine，再旁路判断，避免搜索入口截断桌面触摸序列。
-- 普通、改进版和自定义图标此前存在两套尺寸规则：只有改进版按84%且只能缩小。现在统一按 alpha 可见边界居中到画布短边90%，允许有限度放大和缩小，所有来源共用 `normalizeLauncherIcon()`；设置页100%运行时基准由原先112%调整为120%，即用户确认观感合适的原120%大小，滑块显示值保持不变。
+- 【已废弃】曾将所有来源统一到 alpha 可见边界90%，并把设置页100%运行时基准改为120%。该方案与 DEFAULT-only normalization、统一 IconVisualMetrics 和禁止来源专用倍率的合同冲突，不得恢复。
 - 展开文件夹内容按书架实际可见行高自适应：图标为 48%，应用名为 9.2%，文字中心偏移为 29%；用户调整 50%~150% 图标大小时，展开图标、文字和间距同比缩放。此前误把“缩略图松手后上移”当成展开页落点问题而临时修改的 `M.smali` / `FolderCellPositionAdapter` 入口已全部撤销，不保留错误方案。
 - 关闭文件夹缩略图松手后再上移：拖入动画以外框几何中心计算，而最终 2×2 / 3×3 viewport 使用 PNG 内真实搁板中心，两者相差约外框高度 3.6%~3.7%。`folder_icon_center_offset_2_2 / 3_3` 现在按当前外框尺寸动态补偿，使动画落点与最终缩略图一致，并随屏幕和图标比例自适应。
 - 日期刷新链路保持不变：系统 `DATE_CHANGED`、`TIME_SET`、`TIMEZONE_CHANGED` 广播仍由原版接收器处理，日期纹理缓存键继续包含年份和年内日序；其他手机只要能被标准日历类别或厂商包名检测到，就会显示当日日期并在跨日后更新。
@@ -2329,7 +2367,8 @@ ADB 结论：
 
 - 应用图标页当前仍由 `ThemeChooserActivity` 承载 maintained 风格兼容页，还不是完整迁移的原生 Smartisan Settings Activity。
 - 图标自动识别资源和 Smartisan 网络图标链路仍建议继续做更多应用回归，尤其是系统应用、Google 应用和第三方应用混合安装场景。
-### 2026-08-09
+
+## QuickSearch 历史补录（记录日期：2026-08-09，不参与倒序日期轴）
 
 #### QuickSearch Q8-C Original Search Semantics & Ranking
 

@@ -20,10 +20,11 @@ public final class BackupArchiveReader {
         public final JSONObject theme;
         public final JSONObject icons;
         public final JSONObject shortcutIcons;
+        public final JSONObject portableSources;
 
         ValidatedBackup(File archive, File extractedRoot, BackupManifest manifest,
                 JSONObject layout, JSONObject settings, JSONObject theme, JSONObject icons,
-                JSONObject shortcutIcons) {
+                JSONObject shortcutIcons, JSONObject portableSources) {
             this.archive = archive;
             this.extractedRoot = extractedRoot;
             this.manifest = manifest;
@@ -32,6 +33,7 @@ public final class BackupArchiveReader {
             this.theme = theme;
             this.icons = icons;
             this.shortcutIcons = shortcutIcons;
+            this.portableSources = portableSources;
         }
 
         public int itemCount() { return layout.optJSONArray("items") == null ? 0 : layout.optJSONArray("items").length(); }
