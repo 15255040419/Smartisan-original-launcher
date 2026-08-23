@@ -50,6 +50,8 @@
 
 ## 当前状态总览（2026-08-21）
 
+- 2026-08-23 OPEN_FOLDER_LABEL_ANCHOR_CORRECTION：确认 `FolderCellVisualMetrics -> g.1.smali -> Mc.setTranslate()` 是 Open Folder child label 的最终 Owner。撤销未完成的 `sc[0]` bounds/runtime 生命周期实验；Folder gap 直接复用 `DesktopLabelMetrics.finalVisualGap()`，仅保留 Folder 自身的 width-based anchor correction。1260 设备实测此前 `34.3@1080 -> 40.0167` 过量靠近，现校准为 `28.43@1080`，对应 `33.1683@1260`，使 20 宫格当前最终 Y 约回到原版 `-72` anchor。未修改 Desktop、DesktopLabelMetrics 输出、任何 icon geometry、Folder Preview、书架、行列、Constants 或 50/100/150 隔离。`build.bat`、v1/v2/v3 签名、ADB 覆盖安装和 1260 真机截图通过；1080/1440/2160 仅完成同一 width-based 公式静态验证，未扩写为多设备视觉 PASS。未提交、未推送。
+
 - 2026-08-21 ICON_RENDERING_CONTRACT_CURRENT_STATE：静态代码已收敛为 RAW Source Resolver → IconVisualMetrics → 单次 Static Application Composer，数据库预合成与 managed `LEGACY_UNKNOWN` 回灌路径已删除；ActiveIcon 第二用户倍率 owner 已删除，最终 root 改为跟随 STATIC artwork world rect。静态审计、构建、签名和验证器自测通过；真机安装因 vivo 系统确认未完成，固定运行时矩阵仍未通过。因此当前仅为 `IMPLEMENTATION_COMPLETE / RUNTIME_MATRIX_NOT_PASSED`，不得宣称所有来源、生命周期、分辨率和动态状态视觉已验收一致。
 
 - 2026-08-21 BACKUP_RESTORE_CURRENT_SCOPE：当前只保留 SAF 系统目录；新 schema v3 归档保存可移植改进版 RAW source，V2458A 一次恢复重绑定通过；FolderTopology/Schema 写入仅完成 V2458A 样本。QuickLaunch provider-decorated FINAL 恢复仍为 `ROOT_CAUSE_REOPENED`，普通 Application 最终 raster 仍受 Icon Rendering Contract 门禁，旧归档和 Android 8–16 多 ROM 矩阵未完成。
@@ -264,6 +266,15 @@
 4. 同一天有多条记录时，越靠上的记录越新；参数或结论冲突时，以同日靠上的记录为准。
 
 ## 每日修复记录（倒序）
+
+### 2026-08-23
+
+#### Open Folder Label Gap 与 Anchor 收口
+
+- **根因**：Open Folder label 的真实最终位置已确认由 `FolderCellVisualMetrics` 返回值直接进入 `g.1.smali` 的 `Mc.setTranslate()`。此前虽然把 Folder Gap 改为 Desktop 数值，但仍叠加了从 `+40` 哨兵反推的 `34.3@1080` Anchor correction，导致 1260 设备修正值为 `40.0167`，文字比目标位置更靠近图标。
+- **最终实现**：Folder 继续使用自己的 artwork/text geometry；Gap 直接调用 `DesktopLabelMetrics.finalVisualGap()`，不再维护第二份 Folder Gap 基准。唯一 Folder Anchor correction 调整为 `BASE_FOLDER_LABEL_CORRECTION1080=28.43`，统一按 `surfaceWidth / 1080` 缩放：1080=`28.43`、1260=`33.1683`、1440=`37.9067`、2160=`56.86`。1260/20 宫格下最终 `Mc.setTranslate Y` 约为 `-71.9983`，回到原版 `name_off_set_y_folder=-72` anchor。
+- **冻结范围**：未修改 Desktop、`DesktopLabelMetrics` 输出、普通/Folder icon geometry、166/216 图标基准、Folder Preview、书架、row/column、root scale、Constants 和 Desktop 50/100/150 隔离；已撤掉 bounds 反射、`Qj/Pj` runtime 取底边、临时日志和二阶段生命周期逻辑。
+- **验证**：`build.bat` 成功；APK v1/v2/v3 签名验证通过；`adb install -r build/launcher-signed.apk` 成功；V2458A/1260×2800 真机截图确认翻译机、对讲机、闹钟时钟文字整体下移，图标和书架未变化；未发现 `FATAL EXCEPTION`、`VerifyError` 或 `NoClassDefFoundError`。1080/1440/2160 通过同一 width-based 公式静态审计，尚未取得对应设备截图。未提交、未推送。
 
 ### 2026-08-21
 

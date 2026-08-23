@@ -8292,6 +8292,19 @@
     return-void
 
     :cond_0
+    # PAGE_1_3X3_MODE_FOLDER is the opened-folder scene's own resource base.
+    # It is deliberately excluded from the desktop user-size pass. Closed
+    # folder previews use their desktop-cell mode and continue through it.
+    invoke-static {}, Lcom/smartisanos/launcher/data/Constants;->getPAGE_1_3X3_MODE_FOLDER()I
+
+    move-result v0
+
+    invoke-static {v0}, Lcom/smartisanos/launcher/data/Constants;->mode(I)Lcom/smartisanos/launcher/data/LayoutProperty;
+
+    move-result-object v0
+
+    if-eq p0, v0, :folder_base
+
     iget v0, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->icon_size_origin:F
 
     move v1, v0
@@ -8334,6 +8347,7 @@
 
     invoke-static {p0, p1}, Lcom/smartisanos/launcher/data/LayoutPropertyAdapter;->scaleFolderPreviewForIconSize(Ljava/lang/Object;F)V
 
+    :folder_base
     return-void
 .end method
 

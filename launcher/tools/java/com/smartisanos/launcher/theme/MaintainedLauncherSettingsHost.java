@@ -149,6 +149,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class MaintainedLauncherSettingsHost {
+    private static final float DOPPELGANGER_BADGE_BOTTOM_MARGIN = 0.04f;
     private static final String LOG_TAG = "MaintainedSettings";
     private static final String QS_PERF_TAG = "QS_PERF";
     private static final String QS_INDEX_TAG = "QS_INDEX";
@@ -3114,7 +3115,7 @@ public final class MaintainedLauncherSettingsHost {
 
         float size = Math.max(13f, Math.min(width, height) * 0.19f);
         float left = Math.max(1f, width * 0.125f);
-        float bottom = height - Math.max(1f, height * 0.155f);
+        float bottom = height - Math.max(1f, height * DOPPELGANGER_BADGE_BOTTOM_MARGIN);
         float top = bottom - size;
         RectF shield = new RectF(left, top, left + size, bottom);
         Path shieldPath = buildDoppelgangerBadgePath(shield);
@@ -3154,7 +3155,7 @@ public final class MaintainedLauncherSettingsHost {
         try {
             float size = Math.max(13f, Math.min(width, height) * 0.19f);
             float left = Math.max(1f, width * 0.125f);
-            float bottom = height - Math.max(1f, height * 0.155f);
+            float bottom = height - Math.max(1f, height * DOPPELGANGER_BADGE_BOTTOM_MARGIN);
             float top = bottom - size;
             int sampleX = clamp(Math.round(left + size * 0.5f), 0, width - 1);
             int sampleY = clamp(Math.round(top + size * 0.45f), 0, height - 1);

@@ -1355,7 +1355,7 @@
 
     int-to-float p1, p1
 
-    invoke-static {v2, p1}, Lcom/smartisanos/launcher/data/FolderVisualGeometry;->resolveLabelCenterY(Ljava/lang/Object;F)F
+    invoke-static {p0, v2, v0, p1}, Lcom/smartisanos/launcher/data/FolderCellVisualMetrics;->resolveLabelCenterY(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;F)F
 
     move-result p1
 
@@ -3238,13 +3238,13 @@
 
     int-to-float v2, v2
 
-    invoke-static {v3, v2}, Lcom/smartisanos/launcher/data/FolderVisualGeometry;->resolveLabelCenterY(Ljava/lang/Object;F)F
+    aget-object v0, v0, v1
+
+    invoke-static {p0, v3, v0, v2}, Lcom/smartisanos/launcher/data/FolderCellVisualMetrics;->resolveLabelCenterY(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;F)F
 
     move-result v2
 
     .line 3
-    aget-object v0, v0, v1
-
     const/4 v3, 0x0
 
     invoke-virtual {v0, v3, v2, v3}, Lcom/smartisanos/smengine/SceneNode;->setTranslate(FFF)V
