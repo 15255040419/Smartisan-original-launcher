@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "updated": "2026-07-24",
+  "updated": "2026-08-24",
   "path": "icons/drawable/{packageName}.png",
-  "count": 5315,
+  "count": 5317,
   "note": "Multiple artwork files for the same application are declared in icons/variants.json.",
   "mirrors": [
     "https://gitee.com/RANH-F/Smartisan-original-launcher-download/raw/master/icons/drawable/",
@@ -4244,6 +4244,12 @@
       "file": "com.bigsea.bsfilms.png",
       "bytes": 27772,
       "sha256": "7935996948f7110b15bd6f5eb72572d10f98e3d81cb443d213c7fe4e3b515462"
+    },
+    {
+      "package": "com.bilibili.app.in",
+      "file": "com.bilibili.app.in.png",
+      "bytes": 20152,
+      "sha256": "392c5d99c5ea4a279a91a131d412fa56de8719509eb35fa4a20b2e9473d441df"
     },
     {
       "package": "com.bilibili.azurlane.gh",
@@ -13700,6 +13706,12 @@
       "file": "com.laowangbh.png",
       "bytes": 44643,
       "sha256": "a63d0a187fba5c3e1878a39f6a48e3e276c09245e069c3b9ab6b759e08f8368c"
+    },
+    {
+      "package": "com.larksuite.suite",
+      "file": "com.larksuite.suite.png",
+      "bytes": 16798,
+      "sha256": "64670be858a60485f86f8e329c1ae0f85124ffff5e4889fd2b423559cde329a7"
     },
     {
       "package": "com.larus.nova",
