@@ -1,5 +1,7 @@
 package com.smartisanos.launcher.data;
 
+import android.util.Log;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -80,9 +82,8 @@ public final class FolderSceneMetrics {
                     indicatorCenterY + indicatorHeight * 0.5f);
         }
 
-        final Result result = calculate(width, height, topInset, bottomInset,
+        return calculate(width, height, topInset, bottomInset,
                 visualLeft, visualTop, visualRight, visualBottom);
-        return result;
     }
 
     public static Result calculate(int width, int height, int topInset, int bottomInset,

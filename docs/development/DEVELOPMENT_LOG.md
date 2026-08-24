@@ -48,7 +48,19 @@
 
 构建工具、系统 PATH、签名流程、APK 版本号写入点和二进制 Manifest 修改方式，统一记录在 `docs/build/BUILD_GUIDE.md`。改版本或临时降版测试检查更新前先看该文档，最终版本号必须以 `aapt2 dump badging build\launcher-signed.apk` 为准。
 
-## 当前状态总览（2026-08-21）
+## 当前状态总览（2026-08-25）
+
+- 2026-08-25 OPEN_FOLDER_MODE20_VISUAL_PARITY_AND_CLEAN_PERFORMANCE_TRACE：在 `g.fH -> e/s(pageMode) -> cache/compose(pageMode)` 唯一 Owner 已稳定的前提下，只收敛 Open Folder portrait Visual Base。真机设置页确认 LOW 当前为 20 宫格、Desktop 图标 100%；此前同机 runtime `dH` 为 artwork/texture `141.6/182.4`，1260 HIGH 为 `165.2/212.8`，两者严格符合 `surfaceWidth/1080`。根因是 pageMode 9 经 `cellCount(9)=20` 读取 `MODE_20` 的 `118/152`，Desktop 100% 再消费冻结的 1.20 Golden，而 Mode8 独立资源不消费 Desktop user scale；上一轮原版 Folder `166/216` 因而仍比当前 20 宫格大。现将 Mode8 portrait 的一份 1080 最终视觉基准设为整数资源 `142/182`，1440 profile 为同宽度比例 `189/243`，中间宽度继续由既有 width adaptation 派生；未修改 Owner、IconVisualMetrics、Desktop、50/100/150、Preview、FolderSceneMetrics 或 Timeline。删除 `FolderIconTrace.java`、`OPEN_FOLDER_ICON_TRACE`、`FOLDER_ANIMATION_TRACE`、CELL/OWNER/cache lookup 临时 hook；同时修复 `build.bat` 在括号块内提前展开 `%BUILD_SCRATCH%`、错误复用盘根 `E:\classes`/`E:\dex` 旧 class 的构建污染，clean APK 已确认 `classes2.dex` 不含 Folder trace 字符串。LOW clean APK 覆盖安装成功，Folder 截图尺寸进入与 20 宫格相同量级，静态合同审计、badging、v1/v2/v3 签名和无崩溃检查通过。外部 atrace 的 8 次开关显示：打开首帧 `GLThread onDrawFrame=111~167ms`、其中 CPU running `86%~90%`；关闭首帧约 `26~38ms`；203 帧统计 `onDrawFrame p50=14.966ms/p95=28.681ms/max=167.490ms`，`eglSwapBuffers p95=5.917ms/max=10.166ms`，无 Launcher GC、Bitmap compose 或 texture upload slice。FIRST BAD PERFORMANCE LAYER 因此是 Folder open 时 SMEngine GLThread 内的同步 scene CPU 工作，尚未细化到具体 native/scene 方法；不调整动画时长、不新增缓存或线程。HIGH 本轮 clean APK 视觉与性能尚未复测。未更新 `MEMORY.md`，未提交、未推送。
+
+- 2026-08-25 OPEN_FOLDER_MEMORY_SYNC：对上一条末尾“未更新 `MEMORY.md`”作状态更正：今天确认的唯一 Owner、`Cell.jl()` 重绑定规则、Mode8 与 Desktop 20 宫格等视觉基准、禁止恢复的错误路径及性能边界，现已写入项目 `MEMORY.md`；`BUILD_SCRATCH` 的 CMD 提前展开与 stale class 注入陷阱已写入 `docs/build/BUILD_GUIDE.md`。本条仅同步文档，不改变代码或资源；未提交、未推送。
+
+- 2026-08-24 【已废弃】FOLDER_SCENE_CONTEXT_GLOBAL_COMPOSER_EXPERIMENT
+
+- 2026-08-24 OPEN_FOLDER_COLD_RELOAD_SCALE_ISOLATION_AND_DESKTOP_TEXT_SCALE：定位到 Open Folder 冷重载尺寸异常并非移动入 Folder 的即时路径，而是 `MaintainedLauncherSettingsHost.applyRuntimeIconSizePercent()` 冷重载初始化会遍历共享 `layoutPropertyMap`，其 `scaleLayoutProperty()` 未像 `Constants.applyIconSizeToProperty()` 一样排除 MODE_9/multiPageMode=8，导致 Folder Base 再次消费 Desktop 50/100/150。现在 runtime scaler 在写共享属性前按 `FolderVisualGeometry.isFolderLayoutProperty()` 跳过 Open Folder；关闭状态 Folder Preview 仍随 Desktop Cell 整体只缩放一次。另将低分辨率 Folder profile 从当前不成立的 `artwork=192 / folder texture=184` 恢复为原版 `166/216`，1440 profile 恢复原版 `222/286`，landscape 恢复 `56dp`；未修改 Folder Cell node、Preview、书架、行列或动画。Desktop label Paint 独立按 1080 原版字号基准做 width scale：12宫格 `36 * width/1080`，20宫格 `30 * width/1080`，不消费 Desktop icon userScale。`build.bat`、badging、v1/v2/v3 签名和 `git diff --check` 通过；X21A（1080x2280/480dpi）覆盖安装被 vivo PackageManager 返回 `Failure [-200]`，未卸载 Launcher，因此冷重载及 50/100/150 真机矩阵仍待设备确认。未提交、未推送。
+
+- 2026-08-23 FOLDER_GLTHREAD_RENDER_LIFECYCLE_GUARD：修复 `FolderIcons(la).oa(Z)` 在 Folder 渲染资源已释放但 `jz` 仍为 true 时对 null `iz` 执行 `array-length` 的 GLThread 崩溃。first bad owner 是兼容层 `gj()` 的 Weather/Calendar stale-owner 分支：`FolderInfo.O(package)` 返回 null 后错误调用整个 `FolderIcons.clear()`，同步置空 `iz/hz/kz/Qj`，但 Cell 下一帧仍可能进入 `oa()`。现在 `clear()` 释放前先关闭 `jz`；`oa()` 在 draw 前要求 `jz=true` 且 `iz/hz/kz` 全部非 null，否则关闭 `jz` 并返回；`gj()` owner missing 只停止并清空对应 Weather 或 Calendar ActiveIcon，不再销毁整个 FolderIcons。未改 Folder视觉、Preview、尺寸、书架或动画。V2458A：构建、覆盖安装和设备 dex 一致性通过；20次冷启动、30次 Folder 开关、aShell 同签名覆盖更新返回 Launcher 均 `FATAL/GLThread/la.oa NPE=0`。现有桌面没有 Weather/Calendar 位于 Folder 的样本，未改用户布局造样本；真实卸载与该动态图标 Folder 真机矩阵仍待覆盖。未提交、未推送。
+
+- 2026-08-23 UNLOCK_ANIMATION_FOREGROUND_SESSION_GATE_FIX：`isDefaultHome()` 不再作为解锁动画 session 建立或播放的资格 Gate；锁屏前只认 Smartisan Launcher 自身真实 `resumed + windowFocus`，解锁后只认同一 session 的 `resumed + windowFocus + keyguard unlocked + prepareReady + dismissPending`。`tryCommitUnlockAnimation()` 删除已在 prepare receiver 和正式 play receiver 重复验证的兼容层 `runtimeReady` 阻塞，但保留原版 `J.Ua()` receiver 检查及 `shouldSkipUnlockAnimation()` 场景保护。新增同 session uptime 时间线。V2458A 真机：非默认 HOME 单次 `USER_PRESENT->COMMIT=20ms`、`COMMIT->START=16ms`；默认 HOME 为 `15ms/20ms`；最后 Gate 均为 `WINDOW_FOCUS_TRUE`。非默认 HOME 连续20次 `ARMED/COMMIT/ORIGINAL_PLAY/START/FINISH=20/20/20/20/20`，Settings/微信/电话/相机前台锁解锁及随后手动回 Smartisan 均 `COMMIT=0`。未修改原版 `q(0)/q(1)`、SMEngine 时长、`Eb.update/Ra.T`、图标参数或刷新率适配。未提交、未推送。
 
 - 2026-08-23 OPEN_FOLDER_LABEL_ANCHOR_CORRECTION：确认 `FolderCellVisualMetrics -> g.1.smali -> Mc.setTranslate()` 是 Open Folder child label 的最终 Owner。撤销未完成的 `sc[0]` bounds/runtime 生命周期实验；Folder gap 直接复用 `DesktopLabelMetrics.finalVisualGap()`，仅保留 Folder 自身的 width-based anchor correction。1260 设备实测此前 `34.3@1080 -> 40.0167` 过量靠近，现校准为 `28.43@1080`，对应 `33.1683@1260`，使 20 宫格当前最终 Y 约回到原版 `-72` anchor。未修改 Desktop、DesktopLabelMetrics 输出、任何 icon geometry、Folder Preview、书架、行列、Constants 或 50/100/150 隔离。`build.bat`、v1/v2/v3 签名、ADB 覆盖安装和 1260 真机截图通过；1080/1440/2160 仅完成同一 width-based 公式静态验证，未扩写为多设备视觉 PASS。未提交、未推送。
 
@@ -267,7 +279,32 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-08-24
+
+#### Open Folder 冷重载尺寸隔离与 Desktop Label 宽度适配
+
+- **冷重载根因**：`Constants.applyIconSizeToProperty()` 已正确排除 `PAGE_1_3X3_MODE_FOLDER`，但进程恢复时 `MaintainedLauncherSettingsHost.maybeApplyLauncherIconSize()` 仍会调用 `applyRuntimeIconSizePercent()` 遍历全部 `layoutPropertyMap`，随后由 `scaleLayoutProperty()` 原地改写共享 `LayoutProperty`。该入口没有 Folder owner 判断，因此刚移动入 Folder 时使用的 Folder Base 正常，切换宫格或图标大小触发冷重载后，MODE_9/multiPageMode=8 却重新带入 Desktop userScale。
+- **分辨率差异根因**：当前低分辨率 MODE_9 资源曾把 `icon_size_origin_resize` 改为 192，同时 `icon_size_with_shadow_folder` 只有 184，形成 resized artwork 大于 Folder raster envelope 的非法关系；`P.smali` 加载 `_folder` property 时会把资源 `icon_size_with_shadow_folder` 映射回运行时字段 `icon_size_with_shadow`，所以 184 确实是 Open Folder child 的最终 node/texture 边长，不是未消费的旁路资源。1440 `sw411dp` profile 仍保持可容纳的 `222/286`，所以问题主要在部分低分辨率 profile 暴露。原版 `clean_launcher_raw` 的基准为 1080 `166/216`、1440 `222/286`，并由 Folder 自己的 width-based profile/adaptation 扩展，不依赖 Desktop 50/100/150。
+- **最小修复**：`scaleLayoutProperty()` 在改写共享属性前使用现有 `FolderVisualGeometry.isFolderLayoutProperty()` 识别 Open Folder 并直接跳过，从源头阻断 Desktop userScale 污染；没有采用除以 1.5、机型判断或事后补偿。MODE_9 资源恢复原版 1080 `166/216`、1440 `222/286`、landscape `56dp`。1080 到 1260 的同一宽度规则静态结果约为 artwork `193.67`、Folder texture `252`；1440 使用原版 profile `222/286`。普通 Desktop 和关闭状态 Folder 仍走原有 Desktop scaler，Preview 内部字段未再乘一次 userScale。
+- **Desktop 文字**：`Mc.hq()` 的创建路径和 `Mc.o()` 的主题刷新路径仍读取各自 Desktop `LayoutProperty`，仅在 Paint `setTextSize()` 前调用 `DesktopLabelMetrics.resolveDesktopTextSize()`。字号基准固定为原版 1080 的 12宫格 36、20宫格 30，再乘 `surfaceWidth/1080`；因此 1080/1260/1440 分别为 12宫格 `36/42/48`、20宫格 `30/35/40`。字号不随 Desktop 50/100/150 改变，现有 Desktop label gap 和 icon geometry 均未修改。
+- **冻结范围与验证**：未修改 `IconVisualMetrics`、Static Composer、physical raster、normalization、source resolver、阴影/cache、Weather/Calendar、Folder Preview、Folder书架、row/column、动画或 `FolderCellVisualMetrics`。`build.bat` 成功；最终 APK badging 为 `versionCode=31 / versionName=v1.5.6`，v1/v2/v3 签名通过，`git diff --check` 通过。X21A（1080x2280/480dpi）在线且原 Launcher 已安装，但 `adb install -r`、`adb install -r -d` 和 `/data/local/tmp + pm install -r -d` 均被 vivo 返回 `Failure [-200]`；为避免丢失桌面数据库未卸载 Launcher。故真实 12/20宫格、50/100/150、移动前后与冷重载截图矩阵尚未标记 PASS。未提交、未推送。
+
 ### 2026-08-23
+
+#### Folder GLThread 资源释放与 draw 状态门控修复
+
+- **崩溃路径**：`ka` 的 Folder Cell 仍在 Scene draw 时调用 `FolderIcons.oa(Z)`；兼容层 `gj()` 的 Weather/Calendar ActiveIcon 更新先通过 `FolderInfo.O(package)` 找 owner。当 stale callback 找不到 owner 时，当前实现错误调用整个 `FolderIcons.clear()`，把 `hz/iz/kz/Qj` 等渲染资源置 null，却没有先把 draw 标记 `jz` 置 false。下一帧 `oa()` 看到 `jz=true` 后直接对 null `iz` 执行 `array-length`，对应日志 `FATAL EXCEPTION: GLThread / Attempt to get length of null array / la.oa`。
+- **最小修复**：`clear()` 第一条状态操作改为 `jz=false`，再按原顺序释放 `hz/iz/kz` 和 ActiveIcon；`oa()` 增加最终防线，`jz=false` 直接返回，`iz/hz/kz` 任一为 null 时设置 `jz=false` 并返回，正常 draw/RenderTarget/动画代码保持原样。`gj()` 的 Weather/Calendar owner missing 分支分别只调用对应 ActiveIcon 的原有 `g(true,false)` 停止接口并清空对应字段，然后返回，不再调用整个 `FolderIcons.clear()`；真正 Folder 销毁仍由 `ka.clear()` 等原生命周期负责。
+- **冻结范围**：仅修改 `launcher/smali/com/smartisanos/launcher/view/a/la.smali` 的 `clear()/gj()/oa()` 生命周期状态门控；未修改 Folder Preview、2x2/3x3 viewport、图标尺寸、行列、书架、root scale、材质、动画或任何资源。
+- **验证**：`build.bat` 和 Smali 编译通过；`pm install -r` 覆盖安装成功，设备 `classes.dex` 与本地产物 SHA-256 一致。V2458A 分4批完成20次 `force-stop -> Launcher` 冷启动，完成30次 Folder 连续打开/关闭，并对已安装 aShell 原 APK执行同签名覆盖更新后返回 Launcher；三组均为 `FATAL=0 / GLThread FATAL=0 / la.oa NPE=0`。设备现有 Folder 不含 Weather/Calendar，未通过修改用户桌面布局制造动态 ActiveIcon Folder 样本；真实应用卸载也未执行，因此这两项仍是明确未完成的真机矩阵，不能扩写为全场景 PASS。未提交、未推送。
+
+#### 解锁动画非默认 HOME 前台资格与同步 Commit 修复
+
+- **回归根因**：`launcherActuallyVisibleLocked()`、`onLauncherPaused()` 的锁屏可见快照和 `tryCommitUnlockAnimation()` 正式播放前都把 `isDefaultHome()` 当成必要条件。因此 Smartisan Launcher 即使真实 `resumed + windowFocus`，只要系统默认 HOME 是其他 Launcher 就无法建立或消费 session。播放前还重复调用 `isLauncherRuntimeReady()`；该条件只是 `J.getInstance()+context`，而原版 prepare receiver 在 `q(0)` 前、正式 play receiver 在 `q(1)` 前均已有 `J.Ua()` 检查，不应在已 `prepareReady` 后由兼容层第三次阻塞/取消。
+- **实现**：彻底移除 `isDefaultHome()` 资格方法及三处依赖；锁屏前资格收敛为 Smartisan Launcher 自身真实 resumed/focus 快照，`SCREEN_OFF` 后仍必须确认 Keyguard locked。正式 commit 固定要求同一 session 的 `prepareReady + dismissPending + launcherResumed + windowFocus + keyguardUnlocked`，并继续执行 `shouldSkipUnlockAnimation()`；已 prepare session 不再被兼容层 runtimeReady 重复等待，原版 receiver 的 `J.Ua()` 检查保持不变。没有新增 postDelayed、提前量或 50/100/200ms 延迟，既有 1500ms 只继续用于取消未完成的非直达交接。
+- **诊断时间线**：同一 session 记录 `SCREEN_OFF / PREPARE_BEGIN / PREPARE_READY / USER_PRESENT / LAUNCHER_RESUME / WINDOW_FOCUS_TRUE / KEYGUARD_UNLOCKED / RUNTIME_READY / COMMIT_PLAY / ANIMATION_START` uptime，并输出 `USER_PRESENT->COMMIT`、`COMMIT->START` 和最后满足的 Gate。非默认 HOME 单次为 `20ms/16ms`，默认 HOME 单次为 `15ms/20ms`，两者最后 Gate 均为 `WINDOW_FOCUS_TRUE`；说明 prepare/runtime 已在锁屏阶段完成，首次真实 focus 后同步 commit，没有额外延时等待。
+- **防误播验证**：默认 HOME 锁解一次与非默认但 Smartisan 前台锁解一次均只播放一次。设置、微信主实例、电话和相机分别前台锁屏解锁，随后手动打开 Smartisan，全部 `ARMED=0 / COMMIT=0 / START=0`，只记录 `NOT_VISIBLE_HOME / SKIP_NO_SESSION`。非默认 HOME 连续20次为 `ARMED/COMMIT/ORIGINAL_PLAY/START/FINISH=20/20/20/20/20`，`CANCEL=0`、`SKIP_NOT_PREPARED=0`；20轮 `USER_PRESENT->COMMIT` 为 `6..30ms`（平均 `13.7ms`），`COMMIT->START` 为 `2..21ms`（平均 `5.5ms`）。
+- **冻结与验证**：只修改 `LauncherBelowKeyguardCompat.java` 的 Trigger/Session Gate 与诊断；原版 `q(0)/q(1)`、SMEngine 动画时长、`Eb.update/Ra.T`、图标动画参数及刷新率适配均未改。`build.bat`、`git diff --check`、v1/v2/v3 签名通过；因 vivo 首次增量安装未替换设备 APK，最终改用 `/data/local/tmp + pm install -r` 并在系统确认页继续安装，设备端 `classes2.dex` SHA-256 与本地产物一致。默认 HOME 已恢复为 `com.bbk.launcher2/.Launcher`。未提交、未推送。
 
 #### Open Folder Label Gap 与 Anchor 收口
 

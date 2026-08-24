@@ -96,8 +96,9 @@
     <integer name="icon_offset_y_without_app_name">0</integer>
     <integer name="icon_size_origin">192</integer>
     <integer name="icon_size_origin_resize">192</integer>
+    <integer name="icon_size_origin_folder">142</integer>
     <integer name="icon_size_with_shadow">246</integer>
-    <integer name="icon_size_with_shadow_folder">184</integer>
+    <integer name="icon_size_with_shadow_folder">182</integer>
     <integer name="lock_icon_height">68</integer>
     <integer name="lock_icon_width">84</integer>
     <integer name="magnify_stencil_radius">70</integer>

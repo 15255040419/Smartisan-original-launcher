@@ -27,8 +27,6 @@ public final class IconRasterDiagnostics {
     private static final String RASTER_CACHE_VERSION = "raster:v18-icon-contract";
     private static final String BADGE_VERSION = "badge:v1";
     private static final String SHADOW_VERSION = "shadow:original-v1";
-    private static final ThreadLocal<Integer> REQUESTED_LOGICAL_TEXTURE =
-            new ThreadLocal<Integer>();
     private static volatile String sLifecycle = "COLD";
     /** Enable only in an acceptance build; production builds do not write icon bitmaps. */
     private static final boolean DEBUG_RASTER_DUMP = false;
@@ -205,38 +203,9 @@ public final class IconRasterDiagnostics {
      * path. Active icons, folders, black/white special rendering and off-size
      * animation textures retain their original pipeline.
      */
-    public static boolean useDesktopStaticPipeline(Object activeIcon, Object itemInfo,
-            boolean blackWhite, int width, int height) {
-        if (itemInfo == null || isQuickLaunchItem(itemInfo) || blackWhite || isOriginalActiveIcon(itemInfo)) {
-            return false;
-        }
-        if (isSpecialSettingButton(itemInfo)) return false;
-        String className = itemInfo.getClass().getName();
-        if (className.endsWith(".FolderInfo")
-                || itemField(itemInfo, "packageName").isEmpty()) {
-            return false;
-        }
-        int mode = desktopPageMode();
-        int texture = layoutSize(mode, "icon_size_with_shadow");
-        int folderTexture = layoutSize(currentFolderMode(), "icon_size_with_shadow");
-        boolean accepted = width == height && width > 0
-                && (width == texture || width == folderTexture);
-        if (accepted) REQUESTED_LOGICAL_TEXTURE.set(Integer.valueOf(width));
-        return accepted;
-    }
-
-    public static boolean useManagedDesktopPipeline(Object itemInfo) {
-        if (isQuickLaunchItem(itemInfo)) return false;
-        // This is the fallback entry used when a refresh call does not carry the
-        // final texture dimensions.  Source ownership must not decide geometry:
-        // DEFAULT, IMPROVED, PACK, CUSTOM and RESOURCE all use the same static
-        // application composer.
-        boolean accepted = shouldUseHighResolutionDesktopRaster(itemInfo);
-        if (accepted) {
-            int texture = layoutSize(desktopPageMode(), "icon_size_with_shadow");
-            if (texture > 0) REQUESTED_LOGICAL_TEXTURE.set(Integer.valueOf(texture));
-        }
-        return accepted;
+    public static boolean useStaticApplicationPipeline(Object itemInfo,
+            boolean blackWhite) {
+        return !blackWhite && shouldUseHighResolutionDesktopRaster(itemInfo);
     }
 
     /**
@@ -368,6 +337,12 @@ public final class IconRasterDiagnostics {
         return composeTexture(source, 0, itemInfo);
     }
 
+    public static Bitmap composeStaticApplicationIconTexture(Object itemInfo,
+            Bitmap source, int pageMode) {
+        if (isQuickLaunchItem(itemInfo)) return source;
+        return composeTexture(source, 0, itemInfo, pageMode);
+    }
+
     /**
      * Compatibility entry for the old fallback path. It deliberately does not
      * infer scale from alpha bounds.
@@ -382,7 +357,11 @@ public final class IconRasterDiagnostics {
      * target such as the retired 181px path.
      */
     public static NormalIconRasterSpec resolveNormalIconRasterSpec() {
-        IconVisualMetrics metrics = IconVisualMetrics.resolve(currentPageMode());
+        return resolveNormalIconRasterSpec(desktopPageMode());
+    }
+
+    private static NormalIconRasterSpec resolveNormalIconRasterSpec(int pageMode) {
+        IconVisualMetrics metrics = IconVisualMetrics.resolve(pageMode);
         if (metrics == null) return null;
         return new NormalIconRasterSpec(
                 metrics.logicalArtworkBox, metrics.logicalArtworkBox,
@@ -394,14 +373,19 @@ public final class IconRasterDiagnostics {
     }
 
     private static Bitmap composeTexture(Bitmap source, int actualLogicalTexture, Object itemInfo) {
+        return composeTexture(source, actualLogicalTexture, itemInfo, desktopPageMode());
+    }
+
+    private static Bitmap composeTexture(Bitmap source, int actualLogicalTexture,
+            Object itemInfo, int pageMode) {
         StaticSource resolved = resolveStaticSource(itemInfo, source);
         Drawable rawDrawable = resolved.drawable;
         if ((source == null || source.isRecycled()) && rawDrawable == null) return source;
-        int logicalArtwork = currentLayoutSize("icon_size_origin");
-        int logicalTexture = currentLayoutSize("icon_size_with_shadow");
-        NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
+        int logicalArtwork = layoutSize(pageMode, "icon_size_origin");
+        int logicalTexture = layoutSize(pageMode, "icon_size_with_shadow");
+        NormalIconRasterSpec spec = resolveNormalIconRasterSpec(pageMode);
         if (spec == null) return source;
-        IconVisualMetrics visualMetrics = IconVisualMetrics.resolve(currentPageMode());
+        IconVisualMetrics visualMetrics = IconVisualMetrics.resolve(pageMode);
         if (visualMetrics == null) return source;
         float rasterScale = spec.rasterScale;
         int artwork = spec.artworkWidth;
@@ -519,14 +503,13 @@ public final class IconRasterDiagnostics {
         }
         Log.i(TAG, "ICON_CONTRACT_PIPELINE source=" + resolved.type
                 + " lifecycle=" + lifecycleToken(itemInfo)
-                + " grid=" + gridToken(currentPageMode())
+                + " grid=" + gridToken(pageMode)
                 + " iconSize=" + visualMetrics.iconSizeSetting
                 + " surface=" + visualMetrics.surfaceWidth
                 + " composerCount=1 rawDirect=0 cacheHit=0"
                 + " representation=" + (resolved.legacyDefaultBitmap
                 ? "LEGACY_DEFAULT_BITMAP" : "RAW_DRAWABLE"));
         physicalArtwork.recycle();
-        REQUESTED_LOGICAL_TEXTURE.remove();
         return result;
     }
 
@@ -825,10 +808,37 @@ public final class IconRasterDiagnostics {
     /** Keeps the SMEngine in-memory texture cache separate per physical raster. */
     public static String textureCacheKey(Object itemInfo, String baseKey) {
         if (baseKey == null || baseKey.contains("#" + RASTER_CACHE_VERSION + ":")) return baseKey;
+        return textureCacheKey(itemInfo, baseKey, desktopPageMode());
+    }
+
+    public static String textureCacheKey(Object itemInfo, String baseKey,
+            int pageMode) {
+        if (baseKey == null) return null;
+        int marker = baseKey.indexOf("#" + RASTER_CACHE_VERSION + ":");
+        if (marker >= 0) baseKey = baseKey.substring(0, marker);
+        return buildTextureCacheKey(itemInfo, baseKey, pageMode);
+    }
+
+    /**
+     * Returns the cache identity that the real application Cell must also bind
+     * to its SceneNode. Active and special icons retain their original Desktop
+     * cache contract; only ordinary static application Cells receive a
+     * scene-specific key.
+     */
+    public static String applicationCellTextureCacheKey(Object itemInfo,
+            String baseKey, int pageMode) {
+        if (!shouldUseHighResolutionDesktopRaster(itemInfo)) {
+            return desktopTextureCacheKey(itemInfo, baseKey);
+        }
+        return textureCacheKey(itemInfo, baseKey, pageMode);
+    }
+
+    private static String buildTextureCacheKey(Object itemInfo, String baseKey,
+            int pageMode) {
         if (isQuickLaunchItem(itemInfo)) return quickLaunchTextureCacheKey(itemInfo, baseKey);
-        NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
+        NormalIconRasterSpec spec = resolveNormalIconRasterSpec(pageMode);
         if (spec == null) return baseKey;
-        IconVisualMetrics metrics = IconVisualMetrics.resolve(currentPageMode());
+        IconVisualMetrics metrics = IconVisualMetrics.resolve(pageMode);
         if (metrics == null) return baseKey;
         int logicalArtwork = spec.logicalArtworkWidth;
         int logicalTexture = spec.logicalTextureWidth;
@@ -840,7 +850,6 @@ public final class IconRasterDiagnostics {
         String sourceHash = resolvedSourceHash(itemInfo);
         String sourceType = MaintainedLauncherSettingsHost.desktopIconSourceType(itemInfo);
         String sourceIdentity = MaintainedLauncherSettingsHost.desktopIconSourceIdentity(itemInfo);
-        int pageMode = currentPageMode();
         String themeMode = String.valueOf(currentConstant("isTransparentTheme", 0));
         int iconPercent = Math.round(logicalArtwork * 100f / Math.max(1, baseIconSize(pageMode)));
         String pipeline = isOriginalActiveIcon(itemInfo) ? "ORIGINAL_ACTIVE_ICON"
@@ -971,7 +980,7 @@ public final class IconRasterDiagnostics {
     }
 
     private static int currentLayoutSize(String fieldName) {
-        return layoutSize(currentPageMode(), fieldName);
+        return layoutSize(desktopPageMode(), fieldName);
     }
 
     private static int layoutSize(int mode, String fieldName) {
@@ -984,16 +993,7 @@ public final class IconRasterDiagnostics {
         }
     }
 
-    private static int currentPageMode() {
-        Integer requested = REQUESTED_LOGICAL_TEXTURE.get();
-        if (requested != null && requested.intValue() > 0) {
-            int folderMode = currentFolderMode();
-            if (requested.intValue() == layoutSize(folderMode, "icon_size_with_shadow")) {
-                return folderMode;
-            }
-        }
-        return desktopPageMode();
-    }
+    public static int desktopRenderMode() { return desktopPageMode(); }
 
     private static int desktopPageMode() {
         try {
@@ -1085,16 +1085,6 @@ public final class IconRasterDiagnostics {
         }
     }
 
-    private static int currentFolderMode() {
-        try {
-            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
-            return ((Integer) constants.getMethod("getPAGE_1_3X3_MODE_FOLDER")
-                    .invoke(null)).intValue();
-        } catch (Throwable ignored) {
-            return Integer.MIN_VALUE;
-        }
-    }
-
     public static Bitmap composeSettingButtonTexture(
             Bitmap background,
             Bitmap gear,
@@ -1163,7 +1153,7 @@ public final class IconRasterDiagnostics {
         }
 
         // Print diagnostic log
-        int pageMode = currentPageMode();
+        int pageMode = desktopPageMode();
         DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
         Log.i(TAG, "SETTING_BUTTON_RASTER"
                 + " mode=" + pageMode
@@ -1219,7 +1209,7 @@ public final class IconRasterDiagnostics {
 
     private static void logFallback(boolean pressed, float logicalSettingButtonSize, Bitmap background, Bitmap gear, Bitmap innerShadow) {
         DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
-        int pageMode = currentPageMode();
+        int pageMode = desktopPageMode();
         Log.w(TAG, "SETTING_BUTTON_RASTER"
                 + " mode=" + pageMode
                 + " logicalSettingButton=" + Math.round(logicalSettingButtonSize)

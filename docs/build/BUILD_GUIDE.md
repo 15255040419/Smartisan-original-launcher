@@ -33,6 +33,8 @@
 - `build\launcher-unsigned.apk`：未签名中间包。
 - `build\launcher-aligned.apk`：签名前 zipalign 中间包。
 
+Java helper 编译临时目录固定为 `build\scratch`。`BUILD_SCRATCH` 必须在 CMD 的 `if (...)` 括号块之前赋值；否则 `%BUILD_SCRATCH%` 会在整块解析时提前展开为空，`javac` / `d8` 可能把 `classes`、`dex`、`helpers.jar` 和 `java_sources.txt` 写到盘符根目录，并把已删除的旧 class 再次注入 `classes2.dex`。删除临时诊断 Java 后，clean APK 必须同时检查最终 `classes2.dex` 不再包含对应类名/日志字符串，不能只检查源码目录。
+
 ## JDK / PATH
 
 `build.bat` 自己会临时设置 `JAVA_HOME` 和 `PATH`，不要依赖当前 PowerShell 全局 PATH。查找顺序如下：

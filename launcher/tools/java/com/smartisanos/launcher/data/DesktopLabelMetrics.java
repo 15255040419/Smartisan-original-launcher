@@ -11,6 +11,8 @@ public final class DesktopLabelMetrics {
     // 1080 visible artwork-to-label-top gaps, not icon scaling factors.
     private static final float BASE_GAP_MODE_12 = 14.5f;
     private static final float BASE_GAP_MODE_20 = 13.0f;
+    private static final int BASE_TEXT_SIZE_MODE_12 = 36;
+    private static final int BASE_TEXT_SIZE_MODE_20 = 30;
 
     private DesktopLabelMetrics() {
     }
@@ -39,6 +41,16 @@ public final class DesktopLabelMetrics {
         return desktopGapForCurrentGrid() * widthScale();
     }
 
+    /** Desktop labels follow resolution width, never the user's icon-size setting. */
+    public static int resolveDesktopTextSize(Object property, int fallback) {
+        final int mode = currentDesktopMode();
+        if (!isCurrentDesktopProperty(property)) {
+            return fallback;
+        }
+        final int base = mode == 20 ? BASE_TEXT_SIZE_MODE_20 : BASE_TEXT_SIZE_MODE_12;
+        return Math.max(1, Math.round(base * widthScale()));
+    }
+
     static float widthScale() {
         try {
             Class<?> constants = Class.forName(
@@ -60,6 +72,20 @@ public final class DesktopLabelMetrics {
             return mode.getInt(null) == 20 ? 20 : 12;
         } catch (Throwable ignored) {
             return 12;
+        }
+    }
+
+    private static boolean isCurrentDesktopProperty(Object property) {
+        if (property == null) {
+            return false;
+        }
+        try {
+            Class<?> constants = Class.forName(
+                    "com.smartisanos.launcher.data.Constants");
+            Method mode = constants.getMethod("mode", Integer.TYPE);
+            return mode.invoke(null, Integer.valueOf(currentDesktopMode())) == property;
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 

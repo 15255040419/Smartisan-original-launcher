@@ -2609,6 +2609,20 @@
 .end method
 
 .method public static a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;Z)Lcom/smartisanos/smengine/Da;
+    .locals 1
+
+    invoke-static {}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->desktopRenderMode()I
+
+    move-result v0
+
+    invoke-static {p0, p1, p2, v0}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZI)Lcom/smartisanos/smengine/Da;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
+.method public static a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZI)Lcom/smartisanos/smengine/Da;
     .locals 11
 
     const/4 v0, 0x0
@@ -2629,7 +2643,7 @@
 
     move-result v9
 
-    invoke-static {p0, p1}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->textureCacheKey(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/String;
+    invoke-static {p0, p1, p3}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->textureCacheKey(Ljava/lang/Object;Ljava/lang/String;I)Ljava/lang/String;
 
     move-result-object p1
 
@@ -2952,7 +2966,7 @@
 
     if-eqz v9, :cond_codex_original_texture
 
-    invoke-static {v10, p0}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->composeStaticApplicationIconTexture(Ljava/lang/Object;Landroid/graphics/Bitmap;)Landroid/graphics/Bitmap;
+    invoke-static {v10, p0, p3}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->composeStaticApplicationIconTexture(Ljava/lang/Object;Landroid/graphics/Bitmap;I)Landroid/graphics/Bitmap;
 
     move-result-object p0
 
@@ -3013,6 +3027,43 @@
     return-object p0
 .end method
 
+.method public static a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZIII)Lcom/smartisanos/smengine/Da;
+    .locals 7
+
+    invoke-static {p1, p4}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->useStaticApplicationPipeline(Ljava/lang/Object;Z)Z
+
+    move-result v6
+
+    if-eqz v6, :cond_scene_original_pipeline
+
+    invoke-static {p1, p2, p3, p7}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZI)Lcom/smartisanos/smengine/Da;
+
+    move-result-object p0
+
+    return-object p0
+
+    :cond_scene_original_pipeline
+    move-object v0, p0
+
+    move-object v1, p1
+
+    move-object v2, p2
+
+    move v3, p3
+
+    move v4, p4
+
+    move v5, p5
+
+    move v6, p6
+
+    invoke-static/range {v0 .. v6}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZII)Lcom/smartisanos/smengine/Da;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
 .method public static a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZII)Lcom/smartisanos/smengine/Da;
     .locals 6
 
@@ -3029,7 +3080,7 @@
 
     .line 37
     :cond_1
-    invoke-static {p0, p1, p4, p5, p6}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->useDesktopStaticPipeline(Ljava/lang/Object;Ljava/lang/Object;ZII)Z
+    invoke-static {p1, p4}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->useStaticApplicationPipeline(Ljava/lang/Object;Z)Z
 
     move-result v1
 
@@ -3068,7 +3119,9 @@
     :goto_0
     if-nez v0, :cond_8
 
-    invoke-static {p1}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->useManagedDesktopPipeline(Ljava/lang/Object;)Z
+    const/4 v2, 0x0
+
+    invoke-static {p1, v2}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->useStaticApplicationPipeline(Ljava/lang/Object;Z)Z
 
     move-result v2
 

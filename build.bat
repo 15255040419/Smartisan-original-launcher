@@ -405,10 +405,11 @@ rem ============================================================
 rem 10. Compile migrated settings host Java to classes2.dex
 rem ============================================================
 
+set "BUILD_SCRATCH=%OUT_DIR%\scratch"
+
 if exist "%ROOT%launcher\tools\java" (
   echo [extra] Compiling migrated settings host...
 
-  set "BUILD_SCRATCH=%OUT_DIR%\scratch"
   if exist "%BUILD_SCRATCH%" rmdir /s /q "%BUILD_SCRATCH%"
 
   mkdir "%BUILD_SCRATCH%\classes"

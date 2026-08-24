@@ -695,7 +695,13 @@
 
     move-result-object v0
 
+    move-object v10, v0
+
     iget v0, v0, Lcom/smartisanos/launcher/data/LayoutProperty;->text_font_size:I
+
+    invoke-static {v10, v0}, Lcom/smartisanos/launcher/data/DesktopLabelMetrics;->resolveDesktopTextSize(Ljava/lang/Object;I)I
+
+    move-result v0
 
     .line 2
     new-instance v1, Landroid/graphics/Paint;
@@ -1476,7 +1482,13 @@
 
     move-result-object v5
 
+    move-object v6, v5
+
     iget v5, v5, Lcom/smartisanos/launcher/data/LayoutProperty;->text_font_size:I
+
+    invoke-static {v6, v5}, Lcom/smartisanos/launcher/data/DesktopLabelMetrics;->resolveDesktopTextSize(Ljava/lang/Object;I)I
+
+    move-result v5
 
     .line 34
     new-instance v6, Landroid/graphics/Paint;

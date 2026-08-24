@@ -765,6 +765,16 @@ Launcher 会先确认目标是系统应用或更新后的系统应用，再按�
 
 不要恢复固定像素、整组缩放、错误页面坐标旁路等已废弃方案。
 
+### Open Folder 图标 Owner 与尺寸防回归（2026-08-25）
+
+* Open Folder 的唯一 Scene Owner 固定为 `Cell.g.fH -> e/s(pageMode) -> cache/compose(pageMode)`；Folder child 必须使用 `fH=8` 和 `dH=Constants.mode(8)`。禁止让全局 Workspace、Static Composer、请求 bitmap 宽度、ThreadLocal 或静态 SceneContext 再猜 Folder/Desktop Scene。
+* `Cell.jl()` 是冷重载和 `changeAncestor()` 后的唯一重绑定边界。必须以迁移完成后的真实 parent 判定：parent 为 `FolderPage (view/b/a)` 时设置 `IH=true`、`XH=da`、`fH=8`、`dH=Constants.mode(8)`；parent 为 Desktop 时设置 `IH=false`、`XH=ga`，并恢复当前 Desktop 12/20 的 `fH/dH`。不得沿用迁移前的 `IH`，否则 Folder 冷重载会漂成 Desktop，或拖回 Desktop 后仍残留 Mode8。
+* 当前用户确认的 Open Folder 目标不是旧的原版 Folder `166/216`，而是与当前 Desktop 20 宫格 100% 同一视觉大小。Desktop pageMode 9 经 `cellCount(9)=20` 实际读取 `MODE_20` 的 `118/152`，再由冻结的 Desktop Golden `1.20` 得到 LOW 1080 runtime `141.6/182.4`；因此 Mode8 使用独立的最终资源基准：1080 portrait `142/182`，1440 profile `189/243`，其他宽度只走既有 width adaptation。不得恢复 `166/216`，也不得新增 `0.85/0.86`、dpi/机型分支、density 倍率或第二份 Scene scale。
+* Folder Mode8 不消费 Desktop 50/100/150 用户倍率。Desktop、Open Folder、Folder Preview 是三条独立合同；禁止为了 Folder 尺寸修改 `IconVisualMetrics`、Desktop source/normalization/raster/shadow/cache、ActiveIcon、Folder Preview、书架、行列、`FolderSceneMetrics` 或原版 Timeline。
+* Folder 文字继续由 `FolderCellVisualMetrics -> Mc.setTranslate()` 根据当前 Folder artwork 计算，并与 Desktop 共用 `DesktopLabelMetrics.finalVisualGap()`；已通过真机的 `28.43` anchor correction 不因尺寸调整而改成固定 px 补偿。
+* 临时 `FolderIconTrace`、`OPEN_FOLDER_ICON_TRACE`、`FOLDER_ANIMATION_TRACE`、CELL/OWNER/cache trace 均已删除，不得作为正式架构恢复。
+* LOW 打开 Folder 的轻微卡顿与尺寸 Owner 已分离。clean APK 外部 atrace 首次定位为 Folder open 时 SMEngine `GLThread onDrawFrame` 内同步 CPU scene 工作（首帧约 `111~167ms`），不是 `eglSwapBuffers`、Launcher GC、Bitmap compose 或已证明的 texture upload；尚未定位到具体 native/scene 方法。没有更深 call-stack 证据前，禁止改动画时长或新增预加载、线程池、Bitmap cache。
+
 ---
 
 ## 清理长期记忆

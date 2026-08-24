@@ -2,9 +2,6 @@ package com.smartisanos.launcher.data;
 
 /** Final label anchor for an application inside an opened folder. */
 public final class FolderCellVisualMetrics {
-    /* Converts the folder text anchor to the visually verified desktop-equivalent anchor. */
-    private static final float BASE_FOLDER_LABEL_CORRECTION1080 = 28.43f;
-
     private FolderCellVisualMetrics() {
     }
 
@@ -14,8 +11,7 @@ public final class FolderCellVisualMetrics {
             return DesktopLabelMetrics.resolveLabelCenterY(property, label, fallbackY);
         }
         final float artwork = DesktopLabelMetrics.positive(
-                DesktopLabelMetrics.number(property, "icon_size_origin_resize"),
-                DesktopLabelMetrics.number(property, "icon_size_origin"));
+                DesktopLabelMetrics.number(property, "icon_size_origin"), 0.0f);
         final float textHeight = DesktopLabelMetrics.positive(
                 DesktopLabelMetrics.number(property, "folder_text_font_size"),
                 DesktopLabelMetrics.number(property, "text_font_size"));
@@ -24,14 +20,8 @@ public final class FolderCellVisualMetrics {
         }
         final float artworkBottom = artwork * 0.5f
                 - DesktopLabelMetrics.number(property, "icon_offset_y");
-        final float currentLabelY = -(artworkBottom + DesktopLabelMetrics.finalVisualGap()
+        return -(artworkBottom + DesktopLabelMetrics.finalVisualGap()
                 + textHeight * 0.5f);
-        // SMEngine's verified direction: positive correction moves the folder label toward the icon.
-        return currentLabelY + folderLabelCorrection();
-    }
-
-    static float folderLabelCorrection() {
-        return BASE_FOLDER_LABEL_CORRECTION1080 * DesktopLabelMetrics.widthScale();
     }
 
     private static boolean isOpenFolderChild(Object page) {

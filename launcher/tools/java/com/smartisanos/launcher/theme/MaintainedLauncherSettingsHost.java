@@ -14734,6 +14734,12 @@ public final class MaintainedLauncherSettingsHost {
         if (property == null || scale <= 0f) {
             return;
         }
+        // PAGE_1_3X3_MODE_FOLDER owns an independent, resolution-adapted base.
+        // A cold reload must not feed the desktop 50/100/150 percent back into it.
+        if (com.smartisanos.launcher.data.FolderVisualGeometry
+                .isFolderLayoutProperty(property)) {
+            return;
+        }
         try {
             scaleFloatField(property, "icon_size_origin", scale);
             scaleFloatField(property, "icon_size_with_shadow", scale);
