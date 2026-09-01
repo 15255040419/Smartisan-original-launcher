@@ -2643,10 +2643,19 @@
 
     move-result v9
 
+    const-string v1, "#raster:v18-icon-contract:"
+
+    invoke-virtual {p1, v1}, Ljava/lang/String;->contains(Ljava/lang/CharSequence;)Z
+
+    move-result v1
+
+    if-nez v1, :cond_page_mode_key_ready
+
     invoke-static {p0, p1, p3}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->textureCacheKey(Ljava/lang/Object;Ljava/lang/String;I)Ljava/lang/String;
 
     move-result-object p1
 
+    :cond_page_mode_key_ready
     invoke-static {}, Lcom/smartisanos/smengine/Ra;->getInstance()Lcom/smartisanos/smengine/Ra;
 
     move-result-object v1

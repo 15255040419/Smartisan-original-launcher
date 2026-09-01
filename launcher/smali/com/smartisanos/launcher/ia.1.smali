@@ -94,21 +94,11 @@
 
     if-eqz p2, :cond_codex_unlock_action_ready
 
-    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->armFromScreenOff(Landroid/content/Context;)Z
+    const-string p1, "SCREEN_OFF"
 
-    move-result p2
-
-    if-nez p2, :cond_codex_screen_off_armed
-
-    const-string p1, "SCREEN_OFF_NOT_ARMED"
-
-    invoke-static {v7, p1}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->forceFinishOriginal(Landroid/content/Context;Ljava/lang/String;)V
+    invoke-static {v7, p1}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->armAndPrepareIfNeeded(Landroid/content/Context;Ljava/lang/String;)Z
 
     return-void
-
-    :cond_codex_screen_off_armed
-
-    const-string p1, "action_keyguard_on"
 
     :cond_codex_unlock_action_ready
     sget-boolean p2, Lcom/smartisanos/launcher/data/Constants;->ENABLE_LARGE_SCREEN_MODE:Z
@@ -220,17 +210,6 @@
     return-void
 
     :cond_codex_prepare_session_ready
-    invoke-static {}, Lcom/smartisanos/launcher/theme/MaintainedLauncherSettingsHost;->shouldSkipUnlockAnimation()Z
-
-    move-result p1
-
-    if-eqz p1, :cond_codex_prepare_unlock
-
-    invoke-static {v7}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onPrepareFailed(Landroid/content/Context;)V
-
-    return-void
-
-    :cond_codex_prepare_unlock
     invoke-static {}, Lcom/smartisanos/launcher/J;->Ua()Z
 
     move-result p1

@@ -50,6 +50,10 @@
 
 .field public static final slide_out_to_top:I = 0x7f040016
 
+.field public static final settings_enter:I = 0x7f040012
+
+.field public static final settings_exit:I = 0x7f040015
+
 .field public static final wallpaper_close_enter:I = 0x7f040017
 
 .field public static final wallpaper_close_exit:I = 0x7f040018

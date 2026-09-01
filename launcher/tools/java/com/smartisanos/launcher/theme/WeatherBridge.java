@@ -78,6 +78,7 @@ public final class WeatherBridge {
                 || "com.miui.weather2".equals(pkg)
                 || "com.huawei.android.totemweather".equals(pkg)
                 || "com.hihonor.android.totemweather".equals(pkg)
+                || "com.meizu.flyme.weather".equals(pkg)
                 || "com.sec.android.daemonapp".equals(pkg)) {
             return true;
         }

@@ -1567,7 +1567,7 @@
 .end method
 
 .method public a(Lcom/smartisanos/smengine/F;Lcom/smartisanos/launcher/data/ItemInfo;)V
-    .locals 9
+    .locals 10
 
     .line 33
     iget-byte v0, p2, Lcom/smartisanos/launcher/data/ItemInfo;->itemType:B
@@ -1604,13 +1604,21 @@
     .line 36
     invoke-virtual {p2}, Lcom/smartisanos/launcher/data/ItemInfo;->Ne()Ljava/lang/String;
 
-    move-result-object v8
+    move-result-object v9
+
+    iget-object v8, p0, Lcom/smartisanos/launcher/view/a/la;->Qj:Lcom/smartisanos/launcher/view/a/ka;
+
+    iget v8, v8, Lcom/smartisanos/launcher/view/a/g;->fH:I
+
+    invoke-static {p2, v9, v8}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->textureCacheKey(Ljava/lang/Object;Ljava/lang/String;I)Ljava/lang/String;
+
+    move-result-object v9
 
     .line 37
     invoke-virtual {p2}, Lcom/smartisanos/launcher/data/ItemInfo;->Qe()Z
 
     .line 38
-    invoke-virtual {v0, v8}, Lcom/smartisanos/smengine/Ea;->bb(Ljava/lang/String;)Lcom/smartisanos/smengine/Da;
+    invoke-virtual {v0, v9}, Lcom/smartisanos/smengine/Ea;->bb(Ljava/lang/String;)Lcom/smartisanos/smengine/Da;
 
     move-result-object v0
 
@@ -1718,9 +1726,9 @@
 
     move-object v2, p2
 
-    move-object v3, v8
+    move-object v3, v9
 
-    invoke-static/range {v1 .. v7}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZII)Lcom/smartisanos/smengine/Da;
+    invoke-static/range {v1 .. v8}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZIII)Lcom/smartisanos/smengine/Da;
 
     goto :goto_1
 
@@ -1791,40 +1799,28 @@
 
     move-object v2, p2
 
-    move-object v3, v8
+    move-object v3, v9
 
-    invoke-static/range {v1 .. v7}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZII)Lcom/smartisanos/smengine/Da;
+    invoke-static/range {v1 .. v8}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZIII)Lcom/smartisanos/smengine/Da;
 
     goto :goto_1
 
-    :cond_6
-    const/4 v3, 0x0
-
     .line 58
-    iget-object p0, p0, Lcom/smartisanos/launcher/view/a/la;->Qj:Lcom/smartisanos/launcher/view/a/ka;
-
-    iget-object v0, p0, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
-
-    iget-boolean v4, v0, Lcom/smartisanos/launcher/data/ItemInfo;->mFGTransparentAndBlackWhiteFlag:Z
-
-    iget-object p0, p0, Lcom/smartisanos/launcher/view/a/g;->dH:Lcom/smartisanos/launcher/data/LayoutProperty;
-
-    iget p0, p0, Lcom/smartisanos/launcher/data/LayoutProperty;->icon_size_with_shadow:F
-
-    float-to-int v5, p0
-
-    float-to-int v6, p0
-
+    :cond_6
     move-object v1, p2
 
-    move-object v2, v8
+    move-object v2, v9
 
-    invoke-static/range {v1 .. v6}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZII)Lcom/smartisanos/smengine/Da;
+    const/4 v3, 0x0
+
+    move v4, v8
+
+    invoke-static {v1, v2, v3, v4}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZI)Lcom/smartisanos/smengine/Da;
 
     .line 59
     :cond_7
     :goto_1
-    invoke-virtual {p1, v8}, Lcom/smartisanos/smengine/F;->setImageName(Ljava/lang/String;)V
+    invoke-virtual {p1, v9}, Lcom/smartisanos/smengine/F;->setImageName(Ljava/lang/String;)V
 
     return-void
 .end method
@@ -2153,6 +2149,10 @@
 .method public clear()V
     .locals 7
 
+    const/4 v0, 0x0
+
+    iput-boolean v0, p0, Lcom/smartisanos/launcher/view/a/la;->jz:Z
+
     .line 1
     iget-object v0, p0, Lcom/smartisanos/launcher/view/a/la;->hz:Lcom/smartisanos/smengine/N;
 
@@ -2420,7 +2420,7 @@
 .end method
 
 .method public gj()V
-    .locals 6
+    .locals 8
 
     .line 1
     iget-object v0, p0, Lcom/smartisanos/launcher/view/a/la;->cy:Lcom/smartisanos/launcher/view/activeicon/H;
@@ -2429,13 +2429,13 @@
 
     const/4 v2, 0x1
 
-    if-eqz v0, :cond_0
+    if-eqz v0, :cond_3
 
     iget-object v3, p0, Lcom/smartisanos/launcher/view/a/la;->Qj:Lcom/smartisanos/launcher/view/a/ka;
 
     iget-object v3, v3, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
-    if-eqz v3, :cond_0
+    if-eqz v3, :cond_3
 
     .line 2
     check-cast v3, Lcom/smartisanos/launcher/data/FolderInfo;
@@ -2451,17 +2451,42 @@
     move-result-object v0
 
     .line 3
-    if-nez v0, :cond_weather_item_present
+    if-nez v0, :cond_2
 
+    const/4 v5, 0x0
+
+    invoke-virtual {v3}, Lcom/smartisanos/launcher/data/FolderInfo;->lf()I
+
+    move-result v6
+
+    :goto_0
+    if-ge v5, v6, :cond_1
+
+    invoke-virtual {v3, v5}, Lcom/smartisanos/launcher/data/FolderInfo;->ia(I)Lcom/smartisanos/launcher/data/ItemInfo;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_0
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/data/ItemInfo;->bf()Z
+
+    move-result v7
+
+    if-nez v7, :cond_2
+
+    :cond_0
+    add-int/lit8 v5, v5, 0x1
+
+    goto :goto_0
+
+    :cond_1
     const-string v5, "weather"
 
     invoke-static {v3, v4, v5}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->noteActiveIconOwnerMissing(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V
 
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/la;->clear()V
+    goto :goto_1
 
-    return-void
-
-    :cond_weather_item_present
+    :cond_2
     iget-object v3, p0, Lcom/smartisanos/launcher/view/a/la;->cy:Lcom/smartisanos/launcher/view/activeicon/H;
 
     invoke-virtual {v0}, Lcom/smartisanos/launcher/data/ItemInfo;->Oe()[B
@@ -2480,7 +2505,17 @@
     invoke-virtual {v0, v4}, Lcom/smartisanos/launcher/data/ItemInfo;->a([B)V
 
     .line 5
+    move-object v5, v0
+
     invoke-virtual {v0}, Lcom/smartisanos/launcher/data/ItemInfo;->Ne()Ljava/lang/String;
+
+    move-result-object v0
+
+    iget-object v6, p0, Lcom/smartisanos/launcher/view/a/la;->Qj:Lcom/smartisanos/launcher/view/a/ka;
+
+    iget v6, v6, Lcom/smartisanos/launcher/view/a/g;->fH:I
+
+    invoke-static {v5, v0, v6}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->textureCacheKey(Ljava/lang/Object;Ljava/lang/String;I)Ljava/lang/String;
 
     move-result-object v0
 
@@ -2511,16 +2546,17 @@
     invoke-virtual {v5, v2}, Lcom/smartisanos/smengine/Da;->Tb(Z)V
 
     .line 12
-    :cond_0
+    :cond_3
+    :goto_1
     iget-object v0, p0, Lcom/smartisanos/launcher/view/a/la;->mCalendarView:Lcom/smartisanos/launcher/view/activeicon/m;
 
-    if-eqz v0, :cond_1
+    if-eqz v0, :cond_7
 
     iget-object v3, p0, Lcom/smartisanos/launcher/view/a/la;->Qj:Lcom/smartisanos/launcher/view/a/ka;
 
     iget-object v3, v3, Lcom/smartisanos/launcher/view/a/g;->Rj:Lcom/smartisanos/launcher/data/ItemInfo;
 
-    if-eqz v3, :cond_1
+    if-eqz v3, :cond_7
 
     .line 13
     check-cast v3, Lcom/smartisanos/launcher/data/FolderInfo;
@@ -2536,17 +2572,42 @@
     move-result-object v0
 
     .line 14
-    if-nez v0, :cond_calendar_item_present
+    if-nez v0, :cond_6
 
+    const/4 v5, 0x0
+
+    invoke-virtual {v3}, Lcom/smartisanos/launcher/data/FolderInfo;->lf()I
+
+    move-result v6
+
+    :goto_2
+    if-ge v5, v6, :cond_5
+
+    invoke-virtual {v3, v5}, Lcom/smartisanos/launcher/data/FolderInfo;->ia(I)Lcom/smartisanos/launcher/data/ItemInfo;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_4
+
+    invoke-virtual {v0}, Lcom/smartisanos/launcher/data/ItemInfo;->Te()Z
+
+    move-result v7
+
+    if-nez v7, :cond_6
+
+    :cond_4
+    add-int/lit8 v5, v5, 0x1
+
+    goto :goto_2
+
+    :cond_5
     const-string v5, "calendar"
 
     invoke-static {v3, v4, v5}, Lcom/smartisanos/launcher/model/LauncherModelRepository;->noteActiveIconOwnerMissing(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;)V
 
-    invoke-virtual {p0}, Lcom/smartisanos/launcher/view/a/la;->clear()V
+    goto :goto_3
 
-    return-void
-
-    :cond_calendar_item_present
+    :cond_6
     iget-object v3, p0, Lcom/smartisanos/launcher/view/a/la;->mCalendarView:Lcom/smartisanos/launcher/view/activeicon/m;
 
     invoke-virtual {v0}, Lcom/smartisanos/launcher/data/ItemInfo;->Oe()[B
@@ -2596,7 +2657,8 @@
     invoke-virtual {v4, v2}, Lcom/smartisanos/smengine/Da;->Tb(Z)V
 
     .line 23
-    :cond_1
+    :cond_7
+    :goto_3
     iget-object p0, p0, Lcom/smartisanos/launcher/view/a/la;->Qj:Lcom/smartisanos/launcher/view/a/ka;
 
     invoke-virtual {p0, v2}, Lcom/smartisanos/launcher/view/a/ka;->fb(Z)V
@@ -2609,17 +2671,39 @@
 
     const/4 v0, 0x0
 
-    if-eqz p1, :cond_3
+    iget-boolean v1, p0, Lcom/smartisanos/launcher/view/a/la;->jz:Z
+
+    if-eqz v1, :cond_9
+
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/a/la;->iz:[Lcom/smartisanos/smengine/F;
+
+    if-eqz v1, :cond_0
+
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/a/la;->hz:Lcom/smartisanos/smengine/N;
+
+    if-eqz v1, :cond_0
+
+    iget-object v1, p0, Lcom/smartisanos/launcher/view/a/la;->kz:Lcom/smartisanos/smengine/Camera;
+
+    if-nez v1, :cond_1
+
+    :cond_0
+    iput-boolean v0, p0, Lcom/smartisanos/launcher/view/a/la;->jz:Z
+
+    return-void
+
+    :cond_1
+    if-eqz p1, :cond_5
 
     .line 1
     iget-boolean p1, p0, Lcom/smartisanos/launcher/view/a/la;->jz:Z
 
-    if-eqz p1, :cond_7
+    if-eqz p1, :cond_9
 
     .line 2
     iget-object p1, p0, Lcom/smartisanos/launcher/view/a/la;->lz:Lcom/smartisanos/smengine/F;
 
-    if-eqz p1, :cond_0
+    if-eqz p1, :cond_2
 
     .line 3
     iget-object v1, p0, Lcom/smartisanos/launcher/view/a/la;->kz:Lcom/smartisanos/smengine/Camera;
@@ -2627,7 +2711,7 @@
     invoke-virtual {p1, v1}, Lcom/smartisanos/smengine/F;->draw(Lcom/smartisanos/smengine/Camera;)V
 
     .line 4
-    :cond_0
+    :cond_2
     iget-object p1, p0, Lcom/smartisanos/launcher/view/a/la;->iz:[Lcom/smartisanos/smengine/F;
 
     array-length v1, p1
@@ -2635,24 +2719,24 @@
     move v2, v0
 
     :goto_0
-    if-ge v2, v1, :cond_2
+    if-ge v2, v1, :cond_4
 
     aget-object v3, p1, v2
 
-    if-eqz v3, :cond_1
+    if-eqz v3, :cond_3
 
     .line 5
     iget-object v4, p0, Lcom/smartisanos/launcher/view/a/la;->kz:Lcom/smartisanos/smengine/Camera;
 
     invoke-virtual {v3, v4}, Lcom/smartisanos/smengine/F;->draw(Lcom/smartisanos/smengine/Camera;)V
 
-    :cond_1
+    :cond_3
     add-int/lit8 v2, v2, 0x1
 
     goto :goto_0
 
     .line 6
-    :cond_2
+    :cond_4
     iget-object p1, p0, Lcom/smartisanos/launcher/view/a/la;->hz:Lcom/smartisanos/smengine/N;
 
     invoke-virtual {p1, v0}, Lcom/smartisanos/smengine/N;->La(Z)V
@@ -2663,15 +2747,15 @@
     goto :goto_2
 
     .line 8
-    :cond_3
+    :cond_5
     iget-boolean p1, p0, Lcom/smartisanos/launcher/view/a/la;->jz:Z
 
-    if-eqz p1, :cond_7
+    if-eqz p1, :cond_9
 
     .line 9
     iget-object p1, p0, Lcom/smartisanos/launcher/view/a/la;->lz:Lcom/smartisanos/smengine/F;
 
-    if-eqz p1, :cond_4
+    if-eqz p1, :cond_6
 
     .line 10
     iget-object v1, p0, Lcom/smartisanos/launcher/view/a/la;->kz:Lcom/smartisanos/smengine/Camera;
@@ -2679,7 +2763,7 @@
     invoke-virtual {p1, v1}, Lcom/smartisanos/smengine/F;->draw(Lcom/smartisanos/smengine/Camera;)V
 
     .line 11
-    :cond_4
+    :cond_6
     iget-object p1, p0, Lcom/smartisanos/launcher/view/a/la;->iz:[Lcom/smartisanos/smengine/F;
 
     array-length v1, p1
@@ -2687,24 +2771,24 @@
     move v2, v0
 
     :goto_1
-    if-ge v2, v1, :cond_6
+    if-ge v2, v1, :cond_8
 
     aget-object v3, p1, v2
 
-    if-eqz v3, :cond_5
+    if-eqz v3, :cond_7
 
     .line 12
     iget-object v4, p0, Lcom/smartisanos/launcher/view/a/la;->kz:Lcom/smartisanos/smengine/Camera;
 
     invoke-virtual {v3, v4}, Lcom/smartisanos/smengine/F;->draw(Lcom/smartisanos/smengine/Camera;)V
 
-    :cond_5
+    :cond_7
     add-int/lit8 v2, v2, 0x1
 
     goto :goto_1
 
     .line 13
-    :cond_6
+    :cond_8
     iget-object p1, p0, Lcom/smartisanos/launcher/view/a/la;->hz:Lcom/smartisanos/smengine/N;
 
     invoke-virtual {p1, v0}, Lcom/smartisanos/smengine/N;->La(Z)V
@@ -2712,7 +2796,7 @@
     .line 14
     iput-boolean v0, p0, Lcom/smartisanos/launcher/view/a/la;->jz:Z
 
-    :cond_7
+    :cond_9
     :goto_2
     return-void
 .end method

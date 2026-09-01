@@ -6564,6 +6564,8 @@
     :cond_1
     iput-object p1, p0, Lcom/smartisanos/launcher/view/Eb;->cy:Lcom/smartisanos/launcher/view/activeicon/H;
 
+    invoke-static {}, Lcom/smartisanos/launcher/view/activeicon/H;->zq()V
+
     return-void
 .end method
 

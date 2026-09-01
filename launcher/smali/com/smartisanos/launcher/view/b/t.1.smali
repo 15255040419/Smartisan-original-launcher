@@ -6146,14 +6146,84 @@
     .line 4
     invoke-virtual {v2}, Lcom/smartisanos/launcher/data/FolderInfo;->lf()I
 
-    move-result v2
+    move-result v3
 
-    if-le v2, v1, :cond_0
+    if-le v3, v1, :cond_0
+
+    invoke-static {}, Lcom/smartisanos/launcher/view/Eb;->getInstance()Lcom/smartisanos/launcher/view/Eb;
+
+    move-result-object v3
+
+    sget-object v4, Lcom/smartisanos/launcher/view/activeicon/H;->PACKAGE_NAME:Ljava/lang/String;
+
+    invoke-virtual {v3, v4}, Lcom/smartisanos/launcher/view/Eb;->sa(Ljava/lang/String;)Lcom/smartisanos/launcher/view/activeicon/a;
+
+    move-result-object v3
+
+    instance-of v4, v3, Lcom/smartisanos/launcher/view/activeicon/H;
+
+    if-eqz v4, :folder_preview_default
+
+    check-cast v3, Lcom/smartisanos/launcher/view/activeicon/H;
+
+    invoke-virtual {v3}, Lcom/smartisanos/launcher/view/activeicon/H;->getPackageName()Ljava/lang/String;
+
+    move-result-object v4
+
+    invoke-virtual {v2, v4}, Lcom/smartisanos/launcher/data/FolderInfo;->O(Ljava/lang/String;)Lcom/smartisanos/launcher/data/ItemInfo;
+
+    move-result-object v4
+
+    if-nez v4, :folder_weather_found
+
+    const/4 v4, 0x0
+
+    :folder_weather_scan
+    invoke-virtual {v2}, Lcom/smartisanos/launcher/data/FolderInfo;->lf()I
+
+    move-result v5
+
+    if-ge v4, v5, :folder_preview_default
+
+    invoke-virtual {v2, v4}, Lcom/smartisanos/launcher/data/FolderInfo;->ia(I)Lcom/smartisanos/launcher/data/ItemInfo;
+
+    move-result-object v5
+
+    if-eqz v5, :folder_weather_next
+
+    invoke-virtual {v5}, Lcom/smartisanos/launcher/data/ItemInfo;->bf()Z
+
+    move-result v5
+
+    if-nez v5, :folder_weather_found
+
+    :folder_weather_next
+    add-int/lit8 v4, v4, 0x1
+
+    goto :folder_weather_scan
+
+    :folder_weather_found
+    iget-object v4, v0, Lcom/smartisanos/launcher/view/b/t;->VQ:Lcom/smartisanos/launcher/view/a/g;
+
+    invoke-virtual {v4}, Lcom/smartisanos/launcher/view/a/g;->Ll()Lcom/smartisanos/launcher/view/a/la;
+
+    move-result-object v4
+
+    if-eqz v4, :folder_preview_default
+
+    invoke-virtual {v4, v3}, Lcom/smartisanos/launcher/view/a/la;->a(Lcom/smartisanos/launcher/view/activeicon/H;)V
+
+    invoke-virtual {v4}, Lcom/smartisanos/launcher/view/a/la;->gj()V
+
+    goto :folder_preview_done
 
     .line 5
+    :folder_preview_default
     iget-object v2, v0, Lcom/smartisanos/launcher/view/b/t;->VQ:Lcom/smartisanos/launcher/view/a/g;
 
     invoke-virtual {v2, v1}, Lcom/smartisanos/launcher/view/a/g;->fb(Z)V
+
+    :folder_preview_done
 
     .line 6
     :cond_0

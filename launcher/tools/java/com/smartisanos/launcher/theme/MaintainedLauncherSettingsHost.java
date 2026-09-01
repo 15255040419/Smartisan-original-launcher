@@ -2680,51 +2680,6 @@ public final class MaintainedLauncherSettingsHost {
         return fields;
     }
 
-    public static void onLauncherPausedForUnlock(Activity activity) {
-        LauncherBelowKeyguardCompat.onLauncherPaused(activity);
-    }
-
-    public static void onLauncherResumedForUnlock(Activity activity) {
-        LauncherBelowKeyguardCompat.onLauncherResumed(activity);
-    }
-
-    public static void noteOriginalUnlockBroadcast() {
-        // Kept for binary compatibility. The receiver now records dismiss
-        // candidates directly in LauncherBelowKeyguardCompat.
-    }
-
-    public static boolean shouldSkipUnlockAnimation() {
-        if (android.os.SystemClock.uptimeMillis() < sThemeChangeGuardUntilUptime) {
-            return true;
-        }
-        try {
-            Class<?> themeHandler = Class.forName("com.smartisanos.launcher.theme.t");
-            Object handler = themeHandler.getMethod("getInstance").invoke(null);
-            if (handler != null && Boolean.TRUE.equals(themeHandler.getMethod("Wf").invoke(handler))) {
-                return true;
-            }
-        } catch (Throwable ignored) {
-        }
-        try {
-            Class<?> mainView = Class.forName("com.smartisanos.launcher.view.Eb");
-            Object view = mainView.getMethod("getInstance").invoke(null);
-            if (view == null) {
-                return false;
-            }
-            Object folderController = mainView.getMethod("Bh").invoke(view);
-            if (folderController == null) {
-                return false;
-            }
-            Object openFolder = folderController.getClass().getMethod("hh").invoke(folderController);
-            if (openFolder != null) {
-                android.util.Log.i(LOG_TAG, "unlock animation skipped while folder is open");
-                return true;
-            }
-        } catch (Throwable ignored) {
-        }
-        return false;
-    }
-
     /** Load first-frame icons through the same component-aware path as refreshes. */
     public static Drawable loadIconForComponent(Context context, String packageName, String className) {
         if (context == null || TextUtils.isEmpty(packageName)) {

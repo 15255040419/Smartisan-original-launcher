@@ -1361,6 +1361,12 @@
 
     if-nez v0, :cond_2
 
+    invoke-virtual {p0}, Lcom/smartisanos/launcher/data/ItemInfo;->Te()Z
+
+    move-result v0
+
+    if-nez v0, :cond_2
+
     invoke-virtual {p0}, Lcom/smartisanos/launcher/data/ItemInfo;->bf()Z
 
     move-result p0

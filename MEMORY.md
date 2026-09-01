@@ -711,11 +711,15 @@ Launcher 会先确认目标是系统应用或更新后的系统应用，再按�
 
 原版解锁动画引擎、宫格颜色资源和 `USER_PRESENT` 播放链路均保留在主 Launcher APK。
 
-`SCREEN_OFF` 负责原版锁定预初始化。
+解锁触发只有一个状态 Owner：`LauncherBelowKeyguardCompat`。不得重新引入 `UnlockAnimationCoordinator`、generation、第二套 PlayClaim、动画回调拒绝播放或新的全局 Handler 状态机。
 
-解锁触发基线固定为 Git 标签 `V1.5.3` 的 `25d20c4c`。不得重新引入 `UnlockAnimationCoordinator`、generation、播放权 claim 或由动画回调拒绝播放的第二状态机。
+`SCREEN_OFF`、`Launcher.onPause()`、focus-lost 与 `onStop()` 只允许进入同一个 `armAndPrepareIfNeeded()`。首次真实锁屏证据（`!interactive || keyguardLocked`）立即 ARM 并同步派发一次原版 `action_keyguard_on -> q(0)`；重复来源只记录 `UNLOCK_DUPLICATE_ARM_IGNORED`，不得再次 prepare。
 
-当厂商系统因默认 HOME 进程策略跳过广播时，恢复 v1.5.3 的 Launcher 生命周期兜底：确认真实熄屏后，以原始广播时间戳去重，再补发原版 `action_keyguard_on` 与 `USER_PRESENT`。这不是新的全局状态机。
+锁屏资格使用 Smartisan Launcher 自身真实 `resumed + windowFocus` 前台快照，即使它不是系统默认 HOME 也成立；不得在 Keyguard 切换期间用 HOME resolver 作硬 Gate。厂商 ROM 的 `onPause` 可能早于 Power/Keyguard 状态更新，必须保留 pause 可见候选到 `onStop` 再以真实锁屏证据裁决；普通 APP/设置跳转在 interactive 且未锁定时清除候选，不能 ARM。
+
+解锁信号只设置当前 Session：标准 `USER_PRESENT/action_keyguard_to_dismiss` 记录 dismiss；无该广播时，以“已 prepared、Launcher 在 Keyguard locked 时 resume，随后 focus=true 且 interactive/unlocked”的直接 handoff 作为信号。所有来源只调用同步 `tryCommitUnlockAnimation()`，最终只派发一次内部 play 与原版 `q(1)`；不得伪造 `USER_PRESENT`，不得用 120/250/1200/1500ms 延迟播放。1500ms 只允许作为旧 dismiss 的 stale 判定。
+
+OriginOS 16 / V2458A 已在 Smartisan 非默认 HOME 状态用最终 APK 连续20轮验证：ARM/PREPARE/PREPARE_READY/COMMIT/PLAY/START/FINISH 均为 `20/20/20/20/20/20/20`，重复 lifecycle/SCREEN_OFF ARM 共40次均被忽略，错误为0；Settings、Recents、普通 APP 返回的 ARM/PREPARE/COMMIT/START 均为0。ColorOS、Flyme、锁屏相机、Folder 打开和主题切换矩阵仍需对应真机，不得扩写为全 ROM FINAL。
 
 `Eb.update()` 必须保留统一的真实时间差推进；首帧只建立时间基准，不能回退为每帧固定 `Ra.T(20.0f)`，也不能只对解锁动画增加倍率。
 
@@ -771,6 +775,7 @@ Launcher 会先确认目标是系统应用或更新后的系统应用，再按�
 * `Cell.jl()` 是冷重载和 `changeAncestor()` 后的唯一重绑定边界。必须以迁移完成后的真实 parent 判定：parent 为 `FolderPage (view/b/a)` 时设置 `IH=true`、`XH=da`、`fH=8`、`dH=Constants.mode(8)`；parent 为 Desktop 时设置 `IH=false`、`XH=ga`，并恢复当前 Desktop 12/20 的 `fH/dH`。不得沿用迁移前的 `IH`，否则 Folder 冷重载会漂成 Desktop，或拖回 Desktop 后仍残留 Mode8。
 * 当前用户确认的 Open Folder 目标不是旧的原版 Folder `166/216`，而是与当前 Desktop 20 宫格 100% 同一视觉大小。Desktop pageMode 9 经 `cellCount(9)=20` 实际读取 `MODE_20` 的 `118/152`，再由冻结的 Desktop Golden `1.20` 得到 LOW 1080 runtime `141.6/182.4`；因此 Mode8 使用独立的最终资源基准：1080 portrait `142/182`，1440 profile `189/243`，其他宽度只走既有 width adaptation。不得恢复 `166/216`，也不得新增 `0.85/0.86`、dpi/机型分支、density 倍率或第二份 Scene scale。
 * Folder Mode8 不消费 Desktop 50/100/150 用户倍率。Desktop、Open Folder、Folder Preview 是三条独立合同；禁止为了 Folder 尺寸修改 `IconVisualMetrics`、Desktop source/normalization/raster/shadow/cache、ActiveIcon、Folder Preview、书架、行列、`FolderSceneMetrics` 或原版 Timeline。
+* 关闭状态 Folder Preview 的纹理 Owner 必须是 Folder Cell 自己的 Desktop `Qj.fH`，不能使用全局 `SINGLE_PAGE_MODE`。`FolderIcons(la).a(F, ItemInfo)` 必须先以 `IconRasterDiagnostics.textureCacheKey(item, ItemInfo.Ne(), Qj.fH)` 生成节点绑定 key，再让 Weather ActiveIcon、Calendar ActiveIcon 和普通静态应用全部调用显式 `pageMode` 的 `e/s` Composer。1260 真机已证明错误全局 owner 会把应为 `grid=12, 224/287` 的 Clock/Calendar preview 生成成 `grid=1, 269/344`，表现为偏大偏下；禁止用 Preview 固定倍率、机型偏移或修改 Mode8 掩盖该错误。
 * Folder 文字继续由 `FolderCellVisualMetrics -> Mc.setTranslate()` 根据当前 Folder artwork 计算，并与 Desktop 共用 `DesktopLabelMetrics.finalVisualGap()`；已通过真机的 `28.43` anchor correction 不因尺寸调整而改成固定 px 补偿。
 * 临时 `FolderIconTrace`、`OPEN_FOLDER_ICON_TRACE`、`FOLDER_ANIMATION_TRACE`、CELL/OWNER/cache trace 均已删除，不得作为正式架构恢复。
 * LOW 打开 Folder 的轻微卡顿与尺寸 Owner 已分离。clean APK 外部 atrace 首次定位为 Folder open 时 SMEngine `GLThread onDrawFrame` 内同步 CPU scene 工作（首帧约 `111~167ms`），不是 `eglSwapBuffers`、Launcher GC、Bitmap compose 或已证明的 texture upload；尚未定位到具体 native/scene 方法。没有更深 call-stack 证据前，禁止改动画时长或新增预加载、线程池、Bitmap cache。

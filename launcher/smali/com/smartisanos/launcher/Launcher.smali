@@ -352,6 +352,8 @@
     .line 1
     invoke-super {p0}, Landroid/app/Activity;->onStop()V
 
+    invoke-static {p0}, Lcom/smartisanos/launcher/theme/LauncherBelowKeyguardCompat;->onLauncherStopped(Landroid/app/Activity;)V
+
     return-void
 .end method
 

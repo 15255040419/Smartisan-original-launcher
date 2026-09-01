@@ -96,10 +96,10 @@
     <integer name="icon_offset_y_without_app_name">0</integer>
     <integer name="icon_size_origin">256</integer>
     <integer name="icon_size_origin_resize">256</integer>
-    <integer name="icon_size_origin_folder">189</integer>
+    <integer name="icon_size_origin_folder">197</integer>
     <integer name="shortcut_mask_radius">242</integer>
     <integer name="icon_size_with_shadow">328</integer>
-    <integer name="icon_size_with_shadow_folder">243</integer>
+    <integer name="icon_size_with_shadow_folder">253</integer>
     <integer name="lock_icon_height">136</integer>
     <integer name="lock_icon_width">168</integer>
     <integer name="magnify_stencil_radius">93</integer>

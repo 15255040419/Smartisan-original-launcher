@@ -26,6 +26,20 @@
 
 
 # virtual methods
+.method public finish()V
+    .locals 2
+
+    invoke-super {p0}, Landroid/app/Activity;->finish()V
+
+    const/4 v0, 0x0
+
+    sget v1, Lcom/smartisanos/launcher/R$anim;->settings_exit:I
+
+    invoke-virtual {p0, v0, v1}, Landroid/app/Activity;->overridePendingTransition(II)V
+
+    return-void
+.end method
+
 .method protected onCreate(Landroid/os/Bundle;)V
     .locals 0
 
