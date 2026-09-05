@@ -1123,6 +1123,19 @@ public final class MaintainedLauncherSettingsHost {
         return sSettingsResources;
     }
 
+    /** Loads an exact drawable from the bundled maintained/original resource archive. */
+    public static Drawable loadMaintainedDrawableResource(Context context, String name) {
+        if (context == null || TextUtils.isEmpty(name)) return null;
+        try {
+            Resources resources = settingsResources(context);
+            int drawableId = resources.getIdentifier(name, "drawable", SETTINGS_PKG);
+            return drawableId == 0 ? null : resources.getDrawable(drawableId).mutate();
+        } catch (Throwable error) {
+            Log.w(LOG_TAG, "Maintained drawable unavailable: " + name, error);
+            return null;
+        }
+    }
+
     private static View inflate(Activity activity, SettingsResourceContext context, String layoutName) {
         Resources resources = context.getResources();
         int layoutId = resources.getIdentifier(layoutName, "layout", SETTINGS_PKG);
@@ -1171,7 +1184,7 @@ public final class MaintainedLauncherSettingsHost {
 
         bindGrid(activity, resources, root);
         bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
-        bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", true);
+        bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
         bindBadgeVisibilitySwitch(activity, resources, root);
         bindSwitch(activity, resources, root, "item_id_badge_swipe_clean", "launcher_badge_swipe_clean", false);
         bindSwitch(activity, resources, root, "item_id_unlock_anim", "launcher_unlock_animation_enabled", false);
@@ -1317,16 +1330,17 @@ public final class MaintainedLauncherSettingsHost {
             int visibility = decor.getSystemUiVisibility();
             visibility |= View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
             visibility |= View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+            // Layout behind the navigation bar even when its controls are visible.
+            // The preference changes controls, not the size of the Launcher scene.
+            visibility |= View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
             boolean hideNavigation = LauncherSettingBridge.readBool(
-                    activity, "launcher_hide_navigation_bar", true);
+                    activity, "launcher_hide_navigation_bar", false);
             if (hideNavigation) {
                 visibility |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
                 visibility |= View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-                visibility |= View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
             } else {
                 visibility &= ~View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
                 visibility &= ~View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
-                visibility &= ~View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
             }
             Object windowToken = decor.getWindowToken();
             if (windowToken == null) {
@@ -12973,7 +12987,7 @@ public final class MaintainedLauncherSettingsHost {
             bindBackTitle(activity, resources, root, "view_title",
                     getString(resources, "obsession_header_title", "OCD Settings"), "OCD_OPTIONS", backToMainAction(activity));
             bindSwitch(activity, resources, root, "item_id_hide_lable", "launcher_hide_lable", false);
-            bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", true);
+            bindSwitch(activity, resources, root, "item_id_hide_navigation_bar", "launcher_hide_navigation_bar", false);
             bindSwitch(activity, resources, root, "item_id_dock_slide_reverse",
                     KEY_DOCK_SLIDE_REVERSE_ENABLED, false);
             bindBadgeVisibilitySwitch(activity, resources, root);

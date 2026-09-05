@@ -86,7 +86,10 @@ public final class IconVisualMetrics {
 
             DisplayMetrics display = android.content.res.Resources.getSystem().getDisplayMetrics();
             int logicalWidth = Math.max(1, intField(constants, "window_width", display.widthPixels));
-            int surfaceWidth = launcherSurfaceWidth(display.widthPixels);
+            int resolvedSurfaceWidth = launcherSurfaceWidth();
+            boolean actualSurfaceResolved = resolvedSurfaceWidth > 0;
+            int surfaceWidth = actualSurfaceResolved ? resolvedSurfaceWidth
+                    : Math.max(1, display.widthPixels);
             float scale = surfaceWidth / (float) logicalWidth;
             if (!(scale > 0f) || Float.isNaN(scale) || Float.isInfinite(scale)) scale = 1f;
             int physicalArtwork = Math.max(1, (int) Math.ceil(artwork * scale));
@@ -107,8 +110,9 @@ public final class IconVisualMetrics {
                     + " calendarOuter=" + floatField(property, "calendar_back_size", 0f)
                     + " settingButton=" + floatField(property, "setting_button", 0f)
                     + " physicalScale=" + scale + " surfaceWidth=" + surfaceWidth
-                    + " surfaceOwner=" + (surfaceWidth == display.widthPixels
-                    ? "DISPLAY_FALLBACK" : "LAUNCHER_GL_SURFACE"));
+                    + " actualSurfaceResolved=" + actualSurfaceResolved
+                    + " surfaceOwner=" + (actualSurfaceResolved
+                    ? "LAUNCHER_GL_SURFACE" : "DISPLAY_FALLBACK"));
             return result;
         } catch (Throwable ignored) {
             return null;
@@ -120,7 +124,7 @@ public final class IconVisualMetrics {
     }
 
     /** Prefer the actual Launcher GL surface; DisplayMetrics is startup fallback only. */
-    private static int launcherSurfaceWidth(int fallback) {
+    private static int launcherSurfaceWidth() {
         try {
             Class<?> launcher = Class.forName("com.smartisanos.launcher.J");
             Object instance = launcher.getMethod("getInstance").invoke(null);
@@ -131,7 +135,7 @@ public final class IconVisualMetrics {
             }
         } catch (Throwable ignored) {
         }
-        return Math.max(1, fallback);
+        return 0;
     }
 
     private static float floatField(Object object, String name, float fallback) {

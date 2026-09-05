@@ -4,7 +4,27 @@
 
 > 本区只保留日期、标题和一句话结论；根因、修改、验证与风险统一写入下方“每日修复记录”。已废弃或已取代条目只保留标题。
 
-- 2026-09-01 UNLOCK_FIRST_VISIBLE_GL_FRAME_EXTERNAL_TRACE：肉眼卡顿 Session 的 Focus→Commit、Commit→Start 及首个 GL 帧均为毫秒级，FIRST BAD LAYER 收敛到 Keyguard / Surface / SurfaceFlinger 可见帧交接。
+- 2026-09-04 LAUNCHER_EDGE_TO_EDGE_NAV_VISIBLE：桌面铺满与隐藏导航控件解耦，默认关闭隐藏并复用 maintained 状态栏贴图；V2458A 真机已确认关闭开关时铺满并保留横条。
+
+- 2026-09-05 UNLOCK_V154_RESUME_PRE_ROLL：恢复 v1.5.4 已有的 Resume 后 120ms 预滚时机，但继续使用当前严格 Session 防误播与去重，避免立即预滚过早及 USER_PRESENT 后播。
+
+- 2026-09-05 DEFAULT_VISIBLE_FIT：DEFAULT APK 图标按透明可见边界对齐现有 IMPROVED 可见范围，所有分辨率共用同一相对比例，未改宫格、文字或改进版资源。
+
+- 2026-09-05 V154_SETTING_BUTTON_ASSETS：桌面编辑齿轮恢复 Git 标签 v1.5.4 归档 APK 的白色描边三层资源及原版 SceneNode 路径，不再使用 maintained 的深灰齿轮资源。
+
+- 2026-09-05 ORIGINAL_LOADING_PANEL：初始化加载页恢复 maintained 保存的原版 246×160dp 纵向面板、13sp 文案及原版进度帧，替换移植层自建横向胶囊。
+
+- 2026-09-03 FOLDER_SHARED_TEXTURE_ROUTE：Open Folder 普通应用已恢复共享 Desktop cache/七参数入口，尺寸隔离保留，但三档真机仍有约 78–88ms 长帧，性能验收未通过。
+
+- 2026-09-04 【已被 UNLOCK_V154_RESUME_PRE_ROLL 取代】UNLOCK_LOCKED_RESUME_PRE_ROLL
+
+- 2026-09-03 UNLOCK_DIRECT_DISMISS_PRE_ROLL：【被 LOCKED_RESUME_PRE_ROLL 扩展】真实 USER_PRESENT 路径不等待 Focus，但无法覆盖 USER_PRESENT 晚于 Focus 的样本。
+
+- 2026-09-03 UNLOCK_RESOLUTION_EVIDENCE_BOUNDARY：【已被同机 A/B 与预滚动修复收口】高分辨率不是已证明的动画计算根因，当前可见停顿来自 Focus Gate 暴露静止 Launcher Layer。
+
+- 2026-09-02 ISSUE_11_DESKTOP_LOCAL_GEOMETRY：Cell 局部偏移与真实资源 profile 的 Placement 分离，几何测试通过，状态为 FIX_IMPLEMENTED_PENDING_REMOTE_ACCEPTANCE。
+
+- 2026-09-01 UNLOCK_FIRST_GL_FRAME_EXTERNAL_TRACE：该样本派发与 CPU 绘制为毫秒级，但没有 FIRST_PRESENT，不足以确认 FIRST_BAD_UNLOCK_LAYER。
 
 - 2026-08-31 FOLDER_WEATHER_OWNER_INITIAL_REPLAY_FIX：新 Folder 天气 Owner 已复用原链回放缓存数据，Open Folder 图标仅按约定小幅增大；V2458A 首次显示通过，既有首次打开 GL 卡顿仍未修复。
 
@@ -22,7 +42,7 @@
 
 - 2026-08-21 ICON_RENDERING_CONTRACT_ARCHITECTURE_FROZEN：图标 Source、Geometry、Composer 与 ActiveIcon Sync 四层 Owner 已冻结到 `ICON_RENDERING_CONTRACT.md`，不得恢复固定倍率或多重合成。
 
-- 2026-08-21 EFFECTIVE_ICON_SOURCE_NORMALIZATION_FIX：图标归一化改为按最终实际命中的来源分类，仅 DEFAULT 进入既有 normalizer，真实 IMPROVED/PACK/CUSTOM/RESOURCE 保持设计比例。
+- 2026-08-21 【已被 DEFAULT_VISIBLE_FIT 取代】EFFECTIVE_ICON_SOURCE_NORMALIZATION_FIX
 
 - 2026-08-21 ICON_UNIFICATION_DOCUMENT_AND_CODE_AUDIT：静态与动态图标仍存在未闭环的最终 Owner 和运行时矩阵，统一状态降级为 `ARCHITECTURE_PARTIAL / RUNTIME_UNVERIFIED`。
 
@@ -76,15 +96,108 @@
 
 ## 每日修复记录（倒序）
 
+### 2026-09-05
+
+#### v1.5.4 解锁 Resume 预滚语义恢复
+
+- **根因与证据**：本轮安装前的 Focus 版真机样本为 `USER_PRESENT→COMMIT=117ms`，会在 Launcher 已可见后才播放；随后验证的 direct-dismiss 版虽为 `USER_PRESENT→COMMIT=2ms`、`COMMIT→START=11ms`，用户仍能感知晚。另一方面，首次 locked Resume 立即播放会比 USER_PRESENT 提前约 `367–418ms`，用户确认过早。`v1.5.4` 实际源码不是立即播放，而是 `onLauncherResumedForUnlock()` 在确认锁屏离场后通过主线程延后 `120ms` 派发原版锁屏/解锁链。
+- **修改**：当前严格 Session 在同一 Session 已 Prepare、Launcher locked Resume、direct handoff 有效且尚未消费时，仅安排一次 v1.5.4 的 `120ms` Resume 预滚。到时仍由唯一 `tryCommitUnlockAnimation()` 授权并派发原版 `q(1)`；若 USER_PRESENT 已先到则立即消费，延后任务自动失效。Pause/Stop、非直接回桌面取消、重复广播及以后 HOME 不补播规则不变。
+- **范围**：未改 Unlock XML、Timeline、duration、`Eb.update/Ra.T`、刷新率或 Window/Surface flags。这里的 `120ms` 不是新猜测参数，而是从 `v1.5.4` 对应源码恢复的已存在语义。
+- **验证**：`git diff --check`、`build.bat`、v1/v2/v3 签名、覆盖安装、设备同源 SHA 与 ART verify 通过。V2458A 连续两次有效 Session 均命中 `V1_5_4_RESUME_PRE_ROLL`：Resume→Commit 约 `120/123ms`，Commit→Start `4/5ms`，Start 分别比 USER_PRESENT 提前 `236/223ms`、比 Focus 提前 `337/383ms`，每次仅 Commit/Start/Finish 一次；动画运行 `1313/988ms`。最终肉眼节奏仍以用户验收为准。
+
+#### DEFAULT APK 图标可见主体统一
+
+- **根因证据**：新缓存 v19 已实际重建，排除旧缓存混用。真机日志显示全部来源虽使用同一 `192px artwork / 246px texture`，但 DEFAULT 源图透明可见比例从约 `0.75` 到 `1.0` 不等；完整源画布等比塞入必然造成主体有大有小。此前 DEFAULT-only Launcher3 normalizer 只会缩小面积过大的图标、不会放大带透明留白的图标，因此既造成整体偏小，也无法解决本问题。
+- **修改**：仅 DEFAULT APK 来源使用已有 alpha 可见边界，将最长可见边统一对齐到 IMPROVED 当前约 `98%` 的 artwork 可见范围并按可见中心定位；IMPROVED/PACK/CUSTOM/RESOURCE 继续保留设计画布，不参与归一化。缓存身份更新为 `raster:v20-default-visible-fit`，所有分辨率按相同比例计算，不含包名、机型或固定物理像素特判。
+- **保持不变**：未改 `IconVisualMetrics`、用户 50/100/150% 比例、宫格、Cell、文字、阴影、Folder Preview、ActiveIcon 或动态图标。
+- **验证**：Java 编译、完整 APK 构建、覆盖安装与 ART verify 通过；v20 重建日志中典型 DEFAULT 的最长可见边由此前 `144–192px` 收敛到 `188–192px`，正常桌面与编辑页截图均已取得。不同图形的宽高比和内部构图仍由应用原图决定，最终视觉一致性以用户验收为准。
+
+#### 桌面编辑齿轮恢复 v1.5.4 白色资源
+
+- **根因证据**：`Ec.smali` 当前与 v1.5.4 逐行一致，差异来自资源。maintained 的 gear 本体为深灰；`clean_launcher_raw` 是实心白齿轮；Git 标签 v1.5.4 的受控 `build/launcher-signed.apk` 则使用用户记忆中的白色描边齿轮，三组图片均不是同一文件。
+- **修改**：从 Git 标签 v1.5.4 自身归档 APK 逐字节提取并恢复 `editBtn_bg/gear/inShadow`，不复制 dex/smali；继续由原版 `Ec` 分层绘制和旋转，不增加 tint 或第二套按钮实现。
+- **验证**：恢复后的三张资源 SHA256 分别为 `6504CE57…`、`FDB74861…`、`0CED6D8E…`，与 v1.5.4 归档 APK 完全一致；最终 APK 内再次核对一致，覆盖安装后的编辑模式截图已显示白色描边齿轮。上一轮原始 APK 实心白资源在真机仍显示不符，已由本记录取代。
+
+#### 初始化加载页恢复原版纵向面板
+
+- **根因证据**：Launcher 的 `loading_progress.xml` 及 80 帧 PNG 原本即与 clean 原版一致；差异来自后加的 `OriginalLoadingContentFactory`，它按屏幕宽度生成横向胶囊。原版/maintained 保存的 `smartisan_progress_dialog.xml` 则为 246×160dp 纵向面板、48dp 进度、13sp 单行文案及 12dp 上间距。
+- **修改**：加载页工厂恢复上述纵向结构并加载已有 maintained 资源包中的原版 `smartisan_progress_dialog_bg`，资源不可用时才使用同尺寸暗色圆角 fallback；原版进度动画帧不变。
+- **验证与风险**：构建、签名、覆盖安装及 ART verify 通过，无新增动画帧或时长；本轮没有为了触发加载页而改主题/宫格，纵向面板的实际动画视觉及首次加载 maintained 资源包的 I/O 影响仍待自然触发时验证。已完成真机测试的 APK SHA256 为 `E9043B9A11B1CE8A29A1B0DFA9F778DC9810B60B38D2844C72E7AEBCD26662F9`，当时设备 base.apk 与本地完全一致。随后仅修正诊断文字及 `.gitignore` 精确资源放行并重建，最终待安装 APK 为 v1.5.6/31、SHA256 `1C74EF1A97A590112F926FCDF82AC9531559585CCB068ED6E5F4FFD4A1459615`；手机在最后一次覆盖前断开 ADB，运行行为与已验证包相同但最终字节尚未装机核对。
+
+### 2026-09-04
+
+#### 【已被 2026-09-05 v1.5.4 Resume 120ms 预滚语义取代】解锁动画 App-only 边界：首次 locked Resume 立即预滚动
+
+#### Launcher 铺满布局与导航横条解耦
+
+- 根因：关闭隐藏虚拟键时错误清除 `LAYOUT_HIDE_NAVIGATION`；原版窗口初始化还会重写布局位。顶部布纹则是 `Lc → status_bar.png` 的实际贴图差异。
+- 修复：保留上下系统栏布局，仅切换导航控件；隐藏默认 false；复用 maintained 默认主题状态栏资源，保留外部主题与状态图标明暗链。Unlock、Folder、图标几何不变。
+- 资源：`launcher/assets/Textures/1080p/status_bar.png` 字节原样来自 maintained 同路径，SHA256 `971c34811d38673d3f839371eb19c9ea3325acec6c89e7d40083c6c50ca85416`；原工作区文件为 `be09aaee…`，原始 APK 对应文件为 `f700636b…`，三者不是同一文件。
+- 验证：静态契约、构建、APK 内资源一致性、v1/v2/v3 签名及设备 ART verify 通过。V2458A/1260×2800 真机确认关闭开关时桌面铺满、横条保留、底部标签完整且默认主题顶部平滑；用户确认该效果正常。开启后隐藏横条的最终回切测试因设备被外部操作打断，不扩大为完整开关矩阵。历史“关闭隐藏同时清除底部布局标志”的方案由本记录取代。
+- 范围：没有修改图标/文字几何、Folder 或 Unlock 动画。其他主题继续使用各自资源链，未逐主题截图；三键导航和其他 ROM 未验证。一次性专项文档与静态脚本在本轮收口删除，未提交、未推送，未更新 MEMORY.md。
+
+### 2026-09-03
+
+#### 有效 direct-handoff 的 USER_PRESENT 预滚动恢复
+
+- **根因证据**：同一 V2458A 的既有 SurfaceFlinger A/B 中，v1.5.5 七个有效样本均在 USER_PRESENT 同步派发，ANIMATION_START 比 FIRST_PRESENT 早 `8.034–28.800ms`，FIRST_PRESENT 后 `9.254–60.669ms` 才获 Focus。CURRENT 唯一完整可解析样本则在 Layer visible 后约 `35ms` 才因 Focus 派发，形成静止 Buffer 暴露。v1.5.4 与 v1.5.5 的 `ia.1` 触发链和 `animations/c/k` 主体完全相同；v1.5.4“偶尔较短但不先停顿”符合锁屏后预滚动语义。分辨率可能放大设备差异，但不是本次已证明的动画主体计算根因。
+- **修改**：仅在 `LauncherBelowKeyguardCompat.tryCommitUnlockAnimation()` 中区分真实 direct dismiss 与无 USER_PRESENT fallback。已有 `unlockDismissPending` 只会在 Session active、Launcher resumed 且 `resumeDuringKeyguardHandoff` 有效时建立；该信号存在时不再要求 WindowFocus，仍要求 Prepare、Resume、interactive、Keyguard unlocked、direct handoff 及未消费。无 dismiss 信号时继续要求 Focus，兼容不发 USER_PRESENT 的 ROM。Commit 前仍先设置 `unlockConsumed=true`，继续走唯一原版 `ACTION_INTERNAL_PLAY → ja.k().q(0)`。
+- **保持不变**：未改 `ia.1`、`q(0)/q(1)`、unlock9/12/16/20、Timeline、duration、`Eb.update/Ra.T`、AnimationFrameRateController、Window/Surface flags、Folder、图标或天气；没有恢复 v1.5.4 的 120/250/1200/1500ms 生命周期时间猜测，也没有新增 Handler、Timer、Thread、ROM/分辨率判断。
+- **构建与静态验证**：`git diff --check` 与 `build.bat` 通过；APK 为 `v1.5.6/31`，SHA256 `EB5E9FEF80DF710A093BF67D7C74D97B7F750FB819C9418EB556D3E21DBA7C4D`，v1/v2/v3 签名及设备 `cmd package compile -m verify -f` 通过，覆盖安装成功。
+- **正常解锁真机验证**：V2458A/OriginOS 16 一轮记录 `USER_PRESENT → COMMIT=0ms`、`COMMIT → START=5ms`；Start 时 Focus=false，约 40ms 后 Focus 到达只记录 `UNLOCK_SKIP_CONSUMED`。本 Session 的 COMMIT/START/FINISH 均为 1，证明提前播放和 exactly-once 同时成立。trace 位于 `build/ab_unlock_evidence/current/run_11/`；该轮缺少分析器所需的完整 GL marker，不能声称已重新取得 FIRST_PRESENT，最终肉眼顺滑度待用户验收。
+- **防误播真机验证**：明确打开 `com.android.settings/.homepage.SettingsHomepageActivity` 并确认其为 top 后锁屏解锁，Launcher 日志为 `UNLOCK_SESSION_NOT_ARMED_NOT_VISIBLE_HOME → USER_PRESENT/UNLOCK_SKIP_NO_SESSION`；随后 HOME 的 Resume/Focus 继续 `UNLOCK_SKIP_NO_SESSION`，`PLAY=0`。普通设置返回同样未触发 Unlock Play。
+- **范围与风险**：当前只完成 V2458A 一轮正常解锁和一轮设置前台非直接解锁；还需用户肉眼确认停顿消失，并覆盖快速重复、通知/相机直达及不发 USER_PRESENT 的 ROM。未更新 MEMORY，未提交、未推送。
+
+#### 高分辨率解锁延迟：只读复核与测量边界纠正
+
+- **范围**：记录 Folder 实施后，只读检查当前源码、clean_launcher、maintained 的 UnlockAnimationXML 参考及设备已有日志；未改 Unlock Gate、q(0)/q(1)、动画 XML、Timeline、duration、刷新率、Window/Surface flags，未新建诊断 APK、构建或安装。跨设备“1080P 正常、高分辨率延迟”是用户反馈，尚缺同 APK/主题/宫格/刷新率的对应运行证据，不能直接判定分辨率根因。
+- **设备与来源**：当前 V2458A 为 1260×2800；设备安装包 SHA256 与 Folder 候选 `A163744E84B82B31475C6C3F2756A21F9CBF7E2CD63D1EF1A7DA59BF09765EDE` 一致。读取的现存日志保存在 `build/unlock-resolution-audit/current-existing.log`，不是本轮受控解锁采集。
+
+| 当日日志 Session | USER_PRESENT → COMMIT ms | COMMIT → ANIMATION_START ms | 最后条件 |
+| --- | ---: | ---: | --- |
+| 3，20:03:13 | 27 | 5 | WINDOW_FOCUS_TRUE |
+| 4，20:03:17 | 42 | 4 | WINDOW_FOCUS_TRUE |
+| 5，20:07:28 | 1525 | 2 | WINDOW_FOCUS_TRUE |
+
+- **样本限制**：Session 5 是未标注用户操作的长焦点等待，不能当作高分辨率正常解锁的典型值；以上均没有同步 SurfaceFlinger 实际 present，因此不计算视觉延迟平均值，不证明高分辨率导致等待。USER_PRESENT 与实际检测 KEYGUARD_UNLOCKED 也不是同一测量点，不混用。
+- **READY 的实际含义**：`ia.1.smali` 调用 `ja.hb().q(0)` 后，立即在接收回调中调用 `LauncherBelowKeyguardCompat.onPrepareReady()`。`smengine/n.1.q(F)` 委托 `p.1.a(n,F)`；零延迟分支只是把 Event 放入 `tE` 并请求引擎更新，之后才由 `p.update → ek → Event.run` 消费。`hb` 中的 `Eb.ai()` 清理旧 emergency event，不是 GPU 完成屏障。故 `prepareBegin==prepareReady` 只描述该兼容接线返回，不能证明原版 Scene 已完成 GL 准备、纹理上传或上屏。此处发现的是测量盲区，不是已经证明的卡顿 Owner。
+- **原版/当前边界**：`ea.1.smali` 与 clean_launcher 文件一致；`animations/c/k.smali` 对照原版仅 `isPlaying()` 增加已结束检查，初始化/播放方法没有差异。maintained 的 `UnlockAnimationXML.init/start` 仍是独立的初始化与播放入口，不作为替换当前动画的依据。当前 `J` 的两处 Surface 初始化已经设置 `setPreserveEGLContextOnPause(true)`，不能把问题未经验证地归因于“没有保留 EGLContext”。
+- **分辨率假设**：当前 `IconVisualMetrics.resolve()` 按真实 Surface 宽度与 logical width 比值确定 physical raster；当前样本 physicalScale=1，不表示各分辨率纹理像素数相同，因为 logical LayoutProperty 本身也已经适配。相同宽高比下，1260 宽相对 1080 宽约为 1.36 倍像素量，1440 宽约为 1.78 倍；这只是像素量计算，不是耗时预测，更不能排除 ROM/芯片/刷新率差异。
+- **纠正旧结论**：9 月 1 日的 `onDrawFrame=1.793ms` 与 `eglSwapBuffers=0.256ms` 仅覆盖 CPU 同步区间。GPU/显示同步依赖 fence，不能以 CPU 返回替代 FIRST_PRESENT；撤销“已经排除 Launcher/GL 并确定 SystemUI Owner”的强结论。参考 [AOSP 图形同步说明](https://source.android.com/docs/core/graphics/sync)。当时 EARLY_PLAY 实验没有 FIRST_PRESENT 对齐，不能单凭 START 日志定性；后续同机 v1.5.5/CURRENT Surface A/B 已确认预滚动差异，并由本日更新的严格 Session 实现收口。
+- **下一判决**：优先同一高分辨率设备使用系统原生分辨率设置做受控对照（需确认支持，当前未更改），核对实际 Surface/Buffer 尺寸，并固定同一 APK、主题、宫格、图标大小、刷新率、解锁方式；不把 wm size 的逻辑覆盖冒充面板/Buffer 真正降分辨率。对齐原版准备实际执行、CPU 帧、GPU ready fence、Launcher Layer visible、buffer frame number/present 与 Focus。只在证据确认纹理重建/上传或原版 Prepare Scene 被覆盖时修复对应 Owner；若 Buffer 已 ready 但系统延后显示，则不通过提前 q(1)、固定 delay 或改 Timeline 掩盖。若两版/分辨率的呈现与播放时间均相近，继续核对第一张可见 Buffer 内容。
+- **状态更新**：本节是实施前证据边界；最新结论以同日上方“有效 direct-handoff 的 USER_PRESENT 预滚动恢复”为准。未将分辨率写成 ROOT_CAUSE。
+
+#### Open Folder 共享纹理路径恢复候选与真机结果
+
+- **原因与范围**：按用户要求停止历史 A/B 构建，仅撤销 Open Folder 普通应用独立 Mode8 final representation。方法级对照 37301 恢复 cache/调用入口语义，保留 CURRENT Folder dH 尺寸及两处 Desktop userScale 隔离。
+- **修改**：`g.1.smali` 的 `cb/fb/md` 与 `IconRasterDiagnostics` 的 Cell key/普通 Folder 判断；共享 `e/s` 内部继续保留当前 Desktop static pipeline。并非完整 37301 源码回退，更不等于已证明恢复其性能。
+- **冻结**：未改 Unlock、Timeline、duration、Eb.update/Ra.T、Folder 资源/文字、天气/日历 Owner、g.jl；已有 Issue #11、Unlock 与 Preview 差分均保留。
+- **验证**：diff check、构建、签名、设备 ART verify、安装与冒烟通过。同一个九普通应用 Folder 的 50/100/150% 各一次冷启动首次/第二次打开已采外部 atrace；首次最大 onDrawFrame 为 83.162/87.735/77.642ms，第二次为 78.158/80.932/80.836ms。
+- **结论**：共享路径已实施，但长帧仍在，不能写“文件夹卡顿已修好”。三档截图未见 Folder 跟随桌面缩放，精确像素一致性与用户顺滑手感验收仍未完成。本轮已复核三个临时测试应用回到原位及 Desktop 100%。
+- **文档与仓库**：只记录已验证事实；未更新 MEMORY，未提交、未推送。
+
+### 2026-09-02
+
+#### Issue #11 Desktop 局部偏移 Owner 与真实 Layout Profile
+
+- **证据**：反馈日志中 V2183A 的最终 Launcher Window/SurfaceView 为 1080x2400；适配器使用 1.25 纵向倍率，图标栅格却保持 230/295、physicalScale=1。原版四个高度 profile 的 MODE_12/20/64 局部偏移不随高度改变。
+- **修复**：三个局部偏移明确按所选资源宽度缩放；P 保留实际 Resources/目录/mode，适配器复用原版 global.xml 的真实宽高，仅用于有原版差异证据的 Placement 字段。冻结其他视觉字段；不增加机型、分辨率特判，不改 Folder/Unlock。
+- **审计纠正**：旧 factorFor 虽写了 name_off_set_y 的 scaleY，但整数字段筛选漏掉 off_set 名称，实际 MODE_64 为 -100/-9/-9，并非 -125/-9/-9。修复显式纳入该字段；1080 宽目标为 -100/-7/-7。
+- **诊断**：gridToken 复用 Constants.cellCount；Surface Owner 用实际解析成功标志，数值计算不变。三类新验收日志由 APK 内专用 marker 控制，正常源码不保留 marker。
+- **验证**：1944 组 JVM 实际适配器几何用例、374544 次非目标字段检查、72 组 Folder 全字段比较通过；925 个冻结 APK 资源/原生库条目与备份一致。首次诊断包有新增 Smali p1 异常分支类型冲突，已恢复备份后修正；增加 ART 类初始化验证，修正包构建与 v1/v2/v3 签名通过。完整 Android 视觉矩阵与 V2183A 远程对照尚未完成，不标记 ROOT_CAUSE CONFIRMED。
+- **产物**：`build/issue11/launcher-issue11-acceptance.apk`，v1.5.6/31，SHA256 `B10033F07EA7F44513F8D7D156CC6FE609F2ACED4C52A8E719A37FEF00DA2817`。
+- **真机边界**：最终验收包已覆盖安装 V2458A，桌面与文件夹冒烟可运行；中间诊断包确认本地实际 profile 为 2340x1080。前后截图 mode/图标位置不同，不计同条件视觉通过；最终日志读取为空，不计日志通过。已另构建不含 acceptance marker 的普通包，详见专项报告。
+- **状态**：`FIX_IMPLEMENTED_PENDING_REMOTE_ACCEPTANCE`；字段表、资源链、验证边界及反馈者操作说明见 [专项记录](ISSUE_11_LAYOUT_ACCEPTANCE.md)。MEMORY.md 未更新；未提交、未推送、未向 Issue 发布未经验证的结论。
+
 ### 2026-09-01
 
-#### 解锁动画第一张可见 GL 帧外部取证（调查完成，未改代码）
+#### 解锁动画首个 CPU GL 帧外部取证（未取得实际上屏时间，未改代码）
 
 - **用户可感知问题**：V2458A 解锁时肉眼明确看到桌面先静止一下，随后原版解锁动画才开始运动。本轮只追踪第一张真实 GL 动画帧，不重新调查 Unlock Trigger/Gate 或 `q(1)`。
 - **同一 Session 边界**：肉眼确认卡顿的 `sessionId=5` 中，`WINDOW_FOCUS_TRUE=893008662`、`COMMIT_PLAY=893008663`、`ANIMATION_START=893008665`，即 `FOCUS -> COMMIT=1ms`、`COMMIT -> START=2ms`。
 - **外部 trace 对齐**：未新增生产日志，使用 atrace `view/gfx/sched/freq/idle/am/wm/input` 抓取同一轮。trace clock sync 将 logcat `ANIMATION_START` 对齐到 `1612539.414704s`；回调后第一个新启动的 `GLThread onDrawFrame` 为 `1612539.417238s -> 1612539.419031s`，所以 `START_TO_FIRST_GL_FRAME=2.534ms`、`FIRST_GL_FRAME_DURATION=1.793ms`。
-- **可见帧补充证据**：`ANIMATION_START` 实际已发生在前一个正在执行的 `onDrawFrame` 内；该帧为 `1612539.414053s -> 1612539.416964s`（`2.911ms`），紧接的 `eglSwapBuffers` 为 `1612539.416970s -> 1612539.417226s`（`0.256ms`）。这进一步排除了逻辑 start callback 后 GLThread 长时间无帧或第一帧长阻塞。
-- **结论**：`FIRST_BAD_UNLOCK_LAYER` 不是 Unlock Gate、`q(1)` dispatch、SMEngine first visible frame 或 GLThread `onDrawFrame`。在 A/B 与第一 GL 帧均为正常毫秒级的同一肉眼卡顿样本中，剩余边界是 Keyguard / Surface / SurfaceFlinger 的窗口可见帧交接；不能修改 Launcher 解锁动画掩盖该现象。
+- **CPU 帧补充证据**：`ANIMATION_START` 实际已发生在前一个正在执行的 `onDrawFrame` 内；该帧为 `1612539.414053s -> 1612539.416964s`（`2.911ms`），紧接的 `eglSwapBuffers` 为 `1612539.416970s -> 1612539.417226s`（`0.256ms`）。该片段未见 start 后 CPU GL 长阻塞，但不是可见帧或 GPU 完成证据。
+- **结论纠正（2026-09-03）**：上述数值保留；原先据此将 FIRST BAD 收敛至 Keyguard/SurfaceFlinger 的推断证据不足。未测 Launcher Buffer 实际 FIRST_PRESENT/GPU fence，不能排除首帧内容问题或确认系统交接 Owner，也不能声称已经取得 first visible frame。仍不允许通过修改 Gate/Timeline 猜测修复。
 - **冻结与验证范围**：未修改 `LauncherBelowKeyguardCompat`、`ia.1`、`q(0)/q(1)`、`unlock9/12/16/20`、Timeline、动画时长、`Eb.update()` 或 `Ra.T()`；未构建、未安装、未提交、未推送。当前只有 V2458A / OriginOS 16 的一次肉眼卡顿样本，未细分 SurfaceFlinger 内部 latch/present owner，也不得扩写为多 ROM 结论。
 - 未更新 `MEMORY.md`。
 

@@ -1,6 +1,10 @@
 build/
 *.apk
 *.png
+!launcher/assets/Textures/1080p/status_bar.png
+!launcher/assets/Textures/1080p/setting_button/editBtn_bg.png
+!launcher/assets/Textures/1080p/setting_button/editBtn_gear.png
+!launcher/assets/Textures/1080p/setting_button/editBtn_inShadow.png
 !launcher/tools/maintained_settings_res/res/drawable/com_smartisanos_videoplayerproject.png
 !icons/drawable/*.png
 *.jpg

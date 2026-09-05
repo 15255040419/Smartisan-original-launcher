@@ -1,8 +1,13 @@
 package com.smartisanos.launcher.data;
 
 import android.util.Log;
+import android.content.res.Resources;
 
 import java.lang.reflect.Field;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 public final class LayoutPropertyAdapter {
     private static final String TAG = "LayoutPropertyAdapter";
@@ -22,11 +27,24 @@ public final class LayoutPropertyAdapter {
     private static final float FOLDER_PREVIEW_FIRST_ROW_3X3 = 0.220f;
     private static final float FOLDER_PREVIEW_ROW_PITCH_3X3 = 0.244f;
     private static final float EPSILON = 0.01f;
+    private static final Map<Resources, Map<String, int[]>> PROFILES =
+            new WeakHashMap<Resources, Map<String, int[]>>();
 
     private LayoutPropertyAdapter() {
     }
 
     public static void adapt(Object property, String suffix) {
+        adapt(property, suffix, null, null);
+    }
+
+    /** The parser supplies its actual selected asset directory, never a screen-size guess. */
+    public static void adapt(Object property, String suffix, Resources resources,
+            String selectedDirectory) {
+        adapt(property, suffix, resources, selectedDirectory, 0);
+    }
+
+    public static void adapt(Object property, String suffix, Resources resources,
+            String selectedDirectory, int resourceMode) {
         if (property == null) {
             return;
         }
@@ -38,10 +56,23 @@ public final class LayoutPropertyAdapter {
         }
 
         float resourceBaseWidth = resourceBaseWidth(property, suffix);
-        float resourceBaseHeight = resourceBaseWidth * (BASE_HEIGHT / BASE_WIDTH);
+        // Compatibility baseline ONLY for frozen, non-migrated visual fields.
+        // This is not the selected resource profile height or a placement owner.
+        float frozenVisualBaseHeight = resourceBaseWidth * (BASE_HEIGHT / BASE_WIDTH);
         float scaleX = width / resourceBaseWidth;
-        float scaleY = height / resourceBaseHeight;
+        float scaleY = height / frozenVisualBaseHeight;
         boolean folderLayout = "_folder".equals(suffix);
+        boolean desktopPortrait = !folderLayout && selectedDirectory != null
+                && selectedDirectory.startsWith("layout/portrait/");
+        int[] profile = desktopPortrait ? selectedProfile(resources, selectedDirectory) : null;
+        float placementScaleY = profile == null ? 1.0f : height / (float) profile[1];
+        float localScale = profile == null ? scaleX : width / (float) profile[0];
+        boolean acceptance = desktopPortrait && acceptanceEnabled(resources);
+        float nameOriginal = acceptance ? numericField(property, "name_off_set_y") : 0f;
+        float iconOriginal = acceptance ? numericField(property, "icon_offset_y") : 0f;
+        float iconHiddenOriginal = acceptance
+                ? numericField(property, "icon_offset_y_without_app_name") : 0f;
+        float dockOriginal = acceptance ? numericField(property, "dock_height") : 0f;
         // Open-folder resources are one width-owned visual scene. Scale their
         // LayoutProperty values together before any node/animation is created.
         // Ordinary pages keep their original scene geometry and adapt only the
@@ -52,7 +83,7 @@ public final class LayoutPropertyAdapter {
         if (!folderLayout) {
             scaleIconBoxes(property, iconScale);
         }
-        if (Math.abs(scale - 1.0f) < EPSILON
+        if (!desktopPortrait && Math.abs(scale - 1.0f) < EPSILON
                 && Math.abs(scaleX - 1.0f) < EPSILON
                 && Math.abs(scaleY - 1.0f) < EPSILON) {
             return;
@@ -64,12 +95,15 @@ public final class LayoutPropertyAdapter {
                 String name = field.getName();
                 Class<?> type = field.getType();
                 if (type == Float.TYPE) {
-                    float factor = factorFor(name, suffix, scaleX, scaleY, scale);
+                    float factor = desktopFactorFor(name, suffix, scaleX, scaleY, scale,
+                            desktopPortrait, localScale, placementScaleY);
                     if (factor != 1.0f) {
                         field.setFloat(property, field.getFloat(property) * factor);
                     }
-                } else if (type == Integer.TYPE && shouldScaleInt(name)) {
-                    float factor = factorFor(name, suffix, scaleX, scaleY, scale);
+                } else if (type == Integer.TYPE && (shouldScaleInt(name)
+                        || (desktopPortrait && "name_off_set_y".equals(name)))) {
+                    float factor = desktopFactorFor(name, suffix, scaleX, scaleY, scale,
+                            desktopPortrait, localScale, placementScaleY);
                     if (factor != 1.0f) {
                         int value = field.getInt(property);
                         field.setInt(property, Math.round(value * factor));
@@ -78,11 +112,106 @@ public final class LayoutPropertyAdapter {
             }
             Log.i(TAG, "adapt suffix=" + suffix
                     + ", screen=" + width + "x" + height
-                    + ", resourceBase=" + resourceBaseWidth + "x" + resourceBaseHeight
-                    + ", scaleX=" + scaleX + ", scaleY=" + scaleY);
+                    + ", frozenVisualBase=" + resourceBaseWidth + "x" + frozenVisualBaseHeight
+                    + ", scaleX=" + scaleX + ", frozenVisualScaleY=" + scaleY);
+            if (acceptance) {
+                Log.i(TAG, "LAYOUT_PROFILE_SELECTED actualSurface=" + actualSurface()
+                        + " layoutViewport=" + width + "x" + height
+                        + " mode=MODE_" + resourceMode
+                        + " resourceProfile=" + selectedDirectory
+                        + " resourceProfileSize=" + (profile == null ? "UNRESOLVED"
+                        : profile[0] + "x" + profile[1])
+                        + " scaleX=" + localScale + " scaleY=" + placementScaleY);
+                Log.i(TAG, "CELL_LOCAL_GEOMETRY mode=MODE_" + resourceMode + " suffix=" + suffix
+                        + " nameOffsetOriginal=" + nameOriginal
+                        + " nameOffsetFinal=" + numericField(property, "name_off_set_y")
+                        + " iconOffsetOriginal=" + iconOriginal
+                        + " iconOffsetFinal=" + numericField(property, "icon_offset_y")
+                        + " iconHiddenOffsetOriginal=" + iconHiddenOriginal
+                        + " iconHiddenOffsetFinal=" + numericField(property, "icon_offset_y_without_app_name")
+                        + " owner=CELL_LOCAL_VISUAL");
+                Log.i(TAG, "PAGE_PLACEMENT_GEOMETRY mode=MODE_" + resourceMode + " suffix=" + suffix
+                        + " dockHeightOriginal=" + dockOriginal
+                        + " dockHeightFinal=" + numericField(property, "dock_height")
+                        + " pageHeight=" + numericField(property, "page_height")
+                        + " marginTop=" + numericField(property, "page_view_margin_top")
+                        + " marginBottom=" + numericField(property, "page_view_margin_bottom")
+                        + " scaleY=" + placementScaleY + " owner=SCENE_PLACEMENT");
+            }
         } catch (Throwable t) {
             Log.w(TAG, "layout adaptation skipped", t);
         }
+    }
+
+    private static float desktopFactorFor(String name, String suffix, float scaleX,
+            float legacyY, float legacyUniform, boolean desktopPortrait,
+            float localScale, float placementScaleY) {
+        if (desktopPortrait) {
+            if ("name_off_set_y".equals(name) || "icon_offset_y".equals(name)
+                    || "icon_offset_y_without_app_name".equals(name)) return localScale;
+            // Only fields with differing pristine height-profile values are migrated.
+            // Normal cell/page heights are derived later by Constants, not guessed here.
+            if ("dock_height".equals(name) || "cell_height_dock".equals(name)
+                    || ("_trans".equals(suffix) && ("cell_height".equals(name)
+                    || "page_height".equals(name) || "page_view_margin_top".equals(name)
+                    || "page_view_margin_bottom".equals(name)))) return placementScaleY;
+        }
+        // Frozen visual subsystems retain their pre-issue-11 values. In particular,
+        // changing profile metadata must not rescale raster/shadow/Folder/active icons.
+        return factorFor(name, suffix, scaleX, legacyY, legacyUniform);
+    }
+
+    private static synchronized int[] selectedProfile(Resources resources, String directory) {
+        if (resources == null || directory == null) return null;
+        Map<String, int[]> profiles = PROFILES.get(resources);
+        if (profiles == null) {
+            profiles = new HashMap<String, int[]>();
+            PROFILES.put(resources, profiles);
+        }
+        if (profiles.containsKey(directory)) return profiles.get(directory);
+        int[] result = null;
+        try {
+            Class<?> parser = Class.forName("com.smartisanos.launcher.data.P");
+            Map<?, ?> global = (Map<?, ?>) parser.getMethod("b", Resources.class, String.class)
+                    .invoke(null, resources, directory + "/global.xml");
+            Number width = (Number) global.get("window_width");
+            Number height = (Number) global.get("window_height");
+            if (width != null && height != null && width.intValue() > 0 && height.intValue() > 0) {
+                result = new int[] {width.intValue(), height.intValue()};
+            }
+        } catch (ReflectiveOperationException | ClassCastException error) {
+            Log.w(TAG, "Unable to read selected layout profile " + directory, error);
+        }
+        if (result == null) Log.w(TAG, "LAYOUT_PROFILE_UNRESOLVED directory=" + directory);
+        profiles.put(directory, result);
+        return result;
+    }
+
+    private static boolean acceptanceEnabled(Resources resources) {
+        if (resources == null) return false;
+        try (InputStream marker = resources.getAssets().open("issue11-layout-acceptance.txt")) {
+            return true;
+        } catch (java.io.IOException absent) {
+            return false;
+        }
+    }
+
+    private static String actualSurface() {
+        try {
+            Class<?> launcher = Class.forName("com.smartisanos.launcher.J");
+            Object instance = launcher.getMethod("getInstance").invoke(null);
+            Object surface = instance == null ? null : launcher.getMethod("Oa").invoke(instance);
+            if (surface instanceof android.view.View) {
+                android.view.View view = (android.view.View) surface;
+                if (view.getWidth() > 0 && view.getHeight() > 0) {
+                    return view.getWidth() + "x" + view.getHeight()
+                            + " actualSurfaceResolved=true surfaceOwner=LAUNCHER_GL_SURFACE";
+                }
+            }
+        } catch (ReflectiveOperationException error) {
+            // The first layout load can precede creation of the GL View.
+        }
+        return "UNRESOLVED actualSurfaceResolved=false surfaceOwner=NOT_YET_LAID_OUT";
     }
 
     /**

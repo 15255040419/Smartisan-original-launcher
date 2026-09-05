@@ -1606,9 +1606,9 @@
 
     move-result-object v9
 
-    iget-object v8, p0, Lcom/smartisanos/launcher/view/a/la;->Qj:Lcom/smartisanos/launcher/view/a/ka;
+    invoke-static {}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->desktopRenderMode()I
 
-    iget v8, v8, Lcom/smartisanos/launcher/view/a/g;->fH:I
+    move-result v8
 
     invoke-static {p2, v9, v8}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->textureCacheKey(Ljava/lang/Object;Ljava/lang/String;I)Ljava/lang/String;
 

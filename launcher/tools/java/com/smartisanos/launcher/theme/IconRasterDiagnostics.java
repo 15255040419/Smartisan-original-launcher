@@ -23,8 +23,9 @@ public final class IconRasterDiagnostics {
     private static final String TAG = "LauncherIconRaster";
     private static final Set<String> REPORTED = new HashSet<String>();
     private static final int DIAGNOSTIC_ALPHA_CUTOFF = 40;
-    private static final String SOURCE_CANVAS_VERSION = "source-canvas:v4-icon-contract";
-    private static final String RASTER_CACHE_VERSION = "raster:v18-icon-contract";
+    private static final String SOURCE_CANVAS_VERSION = "source-canvas:v6-default-visible-fit";
+    private static final String RASTER_CACHE_VERSION = "raster:v20-default-visible-fit";
+    private static final float IMPROVED_VISIBLE_EXTENT_RATIO = 0.98f;
     private static final String BADGE_VERSION = "badge:v1";
     private static final String SHADOW_VERSION = "shadow:original-v1";
     private static volatile String sLifecycle = "COLD";
@@ -303,7 +304,13 @@ public final class IconRasterDiagnostics {
     }
 
     private static String gridToken(int mode) {
-        return mode == 0 ? "12" : "20";
+        try {
+            Class<?> constants = Class.forName("com.smartisanos.launcher.data.Constants");
+            return String.valueOf(constants.getMethod("cellCount", Integer.TYPE)
+                    .invoke(null, Integer.valueOf(mode)));
+        } catch (ReflectiveOperationException error) {
+            return "UNKNOWN_MODE_" + mode;
+        }
     }
 
     private static void recycleIfOwned(Bitmap oldBitmap, Bitmap replacement) {
@@ -414,26 +421,35 @@ public final class IconRasterDiagnostics {
         float drawHeight = sourceHeight * sourceScale;
         float drawLeftInArtwork = contentInset + (contentSize - drawWidth) * 0.5f;
         float drawTopInArtwork = contentInset + (contentSize - drawHeight) * 0.5f;
+        boolean defaultVisibleFit = false;
+        if ("DEFAULT".equals(resolved.type) && visibleBefore != null
+                && analysisSource != null && analysisSource.getWidth() > 0
+                && analysisSource.getHeight() > 0) {
+            float visibleWidthInDrawable = visibleBefore.width()
+                    * (sourceWidth / (float) analysisSource.getWidth());
+            float visibleHeightInDrawable = visibleBefore.height()
+                    * (sourceHeight / (float) analysisSource.getHeight());
+            float visibleExtent = Math.max(visibleWidthInDrawable, visibleHeightInDrawable);
+            if (visibleExtent > 0f) {
+                float targetVisibleExtent = contentSize * IMPROVED_VISIBLE_EXTENT_RATIO;
+                sourceScale = targetVisibleExtent / visibleExtent;
+                drawWidth = sourceWidth * sourceScale;
+                drawHeight = sourceHeight * sourceScale;
+                float visibleCenterX = visibleBefore.centerX()
+                        / analysisSource.getWidth();
+                float visibleCenterY = visibleBefore.centerY()
+                        / analysisSource.getHeight();
+                drawLeftInArtwork = contentInset + contentSize * 0.5f
+                        - visibleCenterX * drawWidth;
+                drawTopInArtwork = contentInset + contentSize * 0.5f
+                        - visibleCenterY * drawHeight;
+                defaultVisibleFit = true;
+            }
+        }
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
         Bitmap physicalArtwork = Bitmap.createBitmap(
                 artwork, artwork, Bitmap.Config.ARGB_8888);
         Canvas artworkCanvas = new Canvas(physicalArtwork);
-        String sourceType = resolved.type;
-        if ("DEFAULT".equals(sourceType)) {
-            Drawable normalizationDrawable = rawDrawable;
-            if (normalizationDrawable == null) {
-                normalizationDrawable = new android.graphics.drawable.BitmapDrawable(
-                        android.content.res.Resources.getSystem(), source);
-            }
-            IconNormalizerCompat.Result normalization = IconNormalizerCompat.getScale(
-                    normalizationDrawable, Math.max(1, artwork * 2));
-            drawWidth *= normalization.scale;
-            drawHeight *= normalization.scale;
-            drawLeftInArtwork = contentInset + contentSize * 0.5f
-                    - normalization.visibleCenterX * drawWidth;
-            drawTopInArtwork = contentInset + contentSize * 0.5f
-                    - normalization.visibleCenterY * drawHeight;
-        }
         if (rawDrawable != null) {
             if (rawDrawable instanceof android.graphics.drawable.BitmapDrawable) {
                 ((android.graphics.drawable.BitmapDrawable) rawDrawable).setFilterBitmap(true);
@@ -486,6 +502,7 @@ public final class IconRasterDiagnostics {
                 + " pipeline=STATIC_APPLICATION_COMPOSER"
                 + " sourceType=" + resolved.type
                 + " sourceIdentity=" + resolved.identity
+                + " visibleFit=" + defaultVisibleFit
                 + " source=" + sourceWidth + 'x' + sourceHeight
                 + " finalContentBounds=" + Math.round(drawLeft) + ',' + Math.round(drawTop)
                 + ',' + Math.round(drawWidth) + 'x' + Math.round(drawHeight)
@@ -759,23 +776,28 @@ public final class IconRasterDiagnostics {
         float beforeY = before == null ? 0f : before.height() / (float) Math.max(1, source.getHeight());
         float finalX = after == null ? 0f : after.width() / (float) Math.max(1, artwork);
         float finalY = after == null ? 0f : after.height() / (float) Math.max(1, artwork);
+        boolean defaultVisibleFit = "DEFAULT".equals(
+                MaintainedLauncherSettingsHost.desktopIconSourceType(itemInfo));
         Log.w(TAG, "DEFAULT_ICON_COMPOSE package=" + packageName
                 + " logicalArtwork=" + currentLayoutSize("icon_size_origin")
                 + " physicalArtwork=" + artwork
                 + " logicalTexture=" + currentLayoutSize("icon_size_with_shadow")
-                + " physicalTexture=" + texture + " sourceCanvasPolicy=FULL_BOUNDS"
+                + " physicalTexture=" + texture + " sourceCanvasPolicy="
+                + (defaultVisibleFit ? "DEFAULT_VISIBLE_FIT" : "MANAGED_FULL_BOUNDS")
                 + " sourceScale=" + sourceScale
                 + " finalVisibleWidth=" + (after == null ? 0 : after.width())
                 + " finalVisibleHeight=" + (after == null ? 0 : after.height())
                 + " finalVisibleRatio=" + Math.max(finalX, finalY)
                 + " beforeVisibleRatio=" + Math.max(beforeX, beforeY)
-                + " fitPolicy=FULL_SOURCE_CANVAS"
+                + " fitPolicy=" + (defaultVisibleFit
+                ? "DEFAULT_VISIBLE_FIT" : "MANAGED_FULL_SOURCE_CANVAS")
                 + " cacheVersion=" + RASTER_CACHE_VERSION);
         Log.w(TAG, "SOURCE_CANVAS_NORMALIZATION package=" + packageName
                 + " component=" + component
                 + " sourceSize=" + source.getWidth() + "x" + source.getHeight()
                 + " visibleRatioBefore=" + Math.max(beforeX, beforeY)
-                + " scale=" + sourceScale + " alphaGeometryUsed=false");
+                + " scale=" + sourceScale
+                + " alphaGeometryUsed=" + defaultVisibleFit);
     }
 
     /** True only while the original active-icon controller owns the item. */
@@ -822,15 +844,20 @@ public final class IconRasterDiagnostics {
     /**
      * Returns the cache identity that the real application Cell must also bind
      * to its SceneNode. Active and special icons retain their original Desktop
-     * cache contract; only ordinary static application Cells receive a
-     * scene-specific key.
+     * cache contract. Open Folder reuses the desktop representation (37301);
+     * its LayoutProperty, not raster mode ownership, controls displayed size.
      */
     public static String applicationCellTextureCacheKey(Object itemInfo,
             String baseKey, int pageMode) {
-        if (!shouldUseHighResolutionDesktopRaster(itemInfo)) {
+        if (pageMode == 8 || !shouldUseHighResolutionDesktopRaster(itemInfo)) {
             return desktopTextureCacheKey(itemInfo, baseKey);
         }
         return textureCacheKey(itemInfo, baseKey, pageMode);
+    }
+
+    /** Only the real Open Folder application Cell bypasses scene-mode raster. */
+    public static boolean usesSharedFolderApplicationTexture(Object itemInfo, int pageMode) {
+        return pageMode == 8 && shouldUseHighResolutionDesktopRaster(itemInfo);
     }
 
     private static String buildTextureCacheKey(Object itemInfo, String baseKey,
@@ -863,8 +890,10 @@ public final class IconRasterDiagnostics {
                 + ':' + iconPercent + ':' + pageMode + ":grid=" + pageMode + ':' + themeMode + ':' + pipeline
                 + ":representation=RAW_SOURCE"
                 + ":sourceCanvasVersion=" + SOURCE_CANVAS_VERSION
-                + ":fitPolicy=full-source-canvas"
-                + ":alphaGeometryUsed=false:badgeVersion=" + BADGE_VERSION
+                + ":fitPolicy=" + ("DEFAULT".equals(sourceType)
+                ? "default-visible-fit" : "managed-full-source-canvas")
+                + ":alphaGeometryUsed=" + "DEFAULT".equals(sourceType)
+                + ":badgeVersion=" + BADGE_VERSION
                 + ":shadowVersion=" + SHADOW_VERSION;
         Log.i(TAG, "ICON_CACHE_PIPELINE_KEY packageName=" + packageName
                 + " pipeline=" + pipeline + " finalCacheKey=" + key);
@@ -1085,141 +1114,4 @@ public final class IconRasterDiagnostics {
         }
     }
 
-    public static Bitmap composeSettingButtonTexture(
-            Bitmap background,
-            Bitmap gear,
-            Bitmap innerShadow,
-            boolean pressed,
-            float logicalSettingButtonSize) {
-
-        if (background == null || background.isRecycled()
-                || gear == null || gear.isRecycled()
-                || logicalSettingButtonSize <= 0f) {
-            logFallback(pressed, logicalSettingButtonSize, background, gear, innerShadow);
-            return null;
-        }
-
-        NormalIconRasterSpec spec = resolveNormalIconRasterSpec();
-        if (spec == null || spec.rasterScale <= 0f) {
-            logFallback(pressed, logicalSettingButtonSize, background, gear, innerShadow);
-            return null;
-        }
-
-        int targetPx = Math.max(
-                1,
-                (int) Math.ceil(logicalSettingButtonSize * spec.rasterScale));
-
-        Bitmap output = null;
-        try {
-            output = Bitmap.createBitmap(
-                    targetPx,
-                    targetPx,
-                    Bitmap.Config.ARGB_8888);
-        } catch (Throwable t) {
-            Log.e(TAG, "SETTING_BUTTON_RASTER createBitmap failed", t);
-            logFallback(pressed, logicalSettingButtonSize, background, gear, innerShadow);
-            return null;
-        }
-
-        Canvas canvas = new Canvas(output);
-
-        Paint paint = new Paint(
-                Paint.ANTI_ALIAS_FLAG
-                        | Paint.FILTER_BITMAP_FLAG
-                        | Paint.DITHER_FLAG);
-
-        RectF fullRect = new RectF(
-                0f,
-                0f,
-                targetPx,
-                targetPx);
-
-        drawBitmapFitFull(canvas, background, fullRect, paint);
-
-        if (pressed) {
-            canvas.save();
-            canvas.rotate(
-                    60.0f,
-                    targetPx * 0.5f,
-                    targetPx * 0.5f);
-            drawBitmapFitFull(canvas, gear, fullRect, paint);
-            canvas.restore();
-
-            if (innerShadow != null && !innerShadow.isRecycled()) {
-                drawBitmapFitFull(canvas, innerShadow, fullRect, paint);
-            }
-        } else {
-            drawBitmapFitFull(canvas, gear, fullRect, paint);
-        }
-
-        // Print diagnostic log
-        int pageMode = desktopPageMode();
-        DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
-        Log.i(TAG, "SETTING_BUTTON_RASTER"
-                + " mode=" + pageMode
-                + " logicalSettingButton=" + Math.round(logicalSettingButtonSize)
-                + " rasterScale=" + spec.rasterScale
-                + " sourceBg=" + background.getWidth() + "x" + background.getHeight()
-                + " sourceGear=" + gear.getWidth() + "x" + gear.getHeight()
-                + " sourceShadow=" + (innerShadow != null ? innerShadow.getWidth() + "x" + innerShadow.getHeight() : "null")
-                + " finalTexture=" + targetPx + "x" + targetPx
-                + " surface=" + metrics.widthPixels + "x" + metrics.heightPixels
-                + " pressed=" + pressed
-                + " fallback=false");
-
-        return output;
-    }
-
-    private static void drawBitmapFitFull(
-            Canvas canvas,
-            Bitmap bitmap,
-            RectF destination,
-            Paint paint) {
-
-        if (canvas == null
-                || bitmap == null
-                || bitmap.isRecycled()) {
-            return;
-        }
-
-        Rect source = new Rect(
-                0,
-                0,
-                bitmap.getWidth(),
-                bitmap.getHeight());
-
-        canvas.drawBitmap(
-                bitmap,
-                source,
-                destination,
-                paint);
-    }
-
-    private static void drawDrawableFitFull(Canvas canvas, Drawable drawable, RectF destination) {
-        if (canvas == null || drawable == null) return;
-        int left = Math.round(destination.left);
-        int top = Math.round(destination.top);
-        int right = Math.round(destination.right);
-        int bottom = Math.round(destination.bottom);
-        android.graphics.Rect previous = drawable.getBounds();
-        drawable.setBounds(left, top, right, bottom);
-        drawable.draw(canvas);
-        drawable.setBounds(previous);
-    }
-
-    private static void logFallback(boolean pressed, float logicalSettingButtonSize, Bitmap background, Bitmap gear, Bitmap innerShadow) {
-        DisplayMetrics metrics = android.content.res.Resources.getSystem().getDisplayMetrics();
-        int pageMode = desktopPageMode();
-        Log.w(TAG, "SETTING_BUTTON_RASTER"
-                + " mode=" + pageMode
-                + " logicalSettingButton=" + Math.round(logicalSettingButtonSize)
-                + " rasterScale=0.0"
-                + " sourceBg=" + (background != null && !background.isRecycled() ? background.getWidth() + "x" + background.getHeight() : "null")
-                + " sourceGear=" + (gear != null && !gear.isRecycled() ? gear.getWidth() + "x" + gear.getHeight() : "null")
-                + " sourceShadow=" + (innerShadow != null && !innerShadow.isRecycled() ? innerShadow.getWidth() + "x" + innerShadow.getHeight() : "null")
-                + " finalTexture=0x0"
-                + " surface=" + metrics.widthPixels + "x" + metrics.heightPixels
-                + " pressed=" + pressed
-                + " fallback=true");
-    }
 }

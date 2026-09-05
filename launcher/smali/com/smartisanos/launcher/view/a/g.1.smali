@@ -1603,6 +1603,17 @@
 
     iget v4, p0, Lcom/smartisanos/launcher/view/a/g;->fH:I
 
+    invoke-static {v0, v4}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->usesSharedFolderApplicationTexture(Ljava/lang/Object;I)Z
+
+    move-result v5
+
+    if-eqz v5, :cond_download_texture_mode_ready
+
+    invoke-static {}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->desktopRenderMode()I
+
+    move-result v4
+
+    :cond_download_texture_mode_ready
     invoke-static {v0, v2, v1, v4}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZI)Lcom/smartisanos/smengine/Da;
 
     .line 6
@@ -8670,6 +8681,19 @@
 
     iget v9, p0, Lcom/smartisanos/launcher/view/a/g;->fH:I
 
+    invoke-static {v3, v9}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->usesSharedFolderApplicationTexture(Ljava/lang/Object;I)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_cb_scene_texture
+
+    invoke-static/range {v2 .. v8}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZII)Lcom/smartisanos/smengine/Da;
+
+    move-result-object v0
+
+    goto :goto_0
+
+    :cond_cb_scene_texture
     invoke-static/range {v2 .. v9}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZIII)Lcom/smartisanos/smengine/Da;
 
     move-result-object v0
@@ -10866,8 +10890,20 @@
 
     iget v8, p0, Lcom/smartisanos/launcher/view/a/g;->fH:I
 
+    invoke-static {v2, v8}, Lcom/smartisanos/launcher/theme/IconRasterDiagnostics;->usesSharedFolderApplicationTexture(Ljava/lang/Object;I)Z
+
+    move-result v0
+
+    if-eqz v0, :cond_fb_scene_texture
+
+    invoke-static/range {v1 .. v7}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZII)Lcom/smartisanos/smengine/Da;
+
+    goto :goto_fb_texture_ready
+
+    :cond_fb_scene_texture
     invoke-static/range {v1 .. v8}, Lcom/smartisanos/launcher/e/s;->a(Lcom/smartisanos/launcher/view/activeicon/a;Lcom/smartisanos/launcher/data/ItemInfo;Ljava/lang/String;ZZIII)Lcom/smartisanos/smengine/Da;
 
+    :goto_fb_texture_ready
     const/4 v0, 0x0
 
     if-eqz p1, :cond_1

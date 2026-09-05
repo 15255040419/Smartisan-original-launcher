@@ -2,23 +2,24 @@ package com.smartisanos.launcher.reload;
 
 import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
-import android.os.Build;
 import android.view.Gravity;
-import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.graphics.drawable.Drawable;
 
+import com.smartisanos.launcher.theme.MaintainedLauncherSettingsHost;
+
 /**
- * The single content constructor for the original Smartisan loading capsule.
- * Its values are intentionally a direct transcription of
- * SmartisanProgressDialog.onCreate(), not a redesigned loading view.
+ * The single content constructor for the original Smartisan loading panel.
+ * The 246x160dp vertical structure comes from the maintained copy of
+ * smartisan_progress_dialog.xml. The spinner itself remains the launcher's
+ * original loading_progress animation-list.
  */
 public final class OriginalLoadingContentFactory {
     private static final int ROOT_BACKGROUND = 0x99000000;
-    private static final int PANEL_BACKGROUND = -0xe2dede;
+    private static final int PANEL_BACKGROUND = 0xff181818;
 
     public static final class Content {
         public final FrameLayout root;
@@ -43,46 +44,55 @@ public final class OriginalLoadingContentFactory {
     }
 
     public static Content create(Context context, Drawable progressDrawable, String messageText) {
-        int referenceWidth = getLoadingReferenceWidth(context);
-        int panelHeight = referenceWidth * 3 / 4 / 5;
+        int panelWidth = dp(context, 246);
+        int panelHeight = dp(context, 160);
 
         FrameLayout root = new FrameLayout(context);
         root.setBackgroundColor(ROOT_BACKGROUND);
 
         LinearLayout panel = new LinearLayout(context);
-        panel.setOrientation(LinearLayout.HORIZONTAL);
+        panel.setOrientation(LinearLayout.VERTICAL);
         panel.setGravity(Gravity.CENTER);
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(PANEL_BACKGROUND);
-        background.setCornerRadius(panelHeight / 2f);
-        panel.setBackground(background);
-        panel.setPadding(panelHeight / 2, panelHeight / 6, panelHeight / 2, panelHeight / 6);
+        Drawable originalBackground = MaintainedLauncherSettingsHost.loadMaintainedDrawableResource(
+                context, "smartisan_progress_dialog_bg");
+        if (originalBackground != null) {
+            panel.setBackground(originalBackground);
+        } else {
+            GradientDrawable fallback = new GradientDrawable();
+            fallback.setColor(PANEL_BACKGROUND);
+            fallback.setCornerRadius(dp(context, 12));
+            panel.setBackground(fallback);
+        }
+        panel.setPadding(dp(context, 28), 0, dp(context, 28), 0);
 
         ProgressBar progress = new ProgressBar(context);
         progress.setIndeterminate(true);
         if (progressDrawable != null) {
             progress.setIndeterminateDrawable(progressDrawable.mutate());
         }
-        int progressSize = (int) (panelHeight * 0.6f);
+        int progressSize = dp(context, 48);
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(progressSize,
                 progressSize);
-        progressParams.gravity = Gravity.CENTER_VERTICAL;
+        progressParams.gravity = Gravity.CENTER_HORIZONTAL;
+        progressParams.topMargin = dp(context, 2);
         panel.addView(progress, progressParams);
 
         TextView message = new TextView(context);
         message.setTextColor(0xffffffff);
-        message.setTextSize(2, 15.0f);
+        message.setTextSize(2, 13.0f);
+        message.setSingleLine(true);
+        message.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams messageParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        messageParams.gravity = Gravity.CENTER_VERTICAL;
-        messageParams.leftMargin = panelHeight / 3;
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        messageParams.gravity = Gravity.CENTER_HORIZONTAL;
+        messageParams.topMargin = dp(context, 12);
         panel.addView(message, messageParams);
         updateMessage(message, messageText);
 
         FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, panelHeight, Gravity.CENTER);
+                panelWidth, panelHeight, Gravity.CENTER);
         root.addView(panel, panelParams);
-        return new Content(root, panel, progress, message, referenceWidth, panelHeight);
+        return new Content(root, panel, progress, message, panelWidth, panelHeight);
     }
 
     public static void updateMessage(TextView message, String value) {
@@ -95,18 +105,8 @@ public final class OriginalLoadingContentFactory {
         }
     }
 
-    /** Uses the same physical-width baseline in :reload and the Launcher process. */
-    public static int getLoadingReferenceWidth(Context context) {
-        if (context != null && Build.VERSION.SDK_INT >= 30) {
-            try {
-                WindowManager manager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-                if (manager != null) {
-                    int width = manager.getMaximumWindowMetrics().getBounds().width();
-                    if (width > 0) return width;
-                }
-            } catch (Throwable ignored) {
-            }
-        }
-        return context == null ? 0 : context.getResources().getDisplayMetrics().widthPixels;
+    private static int dp(Context context, int value) {
+        float density = context == null ? 1f : context.getResources().getDisplayMetrics().density;
+        return Math.max(1, (int) (value * density + 0.5f));
     }
 }

@@ -199,7 +199,13 @@
 .end method
 
 .method public static a(Landroid/content/res/Resources;ILjava/lang/String;Ljava/lang/String;)Lcom/smartisanos/launcher/data/LayoutProperty;
-    .locals 6
+    .locals 9
+
+    move-object v6, p0
+
+    move-object v7, p2
+
+    move v8, p1
 
     .line 1
     new-instance v0, Ljava/lang/StringBuilder;
@@ -411,7 +417,7 @@
     .line 17
     :cond_5
     :goto_4
-    invoke-static {p2, p3}, Lcom/smartisanos/launcher/data/LayoutPropertyAdapter;->adapt(Ljava/lang/Object;Ljava/lang/String;)V
+    invoke-static {p2, p3, v6, v7, v8}, Lcom/smartisanos/launcher/data/LayoutPropertyAdapter;->adapt(Ljava/lang/Object;Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;I)V
 
     invoke-virtual {p2, p3}, Lcom/smartisanos/launcher/data/LayoutProperty;->initAfterLoadRes(Ljava/lang/String;)V
 
@@ -464,7 +470,7 @@
 
     .line 20
     :goto_6
-    invoke-static {p2, p3}, Lcom/smartisanos/launcher/data/LayoutPropertyAdapter;->adapt(Ljava/lang/Object;Ljava/lang/String;)V
+    invoke-static {p2, p3, v6, v7, v8}, Lcom/smartisanos/launcher/data/LayoutPropertyAdapter;->adapt(Ljava/lang/Object;Ljava/lang/String;Landroid/content/res/Resources;Ljava/lang/String;I)V
 
     invoke-virtual {p2, p3}, Lcom/smartisanos/launcher/data/LayoutProperty;->initAfterLoadRes(Ljava/lang/String;)V
 

@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.SystemClock;
 import android.util.Log;
@@ -22,7 +24,12 @@ public final class LauncherBelowKeyguardCompat {
 
     private static final String TAG = "UnlockAnimation";
     private static final Object LOCK = new Object();
-    private static final long DISMISS_HANDOFF_TIMEOUT_MS = 1500L;
+    private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
+    // v1.5.4 lifecycle fallback dispatched the original unlock chain 120 ms
+    // after Launcher Resume. Keep that proven timing while retaining the
+    // strict modern Keyguard session and exactly-once ownership below.
+    private static final long V154_RESUME_PRE_ROLL_DELAY_MS = 120L;
+    private static final String V154_RESUME_PRE_ROLL = "V1_5_4_RESUME_PRE_ROLL";
 
     private static Context applicationContext;
     private static long keyguardSessionId;
@@ -55,6 +62,7 @@ public final class LauncherBelowKeyguardCompat {
     private static long sessionCommitPlayUptime;
     private static long sessionAnimationStartUptime;
     private static String sessionArmSource;
+    private static long preRollScheduledSessionId;
 
     private LauncherBelowKeyguardCompat() {
     }
@@ -78,6 +86,7 @@ public final class LauncherBelowKeyguardCompat {
             logLocked(activity, "UNLOCK_LAUNCHER_RESUME", null);
         }
         tryCommitUnlockAnimation(activity, "RESUME");
+        scheduleV154ResumePreRoll(activity);
     }
 
     public static void onLauncherPaused(Activity activity) {
@@ -85,21 +94,26 @@ public final class LauncherBelowKeyguardCompat {
         boolean forceFinish = false;
         synchronized (LOCK) {
             remember(activity);
-            boolean screenTurningOff = !isInteractive(activity) || isKeyguardLocked(activity);
+            boolean interactive = isInteractive(activity);
+            boolean keyguardLocked = isKeyguardLocked(activity);
+            boolean screenTurningOff = !interactive || keyguardLocked;
             boolean wasVisibleLauncher = visibleLauncherBeforeLock && launcherResumed;
             pausedVisibleCandidate = wasVisibleLauncher;
             launcherResumed = false;
             launcherHasWindowFocus = false;
+            if (!unlockConsumed) {
+                resumeDuringKeyguardHandoff = false;
+            }
             logLocked(activity, "UNLOCK_LAUNCHER_PAUSE", null);
             if (wasVisibleLauncher && screenTurningOff) {
                 armFromLifecycle = true;
             } else if (!screenTurningOff) {
                 visibleLauncherBeforeLock = false;
-                if (keyguardSessionActive && (unlockDismissPending
-                        || resumeDuringKeyguardHandoff)) {
-                    cancelLocked("UNLOCK_CANCEL_NOT_DIRECT_HOME", activity);
-                    forceFinish = true;
-                }
+            }
+            if (keyguardSessionActive && unlockDismissPending && interactive
+                    && !keyguardLocked && !unlockConsumed) {
+                cancelLocked("UNLOCK_CANCEL_NOT_DIRECT_HOME", activity);
+                forceFinish = true;
             }
         }
         if (forceFinish) dispatchOriginalAction(activity, ACTION_INTERNAL_FORCE_FINISH);
@@ -133,9 +147,15 @@ public final class LauncherBelowKeyguardCompat {
 
     public static void onLauncherStopped(Activity activity) {
         boolean armFromLifecycle = false;
+        boolean forceFinish = false;
         synchronized (LOCK) {
             remember(activity);
-            boolean screenTurningOff = !isInteractive(activity) || isKeyguardLocked(activity);
+            boolean interactive = isInteractive(activity);
+            boolean keyguardLocked = isKeyguardLocked(activity);
+            boolean screenTurningOff = !interactive || keyguardLocked;
+            if (!unlockConsumed) {
+                resumeDuringKeyguardHandoff = false;
+            }
             if ((visibleLauncherBeforeLock || pausedVisibleCandidate) && screenTurningOff) {
                 visibleLauncherBeforeLock = true;
                 armFromLifecycle = true;
@@ -144,7 +164,13 @@ public final class LauncherBelowKeyguardCompat {
             }
             pausedVisibleCandidate = false;
             logLocked(activity, "UNLOCK_LAUNCHER_STOP", null);
+            if (keyguardSessionActive && unlockDismissPending && interactive
+                    && !keyguardLocked && !unlockConsumed) {
+                cancelLocked("UNLOCK_CANCEL_NOT_DIRECT_HOME", activity);
+                forceFinish = true;
+            }
         }
+        if (forceFinish) dispatchOriginalAction(activity, ACTION_INTERNAL_FORCE_FINISH);
         if (armFromLifecycle) armAndPrepareIfNeeded(activity, "LIFECYCLE_STOP");
     }
 
@@ -164,6 +190,15 @@ public final class LauncherBelowKeyguardCompat {
             }
             if (keyguardSessionActive) {
                 logLocked(context, "UNLOCK_DUPLICATE_ARM_IGNORED", source);
+                return true;
+            }
+            // Some ROMs deliver SCREEN_OFF after the locked-resume callback.
+            // If this same lock session has already consumed its pre-roll,
+            // treating that late broadcast as a new generation truncates the
+            // animation and prepares a second, stale scene.
+            if (unlockConsumed && launcherWasBelowKeyguard && isKeyguardLocked(context)) {
+                logLocked(context, "UNLOCK_DUPLICATE_ARM_IGNORED",
+                        "CONSUMED_LOCK_SESSION " + source);
                 return true;
             }
             if (!visibleLauncherBeforeLock) {
@@ -251,6 +286,7 @@ public final class LauncherBelowKeyguardCompat {
             logLocked(context, "UNLOCK_PREPARE_READY", null);
         }
         tryCommitUnlockAnimation(context, "PREPARE_READY");
+        scheduleV154ResumePreRoll(context);
     }
 
     public static void onPrepareFailed(Context context) {
@@ -260,8 +296,9 @@ public final class LauncherBelowKeyguardCompat {
         dispatchOriginalAction(context, ACTION_INTERNAL_FORCE_FINISH);
     }
 
-    /** USER_PRESENT/dismiss only makes an existing legal session pending. */
+    /** USER_PRESENT/dismiss commits only the current direct Keyguard handoff. */
     public static void onDismissSignal(Context context, String action) {
+        boolean forceFinish = false;
         synchronized (LOCK) {
             remember(context);
             logLocked(context, "UNLOCK_USER_PRESENT", action);
@@ -273,11 +310,20 @@ public final class LauncherBelowKeyguardCompat {
                 logLocked(context, "UNLOCK_SKIP_CONSUMED", action);
                 return;
             }
-            unlockDismissPending = true;
-            if (sessionDismissUptime == 0L) {
-                sessionDismissUptime = SystemClock.uptimeMillis();
+            if (!launcherResumed || !resumeDuringKeyguardHandoff) {
+                cancelLocked("UNLOCK_CANCEL_NOT_DIRECT_HOME", context);
+                forceFinish = true;
+            } else {
+                unlockDismissPending = true;
+                if (sessionDismissUptime == 0L) {
+                    sessionDismissUptime = SystemClock.uptimeMillis();
+                }
+                logLocked(context, "UNLOCK_DISMISS_PENDING", action);
             }
-            logLocked(context, "UNLOCK_DISMISS_PENDING", action);
+        }
+        if (forceFinish) {
+            dispatchOriginalAction(context, ACTION_INTERNAL_FORCE_FINISH);
+            return;
         }
         tryCommitUnlockAnimation(context, "DISMISS");
     }
@@ -290,6 +336,10 @@ public final class LauncherBelowKeyguardCompat {
             remember(context);
             final boolean keyguardLocked = isKeyguardLocked(context);
             final boolean interactive = isInteractive(context);
+            final boolean hasDirectDismissSignal = unlockDismissPending;
+            final boolean v154ResumePreRoll = V154_RESUME_PRE_ROLL.equals(source)
+                    && preRollScheduledSessionId == keyguardSessionId
+                    && resumeDuringKeyguardHandoff;
             final long now = SystemClock.uptimeMillis();
             if (keyguardSessionActive && interactive && !keyguardLocked
                     && sessionKeyguardUnlockedUptime == 0L) {
@@ -309,11 +359,6 @@ public final class LauncherBelowKeyguardCompat {
                 logLocked(context, unlockConsumed ? "UNLOCK_SKIP_CONSUMED" : "UNLOCK_SKIP_NO_SESSION", source);
             } else if (unlockConsumed) {
                 logLocked(context, "UNLOCK_SKIP_CONSUMED", source);
-            } else if (unlockDismissPending && !resumeDuringKeyguardHandoff
-                    && sessionDismissUptime > 0L
-                    && now - sessionDismissUptime > DISMISS_HANDOFF_TIMEOUT_MS) {
-                cancelLocked("UNLOCK_CANCEL_STALE_DISMISS", context);
-                forceFinish = true;
             } else if (!unlockPrepared) {
                 if (!keyguardLocked && launcherResumed && launcherHasWindowFocus) {
                     cancelLocked("UNLOCK_SKIP_NOT_PREPARED", context);
@@ -323,14 +368,18 @@ public final class LauncherBelowKeyguardCompat {
                 }
             } else if (!launcherResumed) {
                 logLocked(context, "UNLOCK_SKIP_NOT_RESUMED", source);
-            } else if (!launcherHasWindowFocus) {
-                logLocked(context, "UNLOCK_SKIP_NO_FOCUS", source);
             } else if (!interactive) {
                 logLocked(context, "UNLOCK_SKIP_NOT_INTERACTIVE", source);
-            } else if (keyguardLocked) {
+            } else if (keyguardLocked && !v154ResumePreRoll) {
                 logLocked(context, "UNLOCK_SKIP_KEYGUARD_STILL_LOCKED", source);
-            } else if (!resumeDuringKeyguardHandoff && !unlockDismissPending) {
+            } else if (!resumeDuringKeyguardHandoff) {
                 logLocked(context, "UNLOCK_SKIP_NO_UNLOCK_SIGNAL", source);
+            } else if (!v154ResumePreRoll
+                    && !hasDirectDismissSignal && !launcherHasWindowFocus) {
+                // A real USER_PRESENT/action_keyguard_to_dismiss belongs to the
+                // current direct Keyguard handoff and commits without waiting
+                // for focus. ROMs without that signal still commit at focus.
+                logLocked(context, "UNLOCK_SKIP_NO_FOCUS", source);
             } else {
                 unlockConsumed = true;
                 unlockDismissPending = false;
@@ -347,6 +396,35 @@ public final class LauncherBelowKeyguardCompat {
         if (dispatch) {
             dispatchOriginalAction(context, ACTION_INTERNAL_PLAY);
         }
+    }
+
+    private static void scheduleV154ResumePreRoll(final Context context) {
+        final long sessionId;
+        synchronized (LOCK) {
+            remember(context);
+            if (!keyguardSessionActive || !launcherWasBelowKeyguard || !unlockPrepared
+                    || unlockConsumed || !launcherResumed || !resumeDuringKeyguardHandoff
+                    || !isInteractive(context) || !isKeyguardLocked(context)
+                    || preRollScheduledSessionId == keyguardSessionId) {
+                return;
+            }
+            sessionId = keyguardSessionId;
+            preRollScheduledSessionId = sessionId;
+            logLocked(context, "UNLOCK_V154_PRE_ROLL_SCHEDULED",
+                    "delayMs=" + V154_RESUME_PRE_ROLL_DELAY_MS);
+        }
+        MAIN_HANDLER.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (LOCK) {
+                    if (keyguardSessionId != sessionId || unlockConsumed
+                            || !keyguardSessionActive) {
+                        return;
+                    }
+                }
+                tryCommitUnlockAnimation(context, V154_RESUME_PRE_ROLL);
+            }
+        }, V154_RESUME_PRE_ROLL_DELAY_MS);
     }
 
     public static boolean takeInternalPlayPermit(Context context) {

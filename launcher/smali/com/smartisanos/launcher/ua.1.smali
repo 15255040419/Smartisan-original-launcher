@@ -624,7 +624,12 @@
 
     move-result-object v1
 
-    const/16 v2, 0x500
+    # Preserve the navigation preference applied before original initialization.
+    invoke-virtual {v1}, Landroid/view/View;->getSystemUiVisibility()I
+
+    move-result v2
+
+    or-int/lit16 v2, v2, 0x700
 
     invoke-virtual {v1, v2}, Landroid/view/View;->setSystemUiVisibility(I)V
 
@@ -654,7 +659,8 @@
 
     move-result v2
 
-    or-int/lit16 v2, v2, 0x500
+    # System bar visibility must not change the size of the Launcher scene.
+    or-int/lit16 v2, v2, 0x700
 
     invoke-virtual {v1, v2}, Landroid/view/View;->setSystemUiVisibility(I)V
 
